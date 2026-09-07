@@ -46,39 +46,51 @@ diagnostics into experiments/"). The 6 missing scripts that produced D1 (`ram_di
 `data/ram_registry.json` has been completed (path fixed to point at `legacy/`, and the sentence
 pointing at reusing the technique for the question below).
 
-## Next question proposed (Plan Session 3 -- cold review, per PLAN.md's every-3-sessions cadence)
+## Session 3 (cold review) verdict -- September 8, 2026
 
-**Session 2 landed. The door-gate mystery is fully closed** (see report below): it was never a
-story-gate bug, `move_tiles` just undercounted real movement badly enough that Link never got
-close enough to Tarkin to receive the shield. `lib/navigator.rb` (D7, snapshot-based, built on
-D6/gemboy PR #9) fixed it -- reached Tarkin, got the shield through a real conversation, and
-walked out the south door with zero blocking. First time this repo has verifiably left the
-starting house. Oracle validation against `starting_house` is partial (3/4 agreement on one
-cell, walk-chain stops at the first disagreement by design -- see
-`lib/validation/starting_house_oracle_check.rb`), not the full grid PLAN.md's Session 2
-originally asked for.
+Run as an isolated subagent with no memory of the building session, per `AGENTS.md`'s "never
+judge your own construction." Independently re-verified claims (re-ran the validation script
+against a live checkout, read raw bytes out of `front_yard_navigator.dump`, reproduced the
+`settle!` artifact by hand, inspected the screenshots) rather than trusting `NEXT.md`'s narrative.
 
-Per `PLAN.md`, a review is due every 3 sessions; Sessions 1 and 2 both ran long and eventful
-(the WRAM/door-gate saga, then the actual fix), a good natural point to have fresh eyes check
-before extending further rather than barrel on.
+**Verdict**: `lib/navigator.rb` complies with D6/D7 and `docs/CONCEPT.md` at the code level --
+confirmed, not just claimed. **But oracle validation coverage is insufficient**:
+`lib/validation/starting_house_oracle_check.rb` is structurally capped at ~1 cell (stops at the
+first `:blocked` result by design) and never touches `front_yard`'s own existing oracle grid at
+all, despite that room now being reachable. The one disagreement found (cell (3,4)/"right") is
+unresolved either way -- as likely the legacy oracle's own documented `[3,3]` corner
+contamination as a real `Navigator` bug; doesn't anchor confidence in either direction.
+**D4 recommendation: stays deferred.** Reaching `front_yard` removes the blocker that made
+Session 1 inconclusive, but isn't itself the evidence -- the two-room WRAM collision-grid diff is
+what would actually decide it, and it still hasn't been rerun. New measurement (D7 asked for
+this, never done before): ~20s wall-clock per `Navigator.tap`, steady state.
+**Recommended next step**: harden the validation script (don't stop at first disagreement,
+exercise `front_yard`'s oracle too) before extending `lib/navigator.rb` to new rooms.
 
-- **Role**: reviewer.
-- **Question**: do `lib/navigator.rb` and its validation script comply with `docs/CONCEPT.md` and
-  the ratified decisions (D6, D7)? Is the partial oracle validation (1 cell, 3/4 agreement)
-  sufficient to trust the tool for further navigation, or does it need broader coverage first?
-  Does reaching a second real room (`front_yard`) finally give a basis to decide D4?
-- **Criterion**: written report, compliant/non-compliant judgment, explicit recommendation on D4
-  submitted to the owner (reviewer doesn't decide it), go/no-go on extending `lib/navigator.rb`
-  vs. hardening validation first.
-- **Budget**: 3h, fresh session, no code written.
-- **Deliverable**: `DECISIONS.md` (D4 if the owner rules on the recommendation), `NEXT.md` note.
-- **Indicator targeted**: verified facts -- checks whether Session 2's "reached front_yard" claim
-  holds up, same logic as the earlier review sessions.
+## Next question proposed (performance, ahead of the review's validation-hardening recommendation)
 
-**If Session 3 clears it**, the natural next builder session is: redo Session 1's original
-two-room WRAM collision-grid diff, now genuinely possible with `starting_house` and `front_yard`
-both reachable through `lib/navigator.rb` -- and/or widen oracle validation and add real specs
-(no test framework wired into `lib/` yet, `lib/validation/` scripts are runnable but not RSpec).
+The owner flagged the ~20s/tap figure as unreasonable before deciding what to build next -- fair:
+at that rate, reaching `front_yard` alone cost minutes of real time per step. Root cause found
+same day: the sandbox's Ruby 3.3.6 has **no YJIT support at all** (`ruby --yjit` warns "Ruby was
+built without YJIT support"), so every `RubyVM::YJIT.enable` call already present in gemboy
+(`emugb.rb`, `debug/headless_emulator.rb`, etc.) silently no-ops. Not a `lib/navigator.rb` or D7
+flaw -- an environment gap affecting every measurement taken this session, including the original
+24-minute boot.
+
+- **Role**: builder (environment/tooling, not game logic).
+- **Criterion**: `Navigator.tap`'s steady-state wall-clock cost measured again after the fix,
+  with a clear before/after number.
+- **Budget**: bounded exploration -- if a YJIT-capable Ruby isn't reasonably obtainable in this
+  environment, say so and fall back to reducing unnecessary work per probe instead of chasing
+  interpreter-level speed.
+- **Deliverable**: either a working YJIT-enabled Ruby in this environment plus the re-measured
+  cost, or a documented decision not to pursue it with the actual blocker named.
+- **Indicator targeted**: none of the three canonical indicators directly (infrastructure, not
+  game progress or a RAM fact) -- justified because it blocks practical iteration speed on
+  everything else, including the review's own recommended next step.
+
+**After this**, back to the review's recommendation: harden oracle validation, then redo Session
+1's two-room WRAM diff (now possible) before D4 can actually be decided.
 
 ## What NOT to redo
 

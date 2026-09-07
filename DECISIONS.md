@@ -89,5 +89,11 @@ to be ratified), `taken without validation` (inherited from the spike, to be rev
   cell; measure before concluding.
 - **Empirically validated, September 8, 2026**: `lib/navigator.rb` implements this and used it to
   reach a real NPC conversation and exit `starting_house` for the first time in this repo's
-  history -- see `NEXT.md`. Snapshot cost not yet measured precisely (memory/time per probe);
-  no practicality problem observed at the scale used so far (a handful of cells).
+  history -- see `NEXT.md`.
+- **Measured, September 8, 2026 (Session 3 review)**: ~20s wall-clock per `Navigator.tap`,
+  steady-state, in this session's sandboxed environment -- not the memory cost this clause
+  anticipated, but a real practicality cost nonetheless. Root cause found same day: the sandbox's
+  Ruby 3.3.6 was built without YJIT support at all (`ruby --yjit` warns "Ruby was built without
+  YJIT support"), so every `RubyVM::YJIT.enable` call already in gemboy (`emugb.rb`,
+  `headless_emulator.rb`, etc.) silently no-ops here. Not a `lib/navigator.rb` or D7 design flaw --
+  an environment gap. See `NEXT.md` for the fix in progress.
