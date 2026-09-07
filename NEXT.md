@@ -23,16 +23,29 @@ screen3_north 161, shop_screen 179, house2_interior 169.
 
 ## Décisions en vigueur
 
-D1 (HRAM, mesurée). D2 (OAM) obsolète. D3, D4 à trancher par le propriétaire. D5, D6, D7 proposées.
-Voir `DECISIONS.md`.
+D1 ratifiée (HRAM). D2 (OAM) obsolète. D3 tranchée : DMG. D4 à trancher, différée au résultat de
+Session 1 (voir `PLAN.md`, tranchage formel en Session 3). D5, D6, D7 ratifiées. Voir
+`DECISIONS.md`.
 
-## Prochaine question proposée
+## Dette d'import à combler (constat du 7 septembre 2026, pas encore traité)
+
+`koholint-init` a été importé depuis `gemboy@claude/usage-2mr345` au commit `c952ded`, un cran
+avant le dernier commit de cette branche (`5ee7949`, "Archive the HRAM diff and other reusable
+scratchpad diagnostics into experiments/"). Ce commit manquant ajoute les scripts qui ont produit
+D1 (`ram_diff_hram.rb`, `ram_diff_hram2.rb`, `diag_scx_scy.rb`, `diag_scx_scy2.rb`,
+`house2_dialogue.rb`, `house2_sprite2.rb`, absents de `legacy/game_agents/experiments/`) et une
+note dans `ram_registry.json` disant explicitement de réutiliser la même technique de diff complet
+pour la question ci-dessous. Le code de `legacy/` lui-même est identique par ailleurs (vérifié).
+À importer ou non : décision du propriétaire.
+
+## Prochaine question proposée (Session 1 du plan, voir `PLAN.md`)
 
 **Le terrain est-il lisible depuis l'état du jeu ?** Hypothèse d'ingénierie, à vérifier : le jeu
 décode chaque salle en une grille d'objets 16×16 (10×8) en WRAM et lit la collision de chaque type
 d'objet dans une table ROM. Si c'est vrai, la collision se lit au lieu de se sonder, et D4 se
 tranche presque seule.
 
+- **Rôle** : explorateur.
 - **Critère** : pour deux écrans déjà cartographiés (`front_yard`, `starting_house`), une lecture
   WRAM prédit les arêtes `:blocked` et `:ok` des grilles de `legacy/.../screen_maps/` avec un taux
   d'accord mesuré et expliqué pour chaque désaccord.
@@ -42,9 +55,11 @@ tranche presque seule.
   confronter aux grilles oracle.
 - **Livrable** : entrée `data/ram_registry.json` promue ou réfutée, plus le taux d'accord dans le
   rapport de session.
+- **Indicateur visé** : faits vérifiés.
 
-Question suivante si celle-ci est confirmée : l'API de session headless dans gemboy (D6), qui
-débloque D7 et vide `legacy/`.
+Session suivante si celle-ci est confirmée (ou réfutée) : Session 2 du plan, l'outil de navigation
+par snapshot (D7) — bloquée tant que l'API de session headless (D6) n'a pas atterri côté gemboy
+(externe, hors périmètre koholint, voir `DECISIONS.md`).
 
 ## Ce qu'il ne faut PAS refaire
 
