@@ -107,8 +107,12 @@ def load_legacy_checkpoint(path)
 end
 
 def load_navigator_dump(path)
-  motherboard = Motherboard.load(File.binread(path))
-  Koholint::Navigator.settle!(motherboard) # cheap and idempotent-ish; safety net, not assumed unneeded
+  # No settle! here: unlike a checkpoint taken right after interact(), this is a real
+  # post-navigation state -- and settle!'s unconditional :down tap is actively harmful on a cell
+  # whose 'down' edge is a screen exit (confirmed: front_yard_navigator.dump sits on row 8, whose
+  # 'down' is the door back into starting_house -- settle! silently walked Link back inside,
+  # room_id 162 -> 178, before any comparison ever ran).
+  Motherboard.load(File.binread(path))
 end
 
 rooms = {
