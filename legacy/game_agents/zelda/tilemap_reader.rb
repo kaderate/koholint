@@ -1,8 +1,12 @@
 # frozen_string_literal: true
 
 require 'digest'
-require_relative '../../ppu/tile'
-require_relative '../../ppu/coordinate'
+# Resolved via $LOAD_PATH, not require_relative: same reason as primitives.rb -- this file moved
+# from gemboy's lib/ to koholint's legacy/, ppu/tile and ppu/coordinate still live in a gemboy
+# checkout (see README.md "Dependency on gemboy") -- the caller $LOAD_PATH.unshift(".../gemboy/lib")
+# first.
+require 'ppu/tile'
+require 'ppu/coordinate'
 
 # Reads the BG layer's visible tilemap directly from VRAM, mirroring exactly what the renderer
 # itself computes per-pixel (see PPU::DotDrawer::CGB#compute_background_pixel / ::DMG's own

@@ -15,7 +15,10 @@
 # to within a few px of the starting position (blocked by a collision). Reading position before
 # that settle window closes is what produced the earlier 7-31px noise (see docs/archive/EXPLORATION_LOG.md) --
 # it was catching different mid-animation frames, not measuring real per-tap variance.
-require_relative '../../../profiling/utils'
+# Resolved via $LOAD_PATH, not require_relative: this file moved from gemboy's lib/ to koholint's
+# legacy/, and profiling/utils.rb still lives in a gemboy checkout (see README.md "Dependency on
+# gemboy") -- the caller is expected to $LOAD_PATH.unshift(".../gemboy/profiling") first.
+require 'utils'
 
 TILE_SIZE = 16 # native px per walkable tile grid cell (measured step is ~14px, see move_tiles)
 FRAME_CYCLES = 70224 # T-cycles/frame, fixed regardless of instruction mix
