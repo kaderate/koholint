@@ -132,20 +132,73 @@ not the same bug, and `legacy/` isn't touched per D5 regardless. The two doc/dat
 (`data/world_model.json`, `docs/archive/EXPLORATION_LOG.md`) already describe the pitfall
 correctly. `lib/navigator.rb`'s `tap` was the only misuse.
 
-## Next question proposed (per Session 3's review, now that performance is no longer the blocker)
+## Session report (September 8, 2026 -- oracle validator hardened, full coverage measured)
 
-Harden `lib/validation/starting_house_oracle_check.rb`: don't stop coverage at the first
-`:blocked` disagreement, and exercise `front_yard`'s own existing oracle grid
-(`legacy/.../screen_maps/overworld_front_yard.json`), never touched despite the room now being
-reachable. Then redo Session 1's original two-room WRAM collision-grid diff -- the test that
-would actually give D4 a basis, per both the review and `docs/ARCHITECTURE_REVIEW.md`'s own plan.
+```
+Question: does Koholint::Navigator's probe_all agree with legacy's oracle grids across every
+reachable cell of both known rooms (starting_house, front_yard), not just a short chain from
+spawn?
+Answer: measured, not a clean confirm/refute either way. Replaced
+lib/validation/starting_house_oracle_check.rb with lib/validation/oracle_grid_check.rb: a
+breadth-first walk over each oracle's own 'ok' edges (so a disagreement never truncates coverage,
+unlike the old script's break-on-first-:blocked). Combined result: 145/173 (83.8%) agreement
+across 55 of 62 oracle-recorded cells (33/37 starting_house, 22/25 front_yard); 4 'exit' edges
+(screen transitions) correctly excluded from the tally and never traversed.
+Two validator bugs found and fixed en route, both in the harness, not in Navigator's collision
+logic itself: (1) move! only guarantees a half-tile commit (COMMIT_THRESHOLD), not full-tile
+arrival -- a naive BFS using the raw post-move cell stalled almost immediately because it kept
+re-deriving the departure cell as "arrived"; fixed by tapping the same direction further until the
+cell actually changes, bounded by MAX_TAPS. (2) Navigator.settle! unconditionally taps :down,
+which is destructive on a cell whose down edge is a screen exit -- front_yard's checkpoint sits
+on exactly that cell (row 8, the door threshold), so settle!-ing it silently walked Link back
+inside the house (room 162 -> 178) before any comparison ever ran, tanking front_yard to 0/3 on
+the first (buggy) full run. Fixed by not settling a real post-navigation dump (only a
+just-checkpointed-after-interact() state needs it).
+The remaining 28 disagreements were not chased further (see "what not to redo" below) -- two
+validator-mechanism patches already spent this session, and the owner separately noted that
+legacy's own oracle was generated using move_tiles, the exact mechanism whose creeping-collision
+undercount caused the original front_yard/shield saga, so some fraction of these may be errors in
+the "ground truth" itself, not in Navigator.
+Indicators: game = unchanged this session (no new milestone). Trip A->B = not this session's
+target. Verified facts = no new registry entries (this was cross-validation, not fact-collection),
+but 55 cells now independently checked against real movement data, up from 1.
+Decisions made: none new; D4 stays open/deferred.
+Next question proposed: see below -- the owner redirected mid-session: live-probing, however
+hardened, doesn't scale (this run: ~32 minutes of real taps for 2 small rooms) and doesn't
+resemble how a human or the game engine itself determines walkability. Pivot to reading a
+per-tile collision source directly instead of extending Navigator further.
+What NOT to redo: don't keep hardening the oracle validator chasing the remaining 28
+disagreements (COMMIT_THRESHOLD tuning, retry budgets, etc.) -- likely legacy-oracle noise, not a
+Navigator bug, and a 3rd/4th patch on the same mechanism is exactly what the anti-patch rule warns
+against.
+```
 
-- **Role**: builder.
-- **Budget**: 6h.
-- **Deliverable**: widened oracle coverage (or every remaining disagreement explained), plus the
-  two-room WRAM diff run for the first time since Session 1's inconclusive attempt.
-- **Indicator targeted**: verified facts (oracle agreement rate, `room_object_grid` promoted or
-  refuted) and, if the WRAM hypothesis holds, progress toward D4 finally being decidable.
+## Next question proposed -- read terrain from game state instead of live-probing it (D4 pivot)
+
+Owner's redirect, September 8, 2026: today's full-coverage run (~32 min of real taps for 2 small
+rooms) makes the scaling problem concrete, and doesn't resemble how a human -- or the game engine
+itself -- decides walkability. D1 answered "where is position" (HRAM); nothing has ever answered
+"where is terrain." Session 1 already tried this exact question (a WRAM diff hunting a
+`room_object_grid`) and came back inconclusive specifically because `front_yard` wasn't
+reproducible yet for the required two-room diff -- see `data/ram_registry.json`'s
+`wram_unmapped.room_object_grid` and D4's own text. `front_yard` is reachable now, and both rooms
+have an independent, cross-checked movement oracle (this session's 145/173) to validate any
+memory-based hypothesis against -- including possibly explaining today's disagreements directly
+(whichever side turns out wrong) instead of guessing.
+
+- **Role**: explorer.
+- **Budget**: 3-4h.
+- **Falsifiable question**: does a per-tile background collision/walkability byte exist in WRAM or
+  VRAM, confirmed by diffing `starting_house` against `front_yard`?
+- **Deliverable**: `data/ram_registry.json` entry (promoted or refuted) for a terrain/collision
+  source, or an explicit "inconclusive, here's why" if the diff doesn't isolate a candidate again.
+- **Indicator targeted**: verified facts, and if confirmed, a path to D4 being decided (on-demand
+  terrain reads would make "map everything" and "map on demand" the same cost).
+- **Fallback if inconclusive again**: `lib/navigator.rb` stays the practical mechanism for
+  near-term progress; a second inconclusive diff is not grounds for a third attempt without the
+  owner deciding to spend more budget on it.
+- **Out of scope for this question**: sprites/OAM-based dynamic obstacles (NPCs, pushable objects)
+  -- explicitly a follow-up once static background terrain is resolved, not bundled in.
 
 ## What NOT to redo
 
@@ -171,6 +224,14 @@ would actually give D4 a basis, per both the review and `docs/ARCHITECTURE_REVIE
   probing. The very first tap in ANY direction can carry a fixed, direction-independent position
   artifact from an unsettled animation state -- call `Koholint::Navigator.settle!` (or otherwise
   burn one throwaway tap) before trusting position deltas from a freshly-loaded checkpoint.
+- Call `Koholint::Navigator.settle!` on every checkpoint reflexively "to be safe." It unconditionally
+  taps :down -- destructive on a cell whose down edge is a screen exit (confirmed on
+  `front_yard_navigator.dump`'s starting cell). Only checkpoints taken right after interact()/dialogue
+  need it; a real post-navigation state doesn't.
+- Assume `Navigator.move!` returning `:ok` means the cell has changed. It only guarantees
+  `COMMIT_THRESHOLD` (half a tile) of real displacement -- `cell_of` right after can still report
+  the departure cell. Keep tapping the same direction until the cell actually changes if you need
+  to know Link has arrived somewhere, not just that the direction isn't blocked.
 
 ## Session report (September 8, 2026 -- Session 2 lands: shield obtained, house left for real)
 

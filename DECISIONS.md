@@ -52,6 +52,17 @@ to be ratified), `taken without validation` (inherited from the spike, to be rev
 - **Options**: map what the next objective requires, by reading terrain from game state; or map
   everything, with the new snapshot-based tool.
 - **Review recommendation**: on demand.
+- **Full-coverage measurement, September 8, 2026**: `lib/validation/oracle_grid_check.rb` walked
+  every reachable cell of both known rooms' oracle grids (not a short chain) against
+  `Navigator.probe_all`: 145/173 (83.8%) agreement, 55/62 oracle cells covered. Still not a clean
+  D4 basis on its own -- see `NEXT.md`'s session report for the full breakdown and two validator
+  bugs found along the way.
+- **Owner redirect, same day**: live-probing (however hardened) doesn't scale -- ~32 minutes of
+  real taps for 2 small rooms -- and doesn't resemble how a human or the game engine itself
+  determines walkability. D1 answered "where is position," never "where is terrain." Next question
+  pivots to reading a per-tile background collision source directly from WRAM/VRAM (Session 1's
+  original two-room diff, now finally possible with both rooms reachable) instead of extending
+  `Navigator`'s live probing further -- see `NEXT.md`.
 
 ## D5 — `legacy/` gets replaced, not extended
 
