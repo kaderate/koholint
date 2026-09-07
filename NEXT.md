@@ -27,16 +27,16 @@ D1 ratifiée (HRAM). D2 (OAM) obsolète. D3 tranchée : DMG. D4 à trancher, dif
 Session 1 (voir `PLAN.md`, tranchage formel en Session 3). D5, D6, D7 ratifiées. Voir
 `DECISIONS.md`.
 
-## Dette d'import à combler (constat du 7 septembre 2026, pas encore traité)
+## Dette d'import comblée (7 septembre 2026)
 
-`koholint-init` a été importé depuis `gemboy@claude/usage-2mr345` au commit `c952ded`, un cran
+`koholint-init` avait été importé depuis `gemboy@claude/usage-2mr345` au commit `c952ded`, un cran
 avant le dernier commit de cette branche (`5ee7949`, "Archive the HRAM diff and other reusable
-scratchpad diagnostics into experiments/"). Ce commit manquant ajoute les scripts qui ont produit
-D1 (`ram_diff_hram.rb`, `ram_diff_hram2.rb`, `diag_scx_scy.rb`, `diag_scx_scy2.rb`,
-`house2_dialogue.rb`, `house2_sprite2.rb`, absents de `legacy/game_agents/experiments/`) et une
-note dans `ram_registry.json` disant explicitement de réutiliser la même technique de diff complet
-pour la question ci-dessous. Le code de `legacy/` lui-même est identique par ailleurs (vérifié).
-À importer ou non : décision du propriétaire.
+scratchpad diagnostics into experiments/"). Les 6 scripts manquants qui ont produit D1
+(`ram_diff_hram.rb`, `ram_diff_hram2.rb`, `diag_scx_scy.rb`, `diag_scx_scy2.rb`,
+`house2_dialogue.rb`, `house2_sprite2.rb`) sont maintenant dans `legacy/game_agents/experiments/`,
+et la note de méthode correspondante dans `data/ram_registry.json` a été complétée (chemin corrigé
+vers `legacy/`, et la phrase orientant vers la réutilisation de la technique pour la question
+ci-dessous).
 
 ## Prochaine question proposée (Session 1 du plan, voir `PLAN.md`)
 
