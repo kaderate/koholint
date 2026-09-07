@@ -173,32 +173,79 @@ Navigator bug, and a 3rd/4th patch on the same mechanism is exactly what the ant
 against.
 ```
 
-## Next question proposed -- read terrain from game state instead of live-probing it (D4 pivot)
+## Session report (September 8, 2026, overnight -- isolated Explorer subagent, terrain in memory)
 
-Owner's redirect, September 8, 2026: today's full-coverage run (~32 min of real taps for 2 small
-rooms) makes the scaling problem concrete, and doesn't resemble how a human -- or the game engine
-itself -- decides walkability. D1 answered "where is position" (HRAM); nothing has ever answered
-"where is terrain." Session 1 already tried this exact question (a WRAM diff hunting a
-`room_object_grid`) and came back inconclusive specifically because `front_yard` wasn't
-reproducible yet for the required two-room diff -- see `data/ram_registry.json`'s
-`wram_unmapped.room_object_grid` and D4's own text. `front_yard` is reachable now, and both rooms
-have an independent, cross-checked movement oracle (this session's 145/173) to validate any
-memory-based hypothesis against -- including possibly explaining today's disagreements directly
-(whichever side turns out wrong) instead of guessing.
+```
+Question: does a per-tile background collision/walkability signal exist -- either as a fixed
+rule over BG tile map IDs, or a dedicated WRAM buffer -- confirmed by cross-checking
+starting_house against front_yard?
 
-- **Role**: explorer.
-- **Budget**: 3-4h.
-- **Falsifiable question**: does a per-tile background collision/walkability byte exist in WRAM or
-  VRAM, confirmed by diffing `starting_house` against `front_yard`?
-- **Deliverable**: `data/ram_registry.json` entry (promoted or refuted) for a terrain/collision
-  source, or an explicit "inconclusive, here's why" if the diff doesn't isolate a candidate again.
-- **Indicator targeted**: verified facts, and if confirmed, a path to D4 being decided (on-demand
-  terrain reads would make "map everything" and "map on demand" the same cost).
-- **Fallback if inconclusive again**: `lib/navigator.rb` stays the practical mechanism for
-  near-term progress; a second inconclusive diff is not grounds for a third attempt without the
-  owner deciding to spend more budget on it.
-- **Out of scope for this question**: sprites/OAM-based dynamic obstacles (NPCs, pushable objects)
-  -- explicitly a follow-up once static background terrain is resolved, not bundled in.
+Answer: confirmed. The active BG tilemap (LCDC bit 0x08 clear -> base 0x9800 in both rooms, read
+via mmu.debug_read) predicts oracle walkability independently in BOTH rooms: cell (row,col) [=
+world y/16, x/16] maps directly to the 2x2 block of BG tile IDs at tilemap rows {2*row,2*row+1},
+cols {2*col,2*col+1} -- no SCX/SCY correction needed, since every sampled state (both checkpoints,
+plus after 8 real moves in front_yard) had SCX=SCY=0.
+
+starting_house (37 walkable / 18 blocked-target cells): walkable cells cluster into ~2 floor
+signatures, blocked into ~9 wall signatures, zero full-block overlap between the classes.
+front_yard (25 walkable / 8 blocked-target cells): 6 floor/path signatures vs 2 wall signatures,
+again zero overlap. The rule is per-room/per-tileset categorical, not a single global numeric
+threshold (no "tile ID >= 0x80 = solid" holds across both) -- points to a ROM-side per-tile-ID
+lookup table, not a per-room WRAM buffer. Supersedes wram_unmapped.room_object_grid's original
+WRAM-buffer hypothesis: the signal exists, just in the wrong memory region from what Session 1
+searched. Full method, finding, and caveats now in data/ram_registry.json's
+terrain_collision.background_tilemap_predicts_walkability.
+
+Two caveats worth carrying forward: (1) granularity -- a couple of single tile IDs appear in both
+classes, but only at doorway/wall-base boundaries where a 16px oracle cell straddles an 8px tile
+boundary, suggesting collision resolves at 8x8, not 16x16. (2) a confirmed one-way-ledge: front_yard
+(6,3) has the room's own unambiguous wall signature, yet Navigator.move! reached it from (5,3) via
+a real LEFT-then-up approach that the static oracle recorded as blocked from that side -- a
+directional asymmetry a pure per-tile lookup won't capture without also encoding one-way edges.
+This is also a concrete candidate explanation for some of the 28/173 disagreements from the prior
+oracle_grid_check.rb run.
+
+Indicators: game = unchanged (memory-layout question, not gameplay). Trip A->B = unchanged. Verified
+facts = 0 new registry entries written by the subagent itself (Explorer role, confirmed clean git
+status in both repos) -- but a specific, reproducible, two-room-validated finding, since promoted
+into data/ram_registry.json by this session (the coordinating session, not the subagent).
+Side finding, single occurrence: starting_house's own room_id (0xFFF6) reads 163, not previously in
+the registry's room table -- added to hram.room_id with provenance, not independently re-verified.
+
+Decisions made: none by the subagent (Explorer role). D4 (DECISIONS.md) updated with this
+measurement, explicitly marked NOT ratified -- the observation layer is a fundamental decision
+belonging to the owner, and this was produced overnight per AGENTS.md's autonomy rule ("executes
+decisions already made... does not choose an architecture"). If ratified, D4 would resolve close
+to automatically (on-demand and exhaustive terrain reads become the same cost once collision no
+longer needs live movement to determine).
+
+Next question proposed: a Builder session, once the owner ratifies the observation-layer
+implication, should (1) formalize the tile-ID -> walkable/blocked lookup as a small per-room table,
+(2) re-run oracle_grid_check.rb's 173-edge sweep with the tile-based predictor substituted for
+Navigator.probe_all to see how many of the 28 original disagreements it actually explains vs. new
+mismatches it introduces, (3) investigate the front_yard (5,3)<->(6,3) ledge specifically -- general
+one-way-ledge category, or a one-off.
+
+What NOT to redo: don't re-run Session 1's WRAM-buffer brute-force search (0xC000-0xDFFF x stride x
+orientation) -- the signal lives in VRAM's existing BG tilemap, not a separate WRAM grid; that
+hypothesis is now supersedable, not just "still inconclusive." Don't expect a single global numeric
+tile-ID rule across rooms -- the partition is categorical per room/tileset, not arithmetic. Don't
+treat the front_yard (5,3)/(6,3) disagreement as a hypothesis failure needing a redesign -- one real
+edge case out of ~88 tested cells, well within a one-way-ledge explanation; chasing it further would
+be another patch on the same "does terrain live in memory" question this session was scoped to
+answer once. Don't assume SCX/SCY=0 always holds in front_yard -- confirmed only near the
+door/spawn area, unverified further out.
+```
+
+## Next question: owner ratification needed before any Builder work (D4 pivot)
+
+The Explorer result above answers this session's falsifiable question, but per `AGENTS.md`
+("fundamental decisions belong to the owner": the observation layer) and its overnight-autonomy
+rule, nothing further was built on top of it unattended. Before a Builder session formalizes the
+tile-ID lookup or touches `Navigator`/`oracle_grid_check.rb`, the owner needs to decide: does
+`koholint` adopt VRAM tilemap reads as (at least a) terrain/collision source, alongside or instead
+of `Navigator`'s live probing? The three Builder tasks above are ready to start the moment that's
+answered -- nothing else is blocking them.
 
 ## What NOT to redo
 

@@ -66,9 +66,9 @@
       "address": "0xFFF6",
       "meaning": "Current room/screen identifier",
       "source": "ram_read_verified",
-      "verified_count": 6,
+      "verified_count": 7,
       "confidence": "verified",
-      "note": "Distinct value on every one of 6 checkpointed screens, no collisions: front_yard=162, overworld_screen2=178, villager_screen=177, screen3_north=161, shop_screen=179, house2_interior=169. Supersedes ScreenGrid's discovery-order screen names as the canonical room key -- see DECISIONS.md."
+      "note": "Distinct value on every one of 7 checkpointed screens, no collisions: front_yard=162, overworld_screen2=178, villager_screen=177, screen3_north=161, shop_screen=179, house2_interior=169, starting_house=163 (single observation, September 8, 2026, from a tile-collision investigation -- not the focus of that session, logged here for completeness rather than re-verified independently). Supersedes ScreenGrid's discovery-order screen names as the canonical room key -- see DECISIONS.md."
     },
     "map_id": {
       "address": "0xFFF7",
@@ -99,9 +99,24 @@
       "not_worth_fixing_in_legacy": "D5 says legacy/ is replaced, not extended; move_tiles's creeping-collision undercount is exactly the class of primitive D7's snapshot-based tool is meant to replace properly. Reaching Tarkin is deferred to Session 2's new lib/ navigation tool rather than patched here."
     },
     "room_object_grid": {
-      "status": "inconclusive, single-room test only",
+      "status": "SUPERSEDED 2026-09-08 -- the signal exists, but in VRAM's existing BG tilemap, not a separate WRAM buffer. See terrain_collision.background_tilemap_predicts_walkability below.",
       "note": "Session 1 hypothesis (docs/ARCHITECTURE_REVIEW.md's next question): a per-room 16x16 object grid in WRAM whose type-per-cell predicts collision. Brute-forced every (base address in 0xC000-0xDFFF, stride in [8,9,10,16,20], row-major/col-major) against the starting_house oracle grid (legacy/.../screen_maps/starting_house.json, 32 cells with edges, 123 direction-edge samples, 28 blocked/95 ok) using a single-byte-value classifier. Best candidates: 80.5% accuracy vs a 77.2% majority-class baseline, using degenerate marker values (0, 255) that are common noise anywhere in RAM -- not a credible signal.",
       "why_inconclusive_not_refuted": "Tested against only one room (front_yard, the second room the criterion calls for, is blocked -- see intro_door_gate's related_finding above). A single static snapshot can't isolate a candidate the way D1's method did (diff between two different rooms to find the block that changes); with only one room, most of WRAM is trivially 'consistent' with almost any single-cell hypothesis by chance. Re-test once a second room is reachable, using the diff-between-rooms method NEXT.md originally specified, before concluding either way on D4."
+    }
+  },
+  "terrain_collision": {
+    "background_tilemap_predicts_walkability": {
+      "status": "confirmed, cross-checked in 2 rooms (starting_house, front_yard) -- an isolated Explorer subagent, September 8, 2026. Full investigation in NEXT.md's session report; not yet ratified as a D4 architecture decision, that's the owner's call -- see DECISIONS.md.",
+      "source": "ram_read_verified",
+      "verified_count": 2,
+      "confidence": "measured, pending ratification",
+      "method": "Read the active BG tilemap (hardware.bg_tilemap_0/1, selected by hardware.lcdc bit 0x08, via mmu.debug_read to bypass PPU bus-gating) and map cell (row,col) [= world y/16, x/16, the oracle grid's own convention] directly to the 2x2 tile-ID block at tilemap rows {2*row,2*row+1}, cols {2*col,2*col+1} -- no SCX/SCY scroll correction applied or needed in either sampled state (both had SCX=SCY=0).",
+      "finding": "In both rooms, every oracle-confirmed-walkable cell's 2x2 tile-ID block and every oracle-confirmed-blocked-target cell's block partition into two disjoint sets with zero full-block overlap: starting_house (37 walkable / 18 blocked cells) uses ~2 floor signatures vs ~9 wall signatures; front_yard (25 walkable / 8 blocked cells) uses 6 floor/path signatures vs 2 wall signatures. The partition is per-room/per-tileset categorical, not a single global numeric threshold across rooms (no 'tile ID >= 0x80 means solid' rule holds in both) -- likely a ROM-side per-tile-ID lookup table keyed by tileset, not a per-room WRAM buffer. Supersedes wram_unmapped.room_object_grid's WRAM-buffer hypothesis: the signal exists, just in the wrong memory region from what Session 1 searched.",
+      "caveats": [
+        "Granularity: a couple of single tile IDs (0x0A/0x0B, 0x7F in starting_house) appear in both a walkable and a blocked 2x2 block, but only at genuine doorway/wall-base boundaries where a 16px oracle cell straddles an 8px tile boundary -- collision plausibly resolves at 8x8 tile granularity, not the 16x16 cell grid the oracle/Navigator use. Not a contradiction of the finding, but means a literal cell-level lookup needs care at boundaries.",
+        "Directional asymmetry: front_yard cell (6,3) has the room's own unambiguous wall tile signature ({0C,0C,1C,1C}), yet Koholint::Navigator.move! reached it via a LEFT approach and reported the (5,3)<->(6,3) boundary open from below -- while the static oracle recorded (5,3)'s 'down' edge as blocked. Read as a one-way ledge (walkable from one side only), not a refutation -- but means a pure tile-ID lookup alone won't fully replace directional probing without also encoding one-way edges.",
+        "SCX/SCY=0 held in every state sampled this session (both checkpoints, plus after 8 real moves in front_yard), but front_yard is a scrolling room -- the no-scroll-correction formula is unverified further from the door/spawn area and should be re-checked before relying on it room-wide."
+      ]
     }
   }
 }

@@ -63,6 +63,18 @@ to be ratified), `taken without validation` (inherited from the spike, to be rev
   pivots to reading a per-tile background collision source directly from WRAM/VRAM (Session 1's
   original two-room diff, now finally possible with both rooms reachable) instead of extending
   `Navigator`'s live probing further -- see `NEXT.md`.
+- **Measured, September 8, 2026 (isolated Explorer subagent, overnight)**: this is the clean
+  outcome this entry's own context anticipated. The BG tilemap (VRAM, not the WRAM buffer Session 1
+  originally searched) predicts oracle walkability via a per-room categorical tile-ID partition,
+  confirmed independently in both `starting_house` and `front_yard` -- see
+  `data/ram_registry.json`'s `terrain_collision.background_tilemap_predicts_walkability` for the
+  full method, finding, and caveats (a granularity edge case at 8px tile boundaries, and one
+  confirmed one-way-ledge directional asymmetry). **Not ratified here** -- the observation layer is
+  the owner's decision to make (per `AGENTS.md`'s "fundamental decisions belong to the owner"), and
+  this was produced during an unattended overnight session per that same document's autonomy rule
+  ("executes decisions already made... does not choose an architecture"). If ratified: D4 would
+  resolve close to automatically, since reading terrain on demand and mapping a whole screen upfront
+  become the same cost once collision no longer requires live movement to determine.
 
 ## D5 — `legacy/` gets replaced, not extended
 
