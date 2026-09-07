@@ -9,7 +9,7 @@
 # (0xb0) are confirmed from a real HUD read. Empty/half-heart tiles and digits 1-9 have NOT been
 # observed (would need Link to take damage or the rupee count to change past 0, neither of which
 # has happened in this session) -- reading an unrecognized tile in these regions reports :unknown
-# rather than guessing a value, per this project's grounded-data discipline (see ZELDA_AGENT.md).
+# rather than guessing a value, per this project's grounded-data discipline (see docs/CONCEPT.md).
 module Zelda
   module HudReader
     WINDOW_TILEMAP_ROW0 = 0 # window-relative tile row for the top HUD line (hearts, rupee icon)

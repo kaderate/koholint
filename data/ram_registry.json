@@ -19,7 +19,7 @@
       "source": "ram_read_verified",
       "verified_count": 2,
       "confidence": "verified",
-      "note": "Confirmed byte-for-byte identical across 2 different NPCs with different text -- see ZELDA_AGENT.md. Decode by pixel bitmap, never by this ID."
+      "note": "Confirmed byte-for-byte identical across 2 different NPCs with different text -- see docs/CONCEPT.md. Decode by pixel bitmap, never by this ID."
     },
     "dialogue_text_scratch_line2": {
       "address": "0xE0-0xEF (tile IDs)",
@@ -84,7 +84,7 @@
       "status": "SUPERSEDED -- see hram.link_position_x / hram.link_position_y above",
       "ruled_out": ["0xD314", "0xD31E", "0xD324", "0xD32E"],
       "ruled_out_reason": "Isolated via 4x consistent-small-positive-delta diff on RIGHT taps (strong signal, see method below), but a follow-up RIGHT/LEFT/DOWN cross-check showed all 4 increase on every tap regardless of direction -- animation-frame or step counters, not an (X,Y) coordinate. A true X byte would decrease on LEFT; none did.",
-      "method_for_next_attempt": "This WRAM-only search (0xC000-0xDFFF) was the mistake: the review ZELDA_ARCHITECTURE_REVIEW.md flagged that neither memory hunt had ever scanned HRAM (0xFF80-0xFFFE). A full 0x0000-0xFFFF diff (see ram_diff_hram.rb in that session's scratchpad) found the real coordinates there in one pass.",
+      "method_for_next_attempt": "This WRAM-only search (0xC000-0xDFFF) was the mistake: the review docs/ARCHITECTURE_REVIEW.md flagged that neither memory hunt had ever scanned HRAM (0xFF80-0xFFFE). A full 0x0000-0xFFFF diff (see legacy/game_agents/experiments/ram_diff_hram.rb and its ram_diff_hram2.rb cross-validation follow-up) found the real coordinates there in one pass. The same full-space-diff technique is what the terrain-collision-in-WRAM question should reuse.",
       "accepted_workaround": "OBSOLETE now that hram.link_position_x/y are verified -- kept as history, not to be reused. find_link() via OAM exclusion was sufficient for the mapping tool but is exactly the wrong-layer approach the review calls out."
     },
     "link_health": { "status": "not found" },
@@ -92,8 +92,14 @@
     "room_id": { "status": "SUPERSEDED -- see hram.room_id above" },
     "quest_flags": { "status": "not found" },
     "intro_door_gate": {
-      "status": "not found, blocked investigation -- see ZELDA_BACKLOG.md",
-      "note": "Whatever flag/condition gates leaving the starting house via the south door is still unknown. Tarin's block message repeats on retry and appears to reposition Link (not a simple one-time interrupt); fully exhausting the second NPC's dialogue did not lift it. Needs a proper WRAM diff around the block-trigger event itself, not further blind retries."
+      "status": "not found, blocked investigation -- see docs/archive/EXPLORATION_LOG.md",
+      "note": "Whatever flag/condition gates leaving the starting house via the south door is still unknown. Tarin's block message repeats on retry and appears to reposition Link (not a simple one-time interrupt); fully exhausting the second NPC's dialogue did not lift it. Needs a proper WRAM diff around the block-trigger event itself, not further blind retries.",
+      "related_finding_2026_09_07": "Re-triggered in a different form post-shield, replaying legacy/game_agents/zelda/scenarios.rb's front_yard from a fresh boot: Link becomes fully unresponsive to all 4 directions near the door-exit target (x=74, y=121), with no dialogue tiles loaded (0xD0-0xEF all zero) and no stuck joypad state. Not explained by front_yard's missing post-movement run_steps settle (tested, ruled out: 400k idle steps then retry still moved=0). Not re-investigated further per the anti-patch rule -- see PLAN.md Session 1's report in NEXT.md."
+    },
+    "room_object_grid": {
+      "status": "inconclusive, single-room test only",
+      "note": "Session 1 hypothesis (docs/ARCHITECTURE_REVIEW.md's next question): a per-room 16x16 object grid in WRAM whose type-per-cell predicts collision. Brute-forced every (base address in 0xC000-0xDFFF, stride in [8,9,10,16,20], row-major/col-major) against the starting_house oracle grid (legacy/.../screen_maps/starting_house.json, 32 cells with edges, 123 direction-edge samples, 28 blocked/95 ok) using a single-byte-value classifier. Best candidates: 80.5% accuracy vs a 77.2% majority-class baseline, using degenerate marker values (0, 255) that are common noise anywhere in RAM -- not a credible signal.",
+      "why_inconclusive_not_refuted": "Tested against only one room (front_yard, the second room the criterion calls for, is blocked -- see intro_door_gate's related_finding above). A single static snapshot can't isolate a candidate the way D1's method did (diff between two different rooms to find the block that changes); with only one room, most of WRAM is trivially 'consistent' with almost any single-cell hypothesis by chance. Re-test once a second room is reachable, using the diff-between-rooms method NEXT.md originally specified, before concluding either way on D4."
     }
   }
 }

@@ -1,128 +1,128 @@
-# Koholint — notes pour agents
+# Koholint — notes for agents
 
-Agent qui joue à Link's Awakening DX via gemboy. Lire `README.md` pour l'arborescence et l'ordre
-de lecture, `NEXT.md` avant toute action.
+Agent that plays Link's Awakening DX through gemboy. Read `README.md` for the layout and reading
+order, `NEXT.md` before any action.
 
 ## Conventions
 
-- **Langue** : documentation et messages en français, code et commentaires en anglais.
-- **Commits** : une seule ligne, à l'impératif, pas de corps. Impact entre parenthèses si utile.
-- **Commentaires** : quasi aucun. Uniquement une contrainte cachée ou un *pourquoi* non déductible
-  du code, en une ligne. Le raisonnement va dans le message de commit ou dans `DECISIONS.md`.
-- **Temps** : l'unité est la frame. Jamais un compteur d'instructions, jamais un `sleep`. Attendre
-  une condition d'état plutôt qu'une durée.
-- **Faits sur le jeu** : tout fait mesuré devient une spec sur checkpoint ou une entrée de
-  `data/ram_registry.json` avec provenance et `verified_count`. Un fait qui n'est ni l'un ni
-  l'autre sera redécouvert par le prochain agent, à plein tarif.
-- **Savoir pré-entraîné** : la carte mémoire du jeu (désassemblage communautaire) est une source
-  d'hypothèses à vérifier, conforme au modèle de provenance. Le savoir de *jeu* (où est l'épée,
-  qui est tel PNJ) est interdit : il s'observe, il ne se suppose pas.
+- **Language**: everything — documentation, messages, code, comments — in English.
+- **Commits**: a single line, imperative mood, no body. Impact in parentheses if useful.
+- **Comments**: almost none. Only a hidden constraint or a *why* that can't be deduced from the
+  code, in one line. Reasoning goes in the commit message or in `DECISIONS.md`.
+- **Time**: the unit is the frame. Never an instruction counter, never a `sleep`. Wait for a state
+  condition, not a duration.
+- **Facts about the game**: every measured fact becomes a checkpoint spec or an entry in
+  `data/ram_registry.json` with provenance and `verified_count`. A fact that is neither will be
+  rediscovered by the next agent, at full cost.
+- **Pre-trained knowledge**: the game's memory map (community disassembly) is a source of
+  hypotheses to verify, consistent with the provenance model. *Game* knowledge (where the sword
+  is, who an NPC is) is forbidden: it is observed, never assumed.
 
-## Processus
+## Process
 
-Ce projet a déjà dérivé une fois : trois jours d'autonomie, cinq correctifs successifs sur le même
-mécanisme, des métriques de moyen prises pour du progrès, et des décisions d'un agent héritées
-comme des faits par le suivant. Les règles ci-dessous existent pour que ça ne se reproduise pas.
-Elles priment sur ton jugement de "il reste juste un petit fix à faire".
+This project has already drifted once: three days of autonomy, five successive patches on the
+same mechanism, means metrics mistaken for progress, and one agent's decisions inherited as facts
+by the next. The rules below exist so it doesn't happen again. They override your judgment of
+"there's just one small fix left".
 
-### Une session, une question
+### One session, one question
 
-- Chaque session commence par **une question falsifiable, un critère de fin et un budget**
-  (temps ou nombre de commits), écrits dans le premier message ou dans `NEXT.md`. Exemple valide :
-  "Confirmer ou réfuter la position de Link en HRAM, budget 2 h, livrable : entrée du registre RAM
-  promue ou réfutée plus une spec." Exemple invalide : "Avancer sur la navigation."
-- La borne atteinte, tu t'arrêtes et tu rends un rapport, même si tu "vois la suite". La suite est
-  une nouvelle question pour une nouvelle session.
-- Avant d'écrire du code, tu **reformules le mandat en critère testable** en deux lignes et tu le
-  fais valider. "Regarder l'écran comme un humain" n'est pas un critère. "Un écran dont toutes les
-  tuiles sont cataloguées se traverse de A à B sans aucune sonde live" en est un.
+- Every session starts with **one falsifiable question, one end criterion, and one budget** (time
+  or number of commits), written in the first message or in `NEXT.md`. Valid example: "Confirm or
+  refute Link's position in HRAM, budget 2h, deliverable: RAM registry entry promoted or refuted
+  plus a spec." Invalid example: "Make progress on navigation."
+- Once the boundary is reached, you stop and hand in a report, even if you "can see what's next".
+  What's next is a new question for a new session.
+- Before writing code, you **restate the mandate as a testable criterion** in two lines and get it
+  validated. "Look at the screen like a human would" is not a criterion. "A screen whose tiles are
+  all catalogued can be traversed from A to B with no live probe at all" is one.
 
-### Trois rôles, jamais dans la même session
+### Three roles, never in the same session
 
-| Rôle | Fait | Ne fait pas |
+| Role | Does | Does not do |
 |---|---|---|
-| Explorateur | spikes jetables, mesures, diffs mémoire, scripts dans le scratchpad | commiter dans `lib/`, décider |
-| Constructeur | implémente une décision déjà prise, avec specs, dans son worktree | changer de paradigme, "profiter" pour corriger autre chose |
-| Réviseur | lit à froid, juge contre `docs/CONCEPT.md` et `DECISIONS.md` | lire le journal narratif avant d'avoir jugé, corriger lui-même |
+| Explorer | throwaway spikes, measurements, memory diffs, scripts in the scratchpad | commit to `lib/`, decide |
+| Builder | implements a decision already made, with specs, in its worktree | change paradigm, "take the opportunity" to fix something else |
+| Reviewer | reads cold, judges against `docs/CONCEPT.md` and `DECISIONS.md` | read the narrative log before judging, fix things itself |
 
-Tu ne juges jamais ta propre construction. Une revue est déclenchée par le propriétaire tous les
-N commits ou chaque matin après une nuit d'autonomie, par une session fraîche sans historique.
+You never judge your own build. A review is triggered by the owner every N commits or every
+morning after a night of autonomy, by a fresh session with no history.
 
-### Des décisions, pas des récits
+### Decisions, not narratives
 
-- `DECISIONS.md` est la seule mémoire des choix. Une entrée par décision : contexte, options,
-  choix, **et la condition qui invaliderait le choix**. Exemple : "OAM comme source de position.
-  Invalidée si une salle contient un sprite mobile autre que Link."
-- Quand la condition d'invalidation se produit, c'est un **retour à la décision**, pas un
-  contournement. Un villageois errant qui bloque une case n'est pas un cas à gérer avec un budget de
-  retries, c'est la preuve que la décision est tombée.
-- `docs/archive/EXPLORATION_LOG.md` est une archive. Tu ne le lis pas pour reprendre un chantier,
-  tu lis `NEXT.md` et `DECISIONS.md`. Tu n'y écris pas de décision.
-- `NEXT.md` tient sur une page : état, décisions en vigueur, prochaine question, comment la
-  vérifier. Toute reprise commence là. Si une reprise exige plus d'une page de lecture, c'est
-  `NEXT.md` qui est cassé, pas la reprise.
+- `DECISIONS.md` is the only memory of choices made. One entry per decision: context, options,
+  choice, **and the condition that would invalidate it**. Example: "OAM as the position source.
+  Invalidated if a room contains a moving sprite other than Link."
+- When the invalidation condition occurs, that's a **return to the decision**, not a workaround. A
+  wandering villager blocking a cell is not a case to handle with a retry budget, it's proof the
+  decision has fallen.
+- `docs/archive/EXPLORATION_LOG.md` is an archive. You don't read it to resume a project, you read
+  `NEXT.md` and `DECISIONS.md`. You don't write decisions into it.
+- `NEXT.md` fits on one page: state, decisions in force, next question, how to verify it. Every
+  resumption starts there. If a resumption requires more than one page of reading, `NEXT.md` is
+  broken, not the resumption.
 
-### Métriques de but, pas de moyen
+### Goal metrics, not means metrics
 
-Trois indicateurs, tenus à jour dans `NEXT.md`, à citer dans chaque rapport de session :
+Three indicators, kept up to date in `NEXT.md`, cited in every session report:
 
-1. **Progression dans le jeu** : dernier jalon atteint (épée, donjon 1, etc.).
-2. **Trajet A vers B** : frames émulées pour traverser un écran déjà connu, sans sonde live.
-3. **Faits vérifiés** : entrées du registre RAM au statut `verified`.
+1. **Progress in the game**: last milestone reached (sword, dungeon 1, etc.).
+2. **Trip A to B**: frames emulated to cross an already-known screen, with no live probe.
+3. **Verified facts**: RAM registry entries at `verified` status.
 
-Une taille de catalogue, un taux de skip, un nombre de cases résolues sont des métriques de moyen.
-Un commit qui ne bouge aucun des trois indicateurs doit dire pourquoi il existe.
+A catalog size, a skip rate, a number of resolved cells are means metrics. A commit that moves
+none of the three indicators must say why it exists.
 
-### Règle anti-rustine
+### Anti-patch rule
 
-**Trois correctifs successifs sur un même mécanisme sans progression d'un indicateur de but égale
-arrêt obligatoire.** Tu écris dans `NEXT.md` une note "paradigme à questionner" avec la question
-que le propriétaire doit trancher, et tu t'arrêtes. Le quatrième fix n'est pas "presque là", c'est
-le signe que le problème est ailleurs.
+**Three successive patches on the same mechanism with no progress on a goal indicator means
+mandatory stop.** You write a "paradigm to question" note in `NEXT.md` with the question the owner
+must decide, and you stop. The fourth fix isn't "almost there", it's the sign the problem is
+elsewhere.
 
-### L'autonomie exécute, elle ne conçoit pas
+### Autonomy executes, it does not design
 
-- Une session sans humain (nuit, routine) **exécute des décisions déjà prises** : runs longs,
-  rebuilds, campagnes de mesure, specs sur des faits établis.
-- Elle ne choisit pas une architecture, ne change pas de source de vérité, ne crée pas un nouveau
-  composant, n'introduit pas un nouveau repère de coordonnées.
-- Son livrable du matin est **un tableau de mesures et une liste de questions**, pas une pile de
-  commits. Si tu as pris une décision de conception pendant une session autonome, tu la marques
-  explicitement `DÉCISION PRISE SANS VALIDATION` dans le rapport et dans `DECISIONS.md`.
+- A session with no human present (overnight, routine) **executes decisions already made**: long
+  runs, rebuilds, measurement campaigns, specs on established facts.
+- It does not choose an architecture, does not change a source of truth, does not create a new
+  component, does not introduce a new coordinate frame.
+- Its morning deliverable is **a table of measurements and a list of questions**, not a pile of
+  commits. If you made a design decision during an autonomous session, mark it explicitly
+  `DECISION MADE WITHOUT VALIDATION` in the report and in `DECISIONS.md`.
 
-### Les décisions de fond appartiennent au propriétaire
+### Fundamental decisions belong to the owner
 
-Tu ne tranches pas, tu proposes avec les options et leurs coûts :
+You don't decide, you propose with options and their costs:
 
-- la couche d'observation (état du jeu en RAM contre sortie du PPU contre pixels) ;
-- exploration exhaustive contre navigation à la demande ;
-- le mode matériel (DMG contre CGB) ;
-- ce qui relève du savoir de *jeu* interdit contre le savoir d'*ingénierie* autorisé comme
-  hypothèse à vérifier.
+- the observation layer (game state in RAM vs. PPU output vs. pixels);
+- exhaustive exploration vs. on-demand navigation;
+- the hardware mode (DMG vs. CGB);
+- what counts as forbidden *game* knowledge vs. allowed *engineering* knowledge as a hypothesis to
+  verify.
 
-### La mémoire, c'est les specs et les données
+### Memory is specs and data
 
-- Tout fait mesuré sur le jeu devient **une spec sur checkpoint** ou **une entrée de registre avec
+- Every fact measured about the game becomes **a checkpoint spec** or **a registry entry with
   provenance**.
-- Pas de commentaire-essai dans le code. Une exploration qui n'a produit ni spec ni entrée de
-  registre n'a rien produit.
+- No essay-comments in the code. An exploration that produced neither a spec nor a registry entry
+  produced nothing.
 
-### Parallélisme
+### Parallelism
 
-- Plusieurs agents seulement sur des **questions indépendantes et bornées**, chacun dans son
-  worktree, intégration par le propriétaire.
-- Jamais deux agents sur le même mécanisme. Jamais un agent qui construit sur une décision qu'un
-  autre agent est en train de remettre en cause.
+- Multiple agents only on **independent, bounded questions**, each in its own worktree,
+  integration by the owner.
+- Never two agents on the same mechanism. Never an agent building on a decision another agent is
+  currently reopening.
 
-### Rapport de fin de session
+### End-of-session report
 
-Toujours le même format, dans `NEXT.md`, pour que le suivant reprenne sans te lire :
+Always the same format, in `NEXT.md`, so the next agent can resume without reading you:
 
 ```
-Question : ...
-Réponse : confirmée / réfutée / indécise (et pourquoi)
-Indicateurs : jeu = ... | trajet A→B = ... | faits vérifiés = ...
-Décisions prises : (aucune, ou liste marquée validée / non validée)
-Prochaine question proposée : ...
-Ce qu'il ne faut PAS refaire : ...
+Question: ...
+Answer: confirmed / refuted / inconclusive (and why)
+Indicators: game = ... | trip A→B = ... | verified facts = ...
+Decisions made: (none, or a list marked validated / not validated)
+Next question proposed: ...
+What NOT to redo: ...
 ```

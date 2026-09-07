@@ -11,28 +11,28 @@ require_relative 'screen_grid'
 # tiles aren't already resolvable from the shared TileCatalog (a wall stays a wall, grass stays
 # grass), so re-exploring a screen (or one sharing tiles with an already-explored one) costs less
 # live testing over time. RoomMap::Recorder is the cross-check: it explores blind, this reads
-# tiles first, and the two graphs should agree (see ZELDA_BACKLOG.md).
+# tiles first, and the two graphs should agree (see docs/archive/EXPLORATION_LOG.md).
 module Zelda
   module ScreenMap
     # Order matters: this engine has order/approach-dependent collision quirks (see
-    # ZELDA_BACKLOG.md's movement model) -- a different order than RoomMap::Recorder's own default
+    # docs/archive/EXPLORATION_LOG.md's movement model) -- a different order than RoomMap::Recorder's own default
     # can change the outcome for the exact same cell. Matching RoomMap's order isn't a fix, just
     # keeps the two tools comparable.
     DIRECTIONS = %i[down left right up].freeze
     MAX_RECOVERIES_PER_CELL = 6
 
     # `reset:` (a proc returning a fresh [cpu, ppu, apu, mmu, keys]) matters: some edges lead to a
-    # transition that never resolves within find_link's retry budget (see ZELDA_BACKLOG.md's
+    # transition that never resolves within find_link's retry budget (see docs/archive/EXPLORATION_LOG.md's
     # RoomMap writeup). Without it (default), :lost aborts the whole build. With it, a cell that
     # exhausts MAX_RECOVERIES_PER_CELL is dropped (and logged) instead of sinking the rest of the
     # frontier -- one recalcitrant cell (a wandering NPC in the way, say) shouldn't cost every
-    # other cell already resolved (see ZELDA_BACKLOG.md's overworld_screen3 finding). `logger`, if
+    # other cell already resolved (see docs/archive/EXPLORATION_LOG.md's overworld_screen3 finding). `logger`, if
     # given, is called with one progress string per cell -- silence until the very end looks like a
     # stall.
     # `on_grid_ready`, if given, is called once with `grid` right after it's created -- a full
     # exploration can run for tens of minutes, and the grid/catalog only reach the caller's own
     # save logic on a normal return, so a hard kill (a wall-clock `timeout` wrapper included --
-    # see ZELDA_BACKLOG.md) mid-build loses everything since the last save. Handing the caller a
+    # see docs/archive/EXPLORATION_LOG.md) mid-build loses everything since the last save. Handing the caller a
     # live reference lets it register a signal trap that saves the real in-progress state instead.
     def self.build(cpu, ppu, apu, keys, mmu, screen_name:, catalog:, stationary_positions:, max_cells: 40,
                    retries: 8, reset: nil, stats: nil, logger: nil, on_grid_ready: nil)
@@ -65,7 +65,7 @@ module Zelda
           # A cell that exhausts its own recovery budget doesn't have to sink the whole screen --
           # `reset` already proved we can get back to a known-good state, so drop just this one
           # cell (and whatever's only reachable through it) and keep exploring the rest of the
-          # frontier (see ZELDA_BACKLOG.md's overworld_screen3 finding: a single hard cell used to
+          # frontier (see docs/archive/EXPLORATION_LOG.md's overworld_screen3 finding: a single hard cell used to
           # discard 27 perfectly good ones alongside it).
           logger&.call("t=#{(Time.now - t0).round(1)}s cell=#{cell.inspect} SKIPPED")
           cpu, ppu, apu, mmu, keys = result[1..]
@@ -107,7 +107,7 @@ module Zelda
     # Resolves one direction from `cell`, retrying via `reset` on failure until it either succeeds or its
     # own recovery budget is exhausted. Budgeted PER DIRECTION (not per cell, keyed [cell, dir] in
     # `recovery_attempts`) -- a single direction that's deterministically unresolvable (the same corner
-    # redirect every reset, see ZELDA_BACKLOG.md's starting_house finding) used to burn through the whole
+    # redirect every reset, see docs/archive/EXPLORATION_LOG.md's starting_house finding) used to burn through the whole
     # cell's recovery budget via a shared counter, starving the other three directions DIRECTIONS' fixed
     # down-first order never got to try. Returns the (possibly reset) state array on success or give-up,
     # :lost if `reset` is unavailable, or a skip_result array if recovery can't even get back to `cell`.
@@ -126,7 +126,7 @@ module Zelda
 
         # :lost, or walk_back_to_cell! (inside apply_outcome!) still failed after its own retry budget --
         # genuinely stuck away from `cell`, not just the deterministic creep a same-seed reset would
-        # reproduce identically (see ZELDA_BACKLOG.md's movement model).
+        # reproduce identically (see docs/archive/EXPLORATION_LOG.md's movement model).
         return :lost unless reset
 
         give_up_on_dir = !recoverable?(recovery_attempts, [cell, dir])
@@ -171,7 +171,7 @@ module Zelda
     # Tries to resolve `dir` from `cell` purely by catalog lookup (no movement, see
     # TileCatalog#skip_outcome) before falling back to a live TileClassifier probe. Returns
     # :ok/:blocked/:scroll/:lost. `stats`, if given, is a Hash tallied with :skipped/:tested -- how
-    # much this screen actually benefited from already-cataloged tiles (see ZELDA_BACKLOG.md).
+    # much this screen actually benefited from already-cataloged tiles (see docs/archive/EXPLORATION_LOG.md).
     #
     # `live_probed` gates the skip lookup on `cell` having at least one directly-tested (not
     # catalog-derived) CONFIRMED edge of its own already -- :lost doesn't count, only :ok/
@@ -179,7 +179,7 @@ module Zelda
     # at `cell` itself -- so a position-specific collision quirk near `cell` (a diagonal corner-
     # redirect, say) has nothing to do with the tile being entered and can get silently overridden
     # by an unrelated cell elsewhere that happens to share the same tile pattern and already
-    # tested clean (see ZELDA_BACKLOG.md's starting_house finding: a fully catalog-skipped
+    # tested clean (see docs/archive/EXPLORATION_LOG.md's starting_house finding: a fully catalog-skipped
     # rebuild, zero live tests anywhere, wrongly resolved `[3,3] -> :down` as `:ok` when a live
     # SCX/SCY-verified probe had already proven it a real `:lost` redirect). Forcing every cell's
     # first-ever direction to be live (DIRECTIONS' fixed order makes that `:down` in practice)

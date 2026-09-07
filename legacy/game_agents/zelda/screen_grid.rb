@@ -19,7 +19,7 @@ module Zelda
     # split, `neighbors`/`path_to`'s BFS traversal (called for pathfinding, not just active
     # exploration) used to auto-vivify a blank entry for every cell it merely looked at, polluting
     # the persisted grid with phantom zero-content cells that were never actually targeted by
-    # `ScreenMap.build` (see ZELDA_BACKLOG.md's overworld_screen3 finding).
+    # `ScreenMap.build` (see docs/archive/EXPLORATION_LOG.md's overworld_screen3 finding).
     def edges_for(cell) = @cells[cell] || {}
 
     def record_edge!(cell, dir, outcome)

@@ -1,8 +1,8 @@
 # Zelda-playing agent — design notes
 
-Local, gitignored (see CLAUDE.md). Design discussion for having Claude play Link's Awakening DX
-through gemboy over a long session, token-efficiently. Not a committed feature — a running
-notebook. ROM is `roms/zelda_la_dx.gbc` (gitignored, not versioned).
+Design discussion for having Claude play Link's Awakening DX through gemboy over a long session,
+token-efficiently. Written during the gemboy spike, before this repo existed; kept here as the
+original concept, still valid. ROM is `roms/zelda_la_dx.gbc` (gitignored, not versioned).
 
 ## Why not frame-by-frame vision
 
@@ -203,9 +203,9 @@ see session 3.)
 
 ### Session 3: autonomous push — hit a real story gate, primitives held up under more use
 
-See `docs/ZELDA_BACKLOG.md` for the live task status; this is the narrative summary.
+See `docs/archive/EXPLORATION_LOG.md` for the live task status; this is the narrative summary.
 
-Set up `docs/ZELDA_BACKLOG.md` and the `zelda_world_model.json` / `zelda_ram_registry.json` data
+Set up `docs/archive/EXPLORATION_LOG.md` and the `zelda_world_model.json` / `zelda_ram_registry.json` data
 files (this session's "note your own progress" ask) — all four docs files now tracked via
 `.gitignore` exceptions rather than living only in the ephemeral session scratchpad.
 

@@ -5,14 +5,14 @@ require 'json'
 # Persistent, cumulative catalog of BG tile classifications, keyed by TilemapReader's
 # pattern_hash (stable across screens/VRAM banks -- see tilemap_reader.rb). The premise this
 # exploits: a background tile never changes what it *is* over the course of the game (grass is
-# always grass, a wall is always a wall -- see ZELDA_BACKLOG.md's navigation overhaul writeup), so
+# always grass, a wall is always a wall -- see docs/archive/EXPLORATION_LOG.md's navigation overhaul writeup), so
 # once a tile is classified here it never needs re-testing on any future screen. That's the whole
 # point versus RoomMap::Recorder's per-screen empirical rediscovery: the number of `unknown` tiles
 # on a new screen should trend toward zero as the catalog grows.
 #
 # `passable_from` records confirmed ENTRY directions only (never inferred as symmetric) -- this is
 # how an asymmetric obstacle (e.g. a ledge you can leap down but not climb back up, confirmed in
-# the game's own manual as a basic, itemless move -- see ZELDA_BACKLOG.md) is represented: its
+# the game's own manual as a basic, itemless move -- see docs/archive/EXPLORATION_LOG.md) is represented: its
 # passable_from might be `["down"]` while `["up"]` stays untested or confirmed blocked separately.
 # An empty passable_from does NOT necessarily mean "wall forever" -- `requires_item` captures the
 # manual's own note that water is crossed automatically once Flippers are obtained, implying it's
@@ -99,7 +99,7 @@ module Zelda
     # passable direction (that's an asymmetric tile -- a door, a ledge -- not a simple wall, and
     # one blocked angle doesn't get to relabel it). Only tiles with zero passable evidence so far
     # get hypothesized as :wall, and only as a :hypothesis (this engine has shown order-dependent
-    # collision quirks -- see ZELDA_BACKLOG.md's movement model -- so one blocked sample isn't
+    # collision quirks -- see docs/archive/EXPLORATION_LOG.md's movement model -- so one blocked sample isn't
     # proof, just a reasonable working guess that record_passable! will correct if contradicted).
     def record_blocked!(hash, source: 'empirique', first_seen: nil)
       existing = @entries[hash]

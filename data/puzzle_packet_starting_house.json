@@ -1,5 +1,5 @@
 {
-  "_readme": "Bounded input packet for the puzzle-solving spike (docs/ZELDA_AGENT.md's isolated-reasoning design). Every field here is either a directly observed fact (RAM/tilemap read, or a dialogue transcript read from the emulator) or explicitly marked as unconfirmed. A hypothesis may cite ONLY entities that appear in this file -- zelda_puzzle_validator.rb enforces that mechanically. Object descriptions are deliberately semantic-free (position + tile IDs, not 'this looks like a bush') to avoid smuggling in pattern-matched guesses from outside knowledge.",
+  "_readme": "Bounded input packet for the puzzle-solving spike (docs/CONCEPT.md's isolated-reasoning design). Every field here is either a directly observed fact (RAM/tilemap read, or a dialogue transcript read from the emulator) or explicitly marked as unconfirmed. A hypothesis may cite ONLY entities that appear in this file -- zelda_puzzle_validator.rb enforces that mechanically. Object descriptions are deliberately semantic-free (position + tile IDs, not 'this looks like a bush') to avoid smuggling in pattern-matched guesses from outside knowledge.",
 
   "room": "starting_house",
   "blocked_exit": {

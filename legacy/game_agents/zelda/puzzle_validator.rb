@@ -1,5 +1,5 @@
 # frozen_string_literal: true
-# Anti-cheat validator for the puzzle-solving spike (docs/ZELDA_AGENT.md).
+# Anti-cheat validator for the puzzle-solving spike (docs/CONCEPT.md).
 #
 # A hypothesis may only cite entity IDs that actually exist in the bounded packet. This is
 # mechanical enforcement, not self-restraint: it doesn't stop pretrained knowledge from

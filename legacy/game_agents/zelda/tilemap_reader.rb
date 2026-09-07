@@ -1,8 +1,12 @@
 # frozen_string_literal: true
 
 require 'digest'
-require_relative '../../ppu/tile'
-require_relative '../../ppu/coordinate'
+# Resolved via $LOAD_PATH, not require_relative: same reason as primitives.rb -- this file moved
+# from gemboy's lib/ to koholint's legacy/, ppu/tile and ppu/coordinate still live in a gemboy
+# checkout (see README.md "Dependency on gemboy") -- the caller $LOAD_PATH.unshift(".../gemboy/lib")
+# first.
+require 'ppu/tile'
+require 'ppu/coordinate'
 
 # Reads the BG layer's visible tilemap directly from VRAM, mirroring exactly what the renderer
 # itself computes per-pixel (see PPU::DotDrawer::CGB#compute_background_pixel / ::DMG's own
@@ -13,7 +17,7 @@ require_relative '../../ppu/coordinate'
 # than move-and-observe.
 #
 # Mode-dependent: despite the ROM's "_dx.gbc" filename, `mmu.model.cgb?` is actually false for it
-# at boot (no --cgb flag forcing CGB on this dual-compatible cartridge, see CLAUDE.md's model
+# at boot (no --cgb flag forcing CGB on this dual-compatible cartridge, see gemboy's model
 # selection rule) -- it runs in plain DMG mode, which has no per-tile attribute byte at all (no
 # bank/palette/flip -- see PPU::DotDrawer::DMG#compute_background_pixel, a single global BGP
 # register colors every tile). Reading VRAM bank 1 on a DMG @vram (allocated with bank: 1, i.e.

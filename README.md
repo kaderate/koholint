@@ -1,45 +1,43 @@
 # Koholint
 
-Un agent qui joue à Link's Awakening DX à travers l'émulateur [gemboy](https://github.com/kaderate/gemboy),
-en Ruby. Le concept : exécution déterministe entre les décisions, faits lus dans la mémoire du jeu,
-LLM sollicité uniquement aux points de décision, chaque fait tracé jusqu'à sa source.
+An agent that plays Link's Awakening DX through the [gemboy](https://github.com/kaderate/gemboy)
+emulator, in Ruby. The concept: deterministic execution between decisions, facts read from the
+game's memory, the LLM called only at decision points, every fact traced back to its source.
 
-Ce dépôt est initialisé à partir du spike `lib/game_agents/` de gemboy (branche
-`claude/usage-2mr345`, commit `c952ded`), après la revue d'architecture qui a conclu à une
-réécriture sur des fondations différentes en gardant le savoir accumulé. La ROM n'est pas
-versionnée.
+This repo was initialized from gemboy's `lib/game_agents/` spike (branch `claude/usage-2mr345`,
+commit `c952ded`), after the architecture review concluded on a rewrite on different foundations
+while keeping the accumulated knowledge. The ROM is not versioned.
 
-## Par où commencer
+## Where to start
 
-Dans cet ordre, et rien d'autre avant d'avoir une question de session :
+In this order, and nothing else before you have a session question:
 
-1. `NEXT.md` : état courant, indicateurs, prochaine question.
-2. `DECISIONS.md` : les choix en vigueur et ce qui les invaliderait.
-3. `AGENTS.md` : les règles de travail. Elles priment sur l'envie de "juste finir un fix".
-4. `docs/ARCHITECTURE_REVIEW.md` : pourquoi on réécrit, et quoi.
-5. `docs/CONCEPT.md` : le concept d'origine, toujours valide.
+1. `NEXT.md`: current state, indicators, next question.
+2. `DECISIONS.md`: the decisions in force and what would invalidate them.
+3. `AGENTS.md`: the working rules. They override the urge to "just finish one more fix".
+4. `docs/ARCHITECTURE_REVIEW.md`: why we're rewriting, and what.
+5. `docs/CONCEPT.md`: the original concept, still valid.
 
-`docs/archive/EXPLORATION_LOG.md` est le journal narratif du spike. C'est une archive : on y
-cherche un fait précis, on ne le lit pas pour reprendre le chantier.
+`docs/archive/EXPLORATION_LOG.md` is the spike's narrative log. It's an archive: you look up a
+specific fact in it, you don't read it to resume the project.
 
-## Arborescence
+## Layout
 
-| Chemin | Rôle |
+| Path | Role |
 |---|---|
-| `data/ram_registry.json` | Adresses mémoire du jeu, chacune avec sa provenance et son `verified_count`. Source de vérité pour tout ce qui lit la RAM. |
-| `data/world_model.json` | Faits accumulés sur le jeu : salles, PNJ, dialogues, inventaire, modèle de mouvement. |
-| `data/puzzle_*.json` | Le paquet d'entrée et les hypothèses du premier puzzle résolu, avec leur validateur dans `legacy/`. |
-| `legacy/` | Le code du spike, intact. Il régénère les checkpoints de `Zelda::Scenarios` et fait tourner le rapport "Carnet de Koholint". À remplacer, pas à étendre (voir `DECISIONS.md`). Ses grilles JSON servent d'oracle pour valider le nouvel outil de navigation, une fois. |
-| `lib/` | Le nouveau code. Vide au départ. |
+| `data/ram_registry.json` | Memory addresses for the game, each with its provenance and `verified_count`. Source of truth for anything that reads RAM. |
+| `data/world_model.json` | Accumulated facts about the game: rooms, NPCs, dialogue, inventory, movement model. |
+| `data/puzzle_*.json` | The input packet and hypotheses for the first solved puzzle, with its validator in `legacy/`. |
+| `legacy/` | The spike's code, untouched. It regenerates `Zelda::Scenarios` checkpoints and runs the "Koholint report". To be replaced, not extended (see `DECISIONS.md`). Its JSON grids serve as an oracle to validate the new navigation tool, once. |
+| `lib/` | The new code. Empty at the start. |
 
-## Dépendance à gemboy
+## Dependency on gemboy
 
-Le code de `legacy/` atteint les internes de gemboy par chemins relatifs (`profiling/utils.rb`,
-`lib/ppu/tile.rb`) et ne tourne donc pas tel quel ici. La première brique du nouveau code est une
-API de session headless côté gemboy (frames, touches, lecture mémoire, snapshot/restore en
-mémoire) dont ce dépôt dépendra comme d'une gem, version épinglée. Tant qu'elle n'existe pas,
-`legacy/` se lance depuis un clone de gemboy.
+`legacy/`'s code reaches into gemboy's internals via relative paths (`profiling/utils.rb`,
+`lib/ppu/tile.rb`) and so doesn't run as-is here. The new code's first building block is a headless
+session API on gemboy's side (frames, keys, memory reads, in-memory snapshot/restore) that this
+repo will depend on like a pinned gem. Until it exists, `legacy/` is run from a gemboy clone.
 
-## Commandes
+## Commands
 
-Aucune pour l'instant. Elles arriveront avec `lib/`.
+None yet. They'll arrive with `lib/`.
