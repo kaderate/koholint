@@ -104,3 +104,14 @@ to be ratified), `taken without validation` (inherited from the spike, to be rev
   (snapshot memory/time) was never the real bottleneck; raw CPU emulation speed in this sandbox
   is. Still no practicality problem with D7's design itself -- the snapshot mechanism is cheap,
   the environment's raw emulation speed is what's slow.
+- **Second fix, same day**: the remaining ~9-11s/tap wasn't sandbox weakness either -- `tap` was
+  calling gemboy's `run_steps(cpu, ppu, apu, count)` (an *instruction* count) with a T-cycle target
+  as `count`, oversimulating ~5.7x every tap (171 emulated frames instead of the intended 30).
+  Fixed by adding `Navigator.run_cycles` (small-chunk accumulation until the T-cycle target is
+  reached, same technique `legacy/`'s own `run_cycles` already used, reimplemented locally per D5)
+  and switching `tap` to call it. No recalibration of `TRIGGER_FRAMES`/`SETTLE_FRAMES` needed --
+  they were always correct as T-cycle targets, only the primitive consuming them was wrong.
+  Result: ~9-11s -> ~1.12-1.20s/tap. Combined with YJIT: ~20s -> ~1.15s, ~17x total. Oracle
+  validation re-run after the fix gave an identical result to before it -- speed changed, not
+  behavior. See `NEXT.md` for the measurement detail and the sweep confirming no other call site
+  shares this bug.

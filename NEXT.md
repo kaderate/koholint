@@ -100,6 +100,38 @@ it via `~/.bashrc` didn't stick (something later in shell init re-prepends the d
 `PATH`) -- explicitly `export PATH="/opt/rbenv/versions/3.3.11-yjit/bin:$PATH"` per command
 instead, or resolve why the profile ordering wins if this comes up again.
 
+## Performance fix -- September 8, 2026: `run_steps`/`run_cycles` confusion, ~8x more gained
+
+The YJIT fix above left `Navigator.tap` at ~9-11s/tap, still far short of `ARCHITECTURE.md`'s
+real-time claim. Root cause was a second, larger bug, not more sandbox weakness: `tap` called
+gemboy's `run_steps(cpu, ppu, apu, count)` directly with `TRIGGER_FRAMES * FRAME_CYCLES` /
+`SETTLE_FRAMES * FRAME_CYCLES` as `count` -- but `run_steps` takes an *instruction* count, not a
+T-cycle target. Measured precisely: this asked for 2,106,720 instructions and actually consumed
+12,014,336 T-cycles, i.e. 171 emulated frames instead of the intended 30 -- ~5.7x oversimulation
+every single tap.
+
+`legacy/game_agents/zelda/primitives.rb` already carried the fix for this, in the form of its own
+`run_cycles(cpu, ppu, apu, target_cycles)` (loops `run_steps` in small 20-instruction chunks,
+accumulating real T-cycles, until the target is reached). Reimplemented the same technique
+directly in `lib/navigator.rb` (`Navigator.run_cycles`) rather than depending on `legacy/`, per D5
+-- `tap` now calls it instead of `run_steps` directly.
+
+**No recalibration was needed.** `TRIGGER_FRAMES`/`SETTLE_FRAMES`/`FRAME_CYCLES` were always
+correctly calibrated *as T-cycle targets*; the only bug was handing that target to a primitive
+that counts instructions instead. Fixing the primitive was sufficient.
+
+**Result**: ~9-11s -> ~1.12-1.20s per tap (another ~8x). Combined with YJIT: **~20s -> ~1.15s,
+~17x total**, close to the ~20x this fix was asked to deliver. Re-ran
+`lib/validation/starting_house_oracle_check.rb` after the fix: identical 3/4 agreement, same
+single (3,4)/"right" disagreement as before -- confirms the fix changed speed only, not behavior.
+
+**Swept for the same bug elsewhere** (`grep -rn run_steps`): the three `legacy/` call sites
+(`scenarios.rb`, `ram_diff_hram.rb`, `ram_diff_hram2.rb`) pass plain instruction counts by their
+own convention (e.g. `run_steps(cpu, ppu, apu, 20_000)`), not a cycle-target mistaken for one --
+not the same bug, and `legacy/` isn't touched per D5 regardless. The two doc/data mentions
+(`data/world_model.json`, `docs/archive/EXPLORATION_LOG.md`) already describe the pitfall
+correctly. `lib/navigator.rb`'s `tap` was the only misuse.
+
 ## Next question proposed (per Session 3's review, now that performance is no longer the blocker)
 
 Harden `lib/validation/starting_house_oracle_check.rb`: don't stop coverage at the first

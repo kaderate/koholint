@@ -34,13 +34,26 @@ module Koholint
       motherboard
     end
 
+    # gemboy's run_steps(cpu, ppu, apu, count) takes an *instruction count*, not raw T-cycles --
+    # calling it with TRIGGER_FRAMES*FRAME_CYCLES like a cycle target (an earlier version of this
+    # method did) asks for that many INSTRUCTIONS, roughly 5.7x more simulated game time than
+    # intended (measured: 2,106,720 instructions ~= 171 real frames, not 30). legacy/'s
+    # primitives.rb already solved this with its own run_cycles (small instruction chunks,
+    # accumulating real cycles until the target is reached) -- same technique, reimplemented here
+    # rather than depending on legacy/ code that D5 says gets replaced, not extended.
+    def self.run_cycles(cpu, ppu, apu, target_cycles)
+      total = 0
+      total += run_steps(cpu, ppu, apu, 20) while total < target_cycles
+      total
+    end
+
     def self.tap(motherboard, direction)
       keys = motherboard.mmu.joypad.key_state
       cpu, ppu, apu = motherboard.cpu, motherboard.ppu, motherboard.apu
       keys.press(direction)
-      run_steps(cpu, ppu, apu, TRIGGER_FRAMES * FRAME_CYCLES)
+      run_cycles(cpu, ppu, apu, TRIGGER_FRAMES * FRAME_CYCLES)
       keys.clear
-      run_steps(cpu, ppu, apu, SETTLE_FRAMES * FRAME_CYCLES)
+      run_cycles(cpu, ppu, apu, SETTLE_FRAMES * FRAME_CYCLES)
     end
 
     # Presses `direction` from `motherboard`'s current state, tracking cumulative displacement
