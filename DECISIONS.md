@@ -37,11 +37,16 @@ to be ratified), `taken without validation` (inherited from the spike, to be rev
 
 ## D4 — Exhaustive exploration per screen
 
-- **Status**: open, **deferred**. Deciding condition: the outcome of Plan Session 1
-  (`PLAN.md`) — if collision reads from WRAM, the exhaustive approach loses its purpose and D4
-  leans toward "on demand" almost automatically. Formal recommendation submitted to the owner in
-  Session 3 (reviewer), based on Session 1's outcome. Deferring has no identified cost: no session
-  in the initial plan depends on D4 before Session 3.
+- **Status**: open, **deferred**. Deciding condition: a clean outcome (confirmed or refuted) from
+  Plan Session 1 (`PLAN.md`) — if collision reads from WRAM, the exhaustive approach loses its
+  purpose and D4 leans toward "on demand" almost automatically. Session 1's first attempt
+  (September 7, 2026) was **inconclusive**, not a clean outcome: `front_yard` (needed for the
+  two-room WRAM diff the method requires) turned out not to be reproducible, and a fallback
+  single-room correlation search found no credible signal either way — see `NEXT.md` and
+  `data/ram_registry.json`'s `wram_unmapped.room_object_grid`. D4 stays deferred past Session 3
+  until a second room is reachable and the two-room test actually runs. Deferring still has no
+  identified cost: no session in the initial plan depends on D4 before Session 3, and Session 3
+  itself can only reiterate this recommendation rather than close D4 until then.
 - **Context**: `ScreenMap.build` probes every cell of a screen, 1.5 to 5h per screen, with a floor
   of one live probe per cell. The concept calls for scripted exploration, not exhaustive.
 - **Options**: map what the next objective requires, by reading terrain from game state; or map
