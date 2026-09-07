@@ -96,4 +96,11 @@ to be ratified), `taken without validation` (inherited from the spike, to be rev
   Ruby 3.3.6 was built without YJIT support at all (`ruby --yjit` warns "Ruby was built without
   YJIT support"), so every `RubyVM::YJIT.enable` call already in gemboy (`emugb.rb`,
   `headless_emulator.rb`, etc.) silently no-ops here. Not a `lib/navigator.rb` or D7 design flaw --
-  an environment gap. See `NEXT.md` for the fix in progress.
+  an environment gap.
+- **Re-measured after the fix, same day**: built a YJIT-enabled Ruby from source (see `NEXT.md`
+  for the recipe and why). ~20s -> ~9-11s per tap -- the ~2x `gemboy/ARCHITECTURE.md` documents
+  for YJIT, delivered, not more. `Motherboard#dump`/`.load` overhead separately measured and
+  negligible (~0.05-0.08s for a ~2.7MB state) -- confirms the cost this clause worried about
+  (snapshot memory/time) was never the real bottleneck; raw CPU emulation speed in this sandbox
+  is. Still no practicality problem with D7's design itself -- the snapshot mechanism is cheap,
+  the environment's raw emulation speed is what's slow.

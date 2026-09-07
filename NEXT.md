@@ -67,30 +67,53 @@ this, never done before): ~20s wall-clock per `Navigator.tap`, steady state.
 **Recommended next step**: harden the validation script (don't stop at first disagreement,
 exercise `front_yard`'s oracle too) before extending `lib/navigator.rb` to new rooms.
 
-## Next question proposed (performance, ahead of the review's validation-hardening recommendation)
+## Performance fix -- September 8, 2026: YJIT installed, ~2x gained, most of the gap is the sandbox itself
 
-The owner flagged the ~20s/tap figure as unreasonable before deciding what to build next -- fair:
-at that rate, reaching `front_yard` alone cost minutes of real time per step. Root cause found
-same day: the sandbox's Ruby 3.3.6 has **no YJIT support at all** (`ruby --yjit` warns "Ruby was
-built without YJIT support"), so every `RubyVM::YJIT.enable` call already present in gemboy
-(`emugb.rb`, `debug/headless_emulator.rb`, etc.) silently no-ops. Not a `lib/navigator.rb` or D7
-flaw -- an environment gap affecting every measurement taken this session, including the original
-24-minute boot.
+`cache.ruby-lang.org` (the standard Ruby source download) is blocked by this environment's egress
+policy (403, confirmed via `/root/.ccr/README.md`'s status endpoint -- a genuine policy denial,
+not retried). GitHub was reachable (`git clone https://github.com/ruby/ruby.git --branch
+v3_3_11`), so built from there instead: `rustc`/`cargo` were already present, `./autogen.sh &&
+./configure --enable-yjit --prefix=/opt/rbenv/versions/3.3.11-yjit && make && make install`
+worked cleanly. Confirmed: `RubyVM::YJIT.enabled?` is `true` when invoked with the `--yjit` flag
+(gemboy's runtime `RubyVM::YJIT.enable` calls need this flag present too, at least in this
+environment/build -- without it `RubyVM::YJIT` isn't even a defined constant, so the `enable`
+call itself would raise; always run with `ruby --yjit ...` here, not bare `ruby`).
 
-- **Role**: builder (environment/tooling, not game logic).
-- **Criterion**: `Navigator.tap`'s steady-state wall-clock cost measured again after the fix,
-  with a clear before/after number.
-- **Budget**: bounded exploration -- if a YJIT-capable Ruby isn't reasonably obtainable in this
-  environment, say so and fall back to reducing unnecessary work per probe instead of chasing
-  interpreter-level speed.
-- **Deliverable**: either a working YJIT-enabled Ruby in this environment plus the re-measured
-  cost, or a documented decision not to pursue it with the actual blocker named.
-- **Indicator targeted**: none of the three canonical indicators directly (infrastructure, not
-  game progress or a RAM fact) -- justified because it blocks practical iteration speed on
-  everything else, including the review's own recommended next step.
+**Result, same `Navigator.tap` steady-state methodology as the review**: ~20s -> ~9-11s. That's
+the ~2x `ARCHITECTURE.md` documents for YJIT, delivered -- not more. `Motherboard#dump`/`.load`
+overhead is negligible (~0.05-0.08s each for a ~2.7MB state, benchmarked separately) and was
+never the bottleneck. The remaining ~9-11s for 30 emulated frames (~0.5s of game time) is a
+further ~18-22x off real-time even with YJIT -- almost certainly this sandbox's CPU being far
+weaker/more shared than whatever machine `ARCHITECTURE.md`'s real-time claim was measured on.
+Not something fixable at the `lib/navigator.rb` or gemboy level without deeper emulator-side
+optimization work, which is out of scope here.
 
-**After this**, back to the review's recommendation: harden oracle validation, then redo Session
-1's two-room WRAM diff (now possible) before D4 can actually be decided.
+**Practical effect**: reaching `front_yard` from `after_shield_interior` (11 `probe_all` calls
+plus a handful of real moves and 12 dialogue interacts) drops from the roughly an-hour-plus this
+would have taken at the old rate to something in the 15-25 minute range -- still slow, but
+usable for a single builder session rather than prohibitive.
+
+**Caveat for future sessions**: this Ruby build lives only in this container
+(`/opt/rbenv/versions/3.3.11-yjit`), not committed anywhere -- a fresh container starts back at
+the no-YJIT default and needs the same build repeated (recipe above, a few minutes). Persisting
+it via `~/.bashrc` didn't stick (something later in shell init re-prepends the default Ruby to
+`PATH`) -- explicitly `export PATH="/opt/rbenv/versions/3.3.11-yjit/bin:$PATH"` per command
+instead, or resolve why the profile ordering wins if this comes up again.
+
+## Next question proposed (per Session 3's review, now that performance is no longer the blocker)
+
+Harden `lib/validation/starting_house_oracle_check.rb`: don't stop coverage at the first
+`:blocked` disagreement, and exercise `front_yard`'s own existing oracle grid
+(`legacy/.../screen_maps/overworld_front_yard.json`), never touched despite the room now being
+reachable. Then redo Session 1's original two-room WRAM collision-grid diff -- the test that
+would actually give D4 a basis, per both the review and `docs/ARCHITECTURE_REVIEW.md`'s own plan.
+
+- **Role**: builder.
+- **Budget**: 6h.
+- **Deliverable**: widened oracle coverage (or every remaining disagreement explained), plus the
+  two-room WRAM diff run for the first time since Session 1's inconclusive attempt.
+- **Indicator targeted**: verified facts (oracle agreement rate, `room_object_grid` promoted or
+  refuted) and, if the WRAM hypothesis holds, progress toward D4 finally being decidable.
 
 ## What NOT to redo
 
