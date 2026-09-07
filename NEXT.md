@@ -50,38 +50,38 @@ diagnostics into experiments/"). The 6 missing scripts that produced D1 (`ram_di
 `data/ram_registry.json` has been completed (path fixed to point at `legacy/`, and the sentence
 pointing at reusing the technique for the question below).
 
-## Next question proposed (Session 1 continuation -- not Plan Session 2 yet)
+## Next question proposed (Plan Session 2 -- D7 nav tool, starts now)
 
-The block-trigger diff recommended since the pre-HRAM spike finally happened this session (see
-report below): stepping the door approach one move at a time and diffing WRAM+HRAM+OAM+IO right
-at the trigger found two candidate flags, `0xD3E7` and `0xDFF9` (both 0 -> 1), isolated from 195
-bytes of dialogue-render/audio/OAM-reposition noise. Neither is cross-validated yet -- single
-occurrence only.
+**The door-gate flag hunt was abandoned -- it was chasing the wrong layer.** Root cause found
+September 7, night: there is no hidden gate flag. Link never gets close enough to Tarkin to
+receive the shield in the first place, because `front_yard`'s approach loop abandons early on
+`move_tiles`'s known "creeping collision" undercount (`moved` reports 0 while position visibly
+advances a few px per tap -- see `data/ram_registry.json`'s `wram_unmapped.intro_door_gate`,
+`root_cause_2026_09_07_night`). The door NPC blocking Link afterward is correct game behavior:
+he genuinely lacks the shield. Per D5, this isn't worth patching in `legacy/`, which is exactly
+the class of bug D7's snapshot-based tool exists to not have.
 
-**Falsifiable question**: do `0xD3E7` and `0xDFF9` reliably flip on every trigger of this gate
-(different approach angle/timing), and is there any reachable state where they're 0 while Link is
-still free to walk past this position (i.e. are they the gate condition, or just rendering-adjacent
-noise that happens to correlate once)?
+D6 landed in gemboy the same day (PR #9: `Motherboard#dump`/`.load`, `MMU::Debug#debug_read`), so
+Session 2 is no longer blocked. Starts now, adjusted from `PLAN.md`'s original scope: it called
+for validating against both `front_yard` and `starting_house`'s oracle grids, but `front_yard`
+(the room) has never actually been reached -- reaching it is what this tool is for. Validate
+against `starting_house` alone first (reachable now, from `after_shield_interior`), then use the
+tool itself to walk Link to Tarkin and out the door; validate against `front_yard`'s oracle once
+that room is actually reached.
 
-- **Role**: explorer.
-- **Criterion**: both flags checked across at least 2 more independently-triggered instances of the
-  gate; if either fails to replicate, it's noise, not the flag -- say so plainly rather than keep
-  the weaker one. If both hold up, try writing the "unblocked" value (1, or whatever bypasses it)
-  into a fresh pre-trigger checkpoint via `mmu.write` and see if Link then walks through -- a write
-  experiment, not just a read, per D6/D7's whole reason for existing (bypass gate testing this way
-  once the gemboy session API is usable outside koholint's ad-hoc scripts too, though a raw
-  `mmu.write` works fine meanwhile).
-- **Budget**: one session, 3h. Three distinct attempts, then stop and report (anti-patch rule).
-- **Then**: once past the door, redo the actual Session 1 test -- diff WRAM between two different
-  rooms (not a single-room blind correlation search, which is what was tried before this round and
-  is far weaker) to isolate the block that changes, correlate with both oracle grids.
-- **Deliverable**: `data/ram_registry.json`'s `wram_unmapped.intro_door_gate` promoted to verified
-  (or refuted) with `verified_count` >= 2, and `room_object_grid` retested once a second room
-  exists.
-- **Indicator targeted**: progress in the game (getting past a gate the original spike never
-  solved) and verified facts.
+- **Role**: builder.
+- **Criterion**: a `lib/` navigation primitive that tests each direction from an in-memory
+  `Motherboard#dump` snapshot then restores via `.load` (D7), reproducing `starting_house`'s
+  oracle grid (`legacy/.../screen_maps/starting_house.json`) with every disagreement explained.
+  Then: used to reach Tarkin from `after_shield_interior` and exit the house, producing a
+  screenshot-verified checkpoint with the shield actually obtained.
+- **Budget**: 6h per `PLAN.md`.
+- **Deliverable**: code + specs in `lib/`, a real (not name-only) `front_yard` checkpoint.
+- **Indicator targeted**: trip A→B (first snapshot-based traversal) and progress in the game
+  (actually leaving the house, for the first time in this repo's history).
 
-Session 2 (D7 nav tool) stays blocked on D6 regardless, and D4 stays deferred until this closes.
+D4 stays deferred -- still no second room to redo Session 1's two-room WRAM diff with, until this
+closes.
 
 ## What NOT to redo
 
@@ -97,8 +97,38 @@ Session 2 (D7 nav tool) stays blocked on D6 regardless, and D4 stays deferred un
 - Assume `scenarios.rb`'s comments describe what a script actually does. "Exhausts the shield-gift
   conversation" produced zero dialogue in this reproduction -- verify by rendering, not by reading
   the comment next to the code.
+- Chase a WRAM-diff "gate flag" before checking the mundane explanation first: is Link actually
+  next to the NPC he's supposed to be talking to? `legacy/`'s `oam_sprites`/`mmu.read` can return
+  an empty/stale OAM read depending on PPU timing -- use `mmu.debug_read` (gemboy PR #9) for a
+  reliable sprite-position check before trusting a "no dialogue" or "nothing there" reading.
+- Trust `move_tiles`'s `moved` return value as "no real displacement happened." It's a known
+  undercount (creeping collision) -- compare raw position across calls, not just the return value.
 
-## Session report (September 7, 2026, night -- isolates the real door-gate trigger)
+## Session report (September 7, 2026, later that night -- corrects the report below: no gate flag, a legacy/ pathing bug)
+
+```
+Question: are 0xD3E7/0xDFF9 (previous report's candidates) the real door-gate condition?
+Answer: no -- wrong layer entirely. Checked Link's actual OAM position (via mmu.debug_read,
+        gemboy PR #9, bypassing a PPU-bus-gating artifact that made plain oam_sprites return an
+        empty list at this exact frame) against the two stationary NPCs: Link at (74,82)/(74,90),
+        the likely-Tarkin pair at (80,120)/(80,128) -- 38px apart, nowhere near adjacent. Tested
+        6 manual :right taps from the same checkpoint: move_tiles reported moved=0 every time,
+        but x visibly advanced 2px per tap (82->94) -- the known "creeping collision" undercount.
+        front_yard's approach loop treats moved=0 as "blocked" and gives up long before reaching
+        Tarkin. No shield is ever given; the door NPC blocking Link afterward is correct game
+        behavior (he genuinely lacks the shield), not a gate to bypass. 0xD3E7/0xDFF9 are almost
+        certainly the door NPC's own dialogue-open noise, deprioritized.
+Indicators: game = still pre-shield, root cause now understood | trip A→B = still not measured |
+        verified facts = still 6 HRAM verified
+Decisions made: none. D5 (legacy/ not extended) means this pathing bug isn't patched here --
+        deferred to Session 2's D7 tool, which now has its D6 dependency (gemboy PR #9, merged
+        same day).
+Next question proposed: see above -- Session 2 starts now.
+What NOT to redo: see above -- check NPC adjacency via debug_read before assuming a dialogue
+        failure means something exotic; don't trust move_tiles's moved=0 as "no progress."
+```
+
+## Earlier session report (September 7, 2026, night -- isolates the real door-gate trigger, superseded above)
 
 ```
 Question: what actually triggers front_yard's block, and is it related to the shield-gift
