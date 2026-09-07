@@ -2,38 +2,34 @@
 
 Entry point for any resumption. One page, no more.
 
-## State as of September 7, 2026
+## State as of September 8, 2026
 
-Repo initialized from the gemboy spike (`claude/usage-2mr345` @ `c952ded`). `lib/` is empty, all
-code is in `legacy/`, all knowledge is in `data/` and `docs/`.
+Repo initialized from the gemboy spike (`claude/usage-2mr345` @ `c952ded`). `lib/navigator.rb`
+holds the first real `lib/` code (D7's snapshot-based navigation tool); the rest of `legacy/` is
+still intact and unmodified, all knowledge is in `data/` and `docs/`.
 
 **Indicators**
 
 | Indicator | Value |
 |---|---|
-| Progress in the game | **Downgraded September 7, 2026, evening** -- "shield obtained, house left" was inherited from a pre-reset run whose checkpoints no longer exist and turned out NOT reproducible (see below): actual verified state is pre-shield, still inside the starting house, 0 NPCs with a *completed* dialogue this session (Tarin's exchange is stuck mid-conversation). No sword. |
-| Trip A to B | Not measured in frames. `ScreenMap.navigate!` works on the 7 mapped screens, at the cost of `legacy/` code -- but see above, those checkpoints are not currently reproducible from boot. |
-| Verified facts (RAM registry) | 6 `verified` HRAM entries: X, Y, X shadow, direction, room, map. See `data/ram_registry.json`. |
+| Progress in the game | **Upgraded September 8, 2026** -- shield genuinely obtained (HUD B slot shows the shield icon, screenshot-verified: `data/screenshots/shield_obtained_dialogue.png`, `shield_obtained_hud.png`) and the starting house genuinely left (`room_id=162, map_id=0` at `0xFFF6`/`0xFFF7`, matching the historical `front_yard` value; `data/screenshots/front_yard_reached.png`) -- both first achieved through real gameplay with `lib/navigator.rb`, not inherited or assumed. No sword. |
+| Trip A to B | First real measurement: settled spawn (row 3, col 4 in `starting_house`) to outside the house (`front_yard`) in 6 snapshot-based navigation steps (down, down, down, left, left, down), zero blind probing, zero legacy code. Frame count not yet logged precisely -- follow-up. |
+| Verified facts (RAM registry) | 6 `verified` HRAM entries unchanged. The door-gate mystery is now fully explained (not a RAM fact per se) -- see `data/ram_registry.json`. |
 
-**Reproducible checkpoints** (`legacy/game_agents/zelda/scenarios.rb`, files in
-`/tmp/zelda_checkpoints`, not versioned): `after_shield_interior` reproduces deterministically from
-a fresh boot (~24min wall time), **but its name is wrong**: the HUD's B/A item slots are both empty
-at that checkpoint -- no shield was actually obtained. `front_yard`'s freeze is a **proximity-
-triggered story gate**, isolated September 7 evening: the 12x `interact()` loop that's supposed to
-be "the shield-gift conversation" (per `scenarios.rb`'s comment) produces zero dialogue at that
-position (confirmed by rendering all 12 frames) -- Tarkin doesn't respond there at all. The real
-trigger fires later, during the walk toward the door: stepping `move_tiles` one call at a time,
-the gate fires between y=122 and y=121 (Link is repositioned backward by the game, matching the
-old "appears to reposition Link" note exactly), opening the dialogue "Hé mon gars, attends un
-peu !" -- byte-for-byte the pre-HRAM story gate in `docs/archive/EXPLORATION_LOG.md` ("Blocked"
-section), never solved before or after this reset. New checkpoints from this session:
-`before_shield_gift.marshal` (right before the fruitless interact loop),
-`after_shield_gift_attempt.marshal` (right after it, functionally identical),
-`door_approach_end.marshal` (blocked, dialogue open). Since `overworld_screen2`, `villager_screen`,
-`shop_screen`, `screen3_north`, and `house2_interior` all chain through `front_yard`, none of them
-are currently reproducible either. Room IDs previously read at `0xFFF6` (from an older, no-longer-
-reproduced run): front_yard 162, overworld_screen2 178, villager_screen 177, screen3_north 161,
-shop_screen 179, house2_interior 169.
+**The `front_yard` mystery is closed.** It was never a story-gate bug: Link genuinely lacked the
+shield, because `legacy/`'s `move_tiles` undercounts real movement (see
+`data/ram_registry.json`'s `wram_unmapped.intro_door_gate`) and gave up approaching Tarkin before
+getting close enough to talk to him. `lib/navigator.rb`'s snapshot-based `move!`/`probe_all`
+(tracking cumulative displacement from a fixed reference instead of `move_tiles`'s per-call
+baseline) reached Tarkin cleanly, received the shield through a real conversation, and walked out
+the south door with **zero blocking, zero "Hé mon gars" message** -- confirming the door was
+always legitimately shield-gated. New Motherboard-format dumps in `/tmp/zelda_checkpoints/`
+(not versioned): `starting_house_settled.dump`, `near_tarkin.dump`, `after_dialogue.dump` (shield
+obtained), `front_yard_navigator.dump` (outside, real). The old `legacy/`-format checkpoints
+(`after_shield_interior.marshal`, `front_yard.marshal`, etc.) are superseded for navigation
+purposes but still useful as `Zelda::Checkpoint`-format inputs to bootstrap a `Motherboard` (see
+`lib/validation/starting_house_oracle_check.rb` for the adapter: `Motherboard.new(cpu, ppu, apu,
+mmu, mmu.dma, mmu.model)`).
 
 ## Decisions in force
 
@@ -50,38 +46,39 @@ diagnostics into experiments/"). The 6 missing scripts that produced D1 (`ram_di
 `data/ram_registry.json` has been completed (path fixed to point at `legacy/`, and the sentence
 pointing at reusing the technique for the question below).
 
-## Next question proposed (Plan Session 2 -- D7 nav tool, starts now)
+## Next question proposed (Plan Session 3 -- cold review, per PLAN.md's every-3-sessions cadence)
 
-**The door-gate flag hunt was abandoned -- it was chasing the wrong layer.** Root cause found
-September 7, night: there is no hidden gate flag. Link never gets close enough to Tarkin to
-receive the shield in the first place, because `front_yard`'s approach loop abandons early on
-`move_tiles`'s known "creeping collision" undercount (`moved` reports 0 while position visibly
-advances a few px per tap -- see `data/ram_registry.json`'s `wram_unmapped.intro_door_gate`,
-`root_cause_2026_09_07_night`). The door NPC blocking Link afterward is correct game behavior:
-he genuinely lacks the shield. Per D5, this isn't worth patching in `legacy/`, which is exactly
-the class of bug D7's snapshot-based tool exists to not have.
+**Session 2 landed. The door-gate mystery is fully closed** (see report below): it was never a
+story-gate bug, `move_tiles` just undercounted real movement badly enough that Link never got
+close enough to Tarkin to receive the shield. `lib/navigator.rb` (D7, snapshot-based, built on
+D6/gemboy PR #9) fixed it -- reached Tarkin, got the shield through a real conversation, and
+walked out the south door with zero blocking. First time this repo has verifiably left the
+starting house. Oracle validation against `starting_house` is partial (3/4 agreement on one
+cell, walk-chain stops at the first disagreement by design -- see
+`lib/validation/starting_house_oracle_check.rb`), not the full grid PLAN.md's Session 2
+originally asked for.
 
-D6 landed in gemboy the same day (PR #9: `Motherboard#dump`/`.load`, `MMU::Debug#debug_read`), so
-Session 2 is no longer blocked. Starts now, adjusted from `PLAN.md`'s original scope: it called
-for validating against both `front_yard` and `starting_house`'s oracle grids, but `front_yard`
-(the room) has never actually been reached -- reaching it is what this tool is for. Validate
-against `starting_house` alone first (reachable now, from `after_shield_interior`), then use the
-tool itself to walk Link to Tarkin and out the door; validate against `front_yard`'s oracle once
-that room is actually reached.
+Per `PLAN.md`, a review is due every 3 sessions; Sessions 1 and 2 both ran long and eventful
+(the WRAM/door-gate saga, then the actual fix), a good natural point to have fresh eyes check
+before extending further rather than barrel on.
 
-- **Role**: builder.
-- **Criterion**: a `lib/` navigation primitive that tests each direction from an in-memory
-  `Motherboard#dump` snapshot then restores via `.load` (D7), reproducing `starting_house`'s
-  oracle grid (`legacy/.../screen_maps/starting_house.json`) with every disagreement explained.
-  Then: used to reach Tarkin from `after_shield_interior` and exit the house, producing a
-  screenshot-verified checkpoint with the shield actually obtained.
-- **Budget**: 6h per `PLAN.md`.
-- **Deliverable**: code + specs in `lib/`, a real (not name-only) `front_yard` checkpoint.
-- **Indicator targeted**: trip A→B (first snapshot-based traversal) and progress in the game
-  (actually leaving the house, for the first time in this repo's history).
+- **Role**: reviewer.
+- **Question**: do `lib/navigator.rb` and its validation script comply with `docs/CONCEPT.md` and
+  the ratified decisions (D6, D7)? Is the partial oracle validation (1 cell, 3/4 agreement)
+  sufficient to trust the tool for further navigation, or does it need broader coverage first?
+  Does reaching a second real room (`front_yard`) finally give a basis to decide D4?
+- **Criterion**: written report, compliant/non-compliant judgment, explicit recommendation on D4
+  submitted to the owner (reviewer doesn't decide it), go/no-go on extending `lib/navigator.rb`
+  vs. hardening validation first.
+- **Budget**: 3h, fresh session, no code written.
+- **Deliverable**: `DECISIONS.md` (D4 if the owner rules on the recommendation), `NEXT.md` note.
+- **Indicator targeted**: verified facts -- checks whether Session 2's "reached front_yard" claim
+  holds up, same logic as the earlier review sessions.
 
-D4 stays deferred -- still no second room to redo Session 1's two-room WRAM diff with, until this
-closes.
+**If Session 3 clears it**, the natural next builder session is: redo Session 1's original
+two-room WRAM collision-grid diff, now genuinely possible with `starting_house` and `front_yard`
+both reachable through `lib/navigator.rb` -- and/or widen oracle validation and add real specs
+(no test framework wired into `lib/` yet, `lib/validation/` scripts are runnable but not RSpec).
 
 ## What NOT to redo
 
@@ -103,8 +100,44 @@ closes.
   reliable sprite-position check before trusting a "no dialogue" or "nothing there" reading.
 - Trust `move_tiles`'s `moved` return value as "no real displacement happened." It's a known
   undercount (creeping collision) -- compare raw position across calls, not just the return value.
+- Treat a checkpoint saved right after dialogue/interact() as a clean baseline for direction
+  probing. The very first tap in ANY direction can carry a fixed, direction-independent position
+  artifact from an unsettled animation state -- call `Koholint::Navigator.settle!` (or otherwise
+  burn one throwaway tap) before trusting position deltas from a freshly-loaded checkpoint.
 
-## Session report (September 7, 2026, later that night -- corrects the report below: no gate flag, a legacy/ pathing bug)
+## Session report (September 8, 2026 -- Session 2 lands: shield obtained, house left for real)
+
+```
+Question: does a snapshot-based nav tool (D7) fix the pathing bug and actually get Link out?
+Answer: yes. Built lib/navigator.rb: #move!/#probe track cumulative displacement from a fixed
+        reference (not move_tiles's per-call baseline) with the same ~14px commit threshold
+        legacy/ already validated, plus Motherboard#dump/.load (gemboy PR #9) for true
+        snapshot/restore probing. Found and fixed two bugs along the way: (1) COMMIT_THRESHOLD
+        needed to be TILE_SIZE/2, not TILE_SIZE -- a real step is ~14px, never a full 16;
+        (2) after_shield_interior (checkpointed right after interact(), no settle) carries a
+        transitional artifact where the first tap in ANY direction produces an identical fixed
+        position shift -- fixed with Navigator.settle!. After both fixes, probe_all against
+        starting_house's oracle grid agreed 3/4 on the tested cell (only "right" disagreed,
+        plausibly a sub-tile alignment difference on an already corner-quirk-documented cell).
+        Used the tool for real: walked to Tarkin (previously unreachable -- legacy/'s pathfinding
+        gave up 38px short), triggered an actual conversation for the first time this session,
+        received the shield (HUD-verified: data/screenshots/shield_obtained_hud.png), then
+        walked to the south door in 6 snapshot-based steps with ZERO blocking -- no "Hé mon gars"
+        message at all, confirming the whole door-gate saga was legitimate shield-gating.
+        room_id/map_id at exit: 162/0, matching the historical front_yard value exactly
+        (data/screenshots/front_yard_reached.png).
+Indicators: game = shield obtained + house left, both screenshot-verified (first time this repo
+        has reproduced this milestone) | trip A→B = first real measurement, 6 steps
+        starting_house->front_yard | verified facts = unchanged, 6 HRAM (this session's finding
+        is architectural/behavioral, not a new RAM address)
+Decisions made: none directly, but D7's snapshot-based approach is now empirically validated,
+        not just designed.
+Next question proposed: see above -- Session 3 (cold review) before extending further.
+What NOT to redo: see above -- COMMIT_THRESHOLD and the settle-before-probing lesson, both real
+        bugs that silently invert probe results if skipped.
+```
+
+## Earlier session report (September 7, 2026, later that night -- corrects the report below: no gate flag, a legacy/ pathing bug)
 
 ```
 Question: are 0xD3E7/0xDFF9 (previous report's candidates) the real door-gate condition?

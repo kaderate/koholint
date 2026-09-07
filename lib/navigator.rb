@@ -9,6 +9,9 @@ module Koholint
   # sub-tile-threshold slide never accumulates into a registered step across repeated calls).
   class Navigator
     TILE_SIZE = 16 # native px per walkable tile grid cell, matches legacy/.../primitives.rb
+    COMMIT_THRESHOLD = TILE_SIZE / 2 # a real step resolves to ~14px, not a full 16 -- same
+                                      # threshold legacy/.../primitives.rb's move_tiles uses to
+                                      # tell a committed step from a collision-bounce
     TRIGGER_FRAMES = 2
     SETTLE_FRAMES = 28
     FRAME_CYCLES = 70_224
@@ -19,6 +22,17 @@ module Koholint
     SIGN = { up: -1, down: 1, left: -1, right: 1 }.freeze
 
     def self.position(mmu) = { x: mmu.read(0xFF98), y: mmu.read(0xFF99) }
+
+    # Checkpoints saved right after dialogue/interact() (no run_steps settle -- e.g. legacy/'s
+    # after_shield_interior) carry a one-off transitional artifact: the FIRST tap in ANY
+    # direction produces the same fixed position shift regardless of which key was pressed
+    # (confirmed empirically: up/down/left/right all showed an identical x:56->70 jump on tap 1
+    # from the same checkpoint). A pure idle wait does NOT clear it -- only an actual keypress
+    # does. Call this once before real probing on a freshly-loaded, unsettled checkpoint.
+    def self.settle!(motherboard)
+      tap(motherboard, :down)
+      motherboard
+    end
 
     def self.tap(motherboard, direction)
       keys = motherboard.mmu.joypad.key_state
@@ -42,7 +56,7 @@ module Koholint
       MAX_TAPS.times do
         tap(motherboard, direction)
         delta = (position(motherboard.mmu)[axis] - start) * sign
-        return :ok if delta >= TILE_SIZE
+        return :ok if delta >= COMMIT_THRESHOLD
       end
       :blocked
     end

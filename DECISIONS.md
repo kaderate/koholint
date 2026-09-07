@@ -87,3 +87,7 @@ to be ratified), `taken without validation` (inherited from the spike, to be rev
   recovery budget, no direction ordering.
 - **Invalidated if**: the memory cost of a snapshot makes it impractical to keep one per screen
   cell; measure before concluding.
+- **Empirically validated, September 8, 2026**: `lib/navigator.rb` implements this and used it to
+  reach a real NPC conversation and exit `starting_house` for the first time in this repo's
+  history -- see `NEXT.md`. Snapshot cost not yet measured precisely (memory/time per probe);
+  no practicality problem observed at the scale used so far (a handful of cells).
