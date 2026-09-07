@@ -11,21 +11,25 @@ code is in `legacy/`, all knowledge is in `data/` and `docs/`.
 
 | Indicator | Value |
 |---|---|
-| Progress in the game | Level-1 shield obtained, starting house left, 4 village NPCs with dialogue captured (Tarin, the house's 2nd occupant, screen3's villager, Pépé le Ramollo in house2). No sword. |
-| Trip A to B | Not measured in frames. `ScreenMap.navigate!` works on the 7 mapped screens, at the cost of `legacy/` code. |
+| Progress in the game | **Downgraded September 7, 2026, evening** -- "shield obtained, house left" was inherited from a pre-reset run whose checkpoints no longer exist and turned out NOT reproducible (see below): actual verified state is pre-shield, still inside the starting house, 0 NPCs with a *completed* dialogue this session (Tarin's exchange is stuck mid-conversation). No sword. |
+| Trip A to B | Not measured in frames. `ScreenMap.navigate!` works on the 7 mapped screens, at the cost of `legacy/` code -- but see above, those checkpoints are not currently reproducible from boot. |
 | Verified facts (RAM registry) | 6 `verified` HRAM entries: X, Y, X shadow, direction, room, map. See `data/ram_registry.json`. |
 
 **Reproducible checkpoints** (`legacy/game_agents/zelda/scenarios.rb`, files in
-`/tmp/zelda_checkpoints`, not versioned): `after_shield_interior` confirmed reproducible from a
-fresh boot (September 7, 2026, ~24min wall time in a fresh container). `front_yard` is **not**
-currently reproducible: replaying it from a fresh `after_shield_interior` deterministically gets
-Link wedged near the door-exit target (x=74, y=121), unresponsive to all 4 directions -- see
-`data/ram_registry.json`'s `wram_unmapped.intro_door_gate.related_finding_2026_09_07`. Since
-`overworld_screen2`, `villager_screen`, `shop_screen`, `screen3_north`, and `house2_interior` all
-chain through `front_yard`, none of them are currently reproducible either -- unverified until
-this is fixed. Room IDs previously read at `0xFFF6` (from an older, no-longer-reproduced run):
-front_yard 162, overworld_screen2 178, villager_screen 177, screen3_north 161, shop_screen 179,
-house2_interior 169.
+`/tmp/zelda_checkpoints`, not versioned): `after_shield_interior` reproduces deterministically from
+a fresh boot (~24min wall time), **but its name is wrong**: the HUD's B/A item slots are both empty
+at that checkpoint (confirmed by rendering the framebuffer, not just trusting the state) -- no
+shield was actually obtained. `front_yard`'s freeze (Link wedged at x=74, y=121, unresponsive to
+all input) is **not a geometry/collision bug**: a rendered screenshot shows an open dialogue box
+reading "Hé mon gars, attends un peu !" -- byte-for-byte the pre-HRAM story gate documented in
+`docs/archive/EXPLORATION_LOG.md` ("Blocked" section): Tarin stops Link at the south door, and it
+was never solved, before or after this reset. My first pass at this (see report below) claimed "no
+dialogue open" from reading `mmu.read(0xD0..0xDF)` -- wrong check: those are **tile IDs** referenced
+through the tilemap, not memory addresses; reading raw ROM bytes at $D0-$DF proved nothing.
+Since `overworld_screen2`, `villager_screen`, `shop_screen`, `screen3_north`, and `house2_interior`
+all chain through `front_yard`, none of them are currently reproducible either. Room IDs previously
+read at `0xFFF6` (from an older, no-longer-reproduced run): front_yard 162, overworld_screen2 178,
+villager_screen 177, screen3_north 161, shop_screen 179, house2_interior 169.
 
 ## Decisions in force
 
@@ -44,25 +48,31 @@ pointing at reusing the technique for the question below).
 
 ## Next question proposed (Session 1 continuation -- not Plan Session 2 yet)
 
-Session 1's actual question (is terrain readable from game state?) is still open -- see the report
-below for what was tried and why it's inconclusive, not refuted. It cannot be properly retested
-without a second, different room, and `front_yard` (the only route to one) is currently broken.
+Corrected understanding (see report below): the blocker isn't a mystery collision bug, it's the
+pre-HRAM "Tarin blocks the south door" story gate from `docs/archive/EXPLORATION_LOG.md`,
+resurfacing because the shield was never actually obtained in this session's reproduction. That
+old entry already names the right method and never got to try it: "a proper WRAM diff around the
+block-trigger event itself, not further blind retries."
 
-**Falsifiable question**: can Link reliably reach a second room (any room, not necessarily
-`front_yard` specifically) from `after_shield_interior`, either by fixing `front_yard`'s door-exit
-sequence or via a different route?
+**Falsifiable question**: what WRAM byte(s) change between (a) a checkpoint just before Tarkin's
+second conversation and (b) one right after it, that differ depending on whether the shield was
+actually granted -- and does forcing/confirming that state lift the door block?
 
 - **Role**: explorer.
-- **Criterion**: a checkpoint exists for a room with a different `0xFFF6` than `after_shield_interior`,
-  reproducible from a fresh boot.
-- **Budget**: one session, 3h. If the door-exit bug resists three distinct fix attempts, stop
-  (anti-patch rule) and write a "paradigm to question" note here instead of a fourth attempt.
-- **Then**: redo the actual Session 1 test -- diff WRAM between the two rooms (not a single-room
-  blind correlation search, which is what was tried this round and is far weaker) to isolate the
-  block that changes, correlate with both oracle grids.
-- **Deliverable**: `data/ram_registry.json`'s `wram_unmapped.room_object_grid` entry promoted or
-  refuted with the two-room method, plus the agreement rate.
-- **Indicator targeted**: verified facts.
+- **Criterion**: either the shield-gift conversation completes (HUD B/A slot shows the shield icon,
+  confirmed by rendering the framebuffer, not assumed from a checkpoint's name) and Link then
+  passes the south door without the "attends un peu" message reappearing; or, if it still blocks,
+  a specific WRAM flag is identified whose value differs between a blocked and unblocked attempt.
+- **Budget**: one session, 3h. If three distinct attempts don't move it, stop (anti-patch rule) and
+  write a "paradigm to question" note here instead of a fourth.
+- **Then**: once past the door, redo the actual Session 1 test -- diff WRAM between two different
+  rooms (not a single-room blind correlation search, which is what was tried this round and is far
+  weaker) to isolate the block that changes, correlate with both oracle grids.
+- **Deliverable**: `data/ram_registry.json`'s `wram_unmapped.intro_door_gate` and
+  `room_object_grid` entries promoted or refuted, plus a screenshot-verified checkpoint that
+  actually has the shield if one is reached.
+- **Indicator targeted**: progress in the game (getting past a gate the original spike never
+  solved) and verified facts.
 
 Session 2 (D7 nav tool) stays blocked on D6 regardless, and D4 stays deferred until this closes.
 
@@ -73,6 +83,32 @@ Session 2 (D7 nav tool) stays blocked on D6 regardless, and D4 stays deferred un
 - Run `ScreenMap.build` on a new screen "in the meantime". 1.5 to 5h per screen for data that D4
   might make useless.
 - Read `docs/archive/EXPLORATION_LOG.md` in full to resume. Look up a fact in it, at most.
+- Trust a checkpoint's *name* (`after_shield_interior`) as a verified fact. Render the framebuffer
+  and look, or read a confirmed RAM address -- names are inherited intent, not provenance.
+- Diagnose "no dialogue open" by reading tile-ID ranges (`0xD0-0xEF`) as if they were memory
+  addresses. They're tile IDs referenced through the tilemap; render the screen instead.
+
+## Session report (September 7, 2026, evening -- corrects the report below)
+
+```
+Question: is the shield actually obtained at the after_shield_interior/front_yard checkpoints,
+        and is front_yard's freeze really an unexplained collision bug?
+Answer: no, and no. Rendered both checkpoints' framebuffers (ppu.export_framebuffer_png) instead
+        of trusting names/prior notes: HUD B/A slots are empty at both -- no shield ever obtained
+        in this session's reproduction. front_yard's "freeze" is an open dialogue box reading
+        "Hé mon gars, attends un peu !" -- byte-for-byte the pre-HRAM "Tarin blocks the south
+        door" story gate in docs/archive/EXPLORATION_LOG.md, never solved before or after the
+        reset. The prior session's "no dialogue open, ruled out" check was wrong: it read
+        mmu.read(0xD0..0xDF) as memory addresses; those are tile IDs referenced through the
+        tilemap, not addresses -- the check proved nothing and the real cause was missed.
+Indicators: game = downgraded (pre-shield, not post-shield as previously recorded) | trip A→B =
+        still not measured | verified facts = still 6 HRAM verified
+Decisions made: none.
+Next question proposed: see above -- WRAM diff around the shield-gift conversation / door-gate
+        trigger, the method the original spike recommended in 2026 and never tried.
+What NOT to redo: don't trust a checkpoint's name over a rendered screenshot; don't check for an
+        open dialogue by reading tile IDs as memory addresses.
+```
 
 ## Last session's report
 
