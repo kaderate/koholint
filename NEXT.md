@@ -18,18 +18,22 @@ code is in `legacy/`, all knowledge is in `data/` and `docs/`.
 **Reproducible checkpoints** (`legacy/game_agents/zelda/scenarios.rb`, files in
 `/tmp/zelda_checkpoints`, not versioned): `after_shield_interior` reproduces deterministically from
 a fresh boot (~24min wall time), **but its name is wrong**: the HUD's B/A item slots are both empty
-at that checkpoint (confirmed by rendering the framebuffer, not just trusting the state) -- no
-shield was actually obtained. `front_yard`'s freeze (Link wedged at x=74, y=121, unresponsive to
-all input) is **not a geometry/collision bug**: a rendered screenshot shows an open dialogue box
-reading "Hé mon gars, attends un peu !" -- byte-for-byte the pre-HRAM story gate documented in
-`docs/archive/EXPLORATION_LOG.md` ("Blocked" section): Tarin stops Link at the south door, and it
-was never solved, before or after this reset. My first pass at this (see report below) claimed "no
-dialogue open" from reading `mmu.read(0xD0..0xDF)` -- wrong check: those are **tile IDs** referenced
-through the tilemap, not memory addresses; reading raw ROM bytes at $D0-$DF proved nothing.
-Since `overworld_screen2`, `villager_screen`, `shop_screen`, `screen3_north`, and `house2_interior`
-all chain through `front_yard`, none of them are currently reproducible either. Room IDs previously
-read at `0xFFF6` (from an older, no-longer-reproduced run): front_yard 162, overworld_screen2 178,
-villager_screen 177, screen3_north 161, shop_screen 179, house2_interior 169.
+at that checkpoint -- no shield was actually obtained. `front_yard`'s freeze is a **proximity-
+triggered story gate**, isolated September 7 evening: the 12x `interact()` loop that's supposed to
+be "the shield-gift conversation" (per `scenarios.rb`'s comment) produces zero dialogue at that
+position (confirmed by rendering all 12 frames) -- Tarkin doesn't respond there at all. The real
+trigger fires later, during the walk toward the door: stepping `move_tiles` one call at a time,
+the gate fires between y=122 and y=121 (Link is repositioned backward by the game, matching the
+old "appears to reposition Link" note exactly), opening the dialogue "Hé mon gars, attends un
+peu !" -- byte-for-byte the pre-HRAM story gate in `docs/archive/EXPLORATION_LOG.md` ("Blocked"
+section), never solved before or after this reset. New checkpoints from this session:
+`before_shield_gift.marshal` (right before the fruitless interact loop),
+`after_shield_gift_attempt.marshal` (right after it, functionally identical),
+`door_approach_end.marshal` (blocked, dialogue open). Since `overworld_screen2`, `villager_screen`,
+`shop_screen`, `screen3_north`, and `house2_interior` all chain through `front_yard`, none of them
+are currently reproducible either. Room IDs previously read at `0xFFF6` (from an older, no-longer-
+reproduced run): front_yard 162, overworld_screen2 178, villager_screen 177, screen3_north 161,
+shop_screen 179, house2_interior 169.
 
 ## Decisions in force
 
@@ -48,29 +52,32 @@ pointing at reusing the technique for the question below).
 
 ## Next question proposed (Session 1 continuation -- not Plan Session 2 yet)
 
-Corrected understanding (see report below): the blocker isn't a mystery collision bug, it's the
-pre-HRAM "Tarin blocks the south door" story gate from `docs/archive/EXPLORATION_LOG.md`,
-resurfacing because the shield was never actually obtained in this session's reproduction. That
-old entry already names the right method and never got to try it: "a proper WRAM diff around the
-block-trigger event itself, not further blind retries."
+The block-trigger diff recommended since the pre-HRAM spike finally happened this session (see
+report below): stepping the door approach one move at a time and diffing WRAM+HRAM+OAM+IO right
+at the trigger found two candidate flags, `0xD3E7` and `0xDFF9` (both 0 -> 1), isolated from 195
+bytes of dialogue-render/audio/OAM-reposition noise. Neither is cross-validated yet -- single
+occurrence only.
 
-**Falsifiable question**: what WRAM byte(s) change between (a) a checkpoint just before Tarkin's
-second conversation and (b) one right after it, that differ depending on whether the shield was
-actually granted -- and does forcing/confirming that state lift the door block?
+**Falsifiable question**: do `0xD3E7` and `0xDFF9` reliably flip on every trigger of this gate
+(different approach angle/timing), and is there any reachable state where they're 0 while Link is
+still free to walk past this position (i.e. are they the gate condition, or just rendering-adjacent
+noise that happens to correlate once)?
 
 - **Role**: explorer.
-- **Criterion**: either the shield-gift conversation completes (HUD B/A slot shows the shield icon,
-  confirmed by rendering the framebuffer, not assumed from a checkpoint's name) and Link then
-  passes the south door without the "attends un peu" message reappearing; or, if it still blocks,
-  a specific WRAM flag is identified whose value differs between a blocked and unblocked attempt.
-- **Budget**: one session, 3h. If three distinct attempts don't move it, stop (anti-patch rule) and
-  write a "paradigm to question" note here instead of a fourth.
+- **Criterion**: both flags checked across at least 2 more independently-triggered instances of the
+  gate; if either fails to replicate, it's noise, not the flag -- say so plainly rather than keep
+  the weaker one. If both hold up, try writing the "unblocked" value (1, or whatever bypasses it)
+  into a fresh pre-trigger checkpoint via `mmu.write` and see if Link then walks through -- a write
+  experiment, not just a read, per D6/D7's whole reason for existing (bypass gate testing this way
+  once the gemboy session API is usable outside koholint's ad-hoc scripts too, though a raw
+  `mmu.write` works fine meanwhile).
+- **Budget**: one session, 3h. Three distinct attempts, then stop and report (anti-patch rule).
 - **Then**: once past the door, redo the actual Session 1 test -- diff WRAM between two different
-  rooms (not a single-room blind correlation search, which is what was tried this round and is far
-  weaker) to isolate the block that changes, correlate with both oracle grids.
-- **Deliverable**: `data/ram_registry.json`'s `wram_unmapped.intro_door_gate` and
-  `room_object_grid` entries promoted or refuted, plus a screenshot-verified checkpoint that
-  actually has the shield if one is reached.
+  rooms (not a single-room blind correlation search, which is what was tried before this round and
+  is far weaker) to isolate the block that changes, correlate with both oracle grids.
+- **Deliverable**: `data/ram_registry.json`'s `wram_unmapped.intro_door_gate` promoted to verified
+  (or refuted) with `verified_count` >= 2, and `room_object_grid` retested once a second room
+  exists.
 - **Indicator targeted**: progress in the game (getting past a gate the original spike never
   solved) and verified facts.
 
@@ -87,8 +94,36 @@ Session 2 (D7 nav tool) stays blocked on D6 regardless, and D4 stays deferred un
   and look, or read a confirmed RAM address -- names are inherited intent, not provenance.
 - Diagnose "no dialogue open" by reading tile-ID ranges (`0xD0-0xEF`) as if they were memory
   addresses. They're tile IDs referenced through the tilemap; render the screen instead.
+- Assume `scenarios.rb`'s comments describe what a script actually does. "Exhausts the shield-gift
+  conversation" produced zero dialogue in this reproduction -- verify by rendering, not by reading
+  the comment next to the code.
 
-## Session report (September 7, 2026, evening -- corrects the report below)
+## Session report (September 7, 2026, night -- isolates the real door-gate trigger)
+
+```
+Question: what actually triggers front_yard's block, and is it related to the shield-gift
+        interact() loop?
+Answer: no relation. Rendered all 12 frames of the interact() loop: zero dialogue at any step --
+        Tarkin doesn't respond at that position, contradicting the "exhausts the shield-gift
+        conversation" comment in scenarios.rb. The real trigger is proximity-based, hit while
+        walking toward the door: stepped move_tiles one call at a time and found the exact
+        transition (y=122 -> y=121, Link repositioned backward by the game -- matches the old
+        "appears to reposition Link" note precisely). Checkpointed both sides of that single
+        move_tiles call and diffed WRAM+HRAM+OAM+IO: 195 bytes changed, mostly dialogue-render
+        state (0xD500-0xD616, cross-validates against the same block found in an earlier
+        same-room diff) and audio registers (the block message's sound effect). Two isolated
+        boolean-looking flags survive that noise: 0xD3E7 and 0xDFF9 (both 0 -> 1) -- candidates
+        for the actual gate condition, not yet cross-validated (single occurrence).
+Indicators: game = still pre-shield (unchanged from the correction above) | trip A→B = still not
+        measured | verified facts = still 6 HRAM verified (2 new hypotheses added, not verified)
+Decisions made: none.
+Next question proposed: see above -- cross-validate 0xD3E7/0xDFF9 across independent triggers,
+        then try a write experiment to test if forcing them lifts the gate.
+What NOT to redo: don't assume the interact() loop does anything without checking; the real event
+        is proximity/movement-triggered, not dialogue-initiated.
+```
+
+## Earlier session report (September 7, 2026, evening -- corrects the report below)
 
 ```
 Question: is the shield actually obtained at the after_shield_interior/front_yard checkpoints,
@@ -110,7 +145,7 @@ What NOT to redo: don't trust a checkpoint's name over a rendered screenshot; do
         open dialogue by reading tile IDs as memory addresses.
 ```
 
-## Last session's report
+## Earlier session report (September 7, 2026, afternoon -- Session 1's original inconclusive result)
 
 ```
 Question: is terrain readable from game state (WRAM object grid predicts collision)?
