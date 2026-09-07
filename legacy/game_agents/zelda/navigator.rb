@@ -1,8 +1,8 @@
 # frozen_string_literal: true
-# Isolated navigation procedure for the Zelda-agent spike (see docs/ZELDA_AGENT.md's Navigator
+# Isolated navigation procedure for the Zelda-agent spike (see docs/CONCEPT.md's Navigator
 # design). Plans a path on a static walkable-tile grid instead of hand-picked direction sequences,
 # so a cluttered room's collision geometry (walls, furniture) is routed around rather than
-# discovered by bumping into it order-dependently -- see ZELDA_BACKLOG.md's "Movement model"
+# discovered by bumping into it order-dependently -- see docs/archive/EXPLORATION_LOG.md's "Movement model"
 # section for why the underlying move_tiles primitive is now precise enough to make this reliable.
 require 'json'
 require_relative 'primitives'
@@ -100,15 +100,15 @@ module Navigator
   end
 
   # Executes a path plan run-by-run, verifying real displacement after each run (closed loop --
-  # see ZELDA_AGENT.md). This room's collision has an order/approach-dependent quirk (a request
+  # see docs/CONCEPT.md). This room's collision has an order/approach-dependent quirk (a request
   # can bump differently depending on prior movement, not just the static geometry -- see
-  # ZELDA_BACKLOG.md), so a single shortfall is retried in place (same cell, same direction)
+  # docs/archive/EXPLORATION_LOG.md), so a single shortfall is retried in place (same cell, same direction)
   # before it's trusted as a real obstacle and blacklisted -- one noisy sample shouldn't poison
   # the persisted grid and wall off a cell that's actually fine from a different approach.
   #
   # Position tracking: the OAM-to-cell rounding is only trusted ONCE, to anchor the very first
   # cell. From there, the current cell is tracked by exact integer accumulation of move_tiles's
-  # own (already-precise, see the movement model in ZELDA_BACKLOG.md) moved-tile counts, never by
+  # own (already-precise, see the movement model in docs/archive/EXPLORATION_LOG.md) moved-tile counts, never by
   # re-rounding a fresh OAM read. Repeatedly re-rounding turned out to be the actual root cause of
   # the previous session's contradictory "blocked cell" reports in this room's narrow corridor --
   # the rounding itself was ambiguous near cell boundaries, not the underlying geometry.
@@ -177,7 +177,7 @@ module Navigator
 
   # Pure-pixel greedy navigation, no grid/cell math at all -- sidesteps the 16px-cell-vs-~14px-
   # real-step drift that made the grid-based reach() unreliable in this room's narrow corridor
-  # (see ZELDA_BACKLOG.md). Always moves along whichever axis has the larger remaining delta;
+  # (see docs/archive/EXPLORATION_LOG.md). Always moves along whichever axis has the larger remaining delta;
   # falls back to the other axis, then to a perpendicular sidestep, if the preferred direction is
   # blocked. Good fit for a small room with few real obstacles (bump-and-reroute is cheap here).
   def self.reach_pixel(cpu, ppu, apu, keys, mmu, target_oam:, stationary_positions:, max_steps: 24, arrive_threshold: 18, prefer_axis: :auto)

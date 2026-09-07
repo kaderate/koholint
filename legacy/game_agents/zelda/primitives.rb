@@ -1,5 +1,5 @@
 # frozen_string_literal: true
-# Reusable action primitives for the Zelda game-playing agent (see docs/ZELDA_AGENT.md).
+# Reusable action primitives for the Zelda game-playing agent (see docs/CONCEPT.md).
 #
 # Link has no fixed OAM slot -- the game reassigns which of the 40 sprite slots renders him
 # between frames. find_link works around this by exclusion: read all active (on-screen) OAM
@@ -13,7 +13,7 @@
 # all produced byte-identical trajectories). Two outcomes only: it resolves to +/-~14px along the
 # pressed axis (a completed step -- not exactly TILE_SIZE, empirically ~14px), or it bounces back
 # to within a few px of the starting position (blocked by a collision). Reading position before
-# that settle window closes is what produced the earlier 7-31px noise (see ZELDA_BACKLOG.md) --
+# that settle window closes is what produced the earlier 7-31px noise (see docs/archive/EXPLORATION_LOG.md) --
 # it was catching different mid-animation frames, not measuring real per-tap variance.
 require_relative '../../../profiling/utils'
 

@@ -1,83 +1,80 @@
 # NEXT
 
-Point d'entrée de toute reprise. Une page, pas plus.
+Entry point for any resumption. One page, no more.
 
-## État au 7 septembre 2026
+## State as of September 7, 2026
 
-Dépôt initialisé depuis le spike gemboy (`claude/usage-2mr345` @ `c952ded`). `lib/` est vide, tout
-le code est dans `legacy/`, tout le savoir dans `data/` et `docs/`.
+Repo initialized from the gemboy spike (`claude/usage-2mr345` @ `c952ded`). `lib/` is empty, all
+code is in `legacy/`, all knowledge is in `data/` and `docs/`.
 
-**Indicateurs**
+**Indicators**
 
-| Indicateur | Valeur |
+| Indicator | Value |
 |---|---|
-| Progression dans le jeu | Bouclier niveau 1 obtenu, maison de départ quittée, 4 PNJ du village avec dialogue capturé (Tarin, la 2e habitante de la maison, le villageois de screen3, Pépé le Ramollo dans house2). Pas d'épée. |
-| Trajet A vers B | Non mesuré en frames. `ScreenMap.navigate!` fonctionne sur les 7 écrans cartographiés, au prix du code `legacy/`. |
-| Faits vérifiés (registre RAM) | 6 entrées HRAM `verified` : X, Y, ombre de X, direction, salle, carte. Voir `data/ram_registry.json`. |
+| Progress in the game | Level-1 shield obtained, starting house left, 4 village NPCs with dialogue captured (Tarin, the house's 2nd occupant, screen3's villager, Pépé le Ramollo in house2). No sword. |
+| Trip A to B | Not measured in frames. `ScreenMap.navigate!` works on the 7 mapped screens, at the cost of `legacy/` code. |
+| Verified facts (RAM registry) | 6 `verified` HRAM entries: X, Y, X shadow, direction, room, map. See `data/ram_registry.json`. |
 
-**Checkpoints reproductibles** (`legacy/game_agents/zelda/scenarios.rb`, fichiers dans
-`/tmp/zelda_checkpoints`, non versionnés) : `after_shield_interior`, `front_yard`,
+**Reproducible checkpoints** (`legacy/game_agents/zelda/scenarios.rb`, files in
+`/tmp/zelda_checkpoints`, not versioned): `after_shield_interior`, `front_yard`,
 `overworld_screen2`, `villager_screen`, `shop_screen`, `screen3_north`, `house2_interior`.
-Identifiants de salle lus en `0xFFF6` : front_yard 162, overworld_screen2 178, villager_screen 177,
+Room IDs read at `0xFFF6`: front_yard 162, overworld_screen2 178, villager_screen 177,
 screen3_north 161, shop_screen 179, house2_interior 169.
 
-## Décisions en vigueur
+## Decisions in force
 
-D1 ratifiée (HRAM). D2 (OAM) obsolète. D3 tranchée : DMG. D4 à trancher, différée au résultat de
-Session 1 (voir `PLAN.md`, tranchage formel en Session 3). D5, D6, D7 ratifiées. Voir
-`DECISIONS.md`.
+D1 ratified (HRAM). D2 (OAM) obsolete. D3 decided: DMG. D4 open, deferred to Session 1's outcome
+(see `PLAN.md`, formally decided in Session 3). D5, D6, D7 ratified. See `DECISIONS.md`.
 
-## Dette d'import comblée (7 septembre 2026)
+## Import gap closed (September 7, 2026)
 
-`koholint-init` avait été importé depuis `gemboy@claude/usage-2mr345` au commit `c952ded`, un cran
-avant le dernier commit de cette branche (`5ee7949`, "Archive the HRAM diff and other reusable
-scratchpad diagnostics into experiments/"). Les 6 scripts manquants qui ont produit D1
-(`ram_diff_hram.rb`, `ram_diff_hram2.rb`, `diag_scx_scy.rb`, `diag_scx_scy2.rb`,
-`house2_dialogue.rb`, `house2_sprite2.rb`) sont maintenant dans `legacy/game_agents/experiments/`,
-et la note de méthode correspondante dans `data/ram_registry.json` a été complétée (chemin corrigé
-vers `legacy/`, et la phrase orientant vers la réutilisation de la technique pour la question
-ci-dessous).
+`koholint-init` had been imported from `gemboy@claude/usage-2mr345` at commit `c952ded`, one commit
+short of that branch's tip (`5ee7949`, "Archive the HRAM diff and other reusable scratchpad
+diagnostics into experiments/"). The 6 missing scripts that produced D1 (`ram_diff_hram.rb`,
+`ram_diff_hram2.rb`, `diag_scx_scy.rb`, `diag_scx_scy2.rb`, `house2_dialogue.rb`,
+`house2_sprite2.rb`) are now in `legacy/game_agents/experiments/`, and the matching method note in
+`data/ram_registry.json` has been completed (path fixed to point at `legacy/`, and the sentence
+pointing at reusing the technique for the question below).
 
-## Prochaine question proposée (Session 1 du plan, voir `PLAN.md`)
+## Next question proposed (Plan Session 1, see `PLAN.md`)
 
-**Le terrain est-il lisible depuis l'état du jeu ?** Hypothèse d'ingénierie, à vérifier : le jeu
-décode chaque salle en une grille d'objets 16×16 (10×8) en WRAM et lit la collision de chaque type
-d'objet dans une table ROM. Si c'est vrai, la collision se lit au lieu de se sonder, et D4 se
-tranche presque seule.
+**Is terrain readable from game state?** Engineering hypothesis, to verify: the game decodes each
+room into a 16x16 object grid (10x8) in WRAM and reads each object type's collision from a ROM
+table. If true, collision is read instead of probed, and D4 decides almost by itself.
 
-- **Rôle** : explorateur.
-- **Critère** : pour deux écrans déjà cartographiés (`front_yard`, `starting_house`), une lecture
-  WRAM prédit les arêtes `:blocked` et `:ok` des grilles de `legacy/.../screen_maps/` avec un taux
-  d'accord mesuré et expliqué pour chaque désaccord.
-- **Budget** : une session, 3 h.
-- **Comment** : depuis un checkpoint, diff WRAM entre deux salles (`0xFFF6` différent) pour isoler
-  la zone qui change en bloc ; corréler sa disposition 10×8 avec la tilemap visible ; puis
-  confronter aux grilles oracle.
-- **Livrable** : entrée `data/ram_registry.json` promue ou réfutée, plus le taux d'accord dans le
-  rapport de session.
-- **Indicateur visé** : faits vérifiés.
+- **Role**: explorer.
+- **Criterion**: for two already-mapped screens (`front_yard`, `starting_house`), a WRAM read
+  predicts the `:blocked`/`:ok` edges of `legacy/.../screen_maps/`'s grids, with a measured
+  agreement rate and every disagreement explained.
+- **Budget**: one session, 3h.
+- **How**: from a checkpoint, diff WRAM between two rooms (different `0xFFF6`) to isolate the zone
+  that changes as a block; correlate its 10x8 layout with the visible tilemap; then check against
+  the oracle grids.
+- **Deliverable**: `data/ram_registry.json` entry promoted or refuted, plus the agreement rate in
+  the session report.
+- **Indicator targeted**: verified facts.
 
-Session suivante si celle-ci est confirmée (ou réfutée) : Session 2 du plan, l'outil de navigation
-par snapshot (D7) — bloquée tant que l'API de session headless (D6) n'a pas atterri côté gemboy
-(externe, hors périmètre koholint, voir `DECISIONS.md`).
+Next session if this one is confirmed (or refuted): Plan Session 2, the snapshot-based navigation
+tool (D7) — blocked until the headless session API (D6) has landed on gemboy's side (external,
+outside koholint's scope, see `DECISIONS.md`).
 
-## Ce qu'il ne faut PAS refaire
+## What NOT to redo
 
-- Chercher la position de Link ailleurs qu'en HRAM. C'est trouvé.
-- Étendre `ScreenMap`, `TileClassifier` ou `TileCatalog`. Ils sont remplacés, pas améliorés.
-- Lancer `ScreenMap.build` sur un nouvel écran "en attendant". 1,5 à 5 h par écran pour une
-  donnée que D4 peut rendre inutile.
-- Lire `docs/archive/EXPLORATION_LOG.md` en entier pour reprendre. Y chercher un fait, au plus.
+- Look for Link's position anywhere other than HRAM. That's found.
+- Extend `ScreenMap`, `TileClassifier`, or `TileCatalog`. They're being replaced, not improved.
+- Run `ScreenMap.build` on a new screen "in the meantime". 1.5 to 5h per screen for data that D4
+  might make useless.
+- Read `docs/archive/EXPLORATION_LOG.md` in full to resume. Look up a fact in it, at most.
 
-## Rapport de la dernière session
+## Last session's report
 
 ```
-Question : la position de Link et l'identifiant de salle sont-ils en HRAM ?
-Réponse : confirmée. 0xFF98/0xFF99 (X/Y, verified_count 8), 0xFF9E (direction), 0xFFF6 (salle,
-          6 écrans distincts), 0xFFF7 (carte : 0 extérieur, 16 pour house2).
-Indicateurs : jeu = 4 PNJ, pas d'épée | trajet A→B = non mesuré | faits vérifiés = 6 HRAM
-Décisions prises : D1 (mesurée, à ratifier). Trois écrans supplémentaires cartographiés avec le
-          code legacy avant la revue (shop_screen, screen3_north, house2_interior).
-Prochaine question proposée : voir ci-dessus.
-Ce qu'il ne faut PAS refaire : voir ci-dessus.
+Question: are Link's position and room ID in HRAM?
+Answer: confirmed. 0xFF98/0xFF99 (X/Y, verified_count 8), 0xFF9E (direction), 0xFFF6 (room,
+        6 distinct screens), 0xFFF7 (map: 0 outdoors, 16 for house2).
+Indicators: game = 4 NPCs, no sword | trip A→B = not measured | verified facts = 6 HRAM
+Decisions made: D1 (measured, to be ratified). Three more screens mapped with the legacy code
+        before the review (shop_screen, screen3_north, house2_interior).
+Next question proposed: see above.
+What NOT to redo: see above.
 ```

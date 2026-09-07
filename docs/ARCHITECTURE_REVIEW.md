@@ -1,167 +1,159 @@
-# Revue d'architecture et de concept du spike
+# Architecture and concept review of the spike
 
-Revue faite le 7 septembre 2026 sur le spike `lib/game_agents/` de gemboy, alors à 50 commits en
-3 jours ; mise à jour le même jour après que la branche d'exploration a vérifié l'hypothèse HRAM
-et cartographié trois écrans de plus. Périmètre : concept et architecture, pas de revue de code.
-Le code revu est dans `legacy/`, le concept dans `docs/CONCEPT.md`, le journal dans
-`docs/archive/EXPLORATION_LOG.md`.
+Review done on September 7, 2026 on gemboy's `lib/game_agents/` spike, then at 50 commits over 3
+days; updated the same day after the exploration branch verified the HRAM hypothesis and mapped
+three more screens. Scope: concept and architecture, not a code review. The reviewed code is in
+`legacy/`, the concept in `docs/CONCEPT.md`, the log in `docs/archive/EXPLORATION_LOG.md`.
 
 ## Verdict
 
-Le concept est solide : exécution déterministe entre les décisions, faits lus en RAM, LLM
-seulement aux points de décision, provenance traçable des faits. Le code du spike ne l'implémente
-pas. Il construit un robot cartographe aveugle qui :
+The concept is sound: deterministic execution between decisions, facts read in RAM, LLM only at
+decision points, traceable provenance of facts. The spike's code does not implement it. It builds
+a blind mapping robot that:
 
-1. lit le jeu par la mauvaise couche (PPU : OAM et VRAM) au lieu de l'état du jeu (RAM/HRAM) ;
-2. ignore le levier principal d'un émulateur déterministe (snapshot/restore instantané) et explore
-   comme un robot physique ;
-3. poursuit un objectif que le concept ne demande pas (cartographier exhaustivement chaque case de
-   chaque écran) à un coût structurel de 1,5 à 5 h par écran.
+1. reads the game through the wrong layer (PPU: OAM and VRAM) instead of game state (RAM/HRAM);
+2. ignores a deterministic emulator's main lever (instant snapshot/restore) and explores like a
+   physical robot;
+3. pursues a goal the concept does not ask for (exhaustively mapping every cell of every screen) at
+   a structural cost of 1.5 to 5h per screen.
 
-Après 4 jours : 7 écrans cartographiés, 4 PNJ, pas d'épée, aucune boucle de décision. La valeur du
-projet (un LLM qui joue) n'a pas commencé.
+After 4 days: 7 screens mapped, 4 NPCs, no sword, no decision loop. The project's value (an LLM
+that plays) has not started.
 
-## Ce qui tient et a été gardé
+## What holds up and was kept
 
-- **Le document de conception** (`docs/CONCEPT.md`) : découplage exécution/décision, déclencheurs
-  détectés par code, pause-capture, split planner/executor, confiance par `verified_count`.
-- **`Zelda::Checkpoint`** (Marshal de tout l'état émulateur, 0,03 s dump / 0,05 s load) et le
-  chaînage de `Zelda::Scenarios`. Meilleure idée technique du spike, socle de tout le reste. Les
-  séquences d'entrée des scénarios encodent des heures d'exploration.
-- **La discipline de validation** : cross-validation entre deux outils, données suspectes jetées
-  plutôt que commitées, fixes revalidés en live. La découverte de la contamination du catalogue par
-  le coin `[3,3]` de starting_house est un vrai résultat.
-- **Trois trouvailles durables** : le scratch-buffer de tuiles pour le texte des dialogues
-  (`0xD0-0xEF`, décoder par bitmap jamais par ID) ; le modèle de mouvement verrouillé sur la tuile
-  (un appui d'une frame commet ~14 px ou un rebond, en ~24-28 frames) ; et, après la revue, la
-  position et la salle en HRAM.
-- **`TilemapReader`** : lecture BG correcte, calquée sur l'adressage du PPU, avec le piège DMG/CGB
-  identifié. Utile pour "regarder l'écran" en cross-check.
+- **The design document** (`docs/CONCEPT.md`): decoupling execution/decision, code-detected
+  triggers, pause-capture, planner/executor split, confidence via `verified_count`.
+- **`Zelda::Checkpoint`** (Marshal of the whole emulator state, 0.03s dump / 0.05s load) and
+  `Zelda::Scenarios`' chaining. The spike's best technical idea, the foundation for everything
+  else. The scenarios' input sequences encode hours of exploration.
+- **Validation discipline**: cross-validation between two tools, suspicious data discarded rather
+  than committed, fixes revalidated live. Discovering the tile catalog's contamination by
+  starting_house's `[3,3]` corner is a real result.
+- **Three lasting findings**: the tile scratch-buffer for dialogue text (`0xD0-0xEF`, decode by
+  bitmap, never by ID); the tile-locked movement model (a one-frame tap commits ~14px or a bounce,
+  over ~24-28 frames); and, after the review, position and room in HRAM.
+- **`TilemapReader`**: correct BG reads, mirroring the PPU's own addressing, with the DMG/CGB trap
+  identified. Useful for "looking at the screen" as a cross-check.
 
-## Problème de fond 1 — la couche d'observation
+## Root problem 1 — the observation layer
 
-Le concept dit "RAM, pas vision". L'implémentation a glissé vers "PPU, pas RAM" :
+The concept says "RAM, not vision". The implementation drifted toward "PPU, not RAM":
 
-| Fait | Lu par le spike via | Fragilité observée |
+| Fact | Read by the spike via | Fragility observed |
 |---|---|---|
-| Position de Link | OAM (`find_link`, tuile 0/2, exclusion de positions) | slot réassigné, pose idle non reconnue, Tarin pris pour Link, villageois errant |
-| Changement d'écran | SCX/SCY, avant ça une distance en px | caméra qui pan sur screen3, faux `:exit` sur starting_house |
-| Terrain | tilemap VRAM, hash 8×8 + palette | même motif de sol partagé entre cases au comportement différent |
-| HUD | window layer | reconfiguré dynamiquement pendant un dialogue |
+| Link's position | OAM (`find_link`, tile 0/2, exclusion of positions) | slot reassigned, idle pose not recognized, Tarin mistaken for Link, wandering villager |
+| Screen change | SCX/SCY, before that a pixel distance | camera panning on screen3, false `:exit` on starting_house |
+| Terrain | VRAM tilemap, 8x8 hash + palette | same floor pattern shared between cells with different behavior |
+| HUD | window layer | dynamically reconfigured during a dialogue |
 
-L'OAM et la VRAM sont la *vue* du jeu, pas son *modèle*. Toute la machinerie de `TileClassifier`
-(cell_for, dérive de coin, `:lost`, `clear_entry_lock!`, budgets de retries) compense l'absence de
-trois faits présents en mémoire : coordonnées réelles de Link, identifiant de salle, collision.
+OAM and VRAM are the game's *view*, not its *model*. All of `TileClassifier`'s machinery
+(cell_for, corner drift, `:lost`, `clear_entry_lock!`, retry budgets) compensates for the absence
+of three facts present in memory: Link's real coordinates, room ID, collision.
 
-**Position et salle : confirmé.** Les deux chasses par diff mémoire du spike n'avaient scanné que
-la WRAM. Un diff sur tout l'espace `0x0000-0xFFFF` a trouvé en une passe `0xFF98` (X), `0xFF99`
-(Y), `0xFF9E` (direction), `0xFFF6` (salle) et `0xFFF7` (carte), en accord avec le désassemblage
-communautaire de LADX. Détail dans `data/ram_registry.json`, décision D1.
+**Position and room: confirmed.** The spike's two memory-diff hunts had never scanned HRAM. A diff
+over the whole `0x0000-0xFFFF` space found, in one pass, `0xFF98` (X), `0xFF99` (Y), `0xFF9E`
+(direction), `0xFFF6` (room), and `0xFFF7` (map), matching the community LADX disassembly. Detail
+in `data/ram_registry.json`, decision D1.
 
-**Collision : hypothèse suivante, même méthode.** Le jeu décode chaque salle en une grille
-d'objets 16×16 (10×8 par écran) en WRAM, et lit la physique de chaque type d'objet dans une table
-ROM. Le catalogue de tuiles reconstruit empiriquement, à 8×8 et par hash de pixels, une information
-que le jeu stocke explicitement au bon niveau de granularité. Le fait que `TileCatalog` ait besoin
-que les 4 tuiles d'une cellule soient d'accord est déjà une approximation de l'objet 16×16 du jeu.
-C'est la prochaine question de `NEXT.md`.
+**Collision: next hypothesis, same method.** The game decodes each room into a 16x16 object grid
+(10x8 per screen) in WRAM, and reads each object type's physics from a ROM table. The
+empirically-rebuilt tile catalog reconstructs, at 8x8 and by pixel hash, information the game
+already stores explicitly at the right level of granularity. That `TileCatalog` needs all 4 tiles
+of a cell to agree is already an approximation of the game's own 16x16 object. This is `NEXT.md`'s
+next question.
 
-## Problème de fond 2 — le déterminisme n'est pas exploité
+## Root problem 2 — determinism is not exploited
 
-L'émulateur est déterministe et la restauration coûte 0,046 s. Pourtant `ScreenMap.build` explore
-comme un robot physique : marcher jusqu'à la case, tester une direction, *revenir à pied*
-(`walk_back_to_cell!`), budget de récupération par direction, re-navigation depuis le spawn après
-chaque `reset`. Conséquences documentées dans le journal : dérive, "creep", contamination par
-l'ordre des directions (`up` d'abord change le résultat de `down`), garde `live_probed`,
-`MAX_RECOVERIES_PER_CELL`, cellules `SKIPPED`, RSS à 1,4 Go après 1,75 h de rechargements de
-fichier.
+The emulator is deterministic and restoring costs 0.046s. Yet `ScreenMap.build` explores like a
+physical robot: walking to the cell, testing a direction, *walking back*
+(`walk_back_to_cell!`), a recovery budget per direction, re-navigating from spawn after every
+`reset`. Documented consequences in the log: drift, "creep", contamination by direction order
+(`up` first changes `down`'s result), the `live_probed` guard, `MAX_RECOVERIES_PER_CELL`, `SKIPPED`
+cells, RSS at 1.4GB after 1.75h of file reloads.
 
-Avec un snapshot **en mémoire** par case (Marshal vers une String, pas vers un fichier) :
+With an **in-memory** snapshot per cell (Marshal to a String, not to a file):
 
-- chaque direction se teste depuis un état strictement identique, puis on restaure ;
-- plus de marche-retour, plus de dérive, plus d'effet d'ordre : `DIRECTIONS` cesse d'être un
-  paramètre ;
-- le quirk de coin de `[3,3]` devient une propriété déterministe de l'état, testable et
-  reproductible, plus un accident d'historique ;
-- `live_probed`, les budgets de récupération et la moitié de `screen_map.rb` disparaissent ;
-- le coût d'une direction tombe à ~30 frames émulées + une restauration.
+- each direction is tested from a strictly identical state, then restored;
+- no more walk-back, no more drift, no more order effect: `DIRECTIONS` stops being a parameter;
+- the `[3,3]` corner quirk becomes a deterministic, testable, reproducible property of the state,
+  rather than a historical accident;
+- `live_probed`, recovery budgets, and half of `screen_map.rb` disappear;
+- the cost of one direction drops to ~30 emulated frames plus a restore.
 
-C'est la décision D7.
+This is decision D7.
 
-## Problème de fond 3 — cartographie exhaustive ou navigation à la demande
+## Root problem 3 — exhaustive mapping or on-demand navigation
 
-Le concept dit qu'Explore est "entièrement scripté, sans jugement", pas "exhaustif". Le spike a
-choisi l'exhaustif sans le décider explicitement. Le coût :
+The concept says Explore is "fully scripted, no judgment", not "exhaustive". The spike chose
+exhaustive without deciding it explicitly. The cost:
 
-| Mesure | Valeur |
+| Measure | Value |
 |---|---|
-| Écrans cartographiés en 4 jours | 7 |
-| Coût d'un écran (`ScreenMap.build`) | 1,5 à 5 h (house2_interior : 2 h 05 pour 27 cases) |
-| Plafond du taux de skip imposé par `live_probed` | 75 % (une sonde live par case minimum) |
-| Meilleur taux observé | 71 % (starting_house) |
-| Écrans d'overworld dans le jeu | environ 256, hors donjons et intérieurs |
+| Screens mapped in 4 days | 7 |
+| Cost of one screen (`ScreenMap.build`) | 1.5 to 5h (house2_interior: 2h05 for 27 cells) |
+| Skip-rate ceiling imposed by `live_probed` | 75% (one live probe per cell minimum) |
+| Best rate observed | 71% (starting_house) |
+| Overworld screens in the game | around 256, excluding dungeons and interiors |
 
-Le garde `live_probed` contredit la promesse du catalogue ("tendre vers zéro test live"). Un joueur
-humain ne sonde pas 40 cases, il regarde l'écran et marche. Si la collision se lit en WRAM
-(prochaine question), la sonde devient un cross-check et non la source. Décision D4, au
-propriétaire.
+The `live_probed` guard contradicts the catalog's promise ("trend toward zero live tests"). A
+human player doesn't probe 40 cells, they look at the screen and walk. If collision reads from
+WRAM (next question), the probe becomes a cross-check, not the source. Decision D4, owner's call.
 
 ## Architecture
 
-**Frontière émulateur/agent inexistante.** Les primitives sont des fonctions globales définies sur
-`main` (`find_link`, `move_tiles`, `tap_key`), l'agent boote via `profiling/utils.rb` de gemboy,
-`Checkpoint` pique des ivars privées de l'APU et du CPU. Le 5-uplet `[cpu, ppu, apu, mmu, keys]`
-traverse chaque signature et se fait réassigner à chaque reset. Il manque un objet **session
-headless côté gemboy** : avancer de N frames, presser/relâcher, lire une adresse, snapshot/restore
-en mémoire. `Motherboard` et `debug/headless_emulator.rb` en sont déjà deux tiers. Il servirait
-aussi `test_roms/` et `profiling/`. Décision D6.
+**No boundary between emulator and agent.** The primitives are global functions defined on `main`
+(`find_link`, `move_tiles`, `tap_key`), the agent boots via gemboy's `profiling/utils.rb`,
+`Checkpoint` reaches into private ivars of the APU and CPU. The `[cpu, ppu, apu, mmu, keys]` tuple
+threads through every signature and gets reassigned on every reset. What's missing is a **headless
+session object on gemboy's side**: advance N frames, press/release, read an address, in-memory
+snapshot/restore. `Motherboard` and `debug/headless_emulator.rb` are already two-thirds of it. It
+would also serve `test_roms/` and `profiling/`. Decision D6.
 
-**Placement.** Un sous-arbre spécifique à une ROM vivait dans `lib/` de l'émulateur, hors de son
-`ARCHITECTURE.md`, avec zéro spec alors que l'émulateur en a 1237, des offenses rubocop tolérées et
-des commentaires-essais contraires à ses conventions. D'où ce dépôt, qui dépend de gemboy comme
-d'une gem.
+**Placement.** A ROM-specific subtree lived in the emulator's `lib/`, outside its own
+`ARCHITECTURE.md`, with zero specs while the emulator has 1237, tolerated rubocop offenses, and
+essay-comments contrary to its own conventions. Hence this repo, which depends on gemboy like a
+gem.
 
-**Le temps est compté en instructions.** `run_steps(60_000_000)` pour attendre le boot,
-`hold: 100_000` pour un appui, mélangés à `TRIGGER_FRAMES * FRAME_CYCLES`. Le jeu échantillonne par
-frame ; l'agent doit ne parler qu'en frames. Mieux : attendre une **condition** d'état (ce que le
-concept appelle un déclencheur) au lieu d'un compteur. Les scénarios sont des minuteries en boucle
-ouverte, fragiles au moindre changement de timing de l'émulateur. Le checkpoint `villager_screen`
-sauvé mi-scroll en est un symptôme.
+**Time is counted in instructions.** `run_steps(60_000_000)` to wait for boot, `hold: 100_000` for
+a keypress, mixed with `TRIGGER_FRAMES * FRAME_CYCLES`. The game samples per frame; the agent
+should speak only in frames. Better: wait for a state **condition** (what the concept calls a
+trigger) instead of a counter. The scenarios are open-loop timers, fragile to any change in the
+emulator's timing. The `villager_screen` checkpoint saved mid-scroll is a symptom of this.
 
-**Trois générations de mappers, quatre repères.** `Navigator` (grille statique + greedy pixel),
-`RoomMap::Recorder` (nœuds pixel snappés), `ScreenGrid` (cellules 16 px depuis les pieds OAM), plus
-`world_model.json.map_graph` écrit à la main. Aucun repère canonique : les écrans s'appellent
-"screen2" par ordre de découverte, les arêtes `:exit` ne relient rien. `0xFFF6` donne la clé et le
-graphe monde gratuitement.
+**Three generations of mappers, four coordinate frames.** `Navigator` (static grid + greedy pixel),
+`RoomMap::Recorder` (snapped pixel nodes), `ScreenGrid` (16px cells from OAM feet), plus
+`world_model.json.map_graph` written by hand. No canonical frame: screens are named "screen2" by
+discovery order, `:exit` edges connect nothing. `0xFFF6` gives the key and the world graph for
+free.
 
-**Le modèle de données n'existe qu'en doc.** Le registre RAM vient de recevoir ses premières
-vraies entrées ; `world_model.json` est édité à la main avec de la prose dedans, alors que le
-concept prévoit une mise à jour mécanique par lecture RAM ; pas d'action log.
+**The data model only exists in docs.** The RAM registry has just received its first real
+entries; `world_model.json` is hand-edited with prose in it, while the concept calls for a
+mechanical update from RAM reads; there is no action log.
 
-**DMG ou CGB, décision implicite.** Décision D3, au propriétaire.
+**DMG or CGB, an implicit decision.** Decision D3, owner's call.
 
-**Politique sur la connaissance pré-entraînée.** L'anti-triche (`puzzle_validator.rb`) vise à
-juste titre le savoir de *jeu*. Il a été appliqué implicitement au savoir d'*ingénierie*, ce qui a
-coûté des jours : la carte mémoire du désassemblage était la bonne source d'hypothèses depuis le
-début. Règle dans `AGENTS.md`.
+**Policy on pre-trained knowledge.** The anti-cheat check (`puzzle_validator.rb`) rightly targets
+*game* knowledge. It was implicitly applied to *engineering* knowledge too, which cost days: the
+disassembly's memory map was the right source of hypotheses all along. Rule in `AGENTS.md`.
 
-## Plan, dans l'ordre
+## Plan, in order
 
-1. ~~Diff mémoire complet, HRAM incluse, pour position et salle.~~ Fait, D1.
-2. **La collision se lit-elle en WRAM ?** Question de `NEXT.md`. Tranche D4 en pratique.
-3. **API de session headless dans gemboy** (D6) : frames, touches, lecture mémoire,
-   snapshot/restore en mémoire, specs. Save state comme fonctionnalité de l'émulateur.
-4. **Nouvel outil de navigation sur snapshot** (D7) dans `lib/`, validé une fois contre les grilles
-   oracle de `legacy/`, puis régénération des 7 checkpoints sans `legacy/`. Suppression de
-   `legacy/`.
-5. **Trancher D3 et D4** avant d'accumuler de nouvelles données.
-6. **Seulement ensuite**, la boucle de décision du concept : déclencheurs sur état RAM, planner,
-   executor, action log JSONL. C'est là que la valeur du projet est censée être.
+1. ~~Full memory diff, HRAM included, for position and room.~~ Done, D1.
+2. **Does collision read from WRAM?** `NEXT.md`'s question. Settles D4 in practice.
+3. **Headless session API in gemboy** (D6): frames, keys, memory reads, in-memory
+   snapshot/restore, specs. Save state as a feature of the emulator.
+4. **New snapshot-based navigation tool** (D7) in `lib/`, validated once against `legacy/`'s
+   oracle grids, then regeneration of the 7 checkpoints without `legacy/`. Removal of `legacy/`.
+5. **Decide D3 and D4** before accumulating new data.
+6. **Only then**, the concept's decision loop: triggers on RAM state, planner, executor, JSONL
+   action log. That's where the project's value is supposed to be.
 
-## Chantiers ouverts du spike, relus
+## Spike's open items, reread
 
-- `[6,7]` d'overworld_screen3 (villageois errant suspecté) : disparaît avec D1 et D7.
-- house2_interior : entré et cartographié par le spike après la revue. Pépé le Ramollo y parle d'un
-  téléphone "à l'extérieur" : premier indice lu dans le jeu, à suivre par le planner.
-- Croissance mémoire de `ScreenMap.build` : cesse d'être un sujet sans rechargement de fichier.
-- OCR des dialogues : après la boucle de décision, pas avant.
-- Épée et `cut_grass` : objectif de jeu, à traiter par le planner, pas par un script.
+- `[6,7]` of overworld_screen3 (suspected wandering villager): disappears with D1 and D7.
+- house2_interior: entered and mapped by the spike after the review. Pépé le Ramollo talks about a
+  phone "outside": first in-game clue read, to be followed up by the planner.
+- `ScreenMap.build`'s memory growth: stops being a topic without file reloads.
+- Dialogue OCR: after the decision loop, not before.
+- Sword and `cut_grass`: a game objective, for the planner to handle, not a script.

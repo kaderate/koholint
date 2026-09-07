@@ -1,84 +1,84 @@
-# Décisions
+# Decisions
 
-Une entrée par choix structurant : contexte, options, choix, et la condition qui l'invaliderait.
-Statuts : `ratifiée` (validée par le propriétaire), `mesurée` (établie empiriquement, à ratifier),
-`prise sans validation` (héritée du spike, à revoir), `à trancher` (ouverte, propriétaire).
+One entry per structuring choice: context, options, choice, and the condition that would
+invalidate it. Statuses: `ratified` (validated by the owner), `measured` (established empirically,
+to be ratified), `taken without validation` (inherited from the spike, to be revisited),
+`open` (to be decided by the owner).
 
-## D1 — Source de position et de salle : HRAM, pas OAM
+## D1 — Source of position and room: HRAM, not OAM
 
-- **Statut** : ratifiée (7 septembre 2026).
-- **Contexte** : le spike lisait la position de Link dans l'OAM par exclusion et détection de
-  tuile, et nommait les écrans par ordre de découverte. Deux chasses par diff mémoire avaient
-  échoué en ne scannant que la WRAM. Un diff sur tout l'espace `0x0000-0xFFFF`, fait le 7 septembre
-  après la revue, a trouvé les octets en HRAM.
-- **Choix** : `0xFF98` (X), `0xFF99` (Y), `0xFF9E` (direction), `0xFFF6` (salle), `0xFFF7` (carte)
-  sont la source primaire. Détail et `verified_count` dans `data/ram_registry.json`. L'OAM devient
-  un cross-check, jamais la source.
-- **Invalidée si** : une salle où ces octets ne suivent pas Link, ou deux salles distinctes avec le
-  même `0xFFF6`+`0xFFF7`.
+- **Status**: ratified (September 7, 2026).
+- **Context**: the spike read Link's position from OAM by exclusion and tile detection, and named
+  screens by discovery order. Two memory-diff hunts had failed by only scanning WRAM. A diff over
+  the whole `0x0000-0xFFFF` space, done on September 7 after the review, found the bytes in HRAM.
+- **Choice**: `0xFF98` (X), `0xFF99` (Y), `0xFF9E` (direction), `0xFFF6` (room), `0xFFF7` (map) are
+  the primary source. Detail and `verified_count` in `data/ram_registry.json`. OAM becomes a
+  cross-check, never the source.
+- **Invalidated if**: a room where these bytes don't track Link, or two distinct rooms sharing the
+  same `0xFFF6`+`0xFFF7`.
 
-## D2 — Position par OAM
+## D2 — Position via OAM
 
-- **Statut** : prise sans validation pendant le spike, **obsolète** par D1.
-- Conservée pour mémoire : elle a coûté `find_link`, `cell_for`, la détection de scroll par
-  SCX/SCY, `clear_entry_lock!` et une part des budgets de retries. Ne pas réintroduire.
+- **Status**: taken without validation during the spike, **obsolete** per D1.
+- Kept for the record: it cost `find_link`, `cell_for`, scroll detection via SCX/SCY,
+  `clear_entry_lock!`, and part of the retry budgets. Do not reintroduce.
 
-## D3 — Mode matériel : DMG
+## D3 — Hardware mode: DMG
 
-- **Statut** : tranchée (7 septembre 2026) — **DMG**.
-- **Contexte** : la ROM DX tourne en DMG faute de flag `--cgb`, découvert incidemment. Le contenu
-  DX (donjon des couleurs, photographe) est verrouillé derrière le mode CGB. Les checkpoints et le
-  catalogue de tuiles (hash incluant la palette) sont spécifiques au mode.
-- **Choix** : rester en DMG. Checkpoints et données actuels réutilisables ; le contenu DX reste
-  inaccessible tant que ce choix n'est pas révisé.
-- **Invalidée si** : le propriétaire décide que l'accès au contenu DX-only justifie de tout
-  régénérer. Coût connu et accepté au moment de la bascule : chaque checkpoint/donnée créée en DMG
-  d'ici là est à refaire.
+- **Status**: decided (September 7, 2026) — **DMG**.
+- **Context**: the DX ROM runs in DMG for lack of a `--cgb` flag, discovered incidentally. DX
+  content (the color dungeon, the photographer) is locked behind CGB mode. Checkpoints and the tile
+  catalog (hash including the palette) are mode-specific.
+- **Choice**: stay on DMG. Current checkpoints and data remain usable; DX content stays
+  inaccessible until this choice is revisited.
+- **Invalidated if**: the owner decides that access to DX-only content justifies regenerating
+  everything. Known and accepted cost at the time of the switch: every checkpoint/data created in
+  DMG up to that point has to be redone.
 
-## D4 — Exploration exhaustive par écran
+## D4 — Exhaustive exploration per screen
 
-- **Statut** : à trancher, **différée**. Condition de tranchage : le résultat de la Session 1 du
-  plan (`PLAN.md`) — si la collision se lit en WRAM, l'exhaustif perd son objet et D4 penche vers
-  "à la demande" quasi automatiquement. Recommandation formelle soumise au propriétaire en
-  Session 3 (réviseur), sur la base du résultat de Session 1. Différer n'a pas de coût identifié :
-  aucune session du plan initial ne dépend de D4 avant Session 3.
-- **Contexte** : `ScreenMap.build` sonde toutes les cases d'un écran, 1,5 à 5 h par écran, avec un
-  plancher d'une sonde live par case. Le concept demande une exploration scriptée, pas exhaustive.
-- **Options** : cartographier ce que le prochain objectif exige, en lisant le terrain depuis l'état
-  du jeu ; ou tout cartographier, avec le nouvel outil sur snapshot.
-- **Recommandation de la revue** : à la demande.
+- **Status**: open, **deferred**. Deciding condition: the outcome of Plan Session 1
+  (`PLAN.md`) — if collision reads from WRAM, the exhaustive approach loses its purpose and D4
+  leans toward "on demand" almost automatically. Formal recommendation submitted to the owner in
+  Session 3 (reviewer), based on Session 1's outcome. Deferring has no identified cost: no session
+  in the initial plan depends on D4 before Session 3.
+- **Context**: `ScreenMap.build` probes every cell of a screen, 1.5 to 5h per screen, with a floor
+  of one live probe per cell. The concept calls for scripted exploration, not exhaustive.
+- **Options**: map what the next objective requires, by reading terrain from game state; or map
+  everything, with the new snapshot-based tool.
+- **Review recommendation**: on demand.
 
-## D5 — `legacy/` se remplace, ne s'étend pas
+## D5 — `legacy/` gets replaced, not extended
 
-- **Statut** : ratifiée (7 septembre 2026).
-- **Choix** : le code importé du spike sert à régénérer les checkpoints de `Zelda::Scenarios` et à
-  produire le rapport, jusqu'à ce que `lib/` couvre ces deux usages. On n'y ajoute ni composant ni
-  correctif au-delà de ce qu'exige une régénération. Ses grilles JSON servent d'oracle une fois,
-  pour valider le nouvel outil de navigation, puis sont supprimées.
-- **Invalidée si** : la parité "régénérer tous les checkpoints" n'est pas atteinte au plus tard à
-  la 2e revue à froid suivant le début de la construction de `lib/` — dans le plan initial
-  (`PLAN.md`), Session 6. Passé ce point sans parité, retour au propriétaire plutôt que
-  prolongation silencieuse. Délai proposé par le planificateur, ajustable par le propriétaire.
+- **Status**: ratified (September 7, 2026).
+- **Choice**: the code imported from the spike is used to regenerate `Zelda::Scenarios`
+  checkpoints and to run the report, until `lib/` covers both uses. No component or fix is added
+  to it beyond what a regeneration requires. Its JSON grids serve as an oracle once, to validate
+  the new navigation tool, then get deleted.
+- **Invalidated if**: "regenerate every checkpoint" parity is not reached by the 2nd cold review
+  following the start of `lib/`'s construction — in the initial plan (`PLAN.md`), Session 6. Past
+  that point without parity, back to the owner rather than silent extension. Delay proposed by the
+  planner, adjustable by the owner.
 
-## D6 — API de session headless côté gemboy, dépendance en gem épinglée
+## D6 — Headless session API on gemboy's side, pinned-gem dependency
 
-- **Statut** : ratifiée (7 septembre 2026).
-- **Choix** : gemboy expose un objet session (avancer de N frames, touches, lecture mémoire,
-  snapshot/restore en mémoire, `Motherboard` dessous). Le save state devient une fonctionnalité de
-  l'émulateur. Ce dépôt en dépend comme d'une gem à version épinglée ; un changement de timing de
-  l'émulateur invalide explicitement les checkpoints au lieu de le faire silencieusement.
-- **Écriture** : par un agent côté gemboy, hors périmètre des sessions koholint. C'est un bloqueur
-  externe pour toute session koholint qui en dépend (Session 2 du plan initial) : signalé au
-  propriétaire dès qu'une telle session est prête à démarrer mais ne peut pas, plutôt que contourné
-  en réimplémentant un bout de session-object ici.
-- **Invalidée si** : gemboy refuse cette API dans son périmètre ; alors elle vit ici, en
-  s'appuyant sur `Motherboard` uniquement.
+- **Status**: ratified (September 7, 2026).
+- **Choice**: gemboy exposes a session object (advance N frames, keys, memory reads, in-memory
+  snapshot/restore, `Motherboard` underneath). Save state becomes a feature of the emulator. This
+  repo depends on it like a pinned-version gem; a change in the emulator's timing explicitly
+  invalidates checkpoints instead of doing so silently.
+- **Authorship**: written by an agent on gemboy's side, outside the scope of koholint sessions.
+  It's an external blocker for any koholint session that depends on it (Session 2 of the initial
+  plan): flagged to the owner as soon as such a session is ready to start but can't, rather than
+  worked around by reimplementing a piece of session-object here.
+- **Invalidated if**: gemboy refuses this API within its scope; then it lives here instead, relying
+  on `Motherboard` only.
 
-## D7 — Sonde de collision par snapshot, pas par marche-retour
+## D7 — Snapshot-based collision probing, not walk-and-return
 
-- **Statut** : ratifiée (7 septembre 2026).
-- **Choix** : toute mesure sur une case part d'un snapshot en mémoire de l'état à cette case ;
-  chaque direction est testée depuis ce même état puis restaurée. Plus de retour à pied, plus de
-  budget de récupération, plus d'ordre de directions.
-- **Invalidée si** : le coût mémoire d'un snapshot rend impraticable d'en garder un par case
-  d'écran ; mesurer avant de conclure.
+- **Status**: ratified (September 7, 2026).
+- **Choice**: every measurement on a cell starts from an in-memory snapshot of the state at that
+  cell; each direction is tested from that same state, then restored. No more walking back, no
+  recovery budget, no direction ordering.
+- **Invalidated if**: the memory cost of a snapshot makes it impractical to keep one per screen
+  cell; measure before concluding.

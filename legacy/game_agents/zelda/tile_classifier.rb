@@ -6,7 +6,7 @@ require_relative 'tile_catalog'
 
 # Tests ONE gameplay cell of movement at a time and feeds the result into a shared TileCatalog,
 # so a tile is only ever probed once across the whole game -- unlike RoomMap::Recorder's per-
-# screen empirical rediscovery (kept as a validation tool, see ZELDA_BACKLOG.md), the point here
+# screen empirical rediscovery (kept as a validation tool, see docs/archive/EXPLORATION_LOG.md), the point here
 # is that classifying the same visual tile (grass, wall...) on screen N+1 costs zero further
 # probing once it was classified on screen N.
 module Zelda
@@ -23,7 +23,7 @@ module Zelda
     # Feet (bottom of his 16px-tall sprite) and horizontal center (he's the left half of a 16px-wide
     # sprite) anchor which 16x16 gameplay cell he occupies -- calibrated against a screenshot: the
     # computed cell landed exactly on the door tile in overworld_front_yard, matching the door's
-    # visible position (see ZELDA_BACKLOG.md).
+    # visible position (see docs/archive/EXPLORATION_LOG.md).
     def self.cell_for(pos)
       feet_y = pos[:y] - 1 # (y - 16) + 15
       center_x = pos[:x] # (x - 8) + 8
@@ -40,7 +40,7 @@ module Zelda
 
     # Whether Link is currently, verifiably, standing in gameplay cell `cell`. A direction test
     # can leave residual drift off a cell's canonical position without crossing into a *confirmed*
-    # neighbor (the "creeping collision" pattern -- see ZELDA_BACKLOG.md's movement model): an edge
+    # neighbor (the "creeping collision" pattern -- see docs/archive/EXPLORATION_LOG.md's movement model): an edge
     # recorded :ok from overworld_front_yard's [5,5] didn't reproduce on direct retesting, traced
     # to exactly this contaminating the next direction's test with a slightly-off start position.
     def self.at_cell?(cpu, ppu, apu, mmu, cell, stationary_positions:)
@@ -49,10 +49,10 @@ module Zelda
     end
 
     # Attempts one gameplay cell of movement in `direction`, retrying a not-yet-moved result (the
-    # "creeping collision" pattern -- see ZELDA_BACKLOG.md's movement model) up to `retries` times.
+    # "creeping collision" pattern -- see docs/archive/EXPLORATION_LOG.md's movement model) up to `retries` times.
     # Outcome is decided by exact cell equality (no distance threshold needed -- positions are
     # quantized to cells now); a screen-exit is confirmed by the camera itself panning (SCX/SCY
-    # changing), not by a raw pixel-distance heuristic -- see ZELDA_BACKLOG.md's starting_house
+    # changing), not by a raw pixel-distance heuristic -- see docs/archive/EXPLORATION_LOG.md's starting_house
     # finding: an open room lets a retry sequence cover more than a few px while overshooting
     # `expected` (a corner redirect, say), and a pixel-distance threshold alone can't tell that
     # apart from an actual scroll.
@@ -84,7 +84,7 @@ module Zelda
 
         # A bounce move_tiles itself reports as "no real step" can still leave a few px of creep --
         # enough, after several retries, to cross into a cell neither `before_cell` nor `expected`
-        # (see ZELDA_BACKLOG.md's movement model). Trust the *measured* final cell, not the
+        # (see docs/archive/EXPLORATION_LOG.md's movement model). Trust the *measured* final cell, not the
         # assumption that a non-":ok" outcome means Link never left `before_cell`.
         return [:blocked, before_cell, before_cell] if after_cell == before_cell
 
@@ -166,12 +166,12 @@ module Zelda
     # (the direction he was still walking when the state was captured) makes real progress -- any
     # other press either does nothing or produces a couple px of bounce/correction that isn't a
     # real step (single-press pixel deltas were observed reversing a prior step's exact distance,
-    # not advancing a new direction -- see ZELDA_BACKLOG.md's movement model). A single full-cell
+    # not advancing a new direction -- see docs/archive/EXPLORATION_LOG.md's movement model). A single full-cell
     # `probe` in `entry_direction` clears it: unlocking only takes a handful of presses (a few px),
     # far fewer than the multi-press budget a full ~16px cell crossing already uses, so by the time
     # probe reports :ok the lock is gone as a side effect. ScreenMap.build never hit this because
     # DIRECTIONS happens to test :down first and every checkpoint so far exits south -- a room
-    # entered from another direction (see house2_interior in ZELDA_BACKLOG.md) would have its very
+    # entered from another direction (see house2_interior in docs/archive/EXPLORATION_LOG.md) would have its very
     # first probe misreport :blocked. Call this once right after loading a fresh checkpoint, before
     # any navigation or exploration; a real (and useful) step if there was no lock to begin with.
     def self.clear_entry_lock!(cpu, ppu, apu, keys, mmu, entry_direction:, stationary_positions:, retries: 8)

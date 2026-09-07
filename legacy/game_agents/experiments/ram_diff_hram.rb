@@ -1,11 +1,11 @@
 # frozen_string_literal: true
 
-# Question falsifiable (revue ZELDA_ARCHITECTURE_REVIEW.md, plan recommande #1) :
-# la position de Link et l'ID de salle sont-ils lisibles en HRAM aux adresses hypothesees
-# (hLinkPositionX ~$FF98, hLinkPositionY ~$FF99, direction ~$FF9E, hMapRoom ~$FFF6, map id ~$FFF7) ?
-# Budget : diff complet 0x0000-0xFFFF autour de 4 appuis dans une meme direction, sur 2 directions
-# orthogonales (RIGHT puis DOWN) pour croiser le signe. Livrable : ram_registry.json mis a jour
-# (verified ou refuted) avec la preuve.
+# Falsifiable question (docs/ARCHITECTURE_REVIEW.md, plan item #1):
+# are Link's position and room ID readable in HRAM at the hypothesized addresses
+# (hLinkPositionX ~$FF98, hLinkPositionY ~$FF99, direction ~$FF9E, hMapRoom ~$FFF6, map id ~$FFF7)?
+# Budget: full 0x0000-0xFFFF diff around 4 taps in the same direction, on 2 orthogonal directions
+# (RIGHT then DOWN) to cross-check the sign. Deliverable: ram_registry.json updated
+# (verified or refuted) with the evidence.
 $LOAD_PATH.unshift(File.expand_path('/home/user/gemboy/lib'))
 $LOAD_PATH.unshift(File.expand_path('/home/user/gemboy/profiling'))
 require 'utils'

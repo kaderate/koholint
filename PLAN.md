@@ -1,159 +1,156 @@
-# Plan — depuis la réinitialisation du 7 septembre 2026
+# Plan — since the September 7, 2026 reset
 
-Suite de SESSIONS, pas de tâches. Chaque session suit le format et les rôles d'`AGENTS.md` : une
-question falsifiable, un critère de fin observable, un budget, un indicateur de but visé. Le plan
-s'arrête à la première session qui fait tourner la boucle de décision du concept (déclencheur sur
-état RAM, planner, executor, action log) sur un objectif de jeu réel — pas plus loin, ce qui suit
-dépend de ce qu'on y aura appris.
+A sequence of SESSIONS, not tasks. Each session follows `AGENTS.md`'s format and roles: one
+falsifiable question, one observable end criterion, one budget, one targeted goal indicator. The
+plan stops at the first session that runs the concept's decision loop (trigger on RAM state,
+planner, executor, action log) on a real game objective — no further, since what follows depends
+on what's learned there.
 
-Contraintes valables pour tout ce plan :
+Constraints that hold across this whole plan:
 
-- Aucune session n'étend `legacy/` ni ne lance `ScreenMap.build` (D5, et NEXT.md "Ce qu'il ne faut
-  PAS refaire").
-- Aucune session autonome (sans humain) n'est planifiée. Le propriétaire attend d'avoir posé les
-  bases (au plus tôt après la Session 4) avant de donner un feu vert à l'autonomie.
-- Revue à froid toutes les 3 sessions — traduction en cadencement de plan du "chaque matin ou si
-  gros blocage" du propriétaire. Un vrai blocage déclenche une revue hors cadence, sans attendre le
-  3e créneau.
-- D6 (API de session headless) est écrite côté gemboy par un autre agent, hors périmètre des
-  sessions koholint. Toute session qui en dépend le note explicitement ; le propriétaire est averti
-  dès qu'une session est prête à démarrer mais bloquée sur cette dépendance.
+- No session extends `legacy/` or runs `ScreenMap.build` (D5, and `NEXT.md`'s "What NOT to redo").
+- No autonomous (unattended) session is planned. The owner is waiting for the foundations to be
+  laid (at the earliest after Session 4) before greenlighting autonomy.
+- Cold review every 3 sessions — a plan-cadence translation of the owner's "every morning or on a
+  major blocker". A real blocker triggers a review out of cadence, without waiting for the 3rd
+  slot.
+- D6 (headless session API) is written on gemboy's side by another agent, outside the scope of
+  koholint sessions. Any session that depends on it notes so explicitly; the owner is warned as
+  soon as a session is ready to start but blocked on this dependency.
 
-**Point d'attention avant Session 1** (constat de cette session de planification, pas une
-décision) : l'import initial (`koholint-init`, commit `42f1f0e`) vient de `gemboy@claude/usage-
-2mr345` au commit `c952ded`, mais cette branche a un commit de plus non importé (`5ee7949`,
-"Archive the HRAM diff and other reusable scratchpad diagnostics into experiments/"). Il ajoute les
-scripts qui ont produit D1 (`ram_diff_hram.rb`, `ram_diff_hram2.rb`, `diag_scx_scy.rb`,
-`diag_scx_scy2.rb`, `house2_dialogue.rb`, `house2_sprite2.rb`) et une note dans `ram_registry.json`
-indiquant explicitement que Session 1 doit réutiliser la même technique de diff complet. Ni le code
-de `legacy/` ni les données ne sont affectés (vérifié identique par ailleurs). À importer ou non :
-décision du propriétaire, pas de cette session.
+**Note before Session 1** (a finding from this planning session, not a decision): the initial
+import (`koholint-init`, commit `42f1f0e`) comes from `gemboy@claude/usage-2mr345` at commit
+`c952ded`, but that branch has one more commit that wasn't imported (`5ee7949`, "Archive the HRAM
+diff and other reusable scratchpad diagnostics into experiments/"). It adds the scripts that
+produced D1 (`ram_diff_hram.rb`, `ram_diff_hram2.rb`, `diag_scx_scy.rb`, `diag_scx_scy2.rb`,
+`house2_dialogue.rb`, `house2_sprite2.rb`) and a note in `ram_registry.json` explicitly pointing
+Session 1 at reusing the same full-diff technique. Neither `legacy/`'s code nor its data are
+affected (checked identical otherwise). Import status: done — see `NEXT.md`.
 
 ---
 
-## Session 1 — Le terrain est-il lisible depuis l'état du jeu ?
+## Session 1 — Is terrain readable from game state?
 
 ```
-Rôle : explorateur
-Question : le jeu décode-t-il chaque salle en une grille d'objets 16×16 (10×8) en WRAM, avec la
-           collision de chaque type d'objet lue dans une table ROM — au lieu d'être sondée ?
-Critère de fin : pour front_yard et starting_house (déjà cartographiés), une lecture WRAM prédit
-           les arêtes :blocked/:ok des grilles legacy/.../screen_maps/ avec un taux d'accord
-           mesuré et chaque désaccord expliqué.
-Budget : 3 h
-Dépend de : D1 (ratifiée)
-Livrable : entrée data/ram_registry.json promue ou réfutée, taux d'accord dans le rapport
-Indicateur visé : faits vérifiés — c'est directement une entrée de registre RAM à statuer
+Role: explorer
+Question: does the game decode each room into a 16x16 object grid (10x8) in WRAM, with each
+          object type's collision read from a ROM table — instead of being probed?
+End criterion: for front_yard and starting_house (already mapped), a WRAM read predicts the
+          :blocked/:ok edges of legacy/.../screen_maps/'s grids with a measured agreement rate,
+          every disagreement explained.
+Budget: 3h
+Depends on: D1 (ratified)
+Deliverable: data/ram_registry.json entry promoted or refuted, agreement rate in the report
+Indicator targeted: verified facts — this is directly a RAM registry entry to be settled
 ```
 
-Déjà entièrement spécifiée dans `NEXT.md` ; reprise ici sans changement, sous réserve du choix D3
-(DMG, confirmé — n'invalide rien : les checkpoints utilisés sont en DMG).
+Already fully specified in `NEXT.md`; carried over here unchanged, subject to D3's choice (DMG,
+confirmed — invalidates nothing: the checkpoints used are in DMG).
 
-## Session 2 — Outil de navigation par snapshot (D7), validé une fois contre l'oracle
-
-```
-Rôle : constructeur
-Question : un outil de navigation dans lib/, qui teste chaque direction depuis un snapshot en
-           mémoire puis restaure (D7), reproduit-il les arêtes :blocked/:ok des grilles oracle
-           legacy/.../screen_maps/ pour front_yard et starting_house ?
-Critère de fin : 100% d'accord avec l'oracle sur ces deux écrans, ou chaque désaccord documenté et
-           expliqué (contamination connue du coin [3,3], notamment) avant d'être accepté.
-Budget : 6 h
-Dépend de : D6 livré côté gemboy (EXTERNE — bloquant, voir note en tête de plan), D7 (ratifiée),
-           conclusion de Session 1
-Livrable : code dans lib/, specs sur checkpoint, JSON oracle des deux écrans marqués consommés
-Indicateur visé : trajet A→B — première traversée mesurée en frames, sans sonde live, sur un
-           écran connu
-```
-
-Si D6 n'a pas atterri côté gemboy quand cette session est prête à démarrer : ne pas contourner en
-réimplémentant un bout de session-object dans koholint. Signaler le blocage au propriétaire et
-attendre.
-
-## Session 3 — Revue à froid : sessions 1–2, et statut de D4
+## Session 2 — Snapshot-based navigation tool (D7), validated once against the oracle
 
 ```
-Rôle : réviseur
-Question : les livrables des sessions 1 et 2 sont-ils conformes à docs/CONCEPT.md et aux décisions
-           ratifiées (D1, D6, D7) ? Le résultat de la Session 1 permet-il de trancher D4
-           (exploration exhaustive contre à la demande), et dans quel sens ?
-Critère de fin : rapport écrit, jugement conforme/non conforme par livrable, recommandation
-           explicite sur D4 soumise au propriétaire (le réviseur ne tranche pas D4 lui-même,
-           voir AGENTS.md "les décisions de fond appartiennent au propriétaire")
-Budget : 3 h, session fraîche, aucun code écrit
-Dépend de : Sessions 1, 2
-Livrable : DECISIONS.md (statut D4 mis à jour si le propriétaire tranche sur la recommandation),
-           note NEXT.md
-Indicateur visé : faits vérifiés — vérifie que ce que les sessions 1–2 déclarent "vérifié" ou
-           "validé" tient à la relecture
+Role: builder
+Question: does a navigation tool in lib/, testing each direction from an in-memory snapshot then
+          restoring (D7), reproduce the :blocked/:ok edges of legacy/.../screen_maps/'s oracle
+          grids for front_yard and starting_house?
+End criterion: 100% agreement with the oracle on these two screens, or every disagreement
+          documented and explained (notably the known [3,3] corner contamination) before being
+          accepted.
+Budget: 6h
+Depends on: D6 delivered on gemboy's side (EXTERNAL — blocking, see note at the top of the plan),
+          D7 (ratified), Session 1's conclusion
+Deliverable: code in lib/, checkpoint specs, oracle JSON for both screens marked consumed
+Indicator targeted: trip A→B — first crossing measured in frames, with no live probe, on a
+          known screen
 ```
 
-## Session 4 — Régénérer les 7 checkpoints avec l'outil lib/, retirer legacy/ (D5)
+If D6 hasn't landed on gemboy's side when this session is ready to start: don't work around it by
+reimplementing a piece of session-object in koholint. Flag the blocker to the owner and wait.
+
+## Session 3 — Cold review: sessions 1–2, and D4's status
 
 ```
-Rôle : constructeur
-Question : les 7 checkpoints connus (after_shield_interior, front_yard, overworld_screen2,
-           villager_screen, shop_screen, screen3_north, house2_interior) sont-ils traversables
-           A→B via lib/ seul, sans aucun fichier de legacy/ ?
-Critère de fin : les 7 checkpoints régénérés et traversés par lib/ ; legacy/ supprimé dans le même
-           commit que le dernier checkpoint atteignant la parité (condition d'invalidation de D5).
-Budget : 9 h (3 blocs de 3 h), un commit par checkpoint migré
-Dépend de : Session 2 (outil de navigation), D5 (ratifiée, délai : voir DECISIONS.md)
-Livrable : code lib/, specs sur les 7 checkpoints, suppression de legacy/
-Indicateur visé : trajet A→B — les 7 trajets connus, mesurés en frames, sans legacy/
+Role: reviewer
+Question: do sessions 1 and 2's deliverables comply with docs/CONCEPT.md and the ratified
+          decisions (D1, D6, D7)? Does Session 1's outcome settle D4 (exhaustive exploration vs.
+          on demand), and in which direction?
+End criterion: written report, compliant/non-compliant judgment per deliverable, explicit
+          recommendation on D4 submitted to the owner (the reviewer does not decide D4 itself,
+          see AGENTS.md "fundamental decisions belong to the owner")
+Budget: 3h, fresh session, no code written
+Depends on: Sessions 1, 2
+Deliverable: DECISIONS.md (D4's status updated if the owner decides based on the recommendation),
+          NEXT.md note
+Indicator targeted: verified facts — checks that what sessions 1–2 declared "verified" or
+          "validated" holds up on rereading
 ```
 
-## Session 5 — Squelette de la boucle de décision (sans objectif réel encore)
+## Session 4 — Regenerate the 7 checkpoints with the lib/ tool, remove legacy/ (D5)
 
 ```
-Rôle : constructeur
-Question : un déclencheur sur changement d'état RAM (salle, santé, texte ouvert) peut-il suspendre
-           l'exécution scriptée, appeler un planner minimal, journaliser l'action dans un fichier
-           JSONL, puis reprendre — sur un scénario jouet (ex. changement de salle simple) ?
-Critère de fin : un run de bout en bout produit un action log JSONL exploitable, avec au moins un
-           déclenchement réel et une décision de planner enregistrée avec sa provenance.
-Budget : 9 h (3 blocs de 3 h)
-Dépend de : Session 4 (lib/ à parité, legacy/ retiré)
-Livrable : code lib/ (déclencheurs, planner minimal, executor, action log), specs
-Indicateur visé : faits vérifiés — l'action log devient la nouvelle source de provenance des
-           décisions prises, aucun indicateur de jeu n'est censé bouger ici (justifié : squelette
-           mécanique, pas encore d'objectif de jeu)
+Role: builder
+Question: are the 7 known checkpoints (after_shield_interior, front_yard, overworld_screen2,
+          villager_screen, shop_screen, screen3_north, house2_interior) traversable A→B via lib/
+          alone, with no file from legacy/?
+End criterion: the 7 checkpoints regenerated and traversed by lib/; legacy/ removed in the same
+          commit as the last checkpoint reaching parity (D5's invalidation condition).
+Budget: 9h (3 blocks of 3h), one commit per migrated checkpoint
+Depends on: Session 2 (navigation tool), D5 (ratified, delay: see DECISIONS.md)
+Deliverable: lib/ code, specs on the 7 checkpoints, removal of legacy/
+Indicator targeted: trip A→B — the 7 known trips, measured in frames, without legacy/
 ```
 
-## Session 6 — Revue à froid : sessions 4–5, prêt pour un objectif réel ?
+## Session 5 — Decision-loop skeleton (no real objective yet)
 
 ```
-Rôle : réviseur
-Question : lib/ couvre-t-il la parité de régénération des 7 checkpoints sans dérive depuis
-           Session 4 ? Le squelette de Session 5 respecte-t-il le découplage exécution/décision de
-           docs/CONCEPT.md (peu d'appels LLM, à des points de décision précis, faits en RAM) ?
-Critère de fin : rapport écrit, jugement conforme/non conforme, feu vert ou non pour Session 7.
-Budget : 3 h, session fraîche, aucun code écrit
-Dépend de : Sessions 4, 5
-Livrable : note NEXT.md, DECISIONS.md si un écart structurant est trouvé
-Indicateur visé : faits vérifiés — même logique que Session 3
+Role: builder
+Question: can a trigger on a RAM state change (room, health, text open) suspend scripted
+          execution, call a minimal planner, log the action to a JSONL file, then resume — on a
+          toy scenario (e.g. a simple room change)?
+End criterion: an end-to-end run produces a usable action-log JSONL, with at least one real
+          trigger and one planner decision logged with its provenance.
+Budget: 9h (3 blocks of 3h)
+Depends on: Session 4 (lib/ at parity, legacy/ removed)
+Deliverable: lib/ code (triggers, minimal planner, executor, action log), specs
+Indicator targeted: verified facts — the action log becomes the new provenance source for
+          decisions made; no game indicator is expected to move here (justified: mechanical
+          skeleton, no game objective yet)
 ```
 
-## Session 7 — Premier objectif de jeu réel via la boucle de décision
+## Session 6 — Cold review: sessions 4–5, ready for a real objective?
 
 ```
-Rôle : constructeur
-Question : la boucle de décision (déclencheurs RAM, planner, executor, action log) peut-elle mener
-           Link d'un point A à un objectif de jeu réel non trivial (ex. obtenir l'épée, ou sortir
-           de la maison de départ si pas déjà acquis à ce stade) en s'appuyant sur les faits en RAM
-           et un minimum d'appels LLM aux points de décision ?
-Critère de fin : l'objectif choisi est atteint au moins une fois, reproductible, avec action log
-           complet et provenance de chaque décision.
-Budget : 9 h (3 blocs de 3 h)
-Dépend de : Session 6 (feu vert), tous les livrables précédents
-Livrable : code lib/, action log JSONL de la run réussie, entrée NEXT.md avec le nouveau jalon
-Indicateur visé : progression dans le jeu — premier jalon de jeu réel atteint par la boucle de
-           décision elle-même, pas par un script de spike. C'est l'objectif du projet ; le plan
-           s'arrête ici.
+Role: reviewer
+Question: does lib/ cover checkpoint-regeneration parity with no drift since Session 4? Does
+          Session 5's skeleton respect docs/CONCEPT.md's execution/decision decoupling (few LLM
+          calls, at precise decision points, RAM-sourced facts)?
+End criterion: written report, compliant/non-compliant judgment, green light or not for Session 7.
+Budget: 3h, fresh session, no code written
+Depends on: Sessions 4, 5
+Deliverable: NEXT.md note, DECISIONS.md if a structural gap is found
+Indicator targeted: verified facts — same logic as Session 3
+```
+
+## Session 7 — First real game objective via the decision loop
+
+```
+Role: builder
+Question: can the decision loop (RAM triggers, planner, executor, action log) lead Link from a
+          point A to a non-trivial real game objective (e.g. getting the sword, or leaving the
+          starting house if not already reached by this point) relying on RAM-sourced facts and a
+          minimum of LLM calls at decision points?
+End criterion: the chosen objective is reached at least once, reproducibly, with a complete
+          action log and provenance for every decision.
+Budget: 9h (3 blocks of 3h)
+Depends on: Session 6 (green light), all prior deliverables
+Deliverable: lib/ code, JSONL action log of the successful run, NEXT.md entry with the new
+          milestone
+Indicator targeted: progress in the game — first real game milestone reached by the decision
+          loop itself, not by a spike script. This is the project's goal; the plan stops here.
 ```
 
 ---
 
-Le plan s'arrête à la Session 7. La suite dépend de ce que cette première boucle réelle aura appris
-— nouvelle question, nouvelle session, décidée à froid par le propriétaire sur la base du rapport
-de Session 7.
+The plan stops at Session 7. What follows depends on what this first real loop will have taught
+— a new question, a new session, decided cold by the owner based on Session 7's report.

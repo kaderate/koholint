@@ -2,7 +2,7 @@
 # Found a named NPC in house2_interior via approach 2 of house2_interact2.rb: "Pépé le Ramollo" --
 # the sprite pair previously guessed as part of the "pot cluster" (tile 112-118) is actually this
 # NPC, dialogue box confirmed. Capture the full dialogue page by page (same method used for
-# Tarkin/the 2nd starting-house NPC/the overworld villager -- see ZELDA_BACKLOG.md).
+# Tarkin/the 2nd starting-house NPC/the overworld villager -- see docs/archive/EXPLORATION_LOG.md).
 $LOAD_PATH.unshift('/home/user/gemboy/lib')
 require 'game_agents/zelda/scenarios'
 require 'game_agents/zelda/screen_map'

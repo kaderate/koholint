@@ -9,7 +9,7 @@
 require 'fileutils'
 $stdout.sync = true # redirected stdout is fully buffered by default -- without this, progress
 # output (see logger: below) doesn't actually appear until the process exits,
-# making a stalled run indistinguishable from a slow one (see ZELDA_BACKLOG.md).
+# making a stalled run indistinguishable from a slow one (see docs/archive/EXPLORATION_LOG.md).
 $LOAD_PATH.unshift(File.expand_path('../..', __dir__))
 require 'game_agents/zelda/scenarios'
 require 'game_agents/zelda/screen_map'
@@ -31,7 +31,7 @@ FileUtils.mkdir_p(File.dirname(grid_path))
 
 # A full exploration can run for tens of minutes; the grid/catalog only reach disk on a normal
 # return below, so a hard kill (a wall-clock `timeout` wrapper included -- see
-# ZELDA_BACKLOG.md's movement model) mid-build loses everything since the last save. `live_grid`
+# docs/archive/EXPLORATION_LOG.md's movement model) mid-build loses everything since the last save. `live_grid`
 # gets a reference the moment ScreenMap.build creates it (see `on_grid_ready:`), so the trap
 # below can save the real in-progress state instead of nothing.
 live_grid = nil
@@ -50,7 +50,7 @@ cpu, ppu, apu, mmu, keys = Zelda::Scenarios.public_send(checkpoint_method)
 # Right after Tarkin's dialogue, Link's sprite renders in an idle pose (a non-tile-0 frame)
 # find_link's tile-ID matching doesn't recognize -- with no exclusions, its fallback grabs the
 # first OAM sprite (Tarkin) instead of Link, corrupting every distance measurement from spawn
-# (see ZELDA_BACKLOG.md). STATIONARY_STARTING_HOUSE already lists exactly those NPC/decor
+# (see docs/archive/EXPLORATION_LOG.md). STATIONARY_STARTING_HOUSE already lists exactly those NPC/decor
 # positions for the interior screens that chain off it.
 no_excl = checkpoint_method == 'after_shield_interior' ? Zelda::Scenarios::STATIONARY_STARTING_HOUSE : []
 reset = -> { Zelda::Checkpoint.load(Zelda::Scenarios.checkpoint_path(checkpoint_method.to_s)) }

@@ -13,7 +13,7 @@ require_relative '../../ppu/coordinate'
 # than move-and-observe.
 #
 # Mode-dependent: despite the ROM's "_dx.gbc" filename, `mmu.model.cgb?` is actually false for it
-# at boot (no --cgb flag forcing CGB on this dual-compatible cartridge, see CLAUDE.md's model
+# at boot (no --cgb flag forcing CGB on this dual-compatible cartridge, see gemboy's model
 # selection rule) -- it runs in plain DMG mode, which has no per-tile attribute byte at all (no
 # bank/palette/flip -- see PPU::DotDrawer::DMG#compute_background_pixel, a single global BGP
 # register colors every tile). Reading VRAM bank 1 on a DMG @vram (allocated with bank: 1, i.e.

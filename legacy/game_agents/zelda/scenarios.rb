@@ -29,7 +29,7 @@ module Zelda
     end
 
     # Boots the save, plays through the intro dialogues and gets the shield from Tarkin -- still
-    # inside the starting house. See ZELDA_BACKLOG.md "Exited the house".
+    # inside the starting house. See docs/archive/EXPLORATION_LOG.md "Exited the house".
     def self.after_shield_interior(rom: 'roms/zelda_la_dx.gbc')
       cached('after_shield_interior', rom:) do
         cpu, ppu, apu, mmu, keys = build_emulator(rom, with_input: true)
@@ -49,7 +49,7 @@ module Zelda
     end
 
     # Continues from after_shield_interior and exits the starting house's south door into the
-    # front yard. See ZELDA_BACKLOG.md "Exited the house".
+    # front yard. See docs/archive/EXPLORATION_LOG.md "Exited the house".
     def self.front_yard(rom: 'roms/zelda_la_dx.gbc')
       cached('front_yard', rom:) do
         cpu, ppu, apu, mmu, keys = after_shield_interior(rom:)
@@ -122,7 +122,7 @@ module Zelda
     end
 
     # Continues from front_yard one screen-scroll south (a fenced plot with a large round bush/
-    # tree). See ZELDA_BACKLOG.md "Overworld exploration".
+    # tree). See docs/archive/EXPLORATION_LOG.md "Overworld exploration".
     def self.overworld_screen2(rom: 'roms/zelda_la_dx.gbc')
       cached('overworld_screen2', rom:) do
         cpu, ppu, apu, mmu, keys = front_yard(rom:)
@@ -135,7 +135,7 @@ module Zelda
     end
 
     # Continues from overworld_screen2 to the 3rd overworld screen (a house + wandering villager,
-    # one more screen-scroll south/west). See ZELDA_BACKLOG.md "Overworld exploration".
+    # one more screen-scroll south/west). See docs/archive/EXPLORATION_LOG.md "Overworld exploration".
     def self.villager_screen(rom: 'roms/zelda_la_dx.gbc')
       cached('villager_screen', rom:) do
         cpu, ppu, apu, mmu, keys = overworld_screen2(rom:)
@@ -154,7 +154,7 @@ module Zelda
 
     # Continues from overworld_screen2 through its confirmed-but-previously-unfollowed east exit
     # (ScreenGrid's [1,9] -> :right -> :exit) -- a shop ("MAGASIN"), never visited before this
-    # checkpoint. See ZELDA_BACKLOG.md "Découverte complète du village". A single move_tiles press
+    # checkpoint. See docs/archive/EXPLORATION_LOG.md "Découverte complète du village". A single move_tiles press
     # isn't reliably enough to complete the scroll transition (same multi-press pattern probe()
     # already handles) -- use it instead of a bare move_tiles call.
     def self.shop_screen(rom: 'roms/zelda_la_dx.gbc')
@@ -171,7 +171,7 @@ module Zelda
 
     # Continues from villager_screen through overworld_screen3's confirmed-but-previously-
     # unfollowed north exit ([0,5] -> :up -> :exit) -- a building with a distinctive large-window
-    # facade, never visited before this checkpoint. See ZELDA_BACKLOG.md "Découverte complète du
+    # facade, never visited before this checkpoint. See docs/archive/EXPLORATION_LOG.md "Découverte complète du
     # village".
     def self.screen3_north(rom: 'roms/zelda_la_dx.gbc')
       cached('screen3_north', rom:) do
@@ -186,7 +186,7 @@ module Zelda
     end
 
     # Continues from villager_screen through house2's door, routing below the tall-grass strip
-    # that blocks a direct approach (see ZELDA_BACKLOG.md's house2_interior finding) -- reachable
+    # that blocks a direct approach (see docs/archive/EXPLORATION_LOG.md's house2_interior finding) -- reachable
     # only via this session's engine determinism: the same push sequence from the same starting
     # cell reproduces the exact same result every time, so a plain move_tiles loop (not probe,
     # which requires each individual call to complete a full gameplay cell) is what actually
