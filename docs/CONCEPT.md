@@ -98,6 +98,22 @@ mid-navigation-script. First item in the spike below.
   stays fully scripted/deterministic — no judgment calls in walking an empty corridor, a sub-agent
   there is pure waste.
 
+### Action primitives — an extensible catalog, not a fixed set
+
+The Explore executor needs a library of actions above raw movement (`Navigator#move!`/`#probe`) to
+run without escalating to the planner at every step. Not exhaustive by design: expected to grow as
+new situations are found, one entry at a time (`AGENTS.md`'s anti-patch rule applies here too — a
+situation no existing action covers is a reason to add one, not to special-case `Navigator`
+itself). Each entry gets its own spec once implemented, per `AGENTS.md`'s "memory is specs and
+data". Known so far, to be extended:
+
+- walk to an NPC (approach and stop at interaction range)
+- walk to an object (approach and stop within reach)
+- leave the screen via a given edge (up/down/left/right)
+- talk to an NPC (`interact` at range, then read the resulting dialogue)
+- raise the shield while stationary
+- raise the shield while moving
+
 ## Data model: confidence must be traceable, not vibes
 
 Every fact carries provenance, not a felt percentage. Confidence is a function of two measurable
