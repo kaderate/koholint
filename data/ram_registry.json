@@ -104,6 +104,13 @@
       "why_inconclusive_not_refuted": "Tested against only one room (front_yard, the second room the criterion calls for, is blocked -- see intro_door_gate's related_finding above). A single static snapshot can't isolate a candidate the way D1's method did (diff between two different rooms to find the block that changes); with only one room, most of WRAM is trivially 'consistent' with almost any single-cell hypothesis by chance. Re-test once a second room is reachable, using the diff-between-rooms method NEXT.md originally specified, before concluding either way on D4."
     }
   },
+  "select_map_screen": {
+    "status": "confirmed -- coordinating session, September 8, 2026, direct check on the owner's hint. Holding (not tapping) :select brings up a full-screen grid overlay -- a released tap alone shows nothing, the screen apparently closes as soon as the button is released. Screenshot taken after holding for ~50 frames from front_yard_navigator.dump.",
+    "source": "screen_render_verified",
+    "verified_count": 1,
+    "confidence": "verified",
+    "note": "A uniform grid of square cells fills most of the screen (every cell looks visually identical at this zoom -- no obvious per-cell 'discovered' shading spotted yet, worth checking more carefully). A small blinking marker (a short vertical mark over a down-pointing chevron) sits at roughly the grid position matching front_yard. A separate framed icon showing '!' and '?' sits in the lower-right, visually distinct from the grid cells (its own border/corner decorations) -- likely a legend/key rather than a map marker, not confirmed either way. NOT YET TESTED: does holding a d-pad direction while :select is held pan/scroll the grid to reveal more of it; does the grid encode per-room discovery status anywhere (visually or in an underlying WRAM/VRAM structure); does the marker or the legend box change based on Link's actual position/room. Flagged as a promising lead for D4/world-topology -- if there's a WRAM bitmap backing this view, reading it directly could reveal the world's shape far faster than room-by-room navigation. Follow-up investigation queued -- see NEXT.md."
+  },
   "room_labels": {
     "_readme": "Human-readable label + description per (room_id, map_id), assigned by visually reading a screenshot -- purely descriptive (shape/color/layout), never a claim about what something 'really is' per AGENTS.md's forbidden-game-knowledge rule. Provisional, renamed/refined as more is observed. Key format: 'room_id/map_id'.",
     "162/0": {

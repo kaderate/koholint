@@ -31,6 +31,25 @@ purposes but still useful as `Zelda::Checkpoint`-format inputs to bootstrap a `M
 `lib/validation/starting_house_oracle_check.rb` for the adapter: `Motherboard.new(cpu, ppu, apu,
 mmu, mmu.dma, mmu.model)`).
 
+## Session report (September 8, 2026 -- SELECT opens a world map screen)
+
+Owner's hint: holding (not tapping) `:select` opens a full-screen grid overlay -- confirmed
+directly by the coordinating session (`data/ram_registry.json`'s new `select_map_screen` entry).
+A uniform grid of cells, a blinking position marker near front_yard's spot on the grid, and a
+separate framed "!?" icon (likely a legend, not confirmed) in the lower-right. Not yet understood:
+whether panning works (d-pad + select held), whether the grid encodes per-room discovery status
+anywhere visible or in an underlying WRAM/VRAM structure, or what the "!?" icon means. This is a
+promising lead for world-topology -- if there's a data structure backing this view, reading it
+directly could reveal the world's shape far faster than room-by-room navigation, in the same
+spirit as D8's terrain-from-memory approach. Follow-up Explorer session queued to dig in properly.
+
+## New standing convention (September 8, 2026) -- keep the Koholint Atlas updated
+
+Owner asked to keep the published Artifact ("Koholint Atlas") updated with real advances, with a
+push notification each time it's republished. Applies going forward -- update it (same URL, not a
+new one) whenever there's a real finding worth showing (new room, new mechanic, new dialogue),
+not for routine/incremental progress.
+
 ## New standing convention (September 8, 2026) -- label every room by looking at it
 
 Owner's instruction: alongside topology/dialogue exploration, give every room a short
