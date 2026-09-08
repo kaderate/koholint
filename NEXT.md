@@ -43,6 +43,62 @@ promising lead for world-topology -- if there's a data structure backing this vi
 directly could reveal the world's shape far faster than room-by-room navigation, in the same
 spirit as D8's terrain-from-memory approach. Follow-up Explorer session queued to dig in properly.
 
+## Session report (September 8, 2026 -- room160 mapped, content corrected, room176 found)
+
+```
+Question: what does room160 contain past its entry, and what are its exits?
+
+Answer: confirmed. Exits: east -> room161 (known). South -> a NEW room, room176/0, via a wide
+opening. North -> blocked at y=26 across 3 columns. West -> no exit found despite 6 tests hitting
+3 different real obstacles (hedge base, river-bank wall, tree-like object) -- consistent with the
+entry-glance's water/river description, genuinely impassable.
+
+Important CORRECTION: room160's entry-glance content ("flower sprites, a green blob") was wrong.
+Full exploration found 3 independently-wandering creatures (tile=0x5E, confirmed via idle OAM
+sampling across 30-frame windows) -- not static decoration. Extensively tested (~20 :a attempts,
+2 chase scripts, positive-controlled) -- solid negative, no dialogue on any of the 3. A second
+sprite type (tile=0x58) exists in OAM but never came on-camera from the entry position -- unresolved.
+
+room176 (new, south of room160): a building with a striped gabled roof and a dark door, a
+hedge/path, 2 more tile=0x5E creatures, and -- new and promising -- two 2-tile humanoid-shaped
+sprite pairs flanking the path, plus a small floating-looking single-tile object. Screenshotted,
+OAM read, not explored further (one-room-per-session discipline). Checkpoints saved:
+room160_entry.dump and room176_entry_from_room160.dump.
+
+Indicators: game = no new dialogue this room (room160 negative), but real topology progress
+(room160 fully mapped, room176 found with the most promising unexplored content yet). Trip A->B =
+front_yard -> room160 entry: 2 real transitions, ~28 move! calls. Verified facts =
+data/ram_registry.json's new world_topology.room160_exits_and_content, room_labels corrected for
+well_platform and extended with room176 (building_screen), hram.room_id extended.
+
+Decisions made: none (Explorer role).
+
+Next question proposed: room176 is the clear next target -- its humanoid-shaped sprite pairs are
+the most promising interaction candidates found since villager_screen's. Chart its exits and test
+those sprites for dialogue, continuing from the already-reached room176_entry_from_room160.dump
+checkpoint rather than re-walking from front_yard.
+
+What NOT to redo: don't re-test room160's west edge (hedge base, river-bank at x=36/y=123, or the
+tree-like object at x=68) expecting an opening -- all 3 confirmed real, one re-tested 6x. Don't
+re-chase room160's tile=0x5E creatures expecting a missed dialogue -- solid negative,
+positive-controlled. Don't trust an entry-glance content description over a full exploration's
+findings -- room160's is the second time this session an entry-glance guess (flowers/blob) turned
+out wrong once actually tested.
+```
+
+## Owner question, September 8, 2026 -- continuous save vs. independent branches
+
+The owner asked directly: does every exploration reload the same fixed checkpoint
+(`front_yard_navigator.dump`), meaning there's no single continuous playthrough accumulating
+progress? Confirmed yes -- every Explorer session this whole day branched from that same fixed
+point (or, same thing, from `starting_house`'s post-shield checkpoint further back), not from
+wherever the previous session left off. Deliberate so far (matches D7's snapshot philosophy: no
+drift, no one session's mistake corrupting another's baseline), but it does mean nothing like an
+item pickup or a triggered story event would persist forward on its own. Owner's decision pending:
+switch to a continuous "main save" model (each session picks up from the last one's end state) for
+future exploration, or keep independent branches from a fixed point for now and treat continuous
+progression as a separate, later phase. Not decided -- flagged here rather than assumed.
+
 ## New standing convention (September 8, 2026) -- keep the Koholint Atlas updated
 
 Owner asked to keep the published Artifact ("Koholint Atlas") updated with real advances, with a
