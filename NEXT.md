@@ -238,6 +238,54 @@ assumptions carelessly -- the .sav write failed once with a relative-path ENOENT
 gemboy's own directory (cwd matters for battery_ram_path's relative path).
 ```
 
+## Session report (September 8, 2026 -- a hint library found: map cursor + sword technique)
+
+```
+Question: do crate_room's crate objects respond to :a, and what is riverside_screen?
+
+Answer: confirmed, both parts -- richest content haul yet, and a new kind of interactable.
+
+crate_room (250/29) is a hint library, not storage. 2 of 9 tile=0x58 objects are readable "book
+stands" with distinct multi-page text: "CONSEILS ET CARTE" describes a d-pad-movable CURSOR on
+the SELECT map screen (distinct from viewport panning, confirmed refuted earlier) plus a
+place-name/"owl message" feature -- see terrain_collision.select_map_screen's new lead. "TOUT SUR
+L'EPEE TOURNOYANTE!" describes a charge-and-release spin-attack sword technique -- real mechanic
+content, relevant once a sword is found. Operational trap caught: pressing :a again on an
+already-closed book re-triggers the conversation from page 1.
+
+riverside_screen (192/0): entry-glance guesses resolved -- the "channel" is a hedge maze with a
+sandy path (not water), the "bubble shapes" are BG-tile decorations not sprites, the "signpost"
+is real but tested negative for :a (not fully exhaustive). West edge is a genuine river wall.
+South leads to a NEW room, room208/0 (2 active sprites seen on entry, unexplored past that).
+
+Indicators: game = no new sword/item, but the first readable-object content this project has
+found. Verified facts = data/ram_registry.json's new crate_room_and_riverside_content entry,
+dialogues.crate_room_book_a/book_b, room_labels for 192 (resolved), 250/29 (corrected to hint
+library), and 208/0 (new stub); select_map_screen's entry extended with the cursor lead.
+
+Decisions made: none (Explorer role).
+
+main.dump updated: backed up to backups/main_20260908_170547.dump first, new main.dump holds
+room_id=208/map_id=0 at (72,37), verified clean by render twice.
+
+Next question proposed: (1) room208 is fresh, unexplored -- natural next target, continuing from
+main.dump. (2) the map-cursor lead from book_a is a genuinely promising, entirely untested
+mechanic for the world-topology goal. (3) riverside_screen's signpost negative deserves one more
+pass with a positive control first before calling it fully closed.
+
+What NOT to redo: don't re-test crate_room's two confirmed books or its north wall -- both
+cleanly exhausted. Don't press :a on an already-closed book "to double check" -- re-triggers the
+whole conversation. Don't retest riverside_screen's south path via x=100/124, or its west edge --
+all confirmed. Don't trust an OAM read showing another room's tile IDs (e.g. building_screen's
+0x78/0x7a) as evidence those NPCs are present elsewhere -- confirmed stale/hidden leftover slots
+in both riverside_screen and room208 this session, not real content.
+```
+
+## Owner check-in requested, September 8, 2026
+
+Owner asked to pause after this session and check in before continuing further exploration. No
+new Explorer session launched after the one above -- awaiting direction.
+
 ## New standing convention (September 8, 2026) -- keep the Koholint Atlas updated
 
 Owner asked to keep the published Artifact ("Koholint Atlas") updated with real advances, with a
