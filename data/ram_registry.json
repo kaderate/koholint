@@ -104,6 +104,41 @@
       "why_inconclusive_not_refuted": "Tested against only one room (front_yard, the second room the criterion calls for, is blocked -- see intro_door_gate's related_finding above). A single static snapshot can't isolate a candidate the way D1's method did (diff between two different rooms to find the block that changes); with only one room, most of WRAM is trivially 'consistent' with almost any single-cell hypothesis by chance. Re-test once a second room is reachable, using the diff-between-rooms method NEXT.md originally specified, before concluding either way on D4."
     }
   },
+  "room_labels": {
+    "_readme": "Human-readable label + description per (room_id, map_id), assigned by visually reading a screenshot -- purely descriptive (shape/color/layout), never a claim about what something 'really is' per AGENTS.md's forbidden-game-knowledge rule. Provisional, renamed/refined as more is observed. Key format: 'room_id/map_id'.",
+    "162/0": {
+      "label": "front_yard",
+      "description": "Grass overworld screen directly outside starting_house's door (south edge, row 8). Legacy-inherited name, kept as canonical. Oracle-mapped in detail (25 cells) -- see terrain_collision entries."
+    },
+    "163/16": {
+      "label": "starting_house",
+      "description": "Single static interior screen (no scrolling), where Link spawns. Legacy-inherited name. Oracle-mapped in detail (37 cells)."
+    },
+    "178/0": {
+      "label": "overworld_screen2",
+      "description": "Grass field directly south of front_yard. A round bush/tree-shaped landmark, one small creature sprite seen near the top-right in early screenshots. Legacy-inherited name; not yet independently re-described in more visual detail since re-confirming the transition."
+    },
+    "177/0": {
+      "label": "villager_screen",
+      "description": "Reached from overworld_screen2 (south then west of front_yard). A building-shaped structure (dark trapezoid/gabled-roof silhouette on a tan rectangular base) centered upper-screen; grass field with darker-green blotchy clusters near the edges. Two interactive OAM sprite pairs: one genuinely static (only its tile ID flickers), one that wanders autonomously -- both trigger the identical dialogue line via :a ('YOUPI! J'ai la pêche! Et toi?'). A lone single-tile companion sprite near the wandering pair is of undetermined nature (decoration, effect, or separate entity). Legacy-inherited name, fits well."
+    },
+    "161/0": {
+      "label": "screen3_north",
+      "description": "West of front_yard, also reachable north from villager_screen -- a genuine 3-way hub. A house-like structure is present (not yet described in the same visual detail as villager_screen's). Three distinct moving OAM creatures: a round green 2-tile 'blob', a wider-ranging 'ear'-shaped creature, and a vertical 2-tile post/standing object -- none confirmed interactive (2 solid negatives after ~14 clean adjacency attempts each, 1 inconclusive due to a chase-tracking issue). Legacy-inherited name (originally reached via a much longer legacy route); the direct front_yard/villager_screen adjacency was only confirmed this session."
+    },
+    "160/0": {
+      "label": "well_platform",
+      "description": "West of screen3_north, via a specific mid-height gap (not the full west edge). A raised stone/hedge platform surrounding a well- or altar-like structure; a water/river tile pattern along its west edge; flower sprites; one green blob-creature sprite seen at entry. New room, no legacy name -- unexplored past its entry point as of this label."
+    },
+    "163/0": {
+      "label": "clover_field",
+      "description": "East of front_yard. Shares room_id 163 with starting_house but map_id 0 (not 16) -- a genuine (room_id,map_id) collision, confirmed distinct. Entirely filled with a repeating clover/bush tile pattern in the area explored so far; no structure, sprite, or other distinguishing feature found yet. New room, no legacy name."
+    },
+    "146/0": {
+      "label": "north_corridor_room",
+      "description": "North of front_yard, reached via a specific corridor at the room's far-west columns (0-1) that threads past a mid-screen hedge wall and a discrete tree-like obstacle. New room, no legacy name -- only the transition itself has been confirmed so far, no detailed visual description captured yet (label/description to refine once explored)."
+    }
+  },
   "world_topology": {
     "front_yard_adjacent_rooms": {
       "status": "4 directions now characterized (not just 3+1) -- two isolated Explorer subagents plus this session's own follow-up capture, September 8, 2026, real navigation via Koholint::Navigator from /tmp/zelda_checkpoints/front_yard_navigator.dump, no assumed game knowledge.",

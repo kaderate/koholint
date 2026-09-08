@@ -31,6 +31,15 @@ purposes but still useful as `Zelda::Checkpoint`-format inputs to bootstrap a `M
 `lib/validation/starting_house_oracle_check.rb` for the adapter: `Motherboard.new(cpu, ppu, apu,
 mmu, mmu.dma, mmu.model)`).
 
+## New standing convention (September 8, 2026) -- label every room by looking at it
+
+Owner's instruction: alongside topology/dialogue exploration, give every room a short
+English label plus a one-paragraph visual description the moment there's enough to describe --
+purely what's observed (shape/color/layout), never a claim about what something "really is" (no
+game-knowledge assumptions). Stored in `data/ram_registry.json`'s new `room_labels` section, keyed
+`"room_id/map_id"`. Applied retroactively to all 7 currently-known rooms; every future Explorer
+session should do the same for any new room it finds or newly describes in more detail.
+
 ## Decisions in force
 
 D1 ratified (HRAM). D2 (OAM) obsolete. D3 decided: DMG. D4 open, still deferred -- Session 1 was
