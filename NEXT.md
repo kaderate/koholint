@@ -237,15 +237,14 @@ answer once. Don't assume SCX/SCY=0 always holds in front_yard -- confirmed only
 door/spawn area, unverified further out.
 ```
 
-## Next question: owner ratification needed before any Builder work (D4 pivot)
+## D4/observation-layer ratified -- September 8, 2026 (see DECISIONS.md's D8)
 
-The Explorer result above answers this session's falsifiable question, but per `AGENTS.md`
-("fundamental decisions belong to the owner": the observation layer) and its overnight-autonomy
-rule, nothing further was built on top of it unattended. Before a Builder session formalizes the
-tile-ID lookup or touches `Navigator`/`oracle_grid_check.rb`, the owner needs to decide: does
-`koholint` adopt VRAM tilemap reads as (at least a) terrain/collision source, alongside or instead
-of `Navigator`'s live probing? The three Builder tasks above are ready to start the moment that's
-answered -- nothing else is blocking them.
+Owner's decision: VRAM tilemap reads are the primary terrain source of truth; `Navigator`'s
+live-probing stays as the fallback/cross-check, not deleted, for whatever the tile read doesn't
+resolve cleanly (ledges, unclassified signatures, a room where the partition doesn't hold as
+cleanly as the first two). Builder session starts now on the three tasks NEXT.md already queued:
+formalize the per-room tile-ID lookup, re-run `oracle_grid_check.rb`'s 173-edge sweep with it
+substituted in, investigate the `front_yard` (5,3)<->(6,3) ledge.
 
 ## What NOT to redo
 

@@ -138,3 +138,25 @@ to be ratified), `taken without validation` (inherited from the spike, to be rev
   validation re-run after the fix gave an identical result to before it -- speed changed, not
   behavior. See `NEXT.md` for the measurement detail and the sweep confirming no other call site
   shares this bug.
+
+## D8 — Terrain source of truth: VRAM tilemap reads, live-probing kept as fallback
+
+- **Status**: ratified (September 8, 2026).
+- **Context**: D4 flagged that exhaustive live-probing doesn't scale and doesn't resemble how a
+  human or the game engine itself determines walkability -- ~32 minutes of real taps to cover 2
+  small rooms (`NEXT.md`). An isolated Explorer subagent (overnight, September 8) confirmed a
+  per-tile background collision signal in the BG tilemap (VRAM `0x9800`/`0x9C00`), independently
+  cross-checked in `starting_house` and `front_yard` with zero walkable/blocked signature overlap
+  in either room -- see `data/ram_registry.json`'s
+  `terrain_collision.background_tilemap_predicts_walkability`. Known caveats: an 8px
+  tile-granularity edge case at doorway/wall-base boundaries, and one confirmed one-way-ledge
+  directional asymmetry (`front_yard` (5,3)<->(6,3)) a pure tile lookup can't capture alone.
+- **Choice**: VRAM tilemap reads become the initial/primary terrain source of truth.
+  `Navigator`'s live-probing (D7) is kept, not deleted -- it's the fallback and cross-check for
+  cases the tile read doesn't resolve cleanly (ledges, an unclassified tile signature, a room
+  where the categorical partition doesn't separate as cleanly as the first two).
+  Owner's framing: "utiliser la lecture VRAM comme source de vérité initiale, mais pas hésiter à
+  repartir sur l'exploration alternative live probing si jamais ça ne marche pas."
+- **Invalidated if**: the tile-ID partition fails to separate cleanly in a third room, or the
+  fraction of cells needing live-probe fallback grows large enough that VRAM reads stop being the
+  practical primary path.
