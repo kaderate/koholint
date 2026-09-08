@@ -504,6 +504,59 @@ angles + a 60-frame idle window. Don't re-test the far-away negative control -- 
 Don't assume a wandering sprite is more likely to be the interactive one -- wrong here. Don't trust
 0xD0-0xDF/0xE0-0xEF as a dialogue-state flag -- re-confirmed all-zero during a real open dialogue.
 ```
+
+## Session report (September 8, 2026 -- room177 fully mapped, 161 confirmed a hub, 2nd dialogue)
+
+```
+Question: (1) is room 177's wandering sprite genuinely interactive, using a tighter tap-by-tap
+chase? (2) what does a proper push (10-15 move! calls/direction) reveal about all 4 of room 177's
+exits?
+
+Answer: confirmed, both parts.
+
+(1) Yes. A tap-by-tap adaptive chase (re-targeting the larger-delta axis after every single tap,
+not a stale multi-tap plan) closed the gap in 24 taps. Facing mattered as much as proximity -- the
+first adjacency attempt with stale facing produced nothing; facing the dominant-delta direction
+right before :a triggered it immediately. Text: "YOUPI! J'ai la pêche! Et toi?" -- same line as
+the static sprite. This also caught a transcription error: the static sprite's registry entry had
+been recorded all-caps ("YOUPI! J'AI LA PECHE! ET TOI?"); a zoomed re-read of the real rendering
+confirmed mixed case with a circumflex accent -- both entries corrected.
+
+(2) All 4 directions resolved. East -> 178 (known). North -> confirmed room_id=161/map_id=0 via a
+building-clear column (x=140), 8 clean move! calls -- 161 now confirmed to border BOTH front_yard
+(west side, already known) and room177 (north side): it's a hub, not a dead end, matching what the
+owner predicted. West and south are both genuine walls (west: x=36, re-tested from two angles;
+south: y=112, independently confirmed at 3 separate columns) -- not budget artifacts. Important
+methodological catch: testing north/west from columns/rows that grazed the building sprite's own
+footprint gave false "blocked" readings at first -- both turned into real open paths once tested
+from a column/row clearly past the building. Also caught: the previous session's
+room177_after_dialogue_exhausted.dump checkpoint is NOT actually closed despite its name (still
+mid-dialogue) -- exposed because a real idle NPC should never show zero OAM movement across 12+
+samples; a correctly-closed checkpoint is now saved at room177_dialogue_closed.dump.
+
+Indicators: game = no new item/sword milestone, but real content progress: a 2nd confirmed
+interactive line (same text, different sprite) and room 177's exit graph is now complete.
+Trip A->B = room177 -> room161 transition, 8 move! calls, zero blocks, ~30s wall-clock -- a new,
+clean measurement. Verified facts = data/ram_registry.json's world_topology.room177_sprites
+(wandering pair: inconclusive -> confirmed interactive) and new room177_exits entry;
+dialogues.room177_wandering_sprite added, dialogues.room177_static_sprite's text corrected.
+
+Decisions made: none (Explorer role).
+
+Next question proposed: chart room 161 itself, now confirmed a hub bordering both front_yard and
+room177 -- its own exits and any interactable content is the natural next "one room" target. Lower
+priority: the lone single-tile companion sprite (tile=38, flags=0) tracking near the wandering
+pair -- decoration, an effect, or a distinct entity, not established either way.
+
+What NOT to redo: don't retest room 177's west/south with more columns -- 3 independent y=112
+stops plus a twice-confirmed x=36 stop are solid. Don't test north/west from the spawn
+column/row expecting a wall -- that's the building's own footprint, not the room edge; test from a
+column/row clearly clear of it. Don't trust room177_after_dialogue_exhausted.dump as a closed
+baseline -- use room177_dialogue_closed.dump instead. Don't identify either room-177 sprite by OAM
+slot number -- both alternate between two slot ranges every frame, identify by position/exclusion.
+Don't assume pixel-adjacency alone triggers :a -- facing the right direction immediately before
+the press matters too.
+```
 What NOT to redo: don't chase starting_house's remaining 12 disagreements further -- triangulated
 via two independent methods against a single static oracle, reads as the oracle's own staleness,
 not a method bug. Don't rebuild the classifier per-cell instead of per-signature -- the whole point

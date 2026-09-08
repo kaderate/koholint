@@ -117,7 +117,14 @@
       "source": "ram_read_verified",
       "verified_count": 1,
       "confidence": "verified",
-      "note": "Room 177 has 2 OAM sprite pairs (flags=0x21 both) beyond Link: one originally at (y=32,x=77/85) plus a nearby single-tile sprite, confirmed to translate position autonomously with zero Link input (idle 60-frame test: x crept 77->106, y stayed ~32-34) -- wanders on its own, not a proximity reaction (kept moving at a similar rate whether approached or not). The other, originally at (y=96,x=120/128), stayed at that exact position across every sample and 2 independent approach angles (13 total move! steps) -- genuinely static, only its tile ID flickers frame-to-frame (animation, not translation). Interaction (:a) confirmed on the STATIC pair only -- see dialogues.room177_static_sprite below. The moving pair's interactivity is INCONCLUSIVE, not refuted -- a simple chase script couldn't maintain clean adjacency against its autonomous wander (10-16px off when :a was pressed), so no dialogue triggering there hasn't been fairly tested yet. Lesson worth keeping: 'moves on its own' was not a reliable predictor of 'is the interactive one' here -- check both regardless of which animates."
+      "note": "Room 177 has 2 OAM sprite pairs (flags=0x21 both) beyond Link, PLUS a lone single-tile companion sprite (tile=38, flags=0) that tracks near the wandering pair without being part of its 2-tile group -- not established whether it's decoration, a shadow/dust effect, or a distinct entity. Pair 1, originally at (y=32,x=77/85): confirmed to translate position autonomously with zero Link input (idle 60-frame test: x crept 77->106, y stayed ~32-34) -- wanders on its own, not a proximity reaction. CONFIRMED interactive, September 8, 2026 (second Explorer subagent, tap-by-tap adaptive chase closing to genuine adjacency in 24 taps) -- see dialogues.room177_wandering_sprite. Pair 2, at (y=96,x=120/128): stayed at that exact position across every sample and 2 independent approach angles (13 move! steps) -- genuinely static, only its tile ID flickers (animation, not translation). Also interactive -- see dialogues.room177_static_sprite. BOTH pairs are interactive with the SAME dialogue text -- 'moves on its own' was not a useful predictor of interactivity either way here, both sprites in this room happen to be interactive. Methodological notes for reuse: both pairs' OAM entries alternate between two disjoint slot ranges frame-to-frame (same slot-reassignment behavior already documented for Link in legacy/primitives.rb) -- identify a sprite by position/exclusion, never a fixed OAM slot number. Facing direction matters as much as raw proximity for triggering :a -- face the sprite's dominant approach axis immediately before pressing :a, not just get pixel-adjacent."
+    },
+    "room177_exits": {
+      "status": "confirmed, all 4 directions -- isolated Explorer subagent, September 8, 2026, real Navigator.move! loops (10-15 calls/direction), room_id/map_id checked after every call.",
+      "source": "ram_read_verified",
+      "verified_count": 1,
+      "confidence": "verified",
+      "note": "East: 4 clean :ok steps then transitions to room_id=178/map_id=0 (re-confirms the known entry path). North: blocked near the spawn column/x=100 (the building's own footprint, not the room edge), but from x=140 (clear of the building) it's 8 consecutive :ok steps then transitions to room_id=161/map_id=0 -- confirms 161 borders BOTH front_yard (west side) and room177 (north side), making 161 a hub, not a dead-end. West: blocked near the building at x=100/spawn row, but wide open at y=106 (below the building) for 12 steps down to x=44, then 1 more step to x=36 where it hits a genuine, consistently-reproduced wall (14 more calls, zero progress, re-tested from two approach angles) -- no transition, real boundary. South: blocked at y=112 independently at 3 separate columns (x=36, x=100, x=140) -- same y every time, strong evidence of one straight wall/hedge spanning the room's width, not a per-column artifact -- no transition, real boundary. Lesson: don't test a direction from a column/row that happens to graze the building sprite's footprint and conclude 'wall' -- both false negatives here (north near spawn, west near spawn row) turned into real open exits once tested from a column/row clear of the building."
     },
     "front_yard_to_room177": {
       "status": "confirmed -- isolated Explorer subagent, September 8, 2026, real navigation via Koholint::Navigator.move! from front_yard_navigator.dump, testing legacy scenarios.rb's old villager_screen hint (direction only, not its tap counts -- legacy's move_tiles-based counts don't map onto move!'s tile-calibrated steps).",
@@ -152,10 +159,22 @@
       "confidence": "verified",
       "room_id": 177,
       "map_id": 0,
-      "sprite_oam_position": "(y=96, x=120/128), 2-tile pair, flags=0x21 -- see terrain_collision-adjacent world_topology.room177_sprites for full sprite context (this is the STATIC one, not the wandering one)",
+      "sprite_oam_position": "(y=96, x=120/128), 2-tile pair, flags=0x21 -- see world_topology.room177_sprites for full sprite context (this is the STATIC one, not the wandering one)",
       "trigger": "Link approached to (116,82)/(116,80), faced the sprite, pressed :a (gemboy's interact() primitive)",
-      "text": "YOUPI! J'AI LA PECHE! ET TOI?",
-      "note": "Repeated :a presses toggled the dialogue box open/closed with the same fixed line every time (not a multi-line/branching conversation observed so far). Negative control: pressing :a 3x from a position far from both room-177 sprites produced no dialogue box at all -- confirms this is proximity-gated to this specific sprite, not a room-wide effect. Checkpoint saved (not versioned, not guaranteed to persist across containers): /tmp/zelda_checkpoints/room177_after_dialogue_exhausted.dump, state right after the toggle sequence."
+      "text": "YOUPI! J'ai la pêche! Et toi?",
+      "note": "Text CORRECTED September 8, 2026 -- the original transcription read as all-caps ('YOUPI! J'AI LA PECHE! ET TOI?'), but a second independent capture (dialogues.room177_wandering_sprite, same text) zoomed the rendered framebuffer and confirmed real mixed case with a circumflex accent on the e in 'pêche'. Trust this version. Repeated :a presses toggled the dialogue box open/closed with the same fixed line every time (not a multi-line/branching conversation observed so far). Negative control: pressing :a 3x from a position far from both room-177 sprites produced no dialogue box at all -- confirms this is proximity-gated to this specific sprite, not a room-wide effect. CAVEAT: /tmp/zelda_checkpoints/room177_after_dialogue_exhausted.dump is NOT actually dialogue-closed despite its name (confirmed by render -- the box was still open; caught because a real idle NPC should never show zero OAM movement across 12+ samples, which this checkpoint did) -- use /tmp/zelda_checkpoints/room177_dialogue_closed.dump instead, verified closed by render."
+    },
+    "room177_wandering_sprite": {
+      "status": "confirmed -- isolated Explorer subagent, September 8, 2026, via a tap-by-tap adaptive chase (re-targeting toward the larger-|delta| axis after every single Navigator.tap, not a stale multi-tap plan).",
+      "source": "screen_render_verified",
+      "verified_count": 1,
+      "confidence": "verified",
+      "room_id": 177,
+      "map_id": 0,
+      "sprite_oam_position": "wanders -- originally (y=32, x=77/85), 2-tile pair, flags=0x21, plus a nearby single-tile companion sprite (tile=38, flags=0) of undetermined nature -- see world_topology.room177_sprites",
+      "trigger": "adaptive chase closed a starting gap of dx=42/dy=-20 to genuine adjacency (dx=-8, dy=9) in 24 taps; facing the dominant-delta direction (down) immediately before :a mattered as much as raw proximity -- a first attempt at dx=10 with stale facing=right produced nothing",
+      "text": "YOUPI! J'ai la pêche! Et toi?",
+      "note": "Content-identical to dialogues.room177_static_sprite's line -- both of room 177's interactive sprites say the same thing. Repeated :a toggled open/closed across multiple rounds, same pattern as the static sprite."
     }
   }
 }
