@@ -64,19 +64,19 @@
     },
     "room_id": {
       "address": "0xFFF6",
-      "meaning": "Current room/screen identifier",
+      "meaning": "Current room/screen identifier -- NOT globally unique by itself, see collision below",
       "source": "ram_read_verified",
-      "verified_count": 7,
+      "verified_count": 9,
       "confidence": "verified",
-      "note": "Distinct value on every one of 7 checkpointed screens, no collisions: front_yard=162, overworld_screen2=178, villager_screen=177, screen3_north=161, shop_screen=179, house2_interior=169, starting_house=163 (single observation, September 8, 2026, from a tile-collision investigation -- not the focus of that session, logged here for completeness rather than re-verified independently). Supersedes ScreenGrid's discovery-order screen names as the canonical room key -- see DECISIONS.md."
+      "note": "front_yard=162, overworld_screen2=178, villager_screen=177, screen3_north=161, shop_screen=179, house2_interior=169, starting_house=163 (map_id=16). COLLISION found September 8, 2026 (Explorer subagent, exploring east of front_yard, observed twice independently in separate script runs): a new outdoor room directly east of front_yard also reads room_id=163, but map_id=0 -- distinct from starting_house's map_id=16 at the same room_id. (room_id, map_id) is the real key, room_id alone is not. Supersedes ScreenGrid's discovery-order screen names as the canonical room key -- see DECISIONS.md."
     },
     "map_id": {
       "address": "0xFFF7",
-      "meaning": "Coarser than room_id -- looks like an overworld/interior (or dungeon) discriminator, not a full map index",
+      "meaning": "Coarser than room_id -- looks like an overworld/interior (or dungeon) discriminator, not a full map index. Combined with room_id, forms the actual unique room key -- see room_id's note above.",
       "source": "ram_read_verified",
-      "verified_count": 6,
+      "verified_count": 8,
       "confidence": "verified",
-      "note": "0 on all 5 overworld screens checked, 16 on the one interior (house2_interior). Only 2 distinct values seen so far -- can't yet distinguish 'overworld' from 'a specific interior/dungeon number' with just one interior sample."
+      "note": "0 on every overworld screen checked (7, now including the 3 new rooms west/east/south of front_yard), 16 on the one interior (house2_interior/starting_house). Only 2 distinct values seen so far -- can't yet distinguish 'overworld' from 'a specific interior/dungeon number' with just one interior sample."
     }
   },
   "wram_unmapped": {
@@ -102,6 +102,15 @@
       "status": "SUPERSEDED 2026-09-08 -- the signal exists, but in VRAM's existing BG tilemap, not a separate WRAM buffer. See terrain_collision.background_tilemap_predicts_walkability below.",
       "note": "Session 1 hypothesis (docs/ARCHITECTURE_REVIEW.md's next question): a per-room 16x16 object grid in WRAM whose type-per-cell predicts collision. Brute-forced every (base address in 0xC000-0xDFFF, stride in [8,9,10,16,20], row-major/col-major) against the starting_house oracle grid (legacy/.../screen_maps/starting_house.json, 32 cells with edges, 123 direction-edge samples, 28 blocked/95 ok) using a single-byte-value classifier. Best candidates: 80.5% accuracy vs a 77.2% majority-class baseline, using degenerate marker values (0, 255) that are common noise anywhere in RAM -- not a credible signal.",
       "why_inconclusive_not_refuted": "Tested against only one room (front_yard, the second room the criterion calls for, is blocked -- see intro_door_gate's related_finding above). A single static snapshot can't isolate a candidate the way D1's method did (diff between two different rooms to find the block that changes); with only one room, most of WRAM is trivially 'consistent' with almost any single-cell hypothesis by chance. Re-test once a second room is reachable, using the diff-between-rooms method NEXT.md originally specified, before concluding either way on D4."
+    }
+  },
+  "world_topology": {
+    "front_yard_adjacent_rooms": {
+      "status": "3 of 4 directions confirmed reachable, 1 confirmed dead-end -- isolated Explorer subagent, September 8, 2026, real navigation via Koholint::Navigator.move! from /tmp/zelda_checkpoints/front_yard_navigator.dump, no assumed game knowledge.",
+      "source": "ram_read_verified",
+      "verified_count": 5,
+      "confidence": "verified",
+      "note": "West of front_yard: room_id=161/map_id=0 (matches the registry's pre-existing single-observation screen3_north=161 note -- now independently re-confirmed via real movement, not just a checkpoint name). East: room_id=163/map_id=0, observed twice independently -- see hram.room_id's collision note, this is NOT starting_house despite sharing room_id. South (away from the known starting_house door, tested from two different entry columns, same result both times): room_id=178/map_id=0 (matches the pre-existing overworld_screen2=178 note, re-confirmed). North: no new territory -- confirmed genuine wall via the far-west column (two consecutive blocked move! calls, cell unchanged, screenshot 91_after_final_north_push.png in the subagent's now-discarded scratchpad), and via the center column (5) walking 'up' loops back into starting_house through its own door rather than finding new territory. None of the 3 new rooms have been explored beyond their entry point -- no item/NPC/story beat confirmed yet, only visually distinct, unverified sprite content per-room."
     }
   },
   "terrain_collision": {

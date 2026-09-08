@@ -292,6 +292,45 @@ observed, not assumed (no pretrained Zelda-knowledge guesses about what's next, 
 - **Deliverable**: the new area's `room_id`/`map_id` registered with provenance, a screenshot/gif
   of what was found, and an honest report if nothing new turns out to be reachable yet.
 - **Indicator targeted**: progress in the game (primarily) -- the one indicator untouched all day.
+
+## Session report (September 8, 2026 -- isolated Explorer subagent, 3 new rooms found)
+
+```
+Question: does front_yard extend beyond its charted 25 cells, and is there a screen transition or
+new objective reachable from the untested directions?
+
+Answer: confirmed, partially. Three new adjacent rooms found via real Koholint::Navigator.move!
+from front_yard_navigator.dump, each with a screenshot: west = room_id 161/map_id 0 (re-confirms
+the registry's old single-observation screen3_north note); east = room_id 163/map_id 0, observed
+twice independently -- a genuine room_id COLLISION with starting_house (also 163, but map_id 16):
+room_id alone is not a unique room key, (room_id, map_id) is -- see
+data/ram_registry.json's hram.room_id; south (tested from two different entry columns, same
+result both times) = room_id 178/map_id 0 (re-confirms the old overworld_screen2 note). North:
+refuted -- a genuine wall via the far-west column (two consecutive blocked move! calls, cell
+unchanged), and the center column loops back into starting_house through its own door rather than
+finding anything new. No concrete next objective (item/NPC/story beat) confirmed -- the 3 new
+rooms are unexplored past their entry point, only visually distinct unverified sprite content.
+
+Indicators: game = unchanged milestone (shield still the last confirmed one). Trip A->B = not the
+target, but incidental data: front_yard's door to each new room's edge took 4-10 move! calls.
+Verified facts = 0 registry entries written by the subagent itself (Explorer role, confirmed clean
+git status in both repos) -- promoted into data/ram_registry.json's new world_topology entry and
+hram.room_id's collision note by this session afterward, with full provenance.
+
+Decisions made: none (Explorer role).
+
+Next question proposed: one room per session, per the one-question rule -- (1) resolve/characterize
+the room_id=163 collision properly (confirm (room_id, map_id) as the real key by checking a few
+more rooms); (2) chart each of the 3 new rooms (161, 163/map0, 178) with Terrain.RoomClassifier +
+a few Navigator probes to find their own exits and anything interactable (item, NPC) -- the
+visually distinct sprites spotted in each screenshot are the natural starting point, not yet
+confirmed as anything.
+
+What NOT to redo: don't walk 'up' along front_yard's column 5 expecting new territory -- confirmed,
+it re-enters starting_house through its own door. Don't assume 1 move! call = 1 tile of progress --
+typically 2 calls per cell (COMMIT_THRESHOLD is half a tile, same caveat as before). Don't retest
+north via column 0 -- confirmed genuine wall, not a budget artifact.
+```
 What NOT to redo: don't chase starting_house's remaining 12 disagreements further -- triangulated
 via two independent methods against a single static oracle, reads as the oracle's own staleness,
 not a method bug. Don't rebuild the classifier per-cell instead of per-signature -- the whole point
