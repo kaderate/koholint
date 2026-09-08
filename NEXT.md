@@ -86,18 +86,27 @@ findings -- room160's is the second time this session an entry-glance guess (flo
 out wrong once actually tested.
 ```
 
-## Owner question, September 8, 2026 -- continuous save vs. independent branches
+## Decided, September 8, 2026 -- continuous save model adopted
 
-The owner asked directly: does every exploration reload the same fixed checkpoint
-(`front_yard_navigator.dump`), meaning there's no single continuous playthrough accumulating
-progress? Confirmed yes -- every Explorer session this whole day branched from that same fixed
-point (or, same thing, from `starting_house`'s post-shield checkpoint further back), not from
-wherever the previous session left off. Deliberate so far (matches D7's snapshot philosophy: no
-drift, no one session's mistake corrupting another's baseline), but it does mean nothing like an
-item pickup or a triggered story event would persist forward on its own. Owner's decision pending:
-switch to a continuous "main save" model (each session picks up from the last one's end state) for
-future exploration, or keep independent branches from a fixed point for now and treat continuous
-progression as a separate, later phase. Not decided -- flagged here rather than assumed.
+Owner's answer to the branching-vs-continuity question above: continuity. New convention:
+
+- `/tmp/zelda_checkpoints/main.dump` is the single canonical "current" state. Every Explorer
+  session going forward loads it (not `front_yard_navigator.dump`) and, if it makes real forward
+  progress (not just probing/testing), overwrites it with its own end state before finishing.
+- Before overwriting, back up the existing `main.dump` to
+  `/tmp/zelda_checkpoints/backups/main_<timestamp>.dump` -- a bad session (Link stuck, a dialogue
+  left open, anything wrong) should be recoverable by restoring the last good backup, not lose the
+  day's progress.
+- Verify by render before trusting a new end state as "good" -- the same lesson
+  `room177_after_dialogue_exhausted.dump` already taught (a checkpoint's name doesn't prove its
+  state). Confirmed clean this time: `main.dump` (seeded from `room176_entry_from_room160.dump`)
+  renders as room176/0 at (136,28), no stuck dialogue, no obviously broken state.
+- Caveat: `/tmp` doesn't survive a brand new container -- this is continuous within this session's
+  lifetime, not across a hard environment reset. Not urgent today; worth a real durable-storage
+  answer later if this project spans multiple fresh containers.
+- Pure probing/testing (a session that only wants to test hypotheses, not advance) should still
+  use a throwaway loaded copy and NOT overwrite `main.dump` -- only sessions making real progress
+  update it. Say explicitly in each Explorer prompt going forward which mode applies.
 
 ## Session report (September 8, 2026 -- SELECT map investigated, mostly refuted, 2 real anomalies)
 
