@@ -267,6 +267,31 @@ Still open: general one-way-ledge category, or a one-off. Low priority given 93.
 working fallback mechanism already in place; worth a session once there's a concrete reason to
 generalize past these two rooms (a third room, or the sword-milestone path needing this specific
 cell).
+```
+
+## D4 decided -- on demand (September 8, 2026, see DECISIONS.md)
+
+Owner's call: D8's terrain reader makes "map everything" and "map on demand" the same cost, so D4
+resolves to on demand. `ScreenMap`/`TileClassifier`/`TileCatalog` stay retired per D5.
+
+## Next question -- resume real game progress beyond front_yard
+
+Owner's priority for the next session, September 8, 2026: infrastructure (perf, oracle validation,
+D8) has absorbed this whole day; the "progress in the game" indicator hasn't moved since the
+shield. Use the now-fast Navigator+Terrain toolchain (VRAM reads primary, live-probe fallback) to
+push past `front_yard`'s known exits into unmapped territory and find the next real objective --
+observed, not assumed (no pretrained Zelda-knowledge guesses about what's next, per `AGENTS.md`).
+
+- **Role**: Explorer (new, unmapped territory -- throwaway spikes, no `lib/` commits, no
+  decisions). Per this session's own earlier precedent (mixing Explorer into a Builder-heavy
+  session blurs the discipline), this should run as an isolated subagent or a genuinely fresh
+  session, not continue inline here.
+- **Budget**: TBD with the owner when launched.
+- **Falsifiable question**: what lies beyond `front_yard`'s exits (besides the door back into
+  `starting_house`), and is there a next concrete objective there (an item, an NPC, a story beat)?
+- **Deliverable**: the new area's `room_id`/`map_id` registered with provenance, a screenshot/gif
+  of what was found, and an honest report if nothing new turns out to be reachable yet.
+- **Indicator targeted**: progress in the game (primarily) -- the one indicator untouched all day.
 What NOT to redo: don't chase starting_house's remaining 12 disagreements further -- triangulated
 via two independent methods against a single static oracle, reads as the oracle's own staleness,
 not a method bug. Don't rebuild the classifier per-cell instead of per-signature -- the whole point

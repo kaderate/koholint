@@ -37,7 +37,14 @@ to be ratified), `taken without validation` (inherited from the spike, to be rev
 
 ## D4 — Exhaustive exploration per screen
 
-- **Status**: open, **deferred**. Deciding condition: a clean outcome (confirmed or refuted) from
+- **Status**: **decided (September 8, 2026) -- on demand.** D8's tile-based terrain reader
+  (`lib/terrain.rb`) is exactly the clean outcome this entry's deciding condition called for:
+  reading a cell's walkability from the BG tilemap costs the same whether it's read upfront for a
+  whole screen or lazily as `Navigator`/route-planning needs it, so "map everything" and "map on
+  demand" collapse to the same cost -- there's no separate exhaustive-mapping step to justify.
+  `ScreenMap`/`TileClassifier`/`TileCatalog` (the exhaustive `legacy/` tools this decision was
+  originally about) stay retired per D5; nothing resurrects them.
+- **Previously**: open, **deferred**. Deciding condition: a clean outcome (confirmed or refuted) from
   Plan Session 1 (`PLAN.md`) — if collision reads from WRAM, the exhaustive approach loses its
   purpose and D4 leans toward "on demand" almost automatically. Session 1's first attempt
   (September 7, 2026) was **inconclusive**, not a clean outcome: `front_yard` (needed for the
