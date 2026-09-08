@@ -156,6 +156,53 @@ script -- it's a ~96-frame cycle; poll for the grid tile settling, don't rely on
 count. Don't re-run the WRAM diff expecting a bigger hit -- already exhaustive over the full 8KB.
 ```
 
+## Session report (September 8, 2026 -- room176's NPCs found, explain the save mechanic, 2 new rooms)
+
+```
+Question: do room176's two humanoid-shaped sprite pairs trigger dialogue, and what are room176's
+exits?
+
+Answer: confirmed, richest single-session haul yet. Both pairs are STATIC (held position all
+session, confirmed by direct approach) and BOTH are interactive, each with DISTINCT dialogue:
+
+Pair A: "M'sieu! Pour sauvegarder, appuyez sur tous les boutons à la fois! Heu, je n'en sais pas
+plus, je ne suis qu'un gosse!"
+Pair B: "Ben... Après une sauvegarde, vous pouvez redémarrer à la dernière porte par laquelle vous
+êtes passé! Pourquoi? Je n'en sais rien, je suis un môme!"
+
+Together: an in-game explanation of the save mechanic itself -- press all buttons at once to
+save, continuing after resumes at the last door passed through. Directly relevant to this
+project's own continuous-save design (see "Decided -- continuous save model adopted" above) --
+worth testing the all-buttons combo directly and checking whether it triggers gemboy's
+save_battery_ram (.sav) rather than trusting the dialogue blindly.
+
+Exits: north -> room160 (known). South -> a NEW room, room192/0, via a specific narrow gap (4
+other columns all blocked). East/west: real walls, each confirmed across 3 rows. BONUS: the
+building's door is enterable -- transitions to a NEW interior, room250/map29, containing 8 static
+crate-shaped objects in a 2x4 grid plus a 9th at the threshold.
+
+Indicators: game = no new item/sword, but the richest content haul yet: 2 new unique dialogue
+lines (vs. room177's repeated line) plus 2 new rooms (192 outdoor, 250/29 indoor). Verified facts
+= data/ram_registry.json's new world_topology.room176_exits_and_content, dialogues.room176_pair_a
+/room176_pair_b, room_labels for 176 (upgraded), 192 and 250/29 (new).
+
+Decisions made: none (Explorer role).
+
+main.dump updated: backed up to backups/main_20260908_143719.dump first, new main.dump holds
+room_id=250/map_id=29 (inside the new crate interior) at (80,116), verified clean by render.
+
+Next question proposed: room192 and room250/29 are both fresh, unexplored past entry -- natural
+next targets. The crate objects in room250/29 are untested for :a (unlike anything tested so far
+-- container-shaped, not creature-shaped). Also worth a dedicated quick test: the all-buttons-at-
+once save combo the NPCs described -- does it actually trigger a .sav write?
+
+What NOT to redo: don't retest room176's east/west edges -- confirmed real walls on 3 rows each.
+Don't retest north from x=78 -- building footprint, not the room edge (real path is x=140).
+Don't treat either humanoid pair as wandering -- both held position all session. Don't chase the
+tile=0x26 flying object with a simple approach script -- moved 39px in 15 frames, faster than any
+sprite characterized so far, needs a tighter loop.
+```
+
 ## New standing convention (September 8, 2026) -- keep the Koholint Atlas updated
 
 Owner asked to keep the published Artifact ("Koholint Atlas") updated with real advances, with a
