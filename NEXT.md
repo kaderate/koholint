@@ -557,6 +557,51 @@ slot number -- both alternate between two slot ranges every frame, identify by p
 Don't assume pixel-adjacency alone triggers :a -- facing the right direction immediately before
 the press matters too.
 ```
+
+## Session report (September 8, 2026 -- room161 confirmed a 3-way hub, room160 found, first solid negative)
+
+```
+Question: what are room 161's 4 exits, and does any of its sprites trigger a dialogue via :a?
+
+Answer: exits confirmed, all 4 directions. East -> front_yard (known). South -> room177 (known,
+room177's own north exit). North -> genuine wall at y=26, confirmed at 3 separate columns
+spanning the room's width (two closer columns gave a false stop first -- the house's own
+footprint, same pattern room177's building caused). West -> a NEW room, room_id=160/map_id=0, via
+a specific mid-height gap (the bottom row hits a real wall instead) -- a visually distinct area:
+raised stone/hedge platform around a well/altar-like structure, water/river tile pattern, flower
+sprites, a green blob creature. room161 is a genuine 3-way hub (front_yard/room177/room160).
+
+Interaction: extensively tested (~32 :a attempts), NO dialogue found on any of room161's sprites.
+Three distinct moving entities identified: a round green blob (chased to 1-3px adjacency from 3
+angles, correct facing, 9 attempts, zero); an "ear"-shaped creature (5 clean attempts, zero,
+sometimes sits above the north wall -- likely unreachable there); a vertical post-like object
+(chase cross-tracked onto other sprites, inconclusive not refuted). A positive control on room177's
+known-interactive sprite, same session, confirmed the test mechanism itself works -- these are real
+negatives, not a broken test. This is the project's first solid "confirmed non-interactive" result,
+as useful as a positive one.
+
+Indicators: game = no new item/dialogue milestone this room, but real topology progress: room161's
+graph is complete (3 neighbors, a genuine hub) and a new, visually rich room (160) found.
+Trip A->B = not this session's primary target. Verified facts =
+data/ram_registry.json's new world_topology.room161_exits_and_sprites entry; hram.room_id's note
+extended with room160.
+
+Decisions made: none (Explorer role).
+
+Next question proposed: room160 is the natural next "one room" target -- visually the richest area
+found yet (platform/well, water tiles, flowers, its own creature), completely unexplored past
+entry. Lower priority: room161's vertical "post" object is the one genuinely inconclusive sprite
+left (chase-script cross-tracking, not a clean negative) -- low priority given how solid the other
+two negatives are.
+
+What NOT to redo: don't retest room161's north from the columns near the house (x=36,52) expecting
+an opening -- confirmed the house's own footprint, superseded by the real wall at y=26 found via
+wider columns. Don't re-chase room161's blob or "ear" creature expecting a missed dialogue --
+both solid negatives, corroborated by a working positive control. Don't reuse a
+"nearest-surviving-pair" chase heuristic on a room with several same-shaped sprites close together
+without tightening it (max-jump distance, tile-ID equality between paired halves) -- it silently
+jumped between distinct sprites here.
+```
 What NOT to redo: don't chase starting_house's remaining 12 disagreements further -- triangulated
 via two independent methods against a single static oracle, reads as the oracle's own staleness,
 not a method bug. Don't rebuild the classifier per-cell instead of per-signature -- the whole point
