@@ -331,6 +331,77 @@ it re-enters starting_house through its own door. Don't assume 1 move! call = 1 
 typically 2 calls per cell (COMMIT_THRESHOLD is half a tile, same caveat as before). Don't retest
 north via column 0 -- confirmed genuine wall, not a budget artifact.
 ```
+
+## Session report (September 8, 2026 -- north corridor found: room 146, a real new room)
+
+The owner pointed out the "north wall" was only tested on 2 of ~9 columns and was described to me
+directly as a tree (a discrete obstacle, not a sealed edge) -- worth trying the other columns. A
+second Explorer subagent did.
+
+```
+Question: is there a real path around the north obstacle via one of the untested columns, and
+what's a first look inside the three previously-found rooms (161, 163/map0, 178)?
+
+Answer: confirmed -- there is a real corridor. Column 1 (x<=24) walks north all the way to the
+top of front_yard with zero blocks and transitions into room_id=146/map_id=0, a genuinely new
+room never seen before this session. Column 0 stops one tile short of the same breakthrough
+point, blocked by a single discrete BG-tile obstacle right at the top-left corner (distinct tile
+signature, no OAM sprite there -- visually tree-like, matching the owner's description, though
+that's a visual read, not confirmed as literally a tree beyond that). Columns 2,3,4,7,8 hit a
+*different* obstacle -- a straight hedge wall at y=122, mid-screen, not the top edge, same wall
+column 5 already ran into. Column 6 wasn't independent data -- it drifted into column 5's path via
+the game's own alignment assist. Net correction to the prior session's "confirmed genuine wall":
+front_yard's north side has one real corridor (columns 0-1) past a mid-screen hedge, not a sealed
+boundary -- that conclusion was right about the wall it tested, wrong to generalize from 2 columns
+to "no north exit."
+
+First-pass room content (entry + a few steps, not fully charted): west/161 has a house-like
+structure, tan block objects, and a rounded green creature-like sprite -- most feature-rich. east
+/163-map0 is an undifferentiated repeating clover/bush field, nothing distinguishing found in the
+area explored. south/178 has a circular hedge/fence ring around a centered creature-like sprite
+plus two small sprites reading as airborne -- the only non-rectangular, deliberately-shaped layout
+of the three, and the subagent's top recommendation for the next dedicated session.
+
+Operational note: this subagent got stuck twice ending its turn on "waiting for the monitor
+notification" with no actual result, apparently from using its own background-task/Monitor
+mechanism internally and not reliably resuming from it -- had to be resumed twice via SendMessage,
+the second time explicitly redirecting it to run everything as synchronous foreground commands
+instead. It then completed the task properly. Its own screenshots were lost somewhere in that
+process (the scratchpad directory only had the *first* session's PNGs on disk afterward) -- the
+room_id=146 finding was independently re-verified and captured by this session directly rather
+than trusted secondhand (see the gif sent to the owner: west leg x:88->24, north leg y:131->88
+crossing into room 146, 93 frames, `Koholint::Navigator.tap` loop against
+front_yard_navigator.dump). The three rooms' "first pass" descriptions above are trusted from the
+subagent's report as-is (git status was independently confirmed clean, Explorer role respected)
+but don't have a fresh independent screenshot from this session -- see the entry-point screenshots
+already sent from the prior session instead.
+
+Indicators: game = unchanged milestone. Trip A->B = incidental: front_yard spawn to room 146's
+entry, reproduced directly this session, ~22 raw taps (west leg 24 taps to x<=24, north leg ~30
+taps to cross into 146 -- raw tap counts, not move! counts, so not directly comparable to the
+subagent's 14 move! calls). Verified facts = world_topology.front_yard_adjacent_rooms updated with
+room_id=146/map_id=0 and the corrected north picture; hram.room_id/map_id verified_count bumped.
+
+Decisions made: none (Explorer role; the room_id=146 capture was this session's own follow-up
+verification work, not a new decision).
+
+Next question proposed: one room per session, per the one-question rule. Top candidate per the
+subagent's own recommendation: chart room_id=178 (south) past its entry -- confirm whether the
+centered creature-like sprite is stationary/decorative or interactable (approach it, check for a
+dialogue/interaction trigger the way Session 2 did with Tarkin), and find 178's own exits. Second
+candidate: room_id=146 (north, found this session) is completely unexplored past its entry --
+front_yard's own north edge clearly wasn't a hard map boundary, so 146 may have more territory
+past it too.
+
+What NOT to redo: don't retest front_yard's north columns 2,3,4,6,7,8 -- confirmed real wall (5
+identical stop points at y=122) or a merge into column 5's known path. Don't retest column 0
+expecting an open path -- confirmed blocked by a real, visually-distinct obstacle one tile short
+of where column 1 breaks through. Don't assume 1 move! call = 1 tile, and don't trust a column
+label without verifying actual x/y after each step -- the game's own alignment assist can drift a
+walk from one column into another mid-traversal (confirmed: column 6 -> column 5). Don't launch an
+Explorer subagent that plans to use its own background/Monitor tooling for a task this size --
+ask it to work synchronously from the start, given this session's stuck-twice experience.
+```
 What NOT to redo: don't chase starting_house's remaining 12 disagreements further -- triangulated
 via two independent methods against a single static oracle, reads as the oracle's own staleness,
 not a method bug. Don't rebuild the classifier per-cell instead of per-signature -- the whole point
