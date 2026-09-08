@@ -454,6 +454,56 @@ confirmed unreliable; direction-only is the reusable part of any legacy hint. Do
 move!'s COMMIT_THRESHOLD math on non-transition steps -- it works correctly there; the
 blocked-but-transitioned quirk is specific to the exact frame a screen-edge crossing occurs.
 ```
+
+## Session report (September 8, 2026 -- first confirmed dialogue text: room 177's static sprite)
+
+Owner's direction: keep exploring the village without stopping, collect as much as possible from
+NPC/object dialogue in parallel.
+
+```
+Question: does either of room 177's two sprite pairs move on its own, and does :a near either
+trigger anything?
+
+Answer: confirmed, both parts, with a twist. One pair (originally y=32,x=77/85, plus a
+single-tile sprite) genuinely wanders with zero Link input (idle 60-frame test: x crept 77->106).
+The other (y=96,x=120/128) stayed at that exact position across 13 approach steps from 2 angles --
+only its tile ID flickers (animation), never its position. Interaction landed on the STATIC pair,
+not the moving one: approached, faced it, pressed :a -> a dialogue box opened reading "YOUPI! J'AI
+LA PECHE! ET TOI?" (data/ram_registry.json's new dialogues.room177_static_sprite entry has the
+full transcript and provenance). Repeated :a toggled the box open/closed, same line every time.
+Negative control (pressing :a far from both sprites) produced nothing, 3x -- confirms this is
+proximity-gated, not a room-wide effect. "Moves on its own" was NOT a reliable predictor of "is
+interactive" here -- worth remembering for future rooms. The moving pair's own interactivity is
+still inconclusive (a chase script couldn't maintain clean adjacency against its wander), not
+refuted.
+
+Also re-confirmed: 0xD0-0xDF/0xE0-0xEF read all-zero even while a real dialogue box was visibly
+open on screen -- dialogue detection must stay screen-render-based, never that address range.
+
+Room 177's own exits, light probe only (not fully confirmed): east returns to 178 (the known entry
+path), north crosses into 161 -- suggesting 161 borders both front_yard and 177, unconfirmed with
+more than a few taps. West/south inconclusive, likely obstructed by the building sprite rather
+than a wall.
+
+Indicators: game = no new milestone in the "item/sword" sense, but the first confirmed dialogue
+text this project has ever captured -- a real content signal, not just topology. Trip A->B =
+unchanged. Verified facts = data/ram_registry.json's world_topology.room177_sprites and the new
+top-level dialogues section (room177_static_sprite) -- the first entries there.
+
+Decisions made: none (Explorer role).
+
+Next question proposed: (1) a cleaner, tighter chase to get confirmed adjacency on the moving
+sprite and settle whether it's also interactive -- inconclusive isn't refuted. (2) confirm room
+177's own exits with more than a light probe, especially whether 161 really borders both
+front_yard and 177 (would mean 161 is a hub, not a dead-end room). (3) once an inventory/state RAM
+address exists, re-check the static sprite's dialogue interaction for any HUD-visible side effect
+beyond the text box.
+
+What NOT to redo: don't re-test the static pair's position -- confirmed fixed across 3 approach
+angles + a 60-frame idle window. Don't re-test the far-away negative control -- confirmed clean 3x.
+Don't assume a wandering sprite is more likely to be the interactive one -- wrong here. Don't trust
+0xD0-0xDF/0xE0-0xEF as a dialogue-state flag -- re-confirmed all-zero during a real open dialogue.
+```
 What NOT to redo: don't chase starting_house's remaining 12 disagreements further -- triangulated
 via two independent methods against a single static oracle, reads as the oracle's own staleness,
 not a method bug. Don't rebuild the classifier per-cell instead of per-signature -- the whole point
