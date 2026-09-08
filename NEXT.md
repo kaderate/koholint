@@ -203,6 +203,41 @@ tile=0x26 flying object with a simple approach script -- moved 39px in 15 frames
 sprite characterized so far, needs a tighter loop.
 ```
 
+## Session report (September 8, 2026 -- save mechanic verified, both NPC lines confirmed accurate)
+
+```
+Question: do room176's two NPC dialogue lines describe a real, working save mechanic?
+
+Answer: confirmed, fully, mechanically -- not trusted on their word. Holding A+B+START+SELECT
+together for ~120 frames opens a real pause/save menu ("REVENIR AU JEU" / "SAUVEGARDER &
+QUITTER", confirmed by rendered text). Selecting "SAUVEGARDER & QUITTER" triggers a genuine
+battery-RAM save -- gemboy/roms/zelda_la_dx.sav's MD5 and mtime both changed, confirmed by direct
+file diff. Rebooting the ROM fresh with that .sav (normal boot path, not a Marshal checkpoint)
+and skipping the title screen resumes in room250/29 (the crate interior where the save happened)
+right at its own door threshold, not the exact mid-room position -- confirms the second NPC's
+"resume at the last door passed through" claim precisely.
+
+Practical payoff: the game's own .sav is a real, ROM-free, 32KB save mechanism -- see
+data/ram_registry.json's new save_and_continue_mechanic entry. Directly relevant to this
+project's continuous-save design: unlike main.dump (which embeds the full ROM via
+Motherboard#dump), a .sav file is safe to persist/commit and is the right tool once there's real
+story/item progress worth preserving durably, not just topology.
+
+Indicators: game = no new milestone in the item sense, but a confirmed, load-bearing game
+mechanic (save/continue) now understood and reproducible. Verified facts =
+data/ram_registry.json's new save_and_continue_mechanic entry, with file-level proof.
+
+Decisions made: none new (this verifies infrastructure, doesn't change D-numbered decisions).
+
+Next question proposed: none urgent -- this was a side-investigation off room176's dialogue, not
+part of the room-by-room exploration queue. Resume with room192 and room250/29 exploration.
+
+What NOT to redo: don't retest the save combo expecting a different result -- confirmed cleanly
+via file MD5 diff, about as solid as evidence gets. Don't use main.dump's working directory
+assumptions carelessly -- the .sav write failed once with a relative-path ENOENT until run from
+gemboy's own directory (cwd matters for battery_ram_path's relative path).
+```
+
 ## New standing convention (September 8, 2026) -- keep the Koholint Atlas updated
 
 Owner asked to keep the published Artifact ("Koholint Atlas") updated with real advances, with a
