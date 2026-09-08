@@ -160,3 +160,12 @@ to be ratified), `taken without validation` (inherited from the spike, to be rev
 - **Invalidated if**: the tile-ID partition fails to separate cleanly in a third room, or the
   fraction of cells needing live-probe fallback grows large enough that VRAM reads stop being the
   practical primary path.
+- **Implemented and validated, same day**: `lib/terrain.rb` (`Terrain.signature_at`,
+  `Terrain::RoomClassifier` -- caches a walkable/blocked verdict per tile-ID signature, live-probes
+  only the first cell seen with a new signature) and
+  `lib/validation/terrain_predictor_check.rb`. Result: 161/173 (93.1%) combined agreement on the
+  same oracle sweep `oracle_grid_check.rb` used, up from the pure-live-probe result (145/173,
+  83.8%), using 22 total live probes instead of up to 8 taps x 173 edges -- `front_yard` reached
+  100% (60/60, 9 probes). The remaining 12 disagreements (all `starting_house`) triangulate as
+  oracle staleness, not a method flaw -- see `NEXT.md` and `data/ram_registry.json`'s
+  `terrain_collision` entry (now `verified`).

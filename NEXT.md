@@ -14,7 +14,7 @@ still intact and unmodified, all knowledge is in `data/` and `docs/`.
 |---|---|
 | Progress in the game | **Upgraded September 8, 2026** -- shield genuinely obtained (HUD B slot shows the shield icon, screenshot-verified: `data/screenshots/shield_obtained_dialogue.png`, `shield_obtained_hud.png`) and the starting house genuinely left (`room_id=162, map_id=0` at `0xFFF6`/`0xFFF7`, matching the historical `front_yard` value; `data/screenshots/front_yard_reached.png`) -- both first achieved through real gameplay with `lib/navigator.rb`, not inherited or assumed. No sword. |
 | Trip A to B | First real measurement: settled spawn (row 3, col 4 in `starting_house`) to outside the house (`front_yard`) in 6 snapshot-based navigation steps (down, down, down, left, left, down), zero blind probing, zero legacy code. Frame count not yet logged precisely -- follow-up. |
-| Verified facts (RAM registry) | 6 `verified` HRAM entries unchanged. The door-gate mystery is now fully explained (not a RAM fact per se) -- see `data/ram_registry.json`. |
+| Verified facts (RAM registry) | 6 `verified` HRAM entries unchanged. The door-gate mystery is now fully explained (not a RAM fact per se). **New September 8, 2026**: terrain/collision now reads from the BG tilemap (D8, `terrain_collision.background_tilemap_predicts_walkability`, `verified`) -- see `data/ram_registry.json`. |
 
 **The `front_yard` mystery is closed.** It was never a story-gate bug: Link genuinely lacked the
 shield, because `legacy/`'s `move_tiles` undercounts real movement (see
@@ -237,14 +237,42 @@ answer once. Don't assume SCX/SCY=0 always holds in front_yard -- confirmed only
 door/spawn area, unverified further out.
 ```
 
-## D4/observation-layer ratified -- September 8, 2026 (see DECISIONS.md's D8)
+## Session report (September 8, 2026 -- D8 implemented: lib/terrain.rb + terrain_predictor_check.rb)
 
-Owner's decision: VRAM tilemap reads are the primary terrain source of truth; `Navigator`'s
-live-probing stays as the fallback/cross-check, not deleted, for whatever the tile read doesn't
-resolve cleanly (ledges, unclassified signatures, a room where the partition doesn't hold as
-cleanly as the first two). Builder session starts now on the three tasks NEXT.md already queued:
-formalize the per-room tile-ID lookup, re-run `oracle_grid_check.rb`'s 173-edge sweep with it
-substituted in, investigate the `front_yard` (5,3)<->(6,3) ledge.
+```
+Question: does D8's tile-based terrain predictor (RoomClassifier: cache a walkable/blocked verdict
+per tile-ID signature, live-probe only the first time a signature is seen) match or beat
+Navigator's pure live-probing on the same 173-edge oracle sweep, using far fewer live taps?
+Answer: confirmed, clearly. Combined 161/173 (93.1%) agreement, up from the pure-live-probe
+sweep's 145/173 (83.8%), using 22 total live probes instead of up to 8 taps x 173 edges.
+front_yard: 60/60 (100%), 9 probes. starting_house: 101/113 (89.4%), 13 probes.
+lib/terrain.rb (Terrain.signature_at, Terrain::RoomClassifier) and
+lib/validation/terrain_predictor_check.rb both committed.
+The 12 remaining starting_house disagreements are an exact cell-by-cell subset of the pure-probe
+sweep's own "oracle=blocked, Navigator=ok" disagreements (cross-checked against the prior session
+report) -- two independent methods (live movement, static tile read) agree with each other and
+disagree with the same static legacy oracle in the same direction, which reads as the oracle being
+stale there, not either live method being wrong. None of the pure-probe sweep's 9 "oracle=ok,
+Navigator=blocked" false negatives survive in the terrain method -- reading the tile directly
+sidesteps whatever COMMIT_THRESHOLD/corner-precision quirk caused those.
+Indicators: game = unchanged. Trip A->B = unchanged (this was a method comparison, not a route).
+Verified facts = terrain_collision.background_tilemap_predicts_walkability promoted from "measured,
+pending ratification" to "verified" in data/ram_registry.json, with the cross-validation numbers
+above as provenance.
+Decisions made: none new -- this executes D8, already ratified by the owner.
+Next question proposed: the front_yard (5,3)<->(6,3) one-way-ledge case (Explorer's original
+finding) wasn't re-exercised by this run -- the BFS never walks into a cell the oracle itself
+labels 'blocked', so it never tested the specific left-then-up approach that found it reachable.
+Still open: general one-way-ledge category, or a one-off. Low priority given 93.1% agreement and a
+working fallback mechanism already in place; worth a session once there's a concrete reason to
+generalize past these two rooms (a third room, or the sword-milestone path needing this specific
+cell).
+What NOT to redo: don't chase starting_house's remaining 12 disagreements further -- triangulated
+via two independent methods against a single static oracle, reads as the oracle's own staleness,
+not a method bug. Don't rebuild the classifier per-cell instead of per-signature -- the whole point
+of D8's efficiency win is signature-level caching; testing every cell individually would just be
+live-probing with extra steps.
+```
 
 ## What NOT to redo
 
