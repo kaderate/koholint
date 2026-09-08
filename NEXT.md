@@ -402,6 +402,58 @@ walk from one column into another mid-traversal (confirmed: column 6 -> column 5
 Explorer subagent that plans to use its own background/Monitor tooling for a task this size --
 ask it to work synchronously from the start, given this session's stuck-twice experience.
 ```
+
+## Session report (September 8, 2026 -- room 177 reached, matches legacy's old villager_screen)
+
+Owner's direction: "focus on the village." `legacy/game_agents/zelda/scenarios.rb`'s old
+`villager_screen` method (room_id 177, its own comment: "a house + wandering villager") starts
+from `overworld_screen2` (room_id 178 -- exactly the already-confirmed "south" room from
+`front_yard`) via `down` then `left`. Told this Explorer subagent explicitly to skip
+background/Monitor after the prior one's stuck-twice experience -- it completed cleanly.
+
+```
+Question: does front_yard -> south (178) -> continue down/left reach room_id=177, following
+legacy's old villager_screen hint (direction only, not its tap counts)?
+
+Answer: confirmed. 16 real Navigator.move! calls: front_yard(162) -[south]-> 178 -[~2-3 down,
+then blocked by a wall]-> -[~10-11 left]-> room_id=177/map_id=0, entered at x=140,y=48. Legacy's
+exact tap counts (40 down, 44 left) didn't map onto move!'s tile-calibrated steps -- confirms
+"trust the direction from an old hint, not the count" as a general pattern, not just a one-off.
+
+Important new Navigator caveat, now documented in lib/navigator.rb: on the exact step that
+crosses a room boundary, move! can return :blocked even though a real transition happened --
+position() rebases onto the new screen, so the pre/post delta on the old axis reads under
+COMMIT_THRESHOLD. Both transitions on this path hit it. Room_id/map_id must be checked after
+every move! call near a screen edge, never inferred from :ok/:blocked alone.
+
+Room 177: a building-shaped structure (dark trapezoid/gabled-roof shape on a tan base) centered
+upper-screen, grass field with darker blotchy clusters near the edges, two small round
+white/cream sprites near the structure. OAM snapshot (single frame): Link at slots 2/3, two 2-tile
+sprite pairs (flags=0x21), one single-tile sprite -- not yet confirmed whether any move (would
+distinguish an animated/interactable sprite from decoration). Screenshot sent to the owner.
+
+Indicators: game = new room reached (177/map0), one screen-scroll south then west of front_yard,
+not yet explored beyond entry. Trip A->B = front_yard to room 177: 16 move! calls, 2 real
+transitions -- first concrete multi-room route measurement with the new toolchain. Verified facts
+= data/ram_registry.json's world_topology.front_yard_adjacent_rooms (178's south transition
+re-confirmed a 3rd time) and new front_yard_to_room177 entry; hram.room_id's note updated.
+
+Decisions made: none (Explorer role) for the room-177 finding itself; the lib/navigator.rb caveat
+comment was added by this session directly (mechanical documentation of an observed bug/limitation,
+not a design decision -- matches the project's "hidden constraint, one line" comment convention).
+
+Next question proposed: a short multi-frame OAM diff at a fixed position in room 177 -- does
+either 2-tile sprite pair move over time/room-revisits? That would distinguish an
+animated/interactable sprite from static decoration without assuming what it depicts, and is the
+natural next step before deciding whether room 177 is worth an interaction attempt (approach +
+check for a dialogue trigger, the way Session 2 did with Tarkin).
+
+What NOT to redo: don't re-verify front_yard->178 or 178's basic shape -- confirmed 3 independent
+times now. Don't re-derive legacy's villager_screen tap counts as literal tile-step counts --
+confirmed unreliable; direction-only is the reusable part of any legacy hint. Don't re-litigate
+move!'s COMMIT_THRESHOLD math on non-transition steps -- it works correctly there; the
+blocked-but-transitioned quirk is specific to the exact frame a screen-edge crossing occurs.
+```
 What NOT to redo: don't chase starting_house's remaining 12 disagreements further -- triangulated
 via two independent methods against a single static oracle, reads as the oracle's own staleness,
 not a method bug. Don't rebuild the classifier per-cell instead of per-signature -- the whole point

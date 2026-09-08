@@ -61,6 +61,11 @@ module Koholint
     # Mutates `motherboard` forward for real; use #probe instead to test without side effects.
     # Returns :ok once TILE_SIZE worth of real progress lands, :blocked after MAX_TAPS with no
     # such progress.
+    # Known caveat (found 2026-09-08, reaching room 177 from front_yard): on a step that crosses a
+    # room boundary, position() rebases onto the new screen, so the old-axis delta can read as
+    # under COMMIT_THRESHOLD even though a real transition just happened -- move! returns :blocked
+    # while room_id/map_id have actually changed. Check room identity after every call near a
+    # screen edge; never infer "nothing happened" from :blocked alone.
     def self.move!(motherboard, direction)
       axis = AXIS.fetch(direction)
       sign = SIGN.fetch(direction)
