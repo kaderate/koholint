@@ -99,6 +99,54 @@ switch to a continuous "main save" model (each session picks up from the last on
 future exploration, or keep independent branches from a fixed point for now and treat continuous
 progression as a separate, later phase. Not decided -- flagged here rather than assumed.
 
+## Session report (September 8, 2026 -- SELECT map investigated, mostly refuted, 2 real anomalies)
+
+```
+Question: does the SELECT map screen pan, encode discovery status, have a readable underlying
+data structure, and what does the "!?" icon mean?
+
+Answer: mostly refuted, one correction to the discovery's own premise, two genuine unexplained
+anomalies found instead.
+
+CORRECTION: holding :select is not a stable state -- it's an automatic ~96-frame open/close
+cycle (confirmed via full-tilemap MD5 hashing frame-by-frame), independent of input. The
+original finding's screenshot just happened to land in an open window.
+
+Panning: refuted (150 frames, 5 conditions, zero scrolled state ever observed -- a held
+direction just leaks into real gameplay once the overlay auto-closes). Visual discovery-status
+encoding: refuted (255/256 grid cells are the identical tile, only the position marker differs,
+despite ~7 rooms already visited). Underlying WRAM structure: refuted as a negative result (only
+115 bytes change in the full 8KB WRAM diff, nowhere near a 256-cell bitmap) -- doesn't rule out a
+structure written elsewhere and merely read here. The "!?" icon: confirmed fixed/room-independent
+(byte-identical tilemap region in 2 different rooms) -- a static legend, not a marker.
+
+The position marker itself: inconclusive -- stayed at the exact same grid cell in front_yard AND
+room177 (different physical rooms), which a real position tracker shouldn't do; needs a more
+distant checkpoint to settle. Two real anomalies, not chased further (low priority): starting_house
+never shows the map at all across 300 frames (interiors may disable it -- one data point);
+room160 shows a grid-LIKE state but renders blank with a different icon entirely (hypothesis:
+map graphics borrow CHR tile slots from the current room's own tileset).
+
+Bottom line: not the world-topology shortcut it looked like -- no pan, no visible fog-of-war, no
+bulk-readable structure found this pass. Registry entry corrected accordingly.
+
+Indicators: game = unchanged (UI/mechanic investigation). Verified facts =
+data/ram_registry.json's select_map_screen entry substantially rewritten with the correction and
+all 4 findings.
+
+Decisions made: none (Explorer role).
+
+Next question proposed: low priority, only if it becomes relevant elsewhere -- a 3rd/more-distant
+checkpoint to settle the marker's semantics; a second interior checkpoint to confirm "no map
+indoors"; the room160 CHR-tileset hypothesis.
+
+What NOT to redo: don't retest panning -- conclusively refuted, cleanest test run this session.
+Don't use raw pixel-color distinct-count to classify screen state -- DMG's 4-shade palette makes
+it useless; use BG tilemap tile IDs. Don't assume "holding select" is a stable state in any future
+script -- it's a ~96-frame cycle; poll for the grid tile settling, don't rely on a fixed frame
+count. Don't re-run the WRAM diff expecting a bigger hit -- already exhaustive over the full 8KB.
+```
+
 ## New standing convention (September 8, 2026) -- keep the Koholint Atlas updated
 
 Owner asked to keep the published Artifact ("Koholint Atlas") updated with real advances, with a
