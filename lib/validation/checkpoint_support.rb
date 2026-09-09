@@ -93,5 +93,26 @@ module Koholint
       end
       [Navigator.position(motherboard.mmu)[axis], calls]
     end
+
+    # Advances a dialogue by tapping A once, then probing whether movement is free again --
+    # AGENTS.md's "wait for a state condition, not a duration" applied to dialogue, since there's
+    # no known memory flag for it (NEXT.md) and a fixed tap count is fragile: a scripted greeting
+    # like Marin's doesn't even open until several hundred idle frames pass (measured live this
+    # session -- no amount of early A-tapping closes a box that hasn't opened yet), and a fixed
+    # count generous enough to cover that risks the opposite failure, re-triggering the SAME
+    # dialogue by pressing A again while still facing the NPC after it closes (the crate_room book
+    # trap, data/ram_registry.json's crate_room_and_riverside_content). Probing via a real
+    # Navigator.move! (not a snapshot probe) is deliberate: once free, that step is genuine
+    # progress, not wasted -- the caller doesn't need to separately re-approach afterward.
+    # `probe_direction` should be a direction with open floor near the NPC (untested directions
+    # risk a false "still blocked" read against real furniture, not dialogue). Mutates
+    # `motherboard`; stops as soon as movement succeeds or `max_rounds` A-taps are spent.
+    def clear_dialogue!(motherboard, probe_direction: :down, max_rounds: 40)
+      max_rounds.times do |i|
+        Navigator.tap_button(motherboard, :a)
+        return i + 1 if Navigator.move!(motherboard, probe_direction) == :ok
+      end
+      nil
+    end
   end
 end

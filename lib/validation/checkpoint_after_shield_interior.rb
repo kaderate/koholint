@@ -4,18 +4,19 @@
 # conversation (which ends with the shield) -- still inside starting_house (163/16). No legacy/
 # file is required anywhere in this script.
 #
-# Frame/tap counts below are empirically tuned this session (screenshots inspected at each stage
-# via a throwaway recon script, not guessed) -- see the commit message. Time is frames throughout
-# (AGENTS.md), never an instruction count; Navigator.tap_button is the single-button press-then-
-# settle primitive this checkpoint needed and Navigator didn't have yet (PLAN.md Part A).
+# Time is frames throughout (AGENTS.md), never an instruction count; Navigator.tap_button is the
+# single-button press-then-settle primitive this checkpoint needed and Navigator didn't have yet
+# (PLAN.md Part A).
 #
-# Two real dialogues happen here, not one: Marin's greeting fires the moment the file loads (no
-# navigation needed -- movement input is locked out entirely while it's up, confirmed live: 16
-# Navigator.move! calls from spawn all reported zero displacement), *then* a short walk to Tarin
-# triggers a second conversation that ends with the shield and an item-get message. The "6x
-# interact" in this session's own mandate was a rough description, not a literal tap count --
-# reaching the same real end state (shield obtained) is what's verified below, visually, the same
-# way this project already reads dialogue state (NEXT.md: no reliable memory flag for it).
+# Two real dialogues happen here, not one, and neither is safe to clear with a fixed tap count
+# (see CheckpointSupport.clear_dialogue!'s comment for why -- a fixed count was tried first this
+# session and failed both ways, too few and too many). Marin's greeting fires on its own a few
+# hundred frames after the file loads, no navigation needed (movement is locked out entirely
+# while it's up); a short walk to Tarin then triggers a second conversation that ends with the
+# shield and an item-get message. The "6x interact" in this session's own mandate was a rough
+# description, not a literal tap count -- reaching the same real end state (shield obtained) is
+# what's verified below, visually, the same way this project already reads dialogue state
+# (NEXT.md: no reliable memory flag for it).
 #
 # Run: ruby lib/validation/checkpoint_after_shield_interior.rb
 
@@ -25,16 +26,7 @@ include Koholint::CheckpointSupport
 
 STARTING_HOUSE = [163, 16].freeze
 BOOT_WAIT_FRAMES = 4200 # boot logo -> intro cutscene -> idles on the title screen
-GREETING_A_TAPS = 16 # Marin's unprompted greeting; measured to close by tap 12, +margin
 TARIN_TARGET = { y: 80, x: 112 }.freeze # same approach point this project used before (docs/archive)
-TARIN_A_TAPS = 30 # Tarin's conversation + the shield item-get message; measured to close at 28 --
-                   # kept close to that, not padded further: overshooting while still facing him
-                   # risks re-triggering the whole conversation (same trap as crate_room's book
-                   # stands, data/ram_registry.json's crate_room_and_riverside_content).
-
-def mash_a(motherboard, times)
-  times.times { Koholint::Navigator.tap_button(motherboard, :a) }
-end
 
 def build
   motherboard = boot_fresh
@@ -46,12 +38,12 @@ def build
   Koholint::Navigator.tap_button(motherboard, :start) # confirm name -> file select, file created
   Koholint::Navigator.tap_button(motherboard, :start) # select the file -> enters starting_house
 
-  mash_a(motherboard, GREETING_A_TAPS)
+  clear_dialogue!(motherboard, probe_direction: :down, max_rounds: 40) # Marin's greeting
 
   nudge_axis!(motherboard, :y, TARIN_TARGET[:y], tolerance: 6, max_steps: 8)
   nudge_axis!(motherboard, :x, TARIN_TARGET[:x], tolerance: 6, max_steps: 8)
 
-  mash_a(motherboard, TARIN_A_TAPS)
+  clear_dialogue!(motherboard, probe_direction: :left, max_rounds: 40) # Tarin -> the shield
 
   motherboard
 end
