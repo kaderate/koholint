@@ -5,6 +5,7 @@ roms/
 *.marshal
 /tmp/
 /.worktrees/
+/.claude/worktrees/
 .DS_Store
 /vendor/
 /coverage/
