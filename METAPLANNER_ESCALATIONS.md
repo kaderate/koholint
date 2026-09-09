@@ -22,4 +22,43 @@ Entry template:
 **Resolution** (MetaPlanner fills in): -> METAPLANNER.md#MP<n>, one-line summary.
 ```
 
-No open entries yet.
+## ESC1: subagents recurringly get stuck waiting for a Monitor notification that never arrives
+
+**Status**: open
+**Opened**: September 9, 2026, by planner session
+**Context**: root-caused this session -- a spawned `Agent`-tool subagent is a bounded, single-shot
+invocation; when it stops calling tools (even to say "waiting for notification"), the invocation
+just ends, nothing self-resumes it. Only an explicit external `SendMessage` from the dispatching
+session continues it. This recurred 7+ times across Explorer/Builder dispatches this session, each
+time mitigated manually. The mechanism is understood but lives only in this conversation, not in
+any file a future dispatching session would read cold.
+**Why process, not domain**: about how subagent prompts are written and what behavior to expect
+from them, not a game fact or a decision about how to play.
+**Resolution** (MetaPlanner fills in):
+
+## ESC2: no rule for what belongs in NEXT.md vs. AGENTS.md, so durable rules pile up in NEXT.md
+
+**Status**: open
+**Opened**: September 9, 2026, by planner session
+**Context**: `NEXT.md`'s "Standing conventions" section holds durable engineering rules (e.g. "never
+`run_in_background` inside an Explorer's own script") indistinguishable in permanence from rules
+that live in `AGENTS.md`, mixed in with genuinely session-specific resumption state. The file has
+already exceeded its own "one page, no more" limit and needed manual trimming twice this session,
+with no structural fix -- likely because there's no rule saying which kind of content is allowed to
+accumulate there.
+**Why process, not domain**: purely about where documentation lives and what NEXT.md is scoped to
+hold, not a game fact.
+**Resolution** (MetaPlanner fills in):
+
+## ESC3: no audit cadence for the verified-status provenance rule, already violated once in the field
+
+**Status**: open
+**Opened**: September 9, 2026, by planner session
+**Context**: a cold review on September 9, 2026 found ~15 `world_topology`/`dialogues` entries
+carrying `verified`/`ram_read_verified` at `verified_count: 1` (below the required bar).
+`AGENTS.md` now states the rule and cites the incident, but nothing assigns responsibility or
+cadence for catching a recurrence -- this instance was found because someone happened to check, not
+because any process step audits for it.
+**Why process, not domain**: a data-integrity/process gap in how facts get promoted to trusted
+status, not a fact about the game itself.
+**Resolution** (MetaPlanner fills in):
