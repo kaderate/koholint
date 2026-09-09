@@ -96,6 +96,23 @@ external review, judged sound but not blocking); whether other already-"refuted"
 project deserve a re-look under the same off-tile-grid-alignment hypothesis now confirmed for
 house2 (not yet tested elsewhere -- one confirmed case, not yet a proven general rule).
 
+**Real architecture question, owner-raised September 9 2026, not yet designed**: the current
+walkability model (D8's `Terrain::RoomClassifier`, `walkable`/`blocked` per tile signature) is a
+static snapshot that conflates several genuinely different things -- see
+`terrain_collision.background_tilemap_predicts_walkability`'s three newest caveats: (1) the bottom
+HUD row reads as a normal 'blocked' cell despite not being world terrain at all, (2) the same
+visual object (e.g. a tree) can carry different signatures per room, by design, but nothing
+currently states this explicitly for a reader reasoning about the data, (3) at least one class of
+terrain (bushes) is CONDITIONALLY blocked -- passable once cut, presumably with an item Link
+doesn't have yet -- and the model has no way to represent "blocked now, for a reason that could
+change" versus "permanently blocked." Owner's framing: how do we build a world-model
+representation that's good enough to act on now but can evolve as more is learned, and --
+explicitly -- how much of getting this right is on-session judgment (mine, this conversation) vs.
+something that belongs in the durable, cold-readable parts of this project (schemas, `AGENTS.md`
+process rules, `DECISIONS.md`) so it doesn't depend on any one session remembering it. Needs a
+real design pass, not a quick patch -- likely a Builder-role decision once scoped (changes D8's
+own data model), not something to implement ad hoc.
+
 ## What NOT to redo
 
 - Don't infer room identity from `move!`'s return value alone near a screen edge -- it can return
