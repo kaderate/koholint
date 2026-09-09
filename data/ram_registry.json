@@ -166,7 +166,7 @@
     },
     "146/0": {
       "label": "north_corridor_room",
-      "description": "North of front_yard, reached via a specific corridor at the room's far-west columns (0-1) that threads past a mid-screen hedge wall and a discrete tree-like obstacle. New room, no legacy name -- only the transition itself has been confirmed so far, no detailed visual description captured yet (label/description to refine once explored)."
+      "description": "North of front_yard, reached via a specific corridor at the room's far-west columns (0-1) that threads past a mid-screen hedge wall and a discrete tree-like obstacle. New room, no legacy name -- only the transition itself has been confirmed so far, no detailed visual description captured yet (label/description to refine once explored). Screenshot on file is a genuine mid-scroll-transition capture, not a clean settled frame -- 3 distinct re-capture attempts (September 9, 2026) from lib_front_yard.dump all plateaued at x=52 pushing west, never reaching the x<=24 corridor the original crossing used; that original crossing's exact starting y is not reproduced by this checkpoint. Anti-patch rule invoked after the 3rd attempt; a clean re-capture needs a checkpoint closer to the original crossing's path, not more blind west-pushes from here."
     }
   },
   "world_topology": {
