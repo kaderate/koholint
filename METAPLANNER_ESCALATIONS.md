@@ -36,6 +36,22 @@ any file a future dispatching session would read cold.
 from them, not a game fact or a decision about how to play.
 **Resolution** (MetaPlanner fills in):
 
+## ESC4: `create_session` dispatch instructions don't mention the repo must be explicitly attached
+
+**Status**: open
+**Opened**: September 9, 2026, by planner session
+**Context**: the first real MetaPlanner dispatch (session `session_019ZMSHF5XTHtJx5yWS66eUz`) was
+created without `source_url`/`source_revision`, on the mistaken assumption that "inherits the
+calling session's environment" (the tool's own description) meant the repo would be checked out
+too. It wasn't -- the session landed in an empty container, correctly identified this as either a
+misconfiguration or a prompt injection (it had no way to tell which), and rightly refused to act
+rather than fabricate a report. A retry with `source_url`/`source_revision` set fixed it. `MP2`
+(the entry documenting `create_session` dispatch) doesn't mention this requirement, so the mistake
+is one bad copy-paste away from repeating.
+**Why process, not domain**: purely about how a peer session gets correctly provisioned before
+dispatch, not a game fact.
+**Resolution** (MetaPlanner fills in):
+
 ## ESC2: no rule for what belongs in NEXT.md vs. AGENTS.md, so durable rules pile up in NEXT.md
 
 **Status**: open
