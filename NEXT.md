@@ -8,17 +8,20 @@ finding, not to resume the project.
 
 6 of the 7 PLAN.md Session 4 checkpoints (`after_shield_interior`, `front_yard`,
 `overworld_screen2`, `villager_screen`, `shop_screen`, `screen3_north`) are regenerated and
-traversed via `lib/` alone, no `legacy/` file. `house2_interior` (the 7th) is REFUTED, not
-inconclusive, via a real walkability-map BFS (`lib/validation/checkpoint_house2_interior.rb`,
-`Terrain::RoomClassifier`) -- see `data/ram_registry.json`'s `world_topology.room177_exits` for
-the full finding. **`legacy/` was NOT removed**: D5's parity condition (all 7 checkpoints) isn't
-met.
+traversed via `lib/` alone, no `legacy/` file. `house2_interior` (the 7th) was REFUTED via BFS
+(`lib/validation/checkpoint_house2_interior.rb`), then FOUND AND CONFIRMED by a follow-up Explorer
+session the same day via a narrower-than-one-tile alignment the BFS's 16px cell grid couldn't
+land on -- see `data/ram_registry.json`'s `world_topology.room177_exits` and the "Paradigm to
+question" section below for the full finding. The Builder-owned `checkpoint_house2_interior.rb`
+itself was NOT updated (Explorer role does not touch `lib/`) -- a Builder session should apply the
+new approach path/alignment to it before D5's parity condition (all 7 checkpoints passing via
+`lib/` alone) can be called met. **`legacy/` was NOT removed** yet as a result.
 
 **Indicators**
 
 | Indicator | Value |
 |---|---|
-| Rooms found | 13 labeled in `data/ram_registry.json`'s `room_labels` (8 "charted", 5 "glimpsed"/less). Graph and screenshots published in the Koholint Atlas artifact. |
+| Rooms found | 14 labeled in `data/ram_registry.json`'s `room_labels` (8 "charted", 6 "glimpsed"/less -- adds `169/16` house2_interior, September 9 2026). Graph and screenshots published in the Koholint Atlas artifact (not yet updated with the new room). |
 | Dialogues / readable text | 7 confirmed entries in `ram_registry.json`'s `dialogues` (villager duo's shared line, room176's two save-mechanic NPC lines, two hint-book pages in the crate_room library, more). |
 | Terrain / collision | D8 live: reads BG tilemap signatures from VRAM (`lib/terrain.rb`), 93.1%-validated against live-probe oracle. Primary method; live probing kept as fallback. |
 | Save/continue | Mechanically verified end-to-end: hold A+B+START+SELECT opens the real save menu, "SAUVEGARDER & QUITTER" writes a real `.sav` (MD5-diffed), "REVENIR AU JEU" continues at the room's own door. This is the durable-progress path -- see "Standing conventions" below. |
@@ -55,29 +58,35 @@ terrain source of truth, live-probing kept as fallback. Full rationale for each:
   budget, exact report format). Never use `run_in_background`/Monitor inside an Explorer's own
   script -- run everything foreground/synchronous, it has gotten subagents stuck twice.
 
-## Paradigm to question (anti-patch, house2_interior)
+## Paradigm to question (anti-patch, house2_interior) -- RESOLVED September 9 2026
 
-Two genuinely distinct attempts at a real walkability-map BFS (`Terrain::RoomClassifier`, cache-
-respecting sweep with a targeted supplementary re-probe, then a corrected exhaustive sweep
-checking every edge's real room identity) both converge: villager_screen (177/0) has only 2 exits
-(161/0 north, 178/0 east), no door into the building anywhere in the 83 cells reachable from
-spawn. This isn't "one more probe away" -- it's the mechanism itself (tile-based cardinal
-movement from a BFS-reachable cell) coming up empty on a full, real sweep. Owner must decide the
-next approach; candidates, not yet tried: (a) sub-pixel wall-hugging alignment before pushing
-into the door (legacy/'s old route detoured into the SW corner first, suggesting position within
-a tile matters, not just which tile); (b) an animation/dialogue trigger (talk to the room's 2
-NPCs first?); (c) house2 is entered from a different room/approach entirely, not villager_screen.
-Do NOT re-run more BFS sweeps or column guesses on this same mechanism without picking one of
-these first.
+house2_interior's door is FOUND and CONFIRMED (candidate (a) above, sub-pixel/alignment, was the
+right one). Full evidence in `data/ram_registry.json`'s `world_topology.room177_exits` (search
+"DOOR FOUND AND CONFIRMED"). Summary: the row directly south of the door (row5, y=80..95) is a
+false floor -- blocked by the building's own footprint at x=100,y=82 (a genuine wall, 0px progress
+across 38 raw taps). The real approach detours one row further south (row6, y~106, already known
+open) before turning toward the door's column and pushing up. Once aligned, the transition takes
+as few as 6 raw taps / 2 `Navigator.move!` calls -- `Navigator.move!`'s `MAX_TAPS = 8` was NEVER
+the bottleneck; do not raise it on the strength of this. The real constraint: the door's trigger
+column is only ~8px wide (x=72/76 worked; x=64/68/80/88, each just 4-8px off, did not), narrower
+than the 16px tile grid `Navigator`/`Terrain::RoomClassifier` currently reason in -- which is
+exactly why the earlier BFS (cell-snapped to 16px) never found it. New room reached: `169/16`
+(`house2_interior` in `room_labels`), a house interior (bed, table with pots), not yet explored
+beyond the entry glance. Explorer checkpoint (not the canonical Builder one):
+`/tmp/zelda_checkpoints/lib_house2_interior_explorer.dump`.
 
 ## Next question
 
 Paused, awaiting the owner's go-ahead (explicit "arrête-toi et ping moi" checkpoint). Candidates
-once resumed: the house2_interior paradigm question above; explore past
+once resumed: explore `house2_interior` (169/16) itself, now reachable -- NPCs? items?; regenerate
+`lib/validation/checkpoint_house2_interior.rb` with the confirmed approach path (Builder work, not
+Explorer -- the fix is known, applying it to `lib/` is a decision-already-made task); explore past
 `riverside_south_room`'s entrance (two unidentified figures seen at the door), test the
 SELECT-map cursor lead from the crate_room hint book, retest `riverside_screen`'s signpost with a
 positive control. Also deferred, not urgent: formalizing a navigation spec/format (raised by an
-external review, judged sound but not blocking).
+external review, judged sound but not blocking); whether other already-"refuted" doors in this
+project deserve a re-look under the same off-tile-grid-alignment hypothesis now confirmed for
+house2 (not yet tested elsewhere -- one confirmed case, not yet a proven general rule).
 
 ## What NOT to redo
 
