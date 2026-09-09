@@ -47,14 +47,21 @@ module Koholint
       total
     end
 
-    def self.tap(motherboard, direction)
+    # Press-then-settle for any single button (direction or otherwise), frame-timed like every
+    # other Navigator primitive (AGENTS.md: time is frames, never an instruction count). Distinct
+    # hold_frames/settle_frames from a direction tap's defaults are for menu/dialogue advancement
+    # (large text-box "typing" settle windows), not movement -- movement keeps TRIGGER_FRAMES/
+    # SETTLE_FRAMES via #tap below.
+    def self.tap_button(motherboard, button, hold_frames: TRIGGER_FRAMES, settle_frames: SETTLE_FRAMES)
       keys = motherboard.mmu.joypad.key_state
       cpu, ppu, apu = motherboard.cpu, motherboard.ppu, motherboard.apu
-      keys.press(direction)
-      run_cycles(cpu, ppu, apu, TRIGGER_FRAMES * FRAME_CYCLES)
+      keys.press(button)
+      run_cycles(cpu, ppu, apu, hold_frames * FRAME_CYCLES)
       keys.clear
-      run_cycles(cpu, ppu, apu, SETTLE_FRAMES * FRAME_CYCLES)
+      run_cycles(cpu, ppu, apu, settle_frames * FRAME_CYCLES)
     end
+
+    def self.tap(motherboard, direction) = tap_button(motherboard, direction)
 
     # Presses `direction` from `motherboard`'s current state, tracking cumulative displacement
     # from the position at entry (not per-tap) -- fixes the creeping-collision undercount.
