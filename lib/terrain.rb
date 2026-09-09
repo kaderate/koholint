@@ -11,12 +11,20 @@ module Koholint
   class Terrain
     def self.bg_tile_map_addr(mmu) = mmu.read(0xFF40).anybits?(0x08) ? 0x9C00 : 0x9800
 
-    # world (row,col) -> the 2x2 block of BG tile IDs at tilemap rows/cols (2*row, 2*col).
-    # Wraps mod 32 (tilemap is a 32x32 wraparound canvas) -- untested far from where SCX/SCY were
-    # confirmed 0 (see data/ram_registry.json's terrain_collision entry).
+    # (row,col) is screen-relative (matches Navigator.position/HRAM, always ~0-9 regardless of
+    # room), so it must be re-based onto SCX/SCY before indexing the tilemap -- confirmed a real
+    # gap, not just untested, this session (Session 4, PLAN.md): villager_screen and
+    # overworld_screen2 both carry SCX/SCY=96/128 and 0/128, and reading without this offset
+    # silently returned another room's leftover tilemap content (byte-identical signatures for
+    # two different rooms, traced back to this). SCX/SCY are pixel units -- >>3 to tiles.
+    def self.scroll_tiles(mmu) = [mmu.read(0xFF43) >> 3, mmu.read(0xFF42) >> 3]
+
+    # world (row,col) -> the 2x2 block of BG tile IDs at tilemap rows/cols (2*row, 2*col), offset
+    # by the current scroll. Wraps mod 32 (tilemap is a 32x32 wraparound canvas).
     def self.signature_at(mmu, row, col)
       base = bg_tile_map_addr(mmu)
-      tile_row, tile_col = row * 2, col * 2
+      scx_tiles, scy_tiles = scroll_tiles(mmu)
+      tile_row, tile_col = (row * 2) + scy_tiles, (col * 2) + scx_tiles
       [0, 1].flat_map do |dr|
         [0, 1].map { |dc| mmu.debug_read(base + (((tile_row + dr) % 32) * 32) + ((tile_col + dc) % 32)) }
       end
