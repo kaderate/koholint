@@ -35,7 +35,7 @@ grids -- already fulfilled and recorded under D8 in `DECISIONS.md`; no other fil
 | Indicator | Value |
 |---|---|
 | Rooms found | 14 labeled in `data/ram_registry.json`'s `room_labels` (8 "charted", 6 "glimpsed"/less -- adds `169/16` house2_interior, September 9 2026). Graph and screenshots published in the Koholint Atlas artifact (not yet updated with the new room). D9 visual-catalog `visual_survey` now covers 4/14 (`front_yard`, `villager_screen` pilot + `crate_room`, `screen3_north` rollout, same day, autonomous session) -- see `DECISIONS.md`'s D9 entry. |
-| Dialogues / readable text | 10 confirmed entries in `ram_registry.json`'s `dialogues` (villager duo's shared line, room176's two save-mechanic NPC lines, crate_room's library fully read -- 4 books + 1 wall object, 9/9 tile objects resolved via OAM, September 9 2026). |
+| Dialogues / readable text | 12 confirmed entries in `ram_registry.json`'s `dialogues` (villager duo's shared line, room176's two save-mechanic NPC lines, crate_room's library fully read -- 4 books + 1 wall object, 9/9 tile objects resolved via OAM; house2_interior's 2 OAM-verified telephone objects, both hypothesis/verified_count 1, September 9 2026). |
 | Terrain / collision | D8 live: reads BG tilemap signatures from VRAM (`lib/terrain.rb`), 93.1%-validated against live-probe oracle. Primary method; live probing kept as fallback. |
 | Save/continue | Mechanically verified end-to-end: hold A+B+START+SELECT opens the real save menu, "SAUVEGARDER & QUITTER" writes a real `.sav` (MD5-diffed), "REVENIR AU JEU" continues at the room's own door. This is the durable-progress path -- see "Standing conventions" below. |
 | Current position | `/tmp/zelda_checkpoints/main.dump` (continuous session state, not versioned -- see below), last saved September 8 17:05, around `riverside_south_room` (208/0), glimpsed but unexplored past the entrance. |
@@ -95,8 +95,11 @@ Paused, awaiting the owner's go-ahead (explicit "arrête-toi et ping moi" checkp
 and d-pad-cursor-while-box-open is tested negative (32 combinations; double-A/`:b`/select-release/
 pre-existing-hold untested but not a priority) -- both resolved, no longer open questions. Crate_room's
 library is fully read, 9/9 objects (September 9 2026) -- also resolved, see "What NOT to redo".
-Candidates once resumed: explore `house2_interior` (169/16) itself, now reachable -- NPCs? items?;
-explore past `riverside_south_room`'s entrance (two unidentified figures seen at the door), retest
+`house2_interior` (169/16) explored past the entry glance, same day: no NPCs or items, but 2
+OAM-verified interactive objects (a telephone giving a hint-flavored monologue, and the phone
+itself ringing into a comedic wrong-number call) -- see `dialogues.house2_telephone_examine`/
+`house2_telephone_call` -- also resolved. Candidates once resumed: explore past
+`riverside_south_room`'s entrance (two unidentified figures seen at the door), retest
 `riverside_screen`'s signpost with a positive control. Also deferred, not urgent: formalizing a
 navigation spec/format (raised by an external review, judged sound but not blocking); whether other
 already-"refuted" doors in this project deserve a re-look under the same off-tile-grid-alignment
