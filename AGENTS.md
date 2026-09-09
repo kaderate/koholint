@@ -14,6 +14,13 @@ order, `NEXT.md` before any action.
 - **Facts about the game**: every measured fact becomes a checkpoint spec or an entry in
   `data/ram_registry.json` with provenance and `verified_count`. A fact that is neither will be
   rediscovered by the next agent, at full cost.
+- **`confidence: verified` / `source: ram_read_verified` requires `verified_count >= 2` from
+  genuinely independent checks** — a different session, a different method, or at minimum a
+  separately-run probe, never two reads from the same script's internal repetition. Below that
+  bar, label it `hypothesis` (`verified_count: 1`) and say so; a future session or a fresh probe
+  closes the gap. Found violated in the field once already (cold review, September 9, 2026): ~15
+  `world_topology`/`dialogues` entries carried `verified`/`ram_read_verified` at `verified_count:
+  1`. Check this before writing to the registry, not after.
 - **Pre-trained knowledge**: the game's memory map (community disassembly) is a source of
   hypotheses to verify, consistent with the provenance model. *Game* knowledge (where the sword
   is, who an NPC is) is forbidden: it is observed, never assumed.
