@@ -27,16 +27,17 @@ specific fact in it, you don't read it to resume the project.
 |---|---|
 | `data/ram_registry.json` | Memory addresses for the game, each with its provenance and `verified_count`. Source of truth for anything that reads RAM. |
 | `data/world_model.json` | Accumulated facts about the game: rooms, NPCs, dialogue, inventory, movement model. |
-| `data/puzzle_*.json` | The input packet and hypotheses for the first solved puzzle, with its validator in `legacy/`. |
-| `legacy/` | The spike's code, untouched. It regenerates `Zelda::Scenarios` checkpoints and runs the "Koholint report". To be replaced, not extended (see `DECISIONS.md`). Its JSON grids serve as an oracle to validate the new navigation tool, once. |
-| `lib/` | The new code. Empty at the start. |
+| `data/puzzle_*.json` | The input packet and hypotheses for the first solved puzzle. Its original validator lived in `legacy/`, removed once `lib/` reached parity (D5). |
+| `lib/` | The current code: `Navigator` (D7 snapshot-based movement), `Terrain` (D8 VRAM-tilemap collision), the Session 4 checkpoint scripts under `lib/validation/`. |
 
 ## Dependency on gemboy
 
-`legacy/`'s code reaches into gemboy's internals via relative paths (`profiling/utils.rb`,
-`lib/ppu/tile.rb`) and so doesn't run as-is here. The new code's first building block is a headless
-session API on gemboy's side (frames, keys, memory reads, in-memory snapshot/restore) that this
-repo will depend on like a pinned gem. Until it exists, `legacy/` is run from a gemboy clone.
+`lib/` reaches into a gemboy checkout via `$GEMBOY_HOME` (defaulting to a sibling `../gemboy`
+directory) for `Motherboard`, `CartridgeLoader`, and frame-stepping helpers — see
+`lib/validation/checkpoint_support.rb`. `legacy/` (the spike's code, replaced per D5 once `lib/`
+regenerated every checkpoint and reached parity — see `DECISIONS.md`) is gone; its JSON grids
+served as a one-time oracle to validate the new navigation and terrain tools (D8) and are no
+longer needed.
 
 ## Commands
 

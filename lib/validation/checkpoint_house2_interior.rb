@@ -1,19 +1,18 @@
 # frozen_string_literal: true
-# Replaces the guessed-column WIP (4 abandoned attempts, all on stale pre-SCX/SCY-fix terrain
-# reads -- see git history) with a real walkability map of villager_screen (177/0), built via
-# Terrain::RoomClassifier (D8): a genuinely new BG-tile signature costs one live probe, cached
-# afterwards. Room identity is checked after every real move regardless of its :ok/:blocked
-# verdict -- not just on a classifier cache miss -- because a shared signature can otherwise mask
-# a door behind an already-cached "blocked" wall (confirmed live this session: the room's real
-# east exit to 178/0 was missed by a cache-respecting sweep alone, only surfacing once every edge's
-# real outcome was checked; see NEXT.md).
+# Regenerates the house2_interior checkpoint lib/-only: continues from villager_screen, follows
+# the narrow-alignment route confirmed by the Explorer session in
+# data/ram_registry.json's world_topology.room177_exits ("DOOR FOUND AND CONFIRMED"). The earlier
+# BFS walkability-map sweep (16px-cell-snapped Terrain::RoomClassifier) never found this door --
+# not a tap-budget gap, but a trigger column narrower than one grid cell. No legacy/ file
+# required.
 #
-# Session 4 (PLAN.md) re-confirmation, September 9 2026: REFUTED, not inconclusive. Full sweep of
-# the 83 cells reachable from villager_screen's spawn (52 walkable, 31 blocked, every edge's real
-# move outcome checked) finds only the two already-known exits -- north to 161/0, east to 178/0 --
-# and no third door into the building. See data/ram_registry.json's world_topology.room177_exits
-# for the finding and NEXT.md's anti-patch note for what this rules out. Kept runnable as a
-# diagnostic: it raises on completion instead of silently reporting success.
+# Route: nudge to x=140 first (avoids the building's own false-floor wall at x=100 on the row
+# directly south of the door), down to row6 (y=110 -- row5, y=80..95, is a genuine wall when
+# approached from the west, confirmed 0px progress across 38 raw taps; y=102, right at the row5/6
+# boundary, is STILL inside the blocked band -- confirmed live this session, a leftward nudge
+# stalled after one step there. y=110 is the value this session's own probing found clear), then
+# left into the ~8px door column (x=72..76 -- x=64/68/80/88, each only 4-8px off, do NOT trigger),
+# then north.
 #
 # Run: ruby lib/validation/checkpoint_house2_interior.rb
 
@@ -21,120 +20,50 @@ require_relative 'checkpoint_support'
 
 include Koholint::CheckpointSupport
 
-VILLAGER_SCREEN = [177, 0].freeze
-KNOWN_EXITS = [[161, 0], [178, 0]].freeze
-MAX_VISITED = 300 # safety net, well above the ~83 cells this room actually has
+HOUSE2_INTERIOR = [169, 16].freeze
+CLEAR_X = 140
+ROW6_Y = 110
+DOOR_X = 74
+DOOR_X_TOLERANCE = 2 # keeps the landing inside the confirmed ~8px trigger band (x=72..76)
 
-def neighbor(row, col, dir)
-  case dir
-  when :up then [row - 1, col]
-  when :down then [row + 1, col]
-  when :left then [row, col - 1]
-  when :right then [row, col + 1]
-  end
-end
+def build
+  motherboard = load_checkpoint('villager_screen')
+  calls = 0
 
-def cell_of(mmu) = [mmu.read(0xFF99) / 16, mmu.read(0xFF98) / 16]
+  _, n = nudge_axis!(motherboard, :x, CLEAR_X, tolerance: 6, max_steps: 15)
+  calls += n
 
-# Flood-fills the room from `motherboard`'s current cell. Returns [visited, blocked, doors]:
-# visited/blocked are cell => snapshot-dump-or-true; doors is every (row, col, dir) whose real
-# move landed in a room other than `start_room`, whatever its :ok/:blocked verdict said.
-def map_room(motherboard, start_room)
-  classifier = Koholint::Terrain::RoomClassifier.new
-  visited = {}
-  blocked = {}
-  doors = []
-  queue = [[motherboard.dump, *cell_of(motherboard.mmu)]]
+  _, n = nudge_axis!(motherboard, :y, ROW6_Y, tolerance: 4, max_steps: 20)
+  calls += n
 
-  until queue.empty? || visited.size >= MAX_VISITED
-    snapshot, row, col = queue.shift
-    key = [row, col]
-    next if visited[key]
+  _, n = nudge_axis!(motherboard, :x, DOOR_X, tolerance: DOOR_X_TOLERANCE, max_steps: 20)
+  calls += n
 
-    visited[key] = snapshot
-    mb = Motherboard.load(snapshot)
-    classifier.verdict_at(mb.mmu, row, col) { :walkable } # Link stands here for real -- free sample
-
-    %i[up down left right].each do |dir|
-      nkey = neighbor(row, col, dir)
-      next if visited[nkey] || blocked[nkey]
-
-      classifier.verdict_at(mb.mmu, *nkey) do
-        walker = Motherboard.load(snapshot)
-        result = Koholint::Navigator.move!(walker, dir)
-        room = room_of(walker)
-        doors << { row:, col:, dir:, room:, dump: walker.dump } if room != start_room
-        result == :ok ? :walkable : :blocked
-      end
-
-      # Confirm for real regardless of the (possibly cached) verdict above: a signature seen as
-      # "blocked" elsewhere in the room isn't a per-cell guarantee, and this is the only way to
-      # find a door hidden behind a wall's own tile signature.
-      walker = Motherboard.load(snapshot)
-      result = Koholint::Navigator.move!(walker, dir)
-      room = room_of(walker)
-      if room != start_room
-        doors << { row:, col:, dir:, room:, dump: walker.dump }
-        next
-      end
-
-      unless result == :ok
-        blocked[nkey] = true
-        next
-      end
-
-      arrived = cell_of(walker.mmu)
-      extra_taps = 0
-      while arrived == key && extra_taps < Koholint::Navigator::MAX_TAPS
-        Koholint::Navigator.tap(walker, dir)
-        arrived = cell_of(walker.mmu)
-        extra_taps += 1
-      end
-      if arrived == key
-        blocked[nkey] = true
-        next
-      end
-
-      room = room_of(walker)
-      if room != start_room
-        doors << { row:, col:, dir:, room:, dump: walker.dump }
-        next
-      end
-
-      queue << [walker.dump, *arrived] unless visited[arrived]
-    end
+  room, n = cross_until_room_change!(motherboard, :up, max_taps: 10)
+  calls += n
+  if room.nil?
+    pos = Koholint::Navigator.position(motherboard.mmu)
+    raise "never crossed north into house2_interior -- still at #{room_of(motherboard).inspect}, position #{pos.inspect}"
   end
 
-  [visited, blocked, doors]
+  wait_frames(motherboard, 20)
+  [motherboard, calls]
 end
 
 if File.exist?(Koholint::CheckpointSupport.checkpoint_path('house2_interior'))
   motherboard = load_checkpoint('house2_interior')
+  calls = nil
 else
-  motherboard = load_checkpoint('villager_screen')
-  start_room = room_of(motherboard)
-  raise "expected to start in villager_screen #{VILLAGER_SCREEN.inspect}, got #{start_room.inspect}" unless start_room == VILLAGER_SCREEN
-
-  visited, blocked, doors = map_room(motherboard, start_room)
-  puts "walkability map: #{visited.size} walkable cells, #{blocked.size} blocked cells"
-  doors.each { |d| puts "  door: (#{d[:row]},#{d[:col]}) #{d[:dir]} -> #{d[:room].inspect}" }
-
-  new_room_doors = doors.reject { |d| KNOWN_EXITS.include?(d[:room]) }
-  if new_room_doors.empty?
-    raise "no house2_interior door found -- #{visited.size} walkable / #{blocked.size} blocked cells mapped, " \
-          "only the known exits (#{KNOWN_EXITS.map(&:inspect).join(', ')}) reached. " \
-          'See data/ram_registry.json world_topology.room177_exits and NEXT.md.'
-  end
-
-  door = new_room_doors.first
-  motherboard = Motherboard.load(door[:dump])
-  wait_frames(motherboard, 20)
+  motherboard, calls = build
   save_checkpoint('house2_interior', motherboard)
 end
 
 room = room_of(motherboard)
-puts "room_id/map_id: #{room.inspect}"
-raise "still in villager_screen -- door never triggered" if room == VILLAGER_SCREEN
+puts "room_id/map_id: #{room.inspect} (expected #{HOUSE2_INTERIOR.inspect})"
+if calls
+  puts "move! calls this build: #{calls} (<= #{calls * Koholint::CheckpointSupport::MOVE_FRAMES_UPPER_BOUND} frames)"
+end
+raise "room mismatch: expected #{HOUSE2_INTERIOR.inspect}, got #{room.inspect}" unless room == HOUSE2_INTERIOR
 
 png_path = File.join(Koholint::CheckpointSupport::CHECKPOINT_DIR, 'lib_house2_interior.png')
 motherboard.ppu.export_framebuffer_png(png_path)

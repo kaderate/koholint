@@ -4,18 +4,27 @@ Entry point for any resumption. One page, no more. Full chronological history (e
 question/answer/decisions) lives in `docs/archive/SESSION_LOG.md` -- read it to look up a past
 finding, not to resume the project.
 
-## State as of September 9, 2026 (PLAN.md Session 4 follow-up)
+## State as of September 9, 2026 (PLAN.md Session 4 complete)
 
-6 of the 7 PLAN.md Session 4 checkpoints (`after_shield_interior`, `front_yard`,
-`overworld_screen2`, `villager_screen`, `shop_screen`, `screen3_north`) are regenerated and
-traversed via `lib/` alone, no `legacy/` file. `house2_interior` (the 7th) was REFUTED via BFS
-(`lib/validation/checkpoint_house2_interior.rb`), then FOUND AND CONFIRMED by a follow-up Explorer
-session the same day via a narrower-than-one-tile alignment the BFS's 16px cell grid couldn't
-land on -- see `data/ram_registry.json`'s `world_topology.room177_exits` and the "Paradigm to
-question" section below for the full finding. The Builder-owned `checkpoint_house2_interior.rb`
-itself was NOT updated (Explorer role does not touch `lib/`) -- a Builder session should apply the
-new approach path/alignment to it before D5's parity condition (all 7 checkpoints passing via
-`lib/` alone) can be called met. **`legacy/` was NOT removed** yet as a result.
+All 7 PLAN.md Session 4 checkpoints (`after_shield_interior`, `front_yard`, `overworld_screen2`,
+`villager_screen`, `shop_screen`, `screen3_north`, `house2_interior`) are regenerated and traversed
+via `lib/` alone, no `legacy/` file. `house2_interior` (the 7th) was REFUTED via BFS, then FOUND
+AND CONFIRMED by an Explorer session the same day via a narrower-than-one-tile alignment the BFS's
+16px cell grid couldn't land on, then a follow-up Builder session rewrote
+`lib/validation/checkpoint_house2_interior.rb` around that route (`Koholint::CheckpointSupport`'s
+`nudge_axis!`/`cross_until_room_change!`, same pattern as the other 6 scripts) and independently
+re-confirmed it -- 2 fresh runs from `villager_screen`'s checkpoint, deterministic, both landing in
+21 `Navigator.move!` calls, room_id/map_id read as 169/16 each time, screenshot re-matches the bed
++ table-with-pots interior. One correction found and fixed along the way: the earlier note's
+`y=106` target for the approach row isn't itself reachable (move! advances in ~8px steps from this
+room's spawn parity) and a default `nudge_axis!` tolerance lands at `y=102`, which is STILL inside
+the row5 false-wall band -- `y=110` is the actual clear value. Full detail and the corrected route
+in `data/ram_registry.json`'s `world_topology.room177_exits` and `room_labels['169/16']`. D5's
+parity condition (all 7 checkpoints passing via `lib/` alone) is met -- **`legacy/` removed**,
+same commit, along with `lib/validation/oracle_grid_check.rb` and `terrain_predictor_check.rb`
+(their one-time purpose -- validating `lib/`'s navigation/terrain tools against `legacy/`'s oracle
+grids -- already fulfilled and recorded under D8 in `DECISIONS.md`; no other file depended on
+`legacy/`).
 
 **Indicators**
 
@@ -77,10 +86,9 @@ beyond the entry glance. Explorer checkpoint (not the canonical Builder one):
 
 ## Next question
 
-Paused, awaiting the owner's go-ahead (explicit "arrête-toi et ping moi" checkpoint). Candidates
-once resumed: explore `house2_interior` (169/16) itself, now reachable -- NPCs? items?; regenerate
-`lib/validation/checkpoint_house2_interior.rb` with the confirmed approach path (Builder work, not
-Explorer -- the fix is known, applying it to `lib/` is a decision-already-made task); explore past
+Paused, awaiting the owner's go-ahead (explicit "arrête-toi et ping moi" checkpoint). Session 4
+(PLAN.md) is now fully complete -- see the State section above. Candidates once resumed: explore
+`house2_interior` (169/16) itself, now reachable -- NPCs? items?; explore past
 `riverside_south_room`'s entrance (two unidentified figures seen at the door), test the
 SELECT-map cursor lead from the crate_room hint book, retest `riverside_screen`'s signpost with a
 positive control. Also deferred, not urgent: formalizing a navigation spec/format (raised by an
@@ -116,3 +124,10 @@ house2 (not yet tested elsewhere -- one confirmed case, not yet a proven general
   on a classifier cache miss.
 - Don't re-run another BFS/walkability-map sweep on villager_screen looking for house2's door --
   see "Paradigm to question" above, the mechanism itself was exhausted, not one attempt short.
+- Don't trust a `nudge_axis!` tolerance without checking where it actually lands -- `move!`
+  advances in consistent ~8px steps from a given spawn parity, so a target that isn't itself on
+  that step sequence (e.g. `y=106` from villager_screen's spawn parity) resolves to whichever
+  step first falls within tolerance, which can be inside a false-wall band one step short of the
+  real target (confirmed: `y=102` reads as "close enough" to `106` at `tolerance: 4` but is still
+  blocked; `y=110` is the real clear value). Print the landed position, don't assume the target
+  was reached because the call returned.
