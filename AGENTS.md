@@ -136,7 +136,11 @@ to fix exactly that, and nothing else.
   it's a planner decision, logged in `DECISIONS.md` like any other.
 - **Trigger**: event-based, not a fixed timer or a schedule. A planner session that hits a
   process-level snag escalates it (see below); the owner can also launch a MetaPlanner session
-  directly at any time.
+  directly at any time. The planner may dispatch MetaPlanner itself via `create_session` the moment
+  it appends an `open` escalation -- except the very first such dispatch, which requires an
+  explicit `AskUserQuestion` confirmation from the owner first, to observe real behavior before
+  trusting it unattended (see `METAPLANNER.md#MP2`). After that first observed run, later
+  dispatches proceed without asking.
 - **Session shape**: same discipline as "One session, one question" above, cascaded up -- short (5
   to 30 minutes), one escalation in, one workflow amendment (or explicit non-amendment) out. Starts
   cold: reads `METAPLANNER.md`, `METAPLANNER_ESCALATIONS.md`, and `AGENTS.md` itself, nothing else

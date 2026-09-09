@@ -64,7 +64,12 @@ environment.
 escalation, via `create_session`, rather than requiring the owner to launch it by hand. The
 one-way-messaging limitation from MP1 option 3 doesn't block this: the dispatch prompt only needs
 to point the new session at `METAPLANNER_ESCALATIONS.md`, `METAPLANNER.md`, and `AGENTS.md`; the
-resolution signal still travels through the committed file, not a reply.
+resolution signal still travels through the committed file, not a reply. **Gated first use**: the
+very first `create_session` dispatch of MetaPlanner requires an explicit `AskUserQuestion`
+confirmation from the owner before firing, specifically to observe the real behavior (does it
+actually stay in scope, does it produce a sane `METAPLANNER.md` entry) before trusting it
+unattended. Owner-validated September 9, 2026. Once that first dispatch has been observed, later
+ones proceed without asking, per this entry.
 
 **Invalidation condition**: if autonomous dispatch turns out to spawn sessions faster than the owner
 wants to track (cost, runaway escalation volume), fall back to owner-launched MetaPlanner sessions
