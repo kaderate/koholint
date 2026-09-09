@@ -219,3 +219,16 @@ to be ratified), `taken without validation` (inherited from the spike, to be rev
 - **Invalidated if**: OAM/CHR-pattern diffing turns out too noisy (pattern-byte collisions between
   genuinely different sprites) or too expensive per room relative to the signal it yields, in
   which case the method -- not necessarily the goal -- needs reconsidering.
+- **Pilot result, same day**: confirmed on both rooms. Mobility diffing reproduced
+  `villager_screen`'s already-known static/wandering NPC split exactly (4 OAM samples, ~2s apart,
+  no checkpoint reload between them). CHR-pattern matching found a real cross-room hit on the
+  first pair: `front_yard`'s previously-unsurveyed wandering creature has byte-identical pattern
+  data to `villager_screen`'s confirmed-interactive wandering NPC -- a concrete, evidence-backed
+  interaction candidate, not a guess. Cost: ~15-20 minutes, 2 emulator boots, 8 OAM samples, 16
+  CHR reads -- well under budget. Data in `data/ram_registry.json`'s new `visual_catalog` section
+  (`hypothesis`/`verified_count: 1`, not yet independently re-checked) and `room_labels`'
+  `visual_survey` sub-objects, commit `2599a61`.
+- **One adjustment before wider rollout**: OAM-entry matching across samples was done by
+  eyeballing per-slot position continuity, which only holds up in sparsely-populated rooms (6-7
+  entries here). A denser room (`crate_room`'s 9-object grid) needs a nearest-neighbor matching
+  helper instead of slot-stability assumptions before this scales past a couple more rooms.
