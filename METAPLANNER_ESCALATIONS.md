@@ -39,7 +39,7 @@ from them, not a game fact or a decision about how to play.
 
 ## ESC4: `create_session` dispatch instructions don't mention the repo must be explicitly attached
 
-**Status**: open
+**Status**: resolved
 **Opened**: September 9, 2026, by planner session
 **Context**: the first real MetaPlanner dispatch (session `session_019ZMSHF5XTHtJx5yWS66eUz`) was
 created without `source_url`/`source_revision`, on the mistaken assumption that "inherits the
@@ -51,7 +51,8 @@ rather than fabricate a report. A retry with `source_url`/`source_revision` set 
 is one bad copy-paste away from repeating.
 **Why process, not domain**: purely about how a peer session gets correctly provisioned before
 dispatch, not a game fact.
-**Resolution** (MetaPlanner fills in):
+**Resolution**: -> `METAPLANNER.md#MP6`, stated the `source_url`/`source_revision` requirement
+directly in `AGENTS.md`'s MetaPlanner "Trigger" bullet, and logged as an amendment to MP2.
 
 ## ESC2: no rule for what belongs in NEXT.md vs. AGENTS.md, so durable rules pile up in NEXT.md
 

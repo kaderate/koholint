@@ -170,7 +170,10 @@ to fix exactly that, and nothing else.
   it appends an `open` escalation -- except the very first such dispatch, which requires an
   explicit `AskUserQuestion` confirmation from the owner first, to observe real behavior before
   trusting it unattended (see `METAPLANNER.md#MP2`). After that first observed run, later
-  dispatches proceed without asking.
+  dispatches proceed without asking. **The dispatch call must set `source_url`/`source_revision`
+  explicitly**: `create_session`'s "inherits the calling session's environment" phrasing covers the
+  `environment_id` only, not an automatic repo checkout -- omitting them lands the new session in an
+  empty container with nothing to act on (see `METAPLANNER.md#MP6`).
 - **Session shape**: same discipline as "One session, one question" above, cascaded up -- short (5
   to 30 minutes), one escalation in, one workflow amendment (or explicit non-amendment) out. Starts
   cold: reads `METAPLANNER.md`, `METAPLANNER_ESCALATIONS.md`, and `AGENTS.md` itself, nothing else

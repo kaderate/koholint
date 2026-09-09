@@ -152,3 +152,31 @@ any process step audits for it.
 **Invalidation condition**: if a provenance violation is later found to have survived a cold review
 that was supposed to catch it (the audit ran but missed it), a checklist item isn't enough and the
 audit needs to be a mechanical script the Reviewer runs, not a manual scan.
+
+## MP6: amend MP2's dispatch instructions to require `source_url`/`source_revision` explicitly
+
+**Date**: September 9, 2026. Resolves `METAPLANNER_ESCALATIONS.md#ESC4`.
+
+**Context**: the first real MetaPlanner dispatch (session `session_019ZMSHF5XTHtJx5yWS66eUz`) was
+created without `source_url`/`source_revision`, on the mistaken reading that `create_session`'s own
+"inherits the calling session's environment" meant the repo would be checked out too. It wasn't --
+the session landed in an empty container, correctly identified this as either a misconfiguration or
+a prompt injection with no way to tell which, and rightly refused to act rather than fabricate a
+report. A retry with `source_url`/`source_revision` set fixed it. `MP2` documented `create_session`
+dispatch without mentioning this requirement, leaving it one bad copy-paste away from repeating.
+
+**Options considered**:
+1. Rewrite `MP2` in place to add the missing detail. Rejected: `MP2` is a genesis entry recording
+   what was actually decided and owner-validated at the time; editing it in place would blur the
+   record of what the first observed dispatch actually tested versus what was learned afterward.
+2. Fix only wherever the dispatch prompt/example is written, without logging a decision. Rejected:
+   this project's own rule -- a change with no `METAPLANNER.md` entry didn't happen, as far as a
+   future cold session is concerned -- applies to MetaPlanner's own dispatch mechanics as much as to
+   anything else.
+3. **Chosen**: log this as a new, separate entry amending `MP2`'s instructions, and state the
+   concrete requirement directly in `AGENTS.md`'s MetaPlanner section (the "Trigger" bullet) so a
+   future dispatch reads it before calling `create_session`, not only in the decision log.
+
+**Invalidation condition**: if a dispatch still omits `source_url`/`source_revision` despite this
+being stated in `AGENTS.md`, the fix needs to move from documentation to a checklist the dispatching
+session is forced to fill in, not another restatement.
