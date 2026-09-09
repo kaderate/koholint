@@ -150,7 +150,20 @@
     },
     "161/0": {
       "label": "screen3_north",
-      "description": "West of front_yard, also reachable north from villager_screen -- a genuine 3-way hub. A house-like structure is present (not yet described in the same visual detail as villager_screen's). Three distinct moving OAM creatures: a round green 2-tile 'blob', a wider-ranging 'ear'-shaped creature, and a vertical 2-tile post/standing object -- none confirmed interactive (2 solid negatives after ~14 clean adjacency attempts each, 1 inconclusive due to a chase-tracking issue). Legacy-inherited name (originally reached via a much longer legacy route); the direct front_yard/villager_screen adjacency was only confirmed this session."
+      "description": "West of front_yard, also reachable north from villager_screen -- a genuine 3-way hub. A house-like structure is present (not yet described in the same visual detail as villager_screen's). Three distinct moving OAM creatures: a round green 2-tile 'blob', a wider-ranging 'ear'-shaped creature, and a vertical 2-tile post/standing object -- none confirmed interactive (2 solid negatives after ~14 clean adjacency attempts each, 1 inconclusive due to a chase-tracking issue). Legacy-inherited name (originally reached via a much longer legacy route); the direct front_yard/villager_screen adjacency was only confirmed this session.",
+      "visual_survey": {
+        "as_of": "2026-09-09, checkpoint /tmp/zelda_checkpoints/lib_screen3_north.dump",
+        "method": "D9 rollout: 4 OAM samples ~2s apart, no input, no checkpoint reload between samples; entries matched across samples via the OamMatch nearest-neighbor helper (scratchpad/walkability/oam_match.rb), not slot number -- see DECISIONS.md D9",
+        "catalog_entries_seen": [
+          "screen3_north_wide_ranging_pair",
+          "front_yard_creature_shadow",
+          "screen3_north_pair_112_114",
+          "screen3_north_blob_126",
+          "screen3_north_solo_38",
+          "villager_screen_companion_sprite"
+        ],
+        "note": "This session's tile-level count (up to 6 distinct moving OAM patterns, some possibly animation-frame variants of the same in-game creature rather than truly separate ones) does not cleanly map onto this room's pre-existing 3-creature narrative description ('round blob', 'ear-shaped', 'vertical post') -- which of these tile groups correspond to which previously-tested creature is NOT established, flagged as an open question rather than forced into the old count. Two confirmed cross-room CHR matches: this room's screen3_north_wide_ranging_pair rides a shadow sprite byte-identical to front_yard_creature_shadow, and this room independently has 2 concurrent instances of the exact sprite villager_screen_companion_sprite uses (tile 94), strengthening that pattern's mobile-not-static reading."
+      }
     },
     "160/0": {
       "label": "well_platform",
@@ -170,7 +183,13 @@
     },
     "250/29": {
       "label": "crate_room",
-      "description": "Interior reached through building_screen's door -- actually a hint library, not storage. 2 of 9 tile=0x58 objects tested are readable 'book stands' with distinct multi-page text: one explains the SELECT map screen (a movable cursor, not panning -- see terrain_collision.select_map_screen) and an 'owl message' per location; the other explains a charge-and-release spin-attack sword technique. Single screen, only exit is south back to building_screen."
+      "description": "Interior reached through building_screen's door -- actually a hint library, not storage. 2 of 9 tile=0x58 objects tested are readable 'book stands' with distinct multi-page text: one explains the SELECT map screen (a movable cursor, not panning -- see terrain_collision.select_map_screen) and an 'owl message' per location; the other explains a charge-and-release spin-attack sword technique. Single screen, only exit is south back to building_screen.",
+      "visual_survey": {
+        "as_of": "2026-09-09, checkpoint /tmp/zelda_checkpoints/lib_crate_room_scan.dump",
+        "method": "D9 rollout: 4 OAM samples ~1.5s apart, no input, no checkpoint reload between samples; entries matched across samples via the OamMatch nearest-neighbor helper (scratchpad/walkability/oam_match.rb) rather than slot number -- this room was DECISIONS.md D9's own motivating case for needing it (9 same-tile entries, slot numbers not stable)",
+        "catalog_entries_seen": ["crate_room_book_objects"],
+        "note": "No new mobile elements found -- all 9 tile=0x58 objects plus Link's own sprite confirm static (spread=0px) across all 4 samples, independently reconfirming (via a genuinely different method) the static classification world_topology.crate_room_and_riverside_content already established via a single-snapshot OAM read. No cross-room CHR match found for tile 88's actual pixel data against front_yard/villager_screen/screen3_north's catalog entries."
+      }
     },
     "208/0": {
       "label": "riverside_south_room",
@@ -382,7 +401,7 @@
     }
   },
   "visual_catalog": {
-    "_readme": "D9 pilot (September 9, 2026): per-room visual survey combining OAM mobility diffing (4 samples over emulated time, no input, from a checkpoint -- same technique proven for crate_room's object survey) with cross-room CHR pattern-byte comparison (0x8000 + tile_id*16, 16 bytes per tile -- actual pixel data, not raw tile IDs, which D8's own caveats already showed are unreliable across tilesets/rooms). One entry per distinct visual pattern (matched by identical CHR bytes, not tile ID). Piloted on 2 rooms only (villager_screen, front_yard) per DECISIONS.md's D9 -- not yet a standing convention for all charted rooms.",
+    "_readme": "D9 pilot (September 9, 2026): per-room visual survey combining OAM mobility diffing (4 samples over emulated time, no input, from a checkpoint -- same technique proven for crate_room's object survey) with cross-room CHR pattern-byte comparison (0x8000 + tile_id*16, 16 bytes per tile -- actual pixel data, not raw tile IDs, which D8's own caveats already showed are unreliable across tilesets/rooms). One entry per distinct visual pattern (matched by identical CHR bytes, not tile ID). Piloted on 2 rooms only (villager_screen, front_yard) per DECISIONS.md's D9 -- not yet a standing convention for all charted rooms. Rolled out to 2 more rooms (crate_room, screen3_north) September 9 2026 using DECISIONS.md D9's flagged OamMatch nearest-neighbor helper (scratchpad/walkability/oam_match.rb) instead of the pilot's per-slot eyeballing -- 2 more confirmed cross-room CHR matches found (front_yard_creature_shadow and villager_screen_companion_sprite both recur in screen3_north), still not ratified as a standing convention.",
     "villager_wandering_creature": {
       "status": "pilot Explorer session, September 9, 2026. OAM position diffed across 4 samples (~2s emulated time apart, no input, same checkpoint) in both rooms; CHR bytes read for tile 80 and tile 82 in both rooms and compared byte-for-byte. Interaction follow-up attempted September 9 2026 (see interaction_tested.162/0) -- inconclusive, a navigation-access problem, not a negative interaction result.",
       "source": "ram_read_verified",
@@ -413,30 +432,102 @@
       "first_seen": "2026-09-09"
     },
     "villager_screen_companion_sprite": {
-      "status": "pilot Explorer session, September 9, 2026. Single-tile OAM entry (slot 14), seen in only 2 of 4 samples, at two different positions.",
+      "status": "pilot Explorer session, September 9, 2026. Single-tile OAM entry (slot 14), seen in only 2 of 4 samples, at two different positions. D9 rollout, September 9 2026 (separate Explorer session, OamMatch nearest-neighbor helper, see DECISIONS.md D9): CHR-matched to 2 independently-wandering single-tile sprites in screen3_north (161/0).",
       "source": "ram_read_verified",
       "verified_count": 1,
       "confidence": "hypothesis",
-      "rooms_seen": ["177/0 (villager_screen)"],
-      "mobility": "likely mobile but under-sampled -- present in samples 0 and 3 only (not 1 or 2), at (y=34,x=130) then (y=16,x=139); intermittent visibility (flicker, or genuinely leaving/re-entering the visible OAM set) prevents a confident static/mobile call from this pilot's 4 samples alone",
-      "tile_ids_seen": { "177/0": [94] },
-      "chr_pattern_match": "no match found against front_yard's tile 26 (the only other single/unpaired sprite tile seen in this pilot) -- distinct CHR bytes",
+      "rooms_seen": ["177/0 (villager_screen)", "161/0 (screen3_north)"],
+      "mobility": "likely mobile but under-sampled in villager_screen -- present in samples 0 and 3 only (not 1 or 2), at (y=34,x=130) then (y=16,x=139); intermittent visibility (flicker, or genuinely leaving/re-entering the visible OAM set) prevents a confident static/mobile call from that pilot's 4 samples alone. CONFIRMED mobile in screen3_north: 2 separate concurrent instances of this same tile, both moving every sample (checkpoint /tmp/zelda_checkpoints/lib_screen3_north.dump, 4 samples ~2s apart) -- one around (y=32-70,x=62-100), one around (y=106-139,x=124-167), tracked independently via OamMatch.track, never converging (not the same physical sprite counted twice). Strengthens the mobile-not-static reading for this pattern generally.",
+      "tile_ids_seen": { "177/0": [94], "161/0": [94] },
+      "chr_pattern_match": "CONFIRMED byte-identical: tile 94 = 0000000000000000c300e742ff66ff66 in both villager_screen's and screen3_north's checkpoints (bank 0). Still no match found against front_yard's tile 26 (distinct CHR bytes) -- see front_yard_creature_shadow below.",
       "interaction_tested": {
-        "177/0": "n -- not previously tested (world_topology.room177_sprites already flagged this sprite's nature as undetermined: decoration, effect, or separate entity); not tested this session either, out of scope"
+        "177/0": "n -- not previously tested (world_topology.room177_sprites already flagged this sprite's nature as undetermined: decoration, effect, or separate entity)",
+        "161/0": "not directly re-tested this session (out of scope: room_labels['161/0'] already records screen3_north's moving creatures as exhaustively tested negative -- 'none respond when spoken to, tested extensively', ~14 adjacency attempts each on 2, 1 inconclusive on a 3rd -- but that testing predates this session's tile-level identification, so it isn't confirmed which of the room's 3 previously-described creatures (if any) corresponds to this specific tile=94 sprite; genuinely unresolved, not assumed negative by association"
       },
       "first_seen": "2026-09-09"
     },
     "front_yard_creature_shadow": {
-      "status": "pilot Explorer session, September 9, 2026. Two-tile OAM entry (slots 18/19, same tile ID 26 on both, attrs=0) tracking the wandering creature (villager_wandering_creature) at a consistent ~8px vertical offset across all 4 samples -- reads as a shadow/ground-contact sprite under the creature, not an independent object.",
+      "status": "pilot Explorer session, September 9, 2026. Two-tile OAM entry (slots 18/19, same tile ID 26 on both, attrs=0) tracking the wandering creature (villager_wandering_creature) at a consistent ~8px vertical offset across all 4 samples -- reads as a shadow/ground-contact sprite under the creature, not an independent object. D9 rollout, September 9 2026 (separate Explorer session): CHR-matched to a shadow pair under a DIFFERENT wandering creature in screen3_north (161/0) -- see screen3_north_wide_ranging_pair below. Same shadow graphic reused under at least 2 visually-distinct creatures across 2 rooms.",
       "source": "ram_read_verified",
       "verified_count": 1,
       "confidence": "hypothesis",
-      "rooms_seen": ["162/0 (front_yard)"],
-      "mobility": "mobile -- moves in lockstep with villager_wandering_creature, same 4-sample deltas, constant relative offset",
-      "tile_ids_seen": { "162/0": [26] },
-      "chr_pattern_match": "no match found against villager_screen's tile set in this pilot",
+      "rooms_seen": ["162/0 (front_yard)", "161/0 (screen3_north)"],
+      "mobility": "mobile -- moves in lockstep with its paired creature, same per-sample deltas, constant relative offset, in both rooms",
+      "tile_ids_seen": { "162/0": [26], "161/0": [26] },
+      "chr_pattern_match": "CONFIRMED byte-identical: tile 26 = 00c00060007100330037003600160014 in both front_yard's and screen3_north's checkpoints (bank 0). Still no match found against villager_screen's tile set.",
       "interaction_tested": {
-        "162/0": "n -- not tested; the lockstep-offset pattern is consistent with a shadow underlay (not independently interactable), but that's a read from position data only, not confirmed by an actual :a probe"
+        "162/0": "n -- not tested; the lockstep-offset pattern is consistent with a shadow underlay (not independently interactable), but that's a read from position data only, not confirmed by an actual :a probe",
+        "161/0": "n -- not tested this session; same reasoning as 162/0, and it rides under screen3_north_wide_ranging_pair, one of the room's already-exhaustively-negative-tested creatures (see room_labels['161/0'])"
+      },
+      "first_seen": "2026-09-09"
+    },
+    "screen3_north_wide_ranging_pair": {
+      "status": "D9 rollout Explorer session, September 9 2026 (OamMatch nearest-neighbor helper, see DECISIONS.md D9's 'one adjustment before wider rollout' note). 2-tile OAM pair (tiles 88+90, or 88+92 depending on animation frame -- attrs 1 throughout) riding the front_yard_creature_shadow-matching tile-26 shadow pair, tracked across 4 samples ~2s apart from checkpoint /tmp/zelda_checkpoints/lib_screen3_north.dump.",
+      "source": "ram_read_verified",
+      "verified_count": 1,
+      "confidence": "hypothesis",
+      "rooms_seen": ["161/0 (screen3_north)"],
+      "mobility": "mobile, wide-ranging -- (y=14,x=70/78) -> (y=18,x=70/78) -> (y=18,x=70/78) -> (y=50,x=111/119) across the 4 samples (~6s emulated, no input); the last jump (~49px in x) is a genuinely large single-gap displacement, matching room_labels['161/0']'s pre-existing 'wider-ranging' creature description more than its other two",
+      "tile_ids_seen": { "161/0": [88, 90, 92] },
+      "chr_pattern_match": "no match found for tiles 88/90/92 against front_yard's or villager_screen's catalog entries -- a visually new creature pattern, not yet seen elsewhere. Its shadow tile (26) IS a confirmed match to front_yard_creature_shadow -- see that entry.",
+      "interaction_tested": {
+        "161/0": "not directly re-tested this session -- likely already covered by room_labels['161/0']'s pre-existing exhaustive negative testing ('three distinct moving OAM creatures... none confirmed interactive, 2 solid negatives after ~14 clean adjacency attempts each, 1 inconclusive'), but that testing predates this session's tile-level identification so the correspondence isn't certain -- flagged, not assumed"
+      },
+      "first_seen": "2026-09-09"
+    },
+    "screen3_north_pair_112_114": {
+      "status": "D9 rollout Explorer session, September 9 2026 (OamMatch nearest-neighbor helper). 2-tile OAM pair (tile 112 or 114 depending on animation/facing frame, attrs 3/35 -- the two halves consistently differ by attrs, likely a flip bit) tracked across 4 samples from the same screen3_north checkpoint.",
+      "source": "ram_read_verified",
+      "verified_count": 1,
+      "confidence": "hypothesis",
+      "rooms_seen": ["161/0 (screen3_north)"],
+      "mobility": "mobile -- (y=115,x=82/90) -> (y=120,x=108/116) -> (y=117,x=71/79) -> (y=116,x=108/116) across the 4 samples; ranges roughly x=71-116, y=115-120, a narrower horizontal band than screen3_north_wide_ranging_pair",
+      "tile_ids_seen": { "161/0": [112, 114] },
+      "chr_pattern_match": "no match found against front_yard's, villager_screen's, or crate_room's catalog entries -- a new pattern",
+      "interaction_tested": {
+        "161/0": "not directly re-tested this session -- same caveat as screen3_north_wide_ranging_pair: plausibly one of room_labels['161/0']'s 3 pre-tested negatives, correspondence not confirmed"
+      },
+      "first_seen": "2026-09-09"
+    },
+    "screen3_north_blob_126": {
+      "status": "D9 rollout Explorer session, September 9 2026 (OamMatch nearest-neighbor helper). Single tile (126, attrs=0) seen TWICE per sample at two different positions -- one exactly static, one mildly mobile. Methodologically notable: the same tile graphic plays both a static-decor role and a mobile role simultaneously in the same room, a case D9's context anticipated ('a room's confirmed-interactable element informs priors about the same-looking element elsewhere') but for mobility rather than interactivity -- don't assume a visual pattern's mobility is a fixed property of the tile.",
+      "source": "ram_read_verified",
+      "verified_count": 1,
+      "confidence": "hypothesis",
+      "rooms_seen": ["161/0 (screen3_north)"],
+      "mobility": "BOTH roles observed in the same room: one instance at (y=96,x=88) is byte-identical-position across all 4 samples (static); a second, separate instance near (y=108,x=98/100/88/100) shifts a few px each sample (spread=12px, mildly mobile) -- not confirmed whether the mobile one is a genuine creature or camera/animation jitter on a decoration, given the small spread",
+      "tile_ids_seen": { "161/0": [126] },
+      "chr_pattern_match": "no match found against front_yard's, villager_screen's, or crate_room's catalog entries",
+      "interaction_tested": {
+        "161/0": "n -- not tested this session"
+      },
+      "first_seen": "2026-09-09"
+    },
+    "screen3_north_solo_38": {
+      "status": "D9 rollout Explorer session, September 9 2026 (OamMatch nearest-neighbor helper). Single tile (38, attrs=0), one instance per sample, no paired second tile found nearby in any sample.",
+      "source": "ram_read_verified",
+      "verified_count": 1,
+      "confidence": "hypothesis",
+      "rooms_seen": ["161/0 (screen3_north)"],
+      "mobility": "mobile -- (y=130,x=86) -> (y=139,x=124) -> (y=130,x=75) -> (y=130,x=112) across the 4 samples, ~49px x-range",
+      "tile_ids_seen": { "161/0": [38] },
+      "chr_pattern_match": "no match found against front_yard's, villager_screen's, or crate_room's catalog entries",
+      "interaction_tested": {
+        "161/0": "not directly re-tested this session -- same caveat as screen3_north_wide_ranging_pair: plausibly one of room_labels['161/0']'s 3 pre-tested negatives, correspondence not confirmed"
+      },
+      "first_seen": "2026-09-09"
+    },
+    "crate_room_book_objects": {
+      "status": "D9 rollout Explorer session, September 9 2026 (OamMatch nearest-neighbor helper, the dense case DECISIONS.md D9 flagged as needing it -- 9 same-tile OAM entries whose slot numbers are not stable identifiers). Independently reconfirms world_topology.crate_room_and_riverside_content's existing static classification via a genuinely different method (multi-sample position diffing + nearest-neighbor matching, not a single-snapshot OAM read) -- satisfies AGENTS.md's verified_count>=2 bar FOR THE MOBILITY CLAIM specifically (not the whole crate_room_and_riverside_content entry, which covers unrelated claims like dialogue content still at verified_count 1).",
+      "source": "ram_read_verified",
+      "verified_count": 2,
+      "confidence": "verified",
+      "rooms_seen": ["250/29 (crate_room)"],
+      "mobility": "static -- all 9 tile=88 (0x58) OAM entries individually tracked (nearest-neighbor, not slot number) across 4 samples ~1.5s apart, spread=0px on every one; Link's own 2-tile sprite (tiles 0/2) also tracked as a sanity check, also spread=0px (no input given)",
+      "tile_ids_seen": { "250/29": [88] },
+      "chr_pattern_match": "no match found against front_yard's, villager_screen's, or screen3_north's catalog entries -- tile 88 = ff00a15ea15ebf40bf40bf40bf40ff00 here, numerically the same tile ID screen3_north also happens to use for a different sprite (00003000281029102619201f2a154a35) -- confirms D8's own caveat that tile IDs aren't stable meaning across tilesets, this time for OAM sprite tiles rather than BG tiles",
+      "interaction_tested": {
+        "250/29": "y (3 of 9) -- already fully resolved before this session: 3 of the 9 OAM objects are interactive (dialogues.crate_room_book_c, crate_room_book_d, crate_room_wall_object), 6 are confirmed hard negatives (world_topology.crate_room_and_riverside_content). dialogues.crate_room_book_a/book_b are ALSO interactive but their relationship to these same 9 OAM objects is an unresolved open question there (the room's own note: 3 read + 6 negative already accounts for all 9, leaving no room for book_a/book_b among them) -- not re-investigated this session, only the static/mobile classification was in scope"
       },
       "first_seen": "2026-09-09"
     }

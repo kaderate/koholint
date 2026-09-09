@@ -232,3 +232,26 @@ to be ratified), `taken without validation` (inherited from the spike, to be rev
   eyeballing per-slot position continuity, which only holds up in sparsely-populated rooms (6-7
   entries here). A denser room (`crate_room`'s 9-object grid) needs a nearest-neighbor matching
   helper instead of slot-stability assumptions before this scales past a couple more rooms.
+- **Rollout, September 9, 2026 (autonomous overnight Explorer session)**: the flagged helper is
+  built (`scratchpad/walkability/oam_match.rb`, `OamMatch.greedy_match`/`.track` -- greedy nearest-
+  neighbor across samples, not an optimal assignment, per this project's "throwaway spike" scope)
+  and applied to `crate_room` and `screen3_north`. `crate_room`: no new mobile elements, all 9
+  tile=0x58 objects independently reconfirmed static via this genuinely different method --
+  satisfies `AGENTS.md`'s `verified_count >= 2` bar for that specific mobility claim (not the
+  whole `world_topology.crate_room_and_riverside_content` entry). `screen3_north`: up to 6 distinct
+  moving OAM tile-patterns found, more granular than the room's pre-existing 3-creature narrative
+  count -- which tile group corresponds to which previously-tested creature is NOT established,
+  left as an open question rather than forced into the old count. 2 more confirmed cross-room CHR
+  matches, both extending patterns from the pilot rather than finding new ones: `front_yard`'s
+  wandering-creature shadow tile is byte-identical to one of `screen3_north`'s creature shadows,
+  and `villager_screen`'s previously-undetermined single-tile "companion sprite" is byte-identical
+  to (and confirmed mobile via) 2 concurrent instances in `screen3_north`. Neither match links to
+  an already-confirmed-interactive element, so no bonus interaction test was run for either (see
+  `data/ram_registry.json`'s `visual_catalog` for the full per-entry detail). Separately, this
+  session's `front_yard` creature interaction follow-up (flagged pending by the pilot) came back
+  INCONCLUSIVE, not negative -- 3 navigation attempts (blind chase, door-avoiding chase, D8-grid-
+  routed chase) all failed to reach adjacency at all, stopped per the anti-patch rule rather than
+  tried a 4th way; see `visual_catalog.villager_wandering_creature`'s `interaction_tested['162/0']`
+  for the full detail. Still not ratified as a standing convention -- now piloted-plus-rolled-out on
+  4 rooms total (2 pilot + 2 rollout), the owner's call on whether to fold it into `AGENTS.md`'s
+  "Room labeling" convention for all charted rooms.
