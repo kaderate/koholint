@@ -34,7 +34,7 @@ grids -- already fulfilled and recorded under D8 in `DECISIONS.md`; no other fil
 
 | Indicator | Value |
 |---|---|
-| Rooms found | 14 labeled in `data/ram_registry.json`'s `room_labels` (8 "charted", 6 "glimpsed"/less -- adds `169/16` house2_interior, September 9 2026). Graph and screenshots published in the Koholint Atlas artifact (not yet updated with the new room). |
+| Rooms found | 14 labeled in `data/ram_registry.json`'s `room_labels` (8 "charted", 6 "glimpsed"/less -- adds `169/16` house2_interior, September 9 2026). Graph and screenshots published in the Koholint Atlas artifact (not yet updated with the new room). D9 visual-catalog `visual_survey` now covers 4/14 (`front_yard`, `villager_screen` pilot + `crate_room`, `screen3_north` rollout, same day, autonomous session) -- see `DECISIONS.md`'s D9 entry. |
 | Dialogues / readable text | 10 confirmed entries in `ram_registry.json`'s `dialogues` (villager duo's shared line, room176's two save-mechanic NPC lines, crate_room's library fully read -- 4 books + 1 wall object, 9/9 tile objects resolved via OAM, September 9 2026). |
 | Terrain / collision | D8 live: reads BG tilemap signatures from VRAM (`lib/terrain.rb`), 93.1%-validated against live-probe oracle. Primary method; live probing kept as fallback. |
 | Save/continue | Mechanically verified end-to-end: hold A+B+START+SELECT opens the real save menu, "SAUVEGARDER & QUITTER" writes a real `.sav` (MD5-diffed), "REVENIR AU JEU" continues at the room's own door. This is the durable-progress path -- see "Standing conventions" below. |
@@ -164,3 +164,17 @@ own data model), not something to implement ad hoc.
   real target (confirmed: `y=102` reads as "close enough" to `106` at `tolerance: 4` but is still
   blocked; `y=110` is the real clear value). Print the landed position, don't assume the target
   was reached because the call returned.
+- Don't blindly chase `front_yard`'s wandering creature (CHR-matches `villager_screen`'s
+  interactive NPC, per D9) straight north from spawn -- the door column (x~80-96) is right there
+  and 2 independent chase attempts walked back into `starting_house` through it by accident,
+  September 9 2026. A 3rd attempt routed via `scratchpad/walkability/front_yard.json`'s own
+  precomputed D8 walkability grid also failed: `Navigator.move!` reported `:blocked` twice in a
+  row at the exact (row5,col3)->(row4,col3) step that grid calls walkable (x=72, pushing from
+  y=92 to y=90 and no further) -- not resolved which of the grid being stale or the creature/its
+  shadow transiently occupying that cell is the cause; the creature's actual interactivity is
+  still genuinely unknown, not refuted. See `visual_catalog.villager_wandering_creature`'s
+  `interaction_tested['162/0']` for the full 3-attempt detail before trying a 4th route.
+- `screen3_north`'s tile-level OAM survey (D9 rollout, September 9 2026) found up to 6 distinct
+  moving patterns, not the room's existing 3-creature narrative count -- don't assume a 1:1
+  mapping between the two without re-deriving it; which tile group is which pre-tested creature
+  is unresolved.
