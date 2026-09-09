@@ -186,3 +186,36 @@ to be ratified), `taken without validation` (inherited from the spike, to be rev
   100% (60/60, 9 probes). The remaining 12 disagreements (all `starting_house`) triangulate as
   oracle staleness, not a method flaw -- see `NEXT.md` and `data/ram_registry.json`'s
   `terrain_collision` entry (now `verified`).
+
+## D9 — Cross-room visual/gameplay catalog: mobility diffing + CHR-pattern matching, piloted first
+
+- **Status**: pilot approved (September 9, 2026), not yet ratified as a standing convention.
+- **Context**: D8 covers terrain/walkability, not the rest of what's on screen. The owner asked
+  for a systematic way to build gameplay understanding from what's visible per room -- not just
+  narrative color, but which visual elements might be interactable -- while explicitly rejecting
+  an unbounded "look at the screen and understand it" mandate (`AGENTS.md`'s own invalid-mandate
+  example). Owner's refinements on the raw idea: rooms aren't guaranteed static over time (rare
+  but real changes possible, so a survey needs a timestamp/checkpoint reference, not a one-time
+  truth); a room's screenshot should be compared against itself over a few frames to separate
+  static decor from moving elements; and matching should let one room's confirmed-interactable
+  element inform priors about the same-looking element elsewhere.
+- **Choice (pilot method)**: per room, take 2-3 OAM/framebuffer samples spaced in time from the
+  same checkpoint and diff sprite x/y positions to separate static (terrain/decor) from mobile
+  (creatures, animated objects) elements -- reuses the OAM-reading approach already proven for
+  crate_room's object survey, not new pixel-diffing infrastructure. Cross-room matching compares
+  actual CHR pattern bytes (`0x8000 + tile_id*16`), the same technique that decoded the SELECT
+  map's icon -- not raw tile IDs, which D8's own caveats already showed are unreliable across
+  tilesets. New artifacts: a `visual_catalog` section in `data/ram_registry.json` (one entry per
+  distinct visual pattern: which rooms it's been seen in, static/mobile, interaction-tested
+  y/n/pending, first-seen date) and a `visual_survey` sub-object per `room_labels` entry (which
+  catalog entries were seen in that room, an `as_of` checkpoint/date). No fixed re-survey
+  schedule -- a room's `as_of` just makes staleness visible; re-survey opportunistically when a
+  session revisits a room for another reason and notices a mismatch, same pattern as an
+  invalidated decision elsewhere in this file.
+- **Scope**: pilot on 2 already-charted rooms (`villager_screen`, `front_yard` -- both have
+  existing checkpoints, `villager_screen` has two known NPCs as a mobility/interaction test case)
+  before deciding whether to fold this into the "Room labeling" standing convention in `AGENTS.md`
+  and apply it to all charted rooms.
+- **Invalidated if**: OAM/CHR-pattern diffing turns out too noisy (pattern-byte collisions between
+  genuinely different sprites) or too expensive per room relative to the signal it yields, in
+  which case the method -- not necessarily the goal -- needs reconsidering.
