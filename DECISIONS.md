@@ -103,7 +103,7 @@ to be ratified), `taken without validation` (inherited from the spike, to be rev
   own invalidation clause anticipated). Built as `Driver` on gemboy's side
   (`gemboy/lib/driver.rb`: `press`/`release`/`tap`, `advance_cycles`/`advance_frames`,
   `read`/`debug_read`, `framebuffer_png`, `snapshot`/`.restore`, `Motherboard` exposed via
-  `#motherboard`, never hidden) — gemboy PR #13, not yet merged to gemboy's `main`.
+  `#motherboard`, never hidden) — gemboy PR #13, merged to gemboy's `main` September 9, 2026.
 - **Choice**: gemboy exposes a session object (advance N frames, keys, memory reads, in-memory
   snapshot/restore, `Motherboard` underneath). Save state becomes a feature of the emulator. This
   repo depends on it like a pinned-version gem; a change in the emulator's timing explicitly
@@ -116,8 +116,8 @@ to be ratified), `taken without validation` (inherited from the spike, to be rev
   on `Motherboard` only.
 - **Not yet done**: koholint's own `lib/` (`Navigator`, the Session 4 checkpoint scripts) still
   drives `Motherboard` directly and hasn't migrated to `Driver` — built in parallel with Session 4
-  on purpose, to keep the two efforts decoupled. Migrating is optional cleanup, not required; do it
-  once gemboy PR #13 merges, not before.
+  on purpose, to keep the two efforts decoupled. gemboy PR #13 is merged now, so this is unblocked;
+  still optional cleanup, not required.
 
 ## D7 — Snapshot-based collision probing, not walk-and-return
 
