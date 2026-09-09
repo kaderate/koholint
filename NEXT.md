@@ -4,7 +4,15 @@ Entry point for any resumption. One page, no more. Full chronological history (e
 question/answer/decisions) lives in `docs/archive/SESSION_LOG.md` -- read it to look up a past
 finding, not to resume the project.
 
-## State as of September 9, 2026
+## State as of September 9, 2026 (PLAN.md Session 4 follow-up)
+
+6 of the 7 PLAN.md Session 4 checkpoints (`after_shield_interior`, `front_yard`,
+`overworld_screen2`, `villager_screen`, `shop_screen`, `screen3_north`) are regenerated and
+traversed via `lib/` alone, no `legacy/` file. `house2_interior` (the 7th) is REFUTED, not
+inconclusive, via a real walkability-map BFS (`lib/validation/checkpoint_house2_interior.rb`,
+`Terrain::RoomClassifier`) -- see `data/ram_registry.json`'s `world_topology.room177_exits` for
+the full finding. **`legacy/` was NOT removed**: D5's parity condition (all 7 checkpoints) isn't
+met.
 
 **Indicators**
 
@@ -47,13 +55,29 @@ terrain source of truth, live-probing kept as fallback. Full rationale for each:
   budget, exact report format). Never use `run_in_background`/Monitor inside an Explorer's own
   script -- run everything foreground/synchronous, it has gotten subagents stuck twice.
 
+## Paradigm to question (anti-patch, house2_interior)
+
+Two genuinely distinct attempts at a real walkability-map BFS (`Terrain::RoomClassifier`, cache-
+respecting sweep with a targeted supplementary re-probe, then a corrected exhaustive sweep
+checking every edge's real room identity) both converge: villager_screen (177/0) has only 2 exits
+(161/0 north, 178/0 east), no door into the building anywhere in the 83 cells reachable from
+spawn. This isn't "one more probe away" -- it's the mechanism itself (tile-based cardinal
+movement from a BFS-reachable cell) coming up empty on a full, real sweep. Owner must decide the
+next approach; candidates, not yet tried: (a) sub-pixel wall-hugging alignment before pushing
+into the door (legacy/'s old route detoured into the SW corner first, suggesting position within
+a tile matters, not just which tile); (b) an animation/dialogue trigger (talk to the room's 2
+NPCs first?); (c) house2 is entered from a different room/approach entirely, not villager_screen.
+Do NOT re-run more BFS sweeps or column guesses on this same mechanism without picking one of
+these first.
+
 ## Next question
 
 Paused, awaiting the owner's go-ahead (explicit "arrête-toi et ping moi" checkpoint). Candidates
-once resumed: explore past `riverside_south_room`'s entrance (two unidentified figures seen at
-the door), test the SELECT-map cursor lead from the crate_room hint book, retest
-`riverside_screen`'s signpost with a positive control. Also deferred, not urgent: formalizing a
-navigation spec/format (raised by an external review, judged sound but not blocking).
+once resumed: the house2_interior paradigm question above; explore past
+`riverside_south_room`'s entrance (two unidentified figures seen at the door), test the
+SELECT-map cursor lead from the crate_room hint book, retest `riverside_screen`'s signpost with a
+positive control. Also deferred, not urgent: formalizing a navigation spec/format (raised by an
+external review, judged sound but not blocking).
 
 ## What NOT to redo
 
@@ -76,3 +100,10 @@ navigation spec/format (raised by an external review, judged sound but not block
   returns already measured at 93.1% agreement; not worth further tuning right now.
 - Don't trust a subagent's screenshot reference after the fact without checking it's still on
   disk -- reproduce the scene directly from the relevant checkpoint if it's gone.
+- Don't trust a `Terrain::RoomClassifier`-cached verdict alone to rule out a door on a given edge
+  -- a shared BG-tile signature can mask a real transition behind an already-cached "blocked"
+  wall from elsewhere in the room (confirmed live: room177's own known east exit was missed by a
+  cache-respecting-only sweep). Check real room identity after every edge's actual move, not only
+  on a classifier cache miss.
+- Don't re-run another BFS/walkability-map sweep on villager_screen looking for house2's door --
+  see "Paradigm to question" above, the mechanism itself was exhausted, not one attempt short.
