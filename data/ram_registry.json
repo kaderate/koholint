@@ -171,7 +171,7 @@
     },
     "169/16": {
       "label": "house2_interior",
-      "description": "Reached from villager_screen (177/0) through the building's south door -- see world_topology.room177_exits for the exact approach path and the narrow (~8px) alignment it needs. Single static interior screen: a bed top-left, a table with pots top-right, checkered floor. Not yet explored for NPCs/dialogue/items. Route reproducibility promoted from entry-glance to cross-session-confirmed, Builder session, September 9 2026: lib/validation/checkpoint_house2_interior.rb (Koholint::CheckpointSupport's nudge_axis!/cross_until_room_change!, no legacy/) reached room_id=169/map_id=16 on 2 independent fresh runs from villager_screen's checkpoint (deleted and reloaded between runs), both landing in 21 Navigator.move! calls -- screenshot re-confirmed the same bed/table-with-pots/checkered-floor interior."
+      "description": "Reached from villager_screen (177/0) through the building's south door -- see world_topology.room177_exits for the exact approach path and the narrow (~8px) alignment it needs. Route reproducibility promoted from entry-glance to cross-session-confirmed, Builder session, September 9 2026 (see prior note, kept for the route detail). Interior explored past the entry glance, isolated Explorer subagent, same day: a north wall of 6 dresser/drawer units, a bench/table with a rotary telephone on it (west side), 2 twin beds plus a round pot/hassock (east side), 3 basket/pot-shaped objects along the west wall, 4 large pot/urn shapes in a 2x2 grid (southeast), checkered floor tile (south-center). Full OAM table read (0xFE00-0xFE9F) from the entry checkpoint found only 2 non-Link sprite groups in the whole room: slots 12-15 (a 4-tile/8x16-double-height block at y=64-80,x=72-80, no matching visible BG furniture -- an invisible trigger in the open floor between the phone table and the beds) and slots 18-19 (a 2-tile pair at y=43,x=40/48, matching the visible telephone-on-table object). Both are interactive -- see dialogues.house2_telephone_examine and dialogues.house2_telephone_call. Every other visible furniture piece (both beds, the dresser wall, the 3 baskets, the 4 pots) has NO OAM entry, so per this project's established pattern (interactive objects are OAM sprites, e.g. crate_room) they're BG-only decoration; spot-checked directly on one bed (approached from below, faced up, :a) -- no dialogue box, confirms non-interactive (hypothesis/verified_count 1, only 1 of 4 non-OAM object types individually tested; the rest inferred from the OAM scan's completeness, not tested one by one). Exits: Navigator.probe_all from the spawn/door threshold (80,118) reads up/left/right as :ok (open floor within the room, not traced into new rooms -- D4, on-demand exploration) and down as :blocked (the door frame itself, consistent with spawning right at the threshold); no second exit found or looked for beyond the known south door back to villager_screen."
     },
     "176/0": {
       "label": "building_screen",
@@ -398,6 +398,30 @@
       "trigger": "faced up into the wall from (x=80,y=34), pressed :a -> a single short quip appears directly, no Oui/Non menu and no book-open animation -- a different interaction shape from book_a-d",
       "text": "Ce n'est pas une commode... Quoi? Tu avais remarqué... OK!",
       "note": "A one-off, fourth-wall-ish joke (roughly 'This isn't a dresser... What? You'd noticed... OK!') about the wall-embedded decoration -- confirms the room's older 'walls north (2 columns, shelf/crate blocked)' observation was a real, interactive object, just not a hint 'book stand' like book_a-d (no Oui/Non prompt, text is a single non-paginated line)."
+    },
+    "house2_telephone_examine": {
+      "status": "hypothesis -- isolated Explorer subagent, September 9 2026, single session, real Navigator.move!/tap_button calls and rendered-framebuffer transcription. Not yet independently reconfirmed.",
+      "source": "screen_render_verified",
+      "verified_count": 1,
+      "confidence": "hypothesis",
+      "room_id": 169,
+      "map_id": 16,
+      "sprite_oam_position": "4-tile block, OAM slots 12-15: (y=64,x=72), (y=64,x=80), (y=80,x=72), (y=80,x=80), attrs=0x02 -- no matching visible BG furniture at this position (open floor between the telephone table and the beds); an invisible interactive trigger, not a rendered object.",
+      "trigger": "from house2_interior's spawn/door threshold (x=80,y=118), 2x Navigator.move!(:up) to (80,94) (no x-nudge needed, already within tolerance of the group's x), then :a -- last movement was :up so Link was already facing up/toward the group.",
+      "text": "Heu... Hum... Comment dire? Téléphone... A l'extérieur... Pépé le Ramollo n'a pas l'air d'être un grand causeur...",
+      "note": "12 :a presses to page through and close (transcribed frame-by-frame from rendered PNGs). Reads as Link's own reaction/thought upon noticing the telephone, distinct from dialogues.house2_telephone_call (the visible phone object itself, which rings and connects a call) -- two separate OAM-verified interactive objects a few tiles apart, not a duplicate. Mentions 'Pépé le Ramollo', the NPC already catalogued in data/world_model.json's building_screen entry (176/0, a different room) -- this text appears to be a hint pointing toward him, not cross-referenced live this session; recording the observed text only, not assuming any meaning beyond it (AGENTS.md's game-knowledge caution). Not retested for reopening/toggle behavior this session -- unlike house2_telephone_call, which was retested and does retrigger."
+    },
+    "house2_telephone_call": {
+      "status": "hypothesis -- isolated Explorer subagent, September 9 2026, single session (one retrigger of the same object counted as the same check, not a second independent one per AGENTS.md's provenance rule), real Navigator.move!/tap_button calls and rendered-framebuffer transcription.",
+      "source": "screen_render_verified",
+      "verified_count": 1,
+      "confidence": "hypothesis",
+      "room_id": 169,
+      "map_id": 16,
+      "sprite_oam_position": "2-tile pair, OAM slots 18-19: (y=43,x=40), (y=43,x=48), attrs=0x02 -- matches the visible rotary-telephone-on-a-table object at the room's west wall (north-west corner).",
+      "trigger": "from spawn (80,118), nudge_axis! x-target 44 (landed x=47, tolerance 4) then y-target 64 (landed y=67, tolerance 4), then Navigator.move!(:up) once more to y=59, then :a facing up toward the phone.",
+      "text": "DRING DRING! DRING! Hello! Madonna à l'appaouiëlle. No darling... CLIC! Tu as dû faire un faux numéro!",
+      "note": "~19 :a presses to page through and close (transcribed frame-by-frame from rendered PNGs; 'l'appaouiëlle' transcribed exactly as rendered, an unusual spelling -- flagged, not corrected, since it wasn't cross-checked against a second independent capture). A comedic wrong-number call (someone claiming to be 'Madonna' answers, says 'No darling...', hangs up, tells Link he must have dialed the wrong number) -- no Oui/Non menu or branching observed. Retested once: pressing :a again while still facing the phone re-triggers the WHOLE sequence from the start ('DRING DRING!' again), same operational trap already documented for crate_room's book stands -- step away before re-testing rather than assuming a fresh :a probes something new."
     }
   },
   "visual_catalog": {
