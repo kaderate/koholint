@@ -1,0 +1,17 @@
+{
+  "hooks": {
+    "SessionStart": [
+      {
+        "matcher": "startup",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "sh -c '[ -x \"${CLAUDE_PROJECT_DIR}/../gemboy/scripts/build_yjit_ruby.sh\" ] && \"${CLAUDE_PROJECT_DIR}/../gemboy/scripts/build_yjit_ruby.sh\" || true'",
+            "timeout": 1500,
+            "statusMessage": "Building YJIT-enabled Ruby if needed..."
+          }
+        ]
+      }
+    ]
+  }
+}
