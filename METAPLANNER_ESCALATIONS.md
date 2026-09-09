@@ -24,7 +24,7 @@ Entry template:
 
 ## ESC1: subagents recurringly get stuck waiting for a Monitor notification that never arrives
 
-**Status**: open
+**Status**: resolved
 **Opened**: September 9, 2026, by planner session
 **Context**: root-caused this session -- a spawned `Agent`-tool subagent is a bounded, single-shot
 invocation; when it stops calling tools (even to say "waiting for notification"), the invocation
@@ -34,7 +34,8 @@ time mitigated manually. The mechanism is understood but lives only in this conv
 any file a future dispatching session would read cold.
 **Why process, not domain**: about how subagent prompts are written and what behavior to expect
 from them, not a game fact or a decision about how to play.
-**Resolution** (MetaPlanner fills in):
+**Resolution**: -> `METAPLANNER.md#MP3`, documented as a hard "Subagent prompts" rule in
+`AGENTS.md`: never write a subagent prompt that ends on a wait for an external notification.
 
 ## ESC4: `create_session` dispatch instructions don't mention the repo must be explicitly attached
 
@@ -54,7 +55,7 @@ dispatch, not a game fact.
 
 ## ESC2: no rule for what belongs in NEXT.md vs. AGENTS.md, so durable rules pile up in NEXT.md
 
-**Status**: open
+**Status**: resolved
 **Opened**: September 9, 2026, by planner session
 **Context**: `NEXT.md`'s "Standing conventions" section holds durable engineering rules (e.g. "never
 `run_in_background` inside an Explorer's own script") indistinguishable in permanence from rules
@@ -64,11 +65,13 @@ with no structural fix -- likely because there's no rule saying which kind of co
 accumulate there.
 **Why process, not domain**: purely about where documentation lives and what NEXT.md is scoped to
 hold, not a game fact.
-**Resolution** (MetaPlanner fills in):
+**Resolution**: -> `METAPLANNER.md#MP4`, added a classification test ("would this line still be
+true once the current question is forgotten?") to both `NEXT.md`'s preamble and `AGENTS.md`'s
+Process section; existing content left untouched, out of mandate.
 
 ## ESC3: no audit cadence for the verified-status provenance rule, already violated once in the field
 
-**Status**: open
+**Status**: resolved
 **Opened**: September 9, 2026, by planner session
 **Context**: a cold review on September 9, 2026 found ~15 `world_topology`/`dialogues` entries
 carrying `verified`/`ram_read_verified` at `verified_count: 1` (below the required bar).
@@ -77,4 +80,5 @@ cadence for catching a recurrence -- this instance was found because someone hap
 because any process step audits for it.
 **Why process, not domain**: a data-integrity/process gap in how facts get promoted to trusted
 status, not a fact about the game itself.
-**Resolution** (MetaPlanner fills in):
+**Resolution**: -> `METAPLANNER.md#MP5`, assigned as a standing checklist item of the existing
+Reviewer role and cold-review cadence, in `AGENTS.md`'s role table and provenance rule.

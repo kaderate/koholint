@@ -4,6 +4,10 @@ Entry point for any resumption. One page, no more. Full chronological history (e
 question/answer/decisions) lives in `docs/archive/SESSION_LOG.md` -- read it to look up a past
 finding, not to resume the project.
 
+Before adding anything here, apply `AGENTS.md`'s scope test (Process section): would this line
+still be true and worth knowing once the current question is answered and forgotten? If yes, it's a
+durable convention -- it belongs in `AGENTS.md`, not here.
+
 ## State as of September 9, 2026 (PLAN.md Session 4 complete)
 
 All 7 PLAN.md Session 4 checkpoints (`after_shield_interior`, `front_yard`, `overworld_screen2`,

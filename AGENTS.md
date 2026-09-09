@@ -20,7 +20,12 @@ order, `NEXT.md` before any action.
   bar, label it `hypothesis` (`verified_count: 1`) and say so; a future session or a fresh probe
   closes the gap. Found violated in the field once already (cold review, September 9, 2026): ~15
   `world_topology`/`dialogues` entries carried `verified`/`ram_read_verified` at `verified_count:
-  1`. Check this before writing to the registry, not after.
+  1`. Check this before writing to the registry, not after. Audited on a fixed cadence, not left to
+  chance: every cold Reviewer session (see "Three roles" below) scans `data/ram_registry.json` for
+  entries claiming `verified`/`ram_read_verified` below the `verified_count >= 2` bar as a standing,
+  unconditional checklist item, reported alongside its compliance judgment -- riding the same
+  every-N-commits/mornings cadence `PLAN.md` already runs cold reviews on (see
+  `METAPLANNER.md#MP5`).
 - **Pre-trained knowledge**: the game's memory map (community disassembly) is a source of
   hypotheses to verify, consistent with the provenance model. *Game* knowledge (where the sword
   is, who an NPC is) is forbidden: it is observed, never assumed.
@@ -50,7 +55,7 @@ by the next. The rules below exist so it doesn't happen again. They override you
 |---|---|---|
 | Explorer | throwaway spikes, measurements, memory diffs, scripts in the scratchpad | commit to `lib/`, decide |
 | Builder | implements a decision already made, with specs, in its worktree | change paradigm, "take the opportunity" to fix something else |
-| Reviewer | reads cold, judges against `docs/CONCEPT.md` and `DECISIONS.md` | read the narrative log before judging, fix things itself |
+| Reviewer | reads cold, judges against `docs/CONCEPT.md` and `DECISIONS.md`, audits `ram_registry.json` provenance (`verified_count` bar) | read the narrative log before judging, fix things itself |
 
 You never judge your own build. A review is triggered by the owner every N commits or every
 morning after a night of autonomy, by a fresh session with no history.
@@ -68,6 +73,12 @@ morning after a night of autonomy, by a fresh session with no history.
 - `NEXT.md` fits on one page: state, decisions in force, next question, how to verify it. Every
   resumption starts there. If a resumption requires more than one page of reading, `NEXT.md` is
   broken, not the resumption.
+- **What belongs in `NEXT.md` versus here**: before adding a line to `NEXT.md`, ask whether it would
+  still be true and worth knowing once the current question is answered and forgotten. If yes -- a
+  standing engineering convention, a naming scheme, a dispatch practice -- it belongs here, in this
+  Process section, not there. `NEXT.md` holds only what's bound to the current state of exploration:
+  indicators, decisions-in-force pointers, the next question, and a bounded "what not to redo" list
+  of recent traps. See `METAPLANNER.md#MP4`.
 
 ### Goal metrics, not means metrics
 
@@ -120,6 +131,25 @@ You don't decide, you propose with options and their costs:
   integration by the owner.
 - Never two agents on the same mechanism. Never an agent building on a decision another agent is
   currently reopening.
+
+### Subagent prompts: never end on a wait for a notification
+
+A dispatched `Agent`-tool subagent is a bounded, single-shot invocation, not a peer session: when
+it stops calling tools -- including to report "waiting for X" -- the invocation simply ends.
+Nothing inside it self-resumes; only an explicit follow-up from the dispatching session continues
+it, and if the dispatcher isn't watching for that gap the subagent looks "stuck" indefinitely. This
+recurred 7+ times across Explorer/Builder dispatches on September 9, 2026, mitigated manually each
+time, before being written down anywhere a future dispatch would read cold (see
+`METAPLANNER.md#MP3`).
+
+- Never write a subagent prompt that tells it to wait for a `Monitor` notification, another
+  session's completion, or any other external event and then continue. If the subagent's task
+  depends on an external condition, either poll it synchronously in a loop within the subagent's
+  own turn (tool calls only, never relying on being re-invoked), or don't delegate that step at all
+  -- keep the waiting in the dispatching session, which can actually be resumed by an external
+  event, and have the subagent return a status report instead.
+- `run_in_background`/`Monitor` are dispatcher-side tools. Never instruct a subagent to use them on
+  itself.
 
 ### MetaPlanner: amending the workflow itself
 
