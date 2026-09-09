@@ -122,7 +122,13 @@
     "_readme": "Human-readable label + description per (room_id, map_id), assigned by visually reading a screenshot -- purely descriptive (shape/color/layout), never a claim about what something 'really is' per AGENTS.md's forbidden-game-knowledge rule. Provisional, renamed/refined as more is observed. Key format: 'room_id/map_id'.",
     "162/0": {
       "label": "front_yard",
-      "description": "Grass overworld screen directly outside starting_house's door (south edge, row 8). Legacy-inherited name, kept as canonical. Oracle-mapped in detail (25 cells) -- see terrain_collision entries."
+      "description": "Grass overworld screen directly outside starting_house's door (south edge, row 8). Legacy-inherited name, kept as canonical. Oracle-mapped in detail (25 cells) -- see terrain_collision entries.",
+      "visual_survey": {
+        "as_of": "2026-09-09, checkpoint /tmp/zelda_checkpoints/lib_front_yard.dump",
+        "method": "D9 pilot: 4 OAM samples ~2s apart, no input, no checkpoint reload between samples",
+        "catalog_entries_seen": ["villager_wandering_creature", "front_yard_creature_shadow"],
+        "note": "New finding, not in any prior survey (front_yard_adjacent_rooms/front_yard_to_room177 only ever covered front_yard's neighbors' sprites, never front_yard's own): a wandering 2-tile creature plus its shadow, on screen the whole 4-sample window. CHR-pattern match against villager_screen's confirmed-interactive wandering NPC (villager_wandering_creature) -- see visual_catalog. Not interaction-tested this session."
+      }
     },
     "163/16": {
       "label": "starting_house",
@@ -134,7 +140,13 @@
     },
     "177/0": {
       "label": "villager_screen",
-      "description": "Reached from overworld_screen2 (south then west of front_yard). A building-shaped structure (dark trapezoid/gabled-roof silhouette on a tan rectangular base) centered upper-screen; grass field with darker-green blotchy clusters near the edges. Two interactive OAM sprite pairs: one genuinely static (only its tile ID flickers), one that wanders autonomously -- both trigger the identical dialogue line via :a ('YOUPI! J'ai la pêche! Et toi?'). A lone single-tile companion sprite near the wandering pair is of undetermined nature (decoration, effect, or separate entity). Legacy-inherited name, fits well."
+      "description": "Reached from overworld_screen2 (south then west of front_yard). A building-shaped structure (dark trapezoid/gabled-roof silhouette on a tan rectangular base) centered upper-screen; grass field with darker-green blotchy clusters near the edges. Two interactive OAM sprite pairs: one genuinely static (only its tile ID flickers), one that wanders autonomously -- both trigger the identical dialogue line via :a ('YOUPI! J'ai la pêche! Et toi?'). A lone single-tile companion sprite near the wandering pair is of undetermined nature (decoration, effect, or separate entity). Legacy-inherited name, fits well.",
+      "visual_survey": {
+        "as_of": "2026-09-09, checkpoint /tmp/zelda_checkpoints/lib_villager_screen.dump",
+        "method": "D9 pilot: 4 OAM samples ~2s apart, no input, no checkpoint reload between samples",
+        "catalog_entries_seen": ["villager_wandering_creature", "villager_static_npc", "villager_screen_companion_sprite"],
+        "note": "Sanity check requested by D9's pilot mandate PASSED: the known static NPC (villager_static_npc) reproduced as position-identical across all 4 samples, the known wandering NPC (villager_wandering_creature) reproduced as position-changing across all 4 samples -- matches the pre-existing dialogues.room177_static_sprite / dialogues.room177_wandering_sprite / world_topology.room177_sprites findings."
+      }
     },
     "161/0": {
       "label": "screen3_north",
@@ -367,6 +379,66 @@
       "trigger": "faced up into the wall from (x=80,y=34), pressed :a -> a single short quip appears directly, no Oui/Non menu and no book-open animation -- a different interaction shape from book_a-d",
       "text": "Ce n'est pas une commode... Quoi? Tu avais remarqué... OK!",
       "note": "A one-off, fourth-wall-ish joke (roughly 'This isn't a dresser... What? You'd noticed... OK!') about the wall-embedded decoration -- confirms the room's older 'walls north (2 columns, shelf/crate blocked)' observation was a real, interactive object, just not a hint 'book stand' like book_a-d (no Oui/Non prompt, text is a single non-paginated line)."
+    }
+  },
+  "visual_catalog": {
+    "_readme": "D9 pilot (September 9, 2026): per-room visual survey combining OAM mobility diffing (4 samples over emulated time, no input, from a checkpoint -- same technique proven for crate_room's object survey) with cross-room CHR pattern-byte comparison (0x8000 + tile_id*16, 16 bytes per tile -- actual pixel data, not raw tile IDs, which D8's own caveats already showed are unreliable across tilesets/rooms). One entry per distinct visual pattern (matched by identical CHR bytes, not tile ID). Piloted on 2 rooms only (villager_screen, front_yard) per DECISIONS.md's D9 -- not yet a standing convention for all charted rooms.",
+    "villager_wandering_creature": {
+      "status": "pilot Explorer session, September 9, 2026. OAM position diffed across 4 samples (~2s emulated time apart, no input, same checkpoint) in both rooms; CHR bytes read for tile 80 and tile 82 in both rooms and compared byte-for-byte.",
+      "source": "ram_read_verified",
+      "verified_count": 1,
+      "confidence": "hypothesis",
+      "rooms_seen": ["177/0 (villager_screen)", "162/0 (front_yard)"],
+      "mobility": "mobile in both rooms -- OAM x/y changed across all 4 samples in each room (villager_screen slots 17/18, e.g. (61,12)->(37,31)->(22,33)->(28,26); front_yard slots 16/17, e.g. (54,57)->(77,46)->(96,50)->(106,46))",
+      "tile_ids_seen": { "177/0": [80, 82, 84, 86], "162/0": [80, 82] },
+      "chr_pattern_match": "CONFIRMED byte-identical: tile 80 = 0000000036005e207e007f0e7f3f7f1b and tile 82 = 00000000000038007c38fc60fedcfeb8 in BOTH rooms' checkpoints (VRAM bank 0, no OAM attrs in either room set the CGB bank bit for these sprites). This is the cross-room match D9 set out to test: the same 2-tile sprite graphic appears as the confirmed-interactive wandering NPC in villager_screen and as an untested wandering sprite in front_yard. villager_screen's tiles 84/86 are additional walk-animation frames (84's bytes are 80's bytes shifted by one tile-row plus a new trailing row -- a walking-animation neighbor in VRAM, not a separate object) not (yet) observed in the front_yard samples -- may just mean the front_yard creature didn't happen to face/step that way during this survey's 4 samples, not that the animation set differs.",
+      "interaction_tested": {
+        "177/0": "y -- dialogues.room177_wandering_sprite, confirmed interactive, text 'YOUPI! J'ai la pêche! Et toi?'",
+        "162/0": "pending -- not tested this session (out of scope per task instructions: catalog and cross-reference, not re-test); the CHR match makes it a strong candidate for a cheap follow-up interaction probe"
+      },
+      "first_seen": "2026-09-09"
+    },
+    "villager_static_npc": {
+      "status": "pilot Explorer session, September 9, 2026. OAM position identical across 4 samples; only its tile ID flickers (animation, not translation) -- reproduces the existing dialogues.room177_static_sprite/world_topology.room177_sprites finding, used here as the pilot's sanity check.",
+      "source": "ram_read_verified",
+      "verified_count": 1,
+      "confidence": "hypothesis",
+      "rooms_seen": ["177/0 (villager_screen)"],
+      "mobility": "static -- OAM position (y=96, x=120/128) identical across all 4 samples; tile ID alternates 96/98 <-> 100/102 (animation only)",
+      "tile_ids_seen": { "177/0": [96, 98, 100, 102] },
+      "chr_pattern_match": "not compared against front_yard's catalog entries -- no matching CHR bytes found among front_yard's small on-screen sprite set (only the wandering creature, its shadow, and Link were on screen across front_yard's 4 samples)",
+      "interaction_tested": {
+        "177/0": "y -- dialogues.room177_static_sprite, confirmed interactive, same text as the wandering pair"
+      },
+      "first_seen": "2026-09-09"
+    },
+    "villager_screen_companion_sprite": {
+      "status": "pilot Explorer session, September 9, 2026. Single-tile OAM entry (slot 14), seen in only 2 of 4 samples, at two different positions.",
+      "source": "ram_read_verified",
+      "verified_count": 1,
+      "confidence": "hypothesis",
+      "rooms_seen": ["177/0 (villager_screen)"],
+      "mobility": "likely mobile but under-sampled -- present in samples 0 and 3 only (not 1 or 2), at (y=34,x=130) then (y=16,x=139); intermittent visibility (flicker, or genuinely leaving/re-entering the visible OAM set) prevents a confident static/mobile call from this pilot's 4 samples alone",
+      "tile_ids_seen": { "177/0": [94] },
+      "chr_pattern_match": "no match found against front_yard's tile 26 (the only other single/unpaired sprite tile seen in this pilot) -- distinct CHR bytes",
+      "interaction_tested": {
+        "177/0": "n -- not previously tested (world_topology.room177_sprites already flagged this sprite's nature as undetermined: decoration, effect, or separate entity); not tested this session either, out of scope"
+      },
+      "first_seen": "2026-09-09"
+    },
+    "front_yard_creature_shadow": {
+      "status": "pilot Explorer session, September 9, 2026. Two-tile OAM entry (slots 18/19, same tile ID 26 on both, attrs=0) tracking the wandering creature (villager_wandering_creature) at a consistent ~8px vertical offset across all 4 samples -- reads as a shadow/ground-contact sprite under the creature, not an independent object.",
+      "source": "ram_read_verified",
+      "verified_count": 1,
+      "confidence": "hypothesis",
+      "rooms_seen": ["162/0 (front_yard)"],
+      "mobility": "mobile -- moves in lockstep with villager_wandering_creature, same 4-sample deltas, constant relative offset",
+      "tile_ids_seen": { "162/0": [26] },
+      "chr_pattern_match": "no match found against villager_screen's tile set in this pilot",
+      "interaction_tested": {
+        "162/0": "n -- not tested; the lockstep-offset pattern is consistent with a shadow underlay (not independently interactable), but that's a read from position data only, not confirmed by an actual :a probe"
+      },
+      "first_seen": "2026-09-09"
     }
   }
 }
