@@ -121,6 +121,40 @@ You don't decide, you propose with options and their costs:
 - Never two agents on the same mechanism. Never an agent building on a decision another agent is
   currently reopening.
 
+### MetaPlanner: amending the workflow itself
+
+Cascades the planner -> worker split one level up. The planner (whoever is driving day-to-day
+sessions and dispatching Explorer/Builder/Reviewer work) can get stuck on a problem that isn't
+about the game at all -- it's about *this process*: a rule that doesn't fit a case it hits, a
+convention two files disagree on, a file that's outgrown its own stated shape. MetaPlanner exists
+to fix exactly that, and nothing else.
+
+- **Mandate**: amend process/coordination artifacts only -- `AGENTS.md`, `NEXT.md`'s own structural
+  rules (not its content), `PLAN.md`, subagent-prompt conventions. Never `DECISIONS.md`, never
+  `data/ram_registry.json`, never anything that is a fact about the game or a decision about how to
+  play it. If a proposed change touches game/domain territory, it isn't a MetaPlanner change --
+  it's a planner decision, logged in `DECISIONS.md` like any other.
+- **Trigger**: event-based, not a fixed timer or a schedule. A planner session that hits a
+  process-level snag escalates it (see below); the owner can also launch a MetaPlanner session
+  directly at any time.
+- **Session shape**: same discipline as "One session, one question" above, cascaded up -- short (5
+  to 30 minutes), one escalation in, one workflow amendment (or explicit non-amendment) out. Starts
+  cold: reads `METAPLANNER.md`, `METAPLANNER_ESCALATIONS.md`, and `AGENTS.md` itself, nothing else
+  from the planner's live conversation.
+- **Memory**: `METAPLANNER.md` is MetaPlanner's own decision log, one entry per workflow change --
+  same shape as `DECISIONS.md`'s entries (context, options, choice, invalidation condition), but for
+  the workflow instead of the game. Written only by MetaPlanner sessions.
+- **Handoff**: `METAPLANNER_ESCALATIONS.md` is the shared queue between the two roles, separate from
+  `METAPLANNER.md` so the access boundary is a file, not a section inside one. The planner may only
+  *append* an entry with status `open` (context, symptom, why it's process and not domain) --
+  never edit or resolve one itself. MetaPlanner drains the queue: marks an entry `resolved` with a
+  pointer to the `METAPLANNER.md` entry that addressed it, and prunes old resolved entries
+  periodically (archive or trim) so the queue doesn't drift into the same one-page violation
+  `NEXT.md` already hit once.
+- Same rule as everywhere else in this project: a change with no entry in `METAPLANNER.md` and no
+  resolved line in `METAPLANNER_ESCALATIONS.md` didn't happen, as far as the next cold session is
+  concerned.
+
 ### End-of-session report
 
 Always the same format, in `NEXT.md`, so the next agent can resume without reading you:

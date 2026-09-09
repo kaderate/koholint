@@ -31,7 +31,7 @@ grids -- already fulfilled and recorded under D8 in `DECISIONS.md`; no other fil
 | Indicator | Value |
 |---|---|
 | Rooms found | 14 labeled in `data/ram_registry.json`'s `room_labels` (8 "charted", 6 "glimpsed"/less -- adds `169/16` house2_interior, September 9 2026). Graph and screenshots published in the Koholint Atlas artifact (not yet updated with the new room). |
-| Dialogues / readable text | 7 confirmed entries in `ram_registry.json`'s `dialogues` (villager duo's shared line, room176's two save-mechanic NPC lines, two hint-book pages in the crate_room library, more). |
+| Dialogues / readable text | 10 confirmed entries in `ram_registry.json`'s `dialogues` (villager duo's shared line, room176's two save-mechanic NPC lines, crate_room's library fully read -- 4 books + 1 wall object, 9/9 tile objects resolved via OAM, September 9 2026). |
 | Terrain / collision | D8 live: reads BG tilemap signatures from VRAM (`lib/terrain.rb`), 93.1%-validated against live-probe oracle. Primary method; live probing kept as fallback. |
 | Save/continue | Mechanically verified end-to-end: hold A+B+START+SELECT opens the real save menu, "SAUVEGARDER & QUITTER" writes a real `.sav` (MD5-diffed), "REVENIR AU JEU" continues at the room's own door. This is the durable-progress path -- see "Standing conventions" below. |
 | Current position | `/tmp/zelda_checkpoints/main.dump` (continuous session state, not versioned -- see below), last saved September 8 17:05, around `riverside_south_room` (208/0), glimpsed but unexplored past the entrance. |
@@ -87,14 +87,20 @@ beyond the entry glance. Explorer checkpoint (not the canonical Builder one):
 ## Next question
 
 Paused, awaiting the owner's go-ahead (explicit "arrête-toi et ping moi" checkpoint). Session 4
-(PLAN.md) is now fully complete -- see the State section above. Candidates once resumed: explore
-`house2_interior` (169/16) itself, now reachable -- NPCs? items?; explore past
-`riverside_south_room`'s entrance (two unidentified figures seen at the door), test the
-SELECT-map cursor lead from the crate_room hint book, retest `riverside_screen`'s signpost with a
-positive control. Also deferred, not urgent: formalizing a navigation spec/format (raised by an
-external review, judged sound but not blocking); whether other already-"refuted" doors in this
-project deserve a re-look under the same off-tile-grid-alignment hypothesis now confirmed for
-house2 (not yet tested elsewhere -- one confirmed case, not yet a proven general rule).
+(PLAN.md) is now fully complete -- see the State section above. SELECT-map fog-of-war is CONFIRMED
+and d-pad-cursor-while-box-open is tested negative (32 combinations; double-A/`:b`/select-release/
+pre-existing-hold untested but not a priority) -- both resolved, no longer open questions. Crate_room's
+library is fully read, 9/9 objects (September 9 2026) -- also resolved, see "What NOT to redo".
+Candidates once resumed: explore `house2_interior` (169/16) itself, now reachable -- NPCs? items?;
+explore past `riverside_south_room`'s entrance (two unidentified figures seen at the door), retest
+`riverside_screen`'s signpost with a positive control. Also deferred, not urgent: formalizing a
+navigation spec/format (raised by an external review, judged sound but not blocking); whether other
+already-"refuted" doors in this project deserve a re-look under the same off-tile-grid-alignment
+hypothesis now confirmed for house2 (not yet tested elsewhere -- one confirmed case, not yet a
+proven general rule); the book_a/book_b vs. OAM discrepancy flagged in
+`world_topology.crate_room_and_riverside_content` (their notes claim "BG object, not OAM sprite",
+but this session's full-room OAM read accounts for all 9 `tile=0x58` objects with none left over --
+unresolved, orthogonal to the content itself, not worth a dedicated round right now).
 
 **Real architecture question, owner-raised September 9 2026, not yet designed**: the current
 walkability model (D8's `Terrain::RoomClassifier`, `walkable`/`blocked` per tile signature) is a
@@ -141,6 +147,12 @@ own data model), not something to implement ad hoc.
   on a classifier cache miss.
 - Don't re-run another BFS/walkability-map sweep on villager_screen looking for house2's door --
   see "Paradigm to question" above, the mechanism itself was exhausted, not one attempt short.
+- Don't re-scan the BG tilemap looking for crate_room's objects -- confirmed dead end, it only
+  holds floor decoration + the dialogue scratch-tile range while text is open. Its 9 objects
+  (`tile=0x58`) are OAM sprites: 8 in the visible 2x4 floor grid (OAM y=48/96, x=28/60/108/140) +
+  1 embedded in the north wall (OAM y=14, x=84, attrs=0x2). Read OAM (`0xFE00-0xFE9F`) directly.
+- Don't re-test crate_room's 6 decorative grid positions (top/bottom rows, cols 2-4) -- exhaustively
+  confirmed negative, including a side-approach and a 5x-tap deep retest on one of them.
 - Don't trust a `nudge_axis!` tolerance without checking where it actually lands -- `move!`
   advances in consistent ~8px steps from a given spawn parity, so a target that isn't itself on
   that step sequence (e.g. `y=106` from villager_screen's spawn parity) resolves to whichever
