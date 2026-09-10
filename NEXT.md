@@ -34,7 +34,7 @@ grids -- already fulfilled and recorded under D8 in `DECISIONS.md`; no other fil
 
 | Indicator | Value |
 |---|---|
-| Rooms found | 18 labeled in `data/ram_registry.json`'s `room_labels` (8 "charted", 10 "glimpsed"/less -- `224/0` riverside_south_river_room and `225/0` riverside_flower_clearing, south/east of `riverside_south_room`, both further explored (224/0's scroll mechanism and "totem" identity resolved, 225/0's ground-accessible extent mapped to a dead-end pocket); `209/0` riverside_east_room, found east of `riverside_south_room`'s south band (past the prior x=134,y=115 stop point), single-glance only, September 10 2026; `179/0` shop_screen, first actually explored September 10 2026 -- turns out to be the shop's EXTERIOR yard, not its interior; see `world_topology.shop_screen_door_approach` and Next question below). Graph and screenshots published in the Koholint Atlas artifact (not yet updated with these rooms or this session's findings). D9 visual-catalog `visual_survey` now covers 4/18 (`front_yard`, `villager_screen` pilot + `crate_room`, `screen3_north` rollout, same day, autonomous session) -- see `DECISIONS.md`'s D9 entry. |
+| Rooms found | 19 labeled in `data/ram_registry.json`'s `room_labels` (8 "charted", 11 "glimpsed"/less -- `224/0` riverside_south_river_room and `225/0` riverside_flower_clearing, south/east of `riverside_south_room`, both further explored (224/0's scroll mechanism and "totem" identity resolved, 225/0's ground-accessible extent mapped plus its NE route now resolved into a real room transition); `209/0` riverside_east_room, found east of `riverside_south_room`'s south band (past the prior x=134,y=115 stop point), single-glance only, September 10 2026; `179/0` shop_screen, first actually explored September 10 2026 -- turns out to be the shop's EXTERIOR yard, not its interior; see `world_topology.shop_screen_door_approach` and Next question below; `226/0` riverside_ne_cove, NEW September 10 2026 -- reached from `225/0`'s previously-abandoned NE route, entry point only, see Next question below). Graph and screenshots published in the Koholint Atlas artifact (not yet updated with these rooms or this session's findings). D9 visual-catalog `visual_survey` now covers 4/19 (`front_yard`, `villager_screen` pilot + `crate_room`, `screen3_north` rollout, same day, autonomous session) -- see `DECISIONS.md`'s D9 entry. |
 | Dialogues / readable text | 14 confirmed entries in `ram_registry.json`'s `dialogues` (villager duo's shared line, room176's two save-mechanic NPC lines, crate_room's library fully read -- 4 books + 1 wall object, 9/9 tile objects resolved via OAM; house2_interior's 2 OAM-verified telephone objects; `riverside_flower_clearing_sign` (225/0) -- a signpost reading "Attention aux oursins !", NOT a chest/item; `shop_screen_yard_npc` (179/0) -- a friendly yard NPC reciting the SAME save-tip line as room176's pair, first confirmed case of a reused dialogue asset, September 10 2026 -- all hypothesis/verified_count 1). |
 | Terrain / collision | D8 live: reads BG tilemap signatures from VRAM (`lib/terrain.rb`), 93.1%-validated against live-probe oracle. Primary method; live probing kept as fallback. |
 | SELECT map (fog-of-war) | Widest-coverage checkpoint: `lib_explorer_225_fresh_entry.dump` (8 lit cells, superset of `main.dump`'s own 6). 6/8 cells now have a place name read from a checkpoint standing IN that exact cell's room ("Village des Mouettes", "Bibliothèque", "Sud du Village" x2 -- `176/0` and `192/0` share it, "Plage Coco" x2), `select_map_screen`'s SEVENTH + EIGHTH SESSION entries (`192/0` riverside_screen closed EIGHTH SESSION, new working route: nudge x to ~88 from `room176_entry_from_room160.dump`, then plain `:down` taps, no special alignment needed -- corrects the earlier "x=94, 8 calls" figure, which doesn't reproduce). Remaining 2 cells (the chain's earliest 2 rooms) confirmed NOT free-readable from any on-file checkpoint (checked EIGHTH SESSION) -- would need a from-boot replay. Scratchpad images ready for the Atlas (`select_map_full_*.png`), not yet pulled in. |
@@ -118,9 +118,17 @@ route around the knockback. Link's equipped-item/inventory RAM location is still
 either, so even finding an item there won't let us confirm it's a sword without visual/dialogue
 confirmation.
 
-**Not yet tried**: a fresh push past `225/0`'s NE route (this time routing around/through the
-knockback rather than treating it as a wall, per D11) and a fuller sweep of `224/0` beyond its
-entry point, specifically looking for the "bidule"; separately (lower priority now), testing
+**UPDATE, September 10 2026 (same day, Explorer session)**: `225/0`'s NE route IS resolved now --
+it was never a wall, just two stacked hazards (an invisible knockback creature plus ordinary
+sea-urchin/flower terrain) that a held shield mostly gets past (see Next question below for full
+detail). It leads to a brand-new room, `226/0` riverside_ne_cove -- but the "bidule" was NOT found
+there, or anywhere else this session; only the room's entry point was glimpsed (budget went
+entirely to solving the route). The search for the "bidule" is still open, now one room further
+along than before.
+
+**Not yet tried**: a fuller sweep of `226/0` past its entry point (probe_all there reads
+up/left/right all open -- genuine unexplored ground, not a dead end) and of `224/0` beyond its
+entry point, both specifically looking for the "bidule"; separately (lower priority now), testing
 `overworld_screen2`'s (178/0) south edge remains a real but less on-narrative frontier; locating
 the inventory/equipped-item RAM bytes. `shop_screen` is RESOLVED not to be this session's answer --
 its yard held only a recycled-dialogue NPC and a decorative object, no item, and its actual
@@ -135,9 +143,11 @@ idle or before re-dispatching a duplicate:
   the `front_yard`/`villager_screen`/`crate_room`/`screen3_north` rollout already in
   `DECISIONS.md`'s D9 entry). Running unusually long (4h+ as of last check, vs. ~45-90 min for
   similar tasks) -- a status check was sent; no reply folded in here yet.
-- **`225/0`/`224/0` re-push** ("Plage Coco" -- pushing past `225/0`'s NE route with the D11
-  knockback understanding, plus a fuller sweep of `224/0`, looking for the "bidule" NPC A
-  mentioned). See "Quest hypothesis" above for the full reasoning.
+
+`225/0`'s NE re-push is DONE (September 10 2026) -- resolved into a real room transition into
+`226/0` riverside_ne_cove. `224/0`'s secondary sweep was NOT done this session (budget went
+entirely to the NE route, which took far more sub-attempts than expected) -- still open, see
+"Not yet tried" above. See Next question below for the full route/finding detail.
 
 `shop_screen`'s door, retry 2 is DONE (September 10 2026) -- clean null result, NOT a repeat of
 the same failure mode: swept off-grid tap offsets at the 3 already-known approach points
@@ -194,6 +204,35 @@ save-tip line as `room176_pair_a`/`room176_pair_b` -- first confirmed case in th
 dialogue line reused verbatim across rooms (`dialogues.shop_screen_yard_npc`) -- and a decorative
 plant/bush object, confirmed non-interactive. No shopkeeper, no buy/sell mechanic, no HUD/inventory
 change -- because the interior was never reached, not because a shop mechanic was ruled out.
+
+**`225/0`'s NE route RESOLVED, September 10 2026 (independent Explorer session)**: the "unexplained
+diagonal slides" were never a real wall -- they were two stacked hazards along the route (an
+invisible mobile hostile creature delivering contact knockback mid-tap, same pattern as `224/0`'s
+totem and D11, plus ordinary blocking terrain: a sea-urchin OAM cluster and a flower-cluster BG
+obstacle). Tactic tested per the owner's suggestion: holding B (the equipped shield) continuously
+via `mmu.joypad.key_state` (not `Navigator.tap_button`, which releases every button between taps)
+while pushing the route. Result: mixed but net positive -- one full clean run took zero damage
+where the same route unshielded had cost 3 hearts, but a later shield-held attempt through the same
+general area still lost a full heart with no OAM sprite visible adjacent in the snapshot, so the
+shield mitigates the creature's knockback without eliminating all damage in the room. Working
+strategy (not a fixed tap count, same caveat as every other route in this room cluster): from
+`lib_explorer_225_fresh_entry.dump`, go down to y~42 before pushing east (avoids one hazard band),
+back up to y~26 to continue east to x~76 where a flower cluster is a real wall, then -- the key
+correction -- drop further south than instinct suggests, to y~41 (below the flower, above the
+sea-urchin row), to clear it and continue east to x~124 (base of a second, NE-corner palm tree),
+then south along the tree's east flank to y~65-68 and east again, which crosses room_id/map_id
+from 225/0 into a brand-new room, **226/0 (`riverside_ne_cove`)**, at x=17,y=67, no damage on the
+crossing itself. `226/0` itself: two palm trees, a differently-oriented hedge corner, more
+sea-urchins, the same green amphibious sprite glimpsed in 225/0, and two more instances of the
+tile=0x60/0x62 hostile-family creature (visually matching 224/0's "totem"). `probe_all` from the
+entry point reads up/left/right all open, down blocked -- genuinely more room to explore, not a
+dead end, but not pursued further this session (budget). The "bidule" item was NOT found in either
+room this session. Full route, checkpoint chain, and every attempt (including the 2 that failed
+and dead-ended back at x=76,y=26) are in `room_labels['225/0']`'s NE-route addendum and
+`room_labels['226/0']`; the transition itself is also in
+`world_topology.riverside_flower_clearing_ne_exit`. `224/0`'s own secondary sweep (also flagged as
+open in its entry) was NOT attempted this session -- the NE route took far more sub-attempts than
+budgeted, leaving no time for it; still open for a future session.
 
 **D11 hazard-classification pass, September 10 2026 (Explorer session)**: `front_yard`'s creature
 (D9's byte-identical CHR match to `villager_screen`'s confirmed-friendly NPC) got a 4th navigation
@@ -319,9 +358,14 @@ own data model), not something to implement ad hoc.
   chase problem already open for riverside_south_room's figures.
 - `225/0`'s signpost (the room's only known interactive object, "Attention aux oursins !") is
   resolved -- don't re-approach it expecting an item; it's a hazard warning, not a chest, and
-  produces no HUD/inventory change. `225/0` does not scroll (single fixed screen) and its ground-
-  accessible area dead-ends at a hedge/water pocket SE of the sign (`probe_all` blocked both
-  down and right there) -- don't re-walk that same SW pocket expecting a new exit; the open gap is
-  the untried NE route past the sign instead (see "Next question"). `lib_explorer_225_route7.dump`
-  is a real but LOW-HEALTH (1 heart) checkpoint -- resume from `lib_explorer_225_fresh_entry.dump`
-  (full health) instead unless deliberately continuing from the dead end.
+  produces no HUD/inventory change. `225/0` does not scroll (single fixed screen) and its SW
+  ground pocket dead-ends at a hedge/water boundary (`probe_all` blocked both down and right
+  there) -- don't re-walk that pocket expecting a new exit. The NE route past the sign is NO
+  LONGER an open gap -- it's resolved into a real transition into `226/0`, see "Next question" for
+  the working strategy (hold the shield, and specifically drop to y~41, not y~26/34, to clear the
+  flower-cluster wall around x=76) before attempting a straight re-push at the old y=26 band, which
+  is a confirmed hard wall there. `lib_explorer_225_route7.dump` is a real but LOW-HEALTH (1 heart)
+  checkpoint -- resume from `lib_explorer_225_fresh_entry.dump` (full health) instead unless
+  deliberately continuing from the dead end. The exact per-leg tap counts on the NE route are not
+  reproducible at a fixed count (same caveat as every other route in this room cluster) -- treat
+  only the y-band strategy as durable, re-derive the taps live via `probe_all`/room_id checks.
