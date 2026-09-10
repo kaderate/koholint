@@ -34,7 +34,7 @@ grids -- already fulfilled and recorded under D8 in `DECISIONS.md`; no other fil
 
 | Indicator | Value |
 |---|---|
-| Rooms found | 19 labeled in `data/ram_registry.json`'s `room_labels` (8 "charted", 11 "glimpsed"/less -- `224/0` riverside_south_river_room and `225/0` riverside_flower_clearing, south/east of `riverside_south_room`, both further explored (224/0's scroll mechanism and "totem" identity resolved, 225/0's ground-accessible extent mapped plus its NE route now resolved into a real room transition); `209/0` riverside_east_room, found east of `riverside_south_room`'s south band (past the prior x=134,y=115 stop point), single-glance only, September 10 2026; `179/0` shop_screen, first actually explored September 10 2026 -- turns out to be the shop's EXTERIOR yard, not its interior; see `world_topology.shop_screen_door_approach` and Next question below; `226/0` riverside_ne_cove, NEW September 10 2026 -- reached from `225/0`'s previously-abandoned NE route, entry point only, see Next question below). Graph and screenshots published in the Koholint Atlas artifact (not yet updated with these rooms or this session's findings). D9 visual-catalog `visual_survey` now covers 4/19 (`front_yard`, `villager_screen` pilot + `crate_room`, `screen3_north` rollout, same day, autonomous session) -- see `DECISIONS.md`'s D9 entry. |
+| Rooms found | 19 labeled in `data/ram_registry.json`'s `room_labels` (8 "charted", 11 "glimpsed"/less -- `224/0` riverside_south_river_room and `225/0` riverside_flower_clearing, south/east of `riverside_south_room`, both further explored (224/0's scroll mechanism and "totem" identity resolved, 225/0's ground-accessible extent mapped plus its NE route now resolved into a real room transition); `209/0` riverside_east_room, found east of `riverside_south_room`'s south band (past the prior x=134,y=115 stop point), single-glance only, September 10 2026; `179/0` shop_screen, first actually explored September 10 2026 -- turns out to be the shop's EXTERIOR yard, not its interior; see `world_topology.shop_screen_door_approach` and Next question below; `226/0` riverside_ne_cove, NEW September 10 2026 -- reached from `225/0`'s previously-abandoned NE route, entry point only, see Next question below). Graph and screenshots published in the Koholint Atlas artifact (not yet updated with these rooms or this session's findings). D9 visual-catalog `visual_survey` now covers 6/19 (`front_yard`, `villager_screen` pilot + `crate_room`, `screen3_north` rollout + `well_platform`, `building_screen` rollout, fresh restart of an abandoned attempt, September 10 2026) -- see `DECISIONS.md`'s D9 entry. |
 | Dialogues / readable text | 14 confirmed entries in `ram_registry.json`'s `dialogues` (villager duo's shared line, room176's two save-mechanic NPC lines, crate_room's library fully read -- 4 books + 1 wall object, 9/9 tile objects resolved via OAM; house2_interior's 2 OAM-verified telephone objects; `riverside_flower_clearing_sign` (225/0) -- a signpost reading "Attention aux oursins !", NOT a chest/item; `shop_screen_yard_npc` (179/0) -- a friendly yard NPC reciting the SAME save-tip line as room176's pair, first confirmed case of a reused dialogue asset, September 10 2026 -- all hypothesis/verified_count 1). |
 | Terrain / collision | D8 live: reads BG tilemap signatures from VRAM (`lib/terrain.rb`), 93.1%-validated against live-probe oracle. Primary method; live probing kept as fallback. |
 | SELECT map (fog-of-war) | Widest-coverage checkpoint: `lib_explorer_225_fresh_entry.dump` (8 lit cells, superset of `main.dump`'s own 6). 6/8 cells now have a place name read from a checkpoint standing IN that exact cell's room ("Village des Mouettes", "Bibliothèque", "Sud du Village" x2 -- `176/0` and `192/0` share it, "Plage Coco" x2), `select_map_screen`'s SEVENTH + EIGHTH SESSION entries (`192/0` riverside_screen closed EIGHTH SESSION, new working route: nudge x to ~88 from `room176_entry_from_room160.dump`, then plain `:down` taps, no special alignment needed -- corrects the earlier "x=94, 8 calls" figure, which doesn't reproduce). Remaining 2 cells (the chain's earliest 2 rooms) confirmed NOT free-readable from any on-file checkpoint (checked EIGHTH SESSION) -- would need a from-boot replay. Scratchpad images ready for the Atlas (`select_map_full_*.png`), not yet pulled in. |
@@ -161,17 +161,31 @@ below.
 
 ## In-flight work (for resumability)
 
-As of September 10, 2026, two subagents are dispatched and may still be running or may have
-completed with results not yet folded in here -- check `ListAgents` before assuming either is
-idle or before re-dispatching a duplicate:
-- **D9 rollout on `well_platform` + `building_screen`, RESTARTED** -- the original attempt hit 6h
-  with no reply to 2 check-in messages and is treated as abandoned (its own task-id is orphaned,
-  don't resume it, don't fold in a late reply from it without cross-checking against whatever this
-  fresh attempt finds). This is a clean fresh dispatch of the same task.
+As of September 10, 2026, one subagent is dispatched and may still be running or may have
+completed with results not yet folded in here -- check `ListAgents` before assuming it is idle or
+before re-dispatching a duplicate:
 - **`shop_screen` door, retry 3** -- via the hedge maze / from the yard NPC's position, aiming at
   the one cell (y=90-110 under the door) no prior attempt has ever stood in. 3rd distinct approach
   per `world_topology.shop_screen_door_approach` -- anti-patch budget for this door is now fully
   spent after this attempt, win or lose.
+
+**D9 rollout on `well_platform` + `building_screen` is DONE (September 10 2026, fresh restart, ~20
+minutes, well inside budget)** -- the earlier 6h+ abandoned attempt is superseded, not resumed.
+Both rooms surveyed (4 OAM samples ~2s apart, no input, no reload, LCDC 8x16 mode confirmed and
+both top+bottom tiles read per DECISIONS.md's D9 pitfall). No genuinely new sprite found in either
+room beyond what prior sessions' descriptions already listed. Findings: (1) `villager_wandering_creature`'s
+companion tile (94/95, `visual_catalog.villager_screen_companion_sprite`) now confirmed
+byte-identical (full top+bottom composite, re-derived fresh from 4 separate checkpoints) in
+well_platform (3 mobile instances) and building_screen (2 mobile instances) too, alongside its
+already-known villager_screen/screen3_north appearances. (2) building_screen's 2 static,
+already dialogue-confirmed NPCs (`dialogues.room176_pair_a`/`room176_pair_b`) got a formal
+`visual_catalog` entry (`building_screen_humanoid_npc_pair`) -- new finding: both share the exact
+same CHR tile data, pair_b is pair_a's sprite rendered X-flipped as a whole, not two distinct
+character designs. (3) building_screen's fast intermittent single-tile object got its own entry
+(`building_screen_flutter_object`) -- no cross-room CHR match, mobility under-sampled by this
+method's ~2s grain (consistent with, not contradicting, its already-known fast/erratic behavior).
+Full detail in `room_labels['160/0']`/`['176/0']`'s new `visual_survey` sub-objects and the 2 new
++ 1 extended `visual_catalog` entries.
 
 `house2_interior`'s bed-healing test is DONE (September 10 2026) -- beds do NOT heal, tested
 cleanly; see "Quest hypothesis" UPDATE 3 above for the full result and the open
