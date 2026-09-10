@@ -255,3 +255,19 @@ to be ratified), `taken without validation` (inherited from the spike, to be rev
   for the full detail. Still not ratified as a standing convention -- now piloted-plus-rolled-out on
   4 rooms total (2 pilot + 2 rollout), the owner's call on whether to fold it into `AGENTS.md`'s
   "Room labeling" convention for all charted rooms.
+- **Methodological correction, September 10, 2026**: re-verification (owner-prompted) found the
+  pilot and rollout's CHR comparisons only ever read the OAM-listed tile ID alone -- but LCDC
+  confirmed 8x16 sprite mode was active in every checkpoint used, meaning each on-screen sprite is
+  actually a top tile + an auto-paired bottom tile (and often two such columns side by side for a
+  16x16 composite). The matches themselves held up when re-checked in full (all 4 tiles of the
+  villager_screen/front_yard creature match byte-for-byte, not just the 2 originally compared), but
+  the method itself was incomplete and got lucky, not verified as thoroughly as the confidence
+  level implied. Also checked and ruled out a real confound: whether the "cross-room match" was
+  trivially Link's own sprite matching itself (Link consistently reads as tile 0/2 in every room
+  checked, structurally distinct from the matched creature's tile 80-83). Fixed going forward:
+  `scratchpad/sprite_render.py`, a reusable 2bpp-tile-to-image decoder (handles 8x16 pairing and
+  16x16 two-column composites, with or without an X-flip), promoted from one-off scratch scripts to
+  a standard tool -- rendering an actual image is now part of investigating any sprite, not an
+  optional extra. It already caught one real mislabel this way: `front_yard_creature_shadow`
+  (named from lockstep position tracking alone) turned out, once rendered, to look like spiky
+  grass/reed tufts, not a flat ground shadow -- renamed pending a clearer read.
