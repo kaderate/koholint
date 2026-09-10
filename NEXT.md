@@ -175,8 +175,13 @@ retest before assuming it needs a whole new route.
 
 ## In-flight work (for resumability)
 
-Nothing dispatched as of this update (September 10, 2026, ~16:45 UTC) -- check `ListAgents` in
-case this is stale by the time it's read.
+As of September 10, 2026, ~16:45 UTC, one subagent is dispatched -- check `ListAgents` before
+assuming it is idle or before re-dispatching a duplicate:
+- **Bush contact/`:a` test** -- this project has classified bushes as "blocked" purely from the
+  BG-tilemap signature method (D8), never from an actual interaction test. Testing in
+  `shop_screen`'s (179/0) yard, at the same bush cluster that was just found blocking the shop
+  door's approach -- creature-free, safe. Directly relevant to the sword hypothesis: confirms or
+  refutes what "conditionally-blocked" actually looks like today.
 
 **D9 rollout on `well_platform` + `building_screen` is DONE (September 10 2026, fresh restart, ~20
 minutes, well inside budget)** -- the earlier 6h+ abandoned attempt is superseded, not resumed.
