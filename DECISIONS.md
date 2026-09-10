@@ -271,3 +271,26 @@ to be ratified), `taken without validation` (inherited from the spike, to be rev
   optional extra. It already caught one real mislabel this way: `front_yard_creature_shadow`
   (named from lockstep position tracking alone) turned out, once rendered, to look like spiky
   grass/reed tufts, not a flat ground shadow -- renamed pending a clearer read.
+
+## D10 — Walkability grids combine D8 (BG tilemap) with D9 (static OAM sprites)
+
+- **Status**: ratified (September 10, 2026).
+- **Context**: the owner spotted, by inspecting the Atlas after the HUD-row fix, that
+  `crate_room`'s walkability overlay shows all 9 of its confirmed-physical crate/book-stand
+  objects as uniformly walkable. Root cause: `Terrain::RoomClassifier` (D8) only ever reads the BG
+  tilemap; these objects are OAM sprites sitting on top of ordinary walkable grass tiles, so
+  nothing in the model sees them as obstacles at all. Not a crate_room-only issue -- any room with
+  a static sprite-based obstacle has the same blind spot. See
+  `data/ram_registry.json`'s `terrain_collision.background_tilemap_predicts_walkability.caveats`
+  (the newest, "CONFIRMED, September 10 2026" entry) for the full evidence.
+- **Choice**: combine the two systems already built rather than inventing a third. For any room
+  D9 has surveyed (`data/ram_registry.json`'s `visual_catalog`), a cell containing a *static*
+  tracked sprite (mobility == static, per D9's OAM multi-sample diffing) is marked blocked in the
+  walkability grid regardless of what its BG signature says. Mobile sprites are NOT folded in this
+  way -- a wandering creature isn't a fixed obstacle, and D9 already tracks those separately by
+  position, not by walkability. This only fixes the gap where D9 coverage already exists (4/14
+  rooms as of this decision); rooms D9 hasn't surveyed keep the blind spot until they are.
+- **Invalidated if**: a static sprite turns out to be walkable-under (e.g. a sprite drawn for
+  visual layering but with no real collision, like a floor decal) -- in that case marking its cell
+  blocked would be a false negative, and the model needs a third state (sprite present, but not
+  necessarily an obstacle) rather than the binary treatment assumed here.
