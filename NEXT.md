@@ -34,7 +34,7 @@ grids -- already fulfilled and recorded under D8 in `DECISIONS.md`; no other fil
 
 | Indicator | Value |
 |---|---|
-| Rooms found | 16 labeled in `data/ram_registry.json`'s `room_labels` (8 "charted", 8 "glimpsed"/less -- adds `224/0` riverside_south_river_room and `225/0` riverside_flower_clearing, September 10 2026, south/east of `riverside_south_room`). Graph and screenshots published in the Koholint Atlas artifact (not yet updated with the 2 new rooms). D9 visual-catalog `visual_survey` now covers 4/16 (`front_yard`, `villager_screen` pilot + `crate_room`, `screen3_north` rollout, same day, autonomous session) -- see `DECISIONS.md`'s D9 entry. |
+| Rooms found | 16 labeled in `data/ram_registry.json`'s `room_labels` (8 "charted", 8 "glimpsed"/less -- `224/0` riverside_south_river_room and `225/0` riverside_flower_clearing, south/east of `riverside_south_room`, both now further explored: 224/0's scroll mechanism and "totem" identity resolved, 225/0's ground-accessible extent mapped to a dead-end pocket, September 10 2026 -- no 17th room found yet). Graph and screenshots published in the Koholint Atlas artifact (not yet updated with the 2 rooms or this session's findings). D9 visual-catalog `visual_survey` now covers 4/16 (`front_yard`, `villager_screen` pilot + `crate_room`, `screen3_north` rollout, same day, autonomous session) -- see `DECISIONS.md`'s D9 entry. |
 | Dialogues / readable text | 13 confirmed entries in `ram_registry.json`'s `dialogues` (villager duo's shared line, room176's two save-mechanic NPC lines, crate_room's library fully read -- 4 books + 1 wall object, 9/9 tile objects resolved via OAM; house2_interior's 2 OAM-verified telephone objects; `riverside_flower_clearing_sign` (225/0) -- a signpost reading "Attention aux oursins !", NOT a chest/item, added September 10 2026 -- all hypothesis/verified_count 1). |
 | Terrain / collision | D8 live: reads BG tilemap signatures from VRAM (`lib/terrain.rb`), 93.1%-validated against live-probe oracle. Primary method; live probing kept as fallback. |
 | Save/continue | Mechanically verified end-to-end: hold A+B+START+SELECT opens the real save menu, "SAUVEGARDER & QUITTER" writes a real `.sav` (MD5-diffed), "REVENIR AU JEU" continues at the room's own door. This is the durable-progress path -- see "Standing conventions" below. |
@@ -73,20 +73,10 @@ terrain source of truth, live-probing kept as fallback. Full rationale for each:
 
 ## Paradigm to question (anti-patch, house2_interior) -- RESOLVED September 9 2026
 
-house2_interior's door is FOUND and CONFIRMED (candidate (a) above, sub-pixel/alignment, was the
-right one). Full evidence in `data/ram_registry.json`'s `world_topology.room177_exits` (search
-"DOOR FOUND AND CONFIRMED"). Summary: the row directly south of the door (row5, y=80..95) is a
-false floor -- blocked by the building's own footprint at x=100,y=82 (a genuine wall, 0px progress
-across 38 raw taps). The real approach detours one row further south (row6, y~106, already known
-open) before turning toward the door's column and pushing up. Once aligned, the transition takes
-as few as 6 raw taps / 2 `Navigator.move!` calls -- `Navigator.move!`'s `MAX_TAPS = 8` was NEVER
-the bottleneck; do not raise it on the strength of this. The real constraint: the door's trigger
-column is only ~8px wide (x=72/76 worked; x=64/68/80/88, each just 4-8px off, did not), narrower
-than the 16px tile grid `Navigator`/`Terrain::RoomClassifier` currently reason in -- which is
-exactly why the earlier BFS (cell-snapped to 16px) never found it. New room reached: `169/16`
-(`house2_interior` in `room_labels`), a house interior (bed, table with pots), not yet explored
-beyond the entry glance. Explorer checkpoint (not the canonical Builder one):
-`/tmp/zelda_checkpoints/lib_house2_interior_explorer.dump`.
+house2_interior's door was FOUND and CONFIRMED: not a wider `MAX_TAPS`, but an ~8px trigger column
+narrower than the 16px grid the earlier BFS reasoned in. Full evidence and the corrected route in
+`data/ram_registry.json`'s `world_topology.room177_exits` (search "DOOR FOUND AND CONFIRMED").
+Kept here only as a worked example of the anti-patch rule paying off -- no open action remains.
 
 ## Next question
 
@@ -102,32 +92,33 @@ genuine adjacency at the press -- INCONCLUSIVE, not negative (see
 a procedure ("keep tapping `:right`, check room_id after each"), NOT at a fixed tap count (see
 `world_topology.riverside_south_room_south_exit`). `225/0`'s previously glimpsed-only "chest-like
 object" is RESOLVED, same day: it's a signpost ("Attention aux oursins !" -- a hazard warning, not
-an item; see `dialogues.riverside_flower_clearing_sign`), no HUD/inventory change. `224/0`'s
-anomaly got a real per-frame mechanism probe, September 10 2026: the "2nd screen" jump is a genuine
-SCY hardware scroll (0->128 over ~34-40 frames, LCDC/WY/WX/SCX unchanged throughout, triggered by
-any single directional tap), confirming the scripted-scroll hypothesis directly rather than only by
-axis-pattern inference. The idle-frame drift after the scroll is now also characterized: HRAM
-position keeps changing in discrete hold-then-jump steps with confirmed zero input (FakeKeys
-checked all-false), but in 2 fresh reproductions this session Link's own OAM sprite reads
-y=244 (hidden/off-screen) for nearly the entire drift -- the drift is NOT a visible sprite being
-pushed, more like unfinished scripted repositioning. UNRESOLVED: the earlier `south_jump` checkpoint
-shows the opposite (OAM visible, animating normally) during an otherwise similarly-shaped drift --
-not chased further this session per the anti-patch rule (3 probes already spent); see
-`room_labels['224/0']`'s "PER-FRAME MECHANISM PROBE" note for full detail and the new
-`lib_explorer_room224_post_scroll_hidden.dump` checkpoint. The south band's
+an item; see `dialogues.riverside_flower_clearing_sign`), no HUD/inventory change. `224/0`'s scroll mechanism is now FULLY RESOLVED, September 10 2026 (4th independent Explorer
+session): it's a pure TIME-based scripted intro scroll (SCY 0->128 over ~40-60f) that starts the
+instant the room loads and runs with confirmed ZERO input (plain idle-wait reproduces it identically
+to any tap or even an `:a` press) -- the earlier "any directional input triggers it" theory is
+superseded, it was coincidental frame-window overlap, not a real input trigger. `224/0`'s "totem/
+statue near the entry point" is also identified, same session: it's the mobile OAM creature
+(tile=0x60 family, same wandering group as 0x62/64/66/68/6A already in this room) caught in an early
+static-looking pose, not fixed BG art. A clean face+`:a` dialogue test on it was NOT completed (it
+wanders off before a controlled post-scroll approach lines up, same difficulty already logged for
+riverside_south_room's figures) -- but an incidental hit during the chase (HUD hearts dropped with
+no OAM sprite adjacent in either snapshot) confirms it's a real contact-damage enemy, not neutral
+decoration. `225/0` was explored past the signpost, same session: it does NOT scroll (fixed single
+screen, confirmed), and its ground-accessible area is small and enclosed -- hedges north/west, a
+water strip south/east that was never actually entered (swim-gated hypothesis, Link has no Flippers
+yet, unconfirmed) -- `Navigator.probe_all` dead-ends at `down: blocked, right: blocked` in the SW
+pocket. No new room transition found in 225/0. One route (hugging the top row east past the sign
+toward the NE bush cluster) produced only unexplained diagonal slides, never reaching that area --
+open gap for a future session. Full detail in `room_labels['224/0']`/`['225/0']`. The south band's
 east extent from the original x=134,y=115 stop point (within 208/0 itself) is still unprobed.
 Candidates once resumed: a dedicated multi-sample OAM-tracking session for riverside_south_room's
 2 wandering figures (continuous per-frame position log, to actually catch genuine adjacency before
-pressing :a); reconciling why `south_jump`'s drift shows visible OAM against this session's two
-hidden-OAM reproductions (different entry edge into 224/0 is the leading unconfirmed guess); retest
-`riverside_screen`'s signpost with a positive control. Also deferred, not urgent: formalizing a
-navigation spec/format (raised by an external review, judged sound but not blocking); whether other
-already-"refuted" doors in this project deserve a re-look under the same off-tile-grid-alignment
-hypothesis now confirmed for house2 (not yet tested elsewhere -- one confirmed case, not yet a
-proven general rule); the book_a/book_b vs. OAM discrepancy flagged in
-`world_topology.crate_room_and_riverside_content` (their notes claim "BG object, not OAM sprite",
-but this session's full-room OAM read accounts for all 9 `tile=0x58` objects with none left over --
-unresolved, orthogonal to the content itself, not worth a dedicated round right now).
+pressing :a) -- the same technique would also settle `224/0`'s totem-creature and `225/0`'s NE-route
+question above; whether `225/0`'s water strip is genuinely Flippers-gated (untested, only inferred);
+whether other already-"refuted" doors in this project deserve a re-look under the same
+off-tile-grid-alignment hypothesis now confirmed for house2 (one confirmed case, not yet a proven
+general rule). Also deferred, not urgent: formalizing a navigation spec/format (raised by an
+external review, judged sound but not blocking).
 
 **Real architecture question, owner-raised September 9 2026, not yet designed**: the current
 walkability model (D8's `Terrain::RoomClassifier`, `walkable`/`blocked` per tile signature) is a
@@ -203,17 +194,23 @@ own data model), not something to implement ad hoc.
   is unresolved.
 - Don't assume a stable `room_id`/`map_id` means "same screen" -- `224/0`
   (riverside_south_river_room) visually renders as 2 distinct screens under that one room_id via a
-  genuine SCY hardware scroll (confirmed by direct telemetry, not just inference -- see
-  `room_labels['224/0']`'s "PER-FRAME MECHANISM PROBE"), triggered by any of the 4 directions from
-  the entry point (x=104,y=141), not just `:down`. Don't expect a fixed `Navigator.move!` tap count
-  for 208/0->224/0->225/0 either -- 2 independent runs crossed into 225/0 after 3 and 7 total
-  `:right` taps respectively; the reliable procedure is "keep tapping and check room_id after each."
-  The post-scroll idle drift (position changes over hundreds of frames with confirmed zero input)
-  is stepwise, not a smooth current, and in 2 fresh reproductions happens while Link's own OAM
-  sprite is hidden (y=244) -- don't read a visible, moving Link sprite into this without checking
-  OAM directly. Don't re-attempt a fresh reproduction chasing why `lib_explorer_room224_south_jump`
-  (an earlier, differently-sourced checkpoint) shows visible OAM during its own drift instead --
-  already 3 probes deep on this specific sub-question this session, stopped per the anti-patch rule.
+  genuine SCY hardware scroll (0->128 over ~40-60f). It is PURELY TIME-BASED, confirmed by a plain
+  zero-input idle-wait reproducing it identically -- don't describe it as input-triggered, that
+  theory is superseded (see `room_labels['224/0']`). Don't expect a fixed `Navigator.move!` tap
+  count for 208/0->224/0->225/0 either -- runs have crossed into 225/0 after 3-7 total `:right`
+  taps; the reliable procedure is "keep tapping and check room_id after each." The post-scroll idle
+  drift (position changes over hundreds of frames with confirmed zero input) is stepwise, not a
+  smooth current, and Link's own OAM sprite is sometimes hidden (y=244) during it -- don't read a
+  visible, moving Link sprite into this without checking OAM directly; why OAM visibility differs
+  between reproductions is still unresolved, not chased further (anti-patch rule, 3+ probes spent
+  across 2 sessions). `224/0`'s "totem/statue" is the mobile tile=0x60 creature family, not static
+  BG art -- don't expect a clean dialogue test on it without solving the same wandering-target
+  chase problem already open for riverside_south_room's figures.
 - `225/0`'s signpost (the room's only known interactive object, "Attention aux oursins !") is
   resolved -- don't re-approach it expecting an item; it's a hazard warning, not a chest, and
-  produces no HUD/inventory change.
+  produces no HUD/inventory change. `225/0` does not scroll (single fixed screen) and its ground-
+  accessible area dead-ends at a hedge/water pocket SE of the sign (`probe_all` blocked both
+  down and right there) -- don't re-walk that same SW pocket expecting a new exit; the open gap is
+  the untried NE route past the sign instead (see "Next question"). `lib_explorer_225_route7.dump`
+  is a real but LOW-HEALTH (1 heart) checkpoint -- resume from `lib_explorer_225_fresh_entry.dump`
+  (full health) instead unless deliberately continuing from the dead end.
