@@ -51,7 +51,10 @@ OAM mobility diffing + cross-room CHR pattern comparison (`visual_catalog`). D11
 (September 10, 2026): before chasing a not-yet-classified mobile sprite for dialogue, run a cheap
 contact/proximity test first (watch HUD hearts and Link's own position for the jump/knockback
 signature) -- `visual_catalog` entries carry a `hazard_status` field (`friendly`/`hostile`/
-`unknown`) for this. Full rationale for each: `DECISIONS.md`.
+`unknown`) for this. D12 ratified (September 10, 2026): RAM writes to gameplay state (HP via
+`0xDB5A`, or any other writable mechanic found later) are for isolated tests only -- never to push
+past a real in-game obstacle (e.g. topping HP up to continue exploring) without asking the owner
+first, every time, never a standing blanket approval. Full rationale for each: `DECISIONS.md`.
 
 ## Standing conventions
 
@@ -146,15 +149,15 @@ checked so far). Important caveat on file: a direct `mmu.write` to `0xDB5A` does
 visible HUD heart icons (they only redraw via the game's own damage-handling code) -- read this
 byte directly, don't trust the on-screen hearts after a manual write.
 
-**OPEN QUESTION for the owner, not decided here**: now that `0xDB5A` is a known, writable HP
-byte, a 3rd Plage Coco push COULD top HP back up with a direct write before continuing rather than
-finding a real in-game heal. That's a genuine paradigm choice (save-editing/state-injection vs.
-staying inside legitimate play, even on throwaway scratch checkpoints), not something to decide
-unilaterally -- flagged rather than acted on. Until the owner weighs in, this thread stays paused;
-`shop_screen`'s door and `overworld_screen2`'s south edge are safer, unblocked fronts in the
-meantime. `shop_screen` is otherwise RESOLVED not to be this session's answer -- its yard held
-only a recycled-dialogue NPC and a decorative object, no item, and its actual interior (behind the
-"MAGASIN" door) was never reached -- see Next question below.
+**RESOLVED, September 10 2026 (owner decision, now D12 in `DECISIONS.md`)**: RAM writes to HP
+(or any other gameplay-state byte) are case-by-case, asked every time -- NOT a standing tool for
+pushing past this specific blocker. So the Plage Coco thread stays genuinely paused until either a
+real in-game heal is found, a route around the hostile creature is found, or the owner explicitly
+approves a write for that specific push. `shop_screen`'s door and `overworld_screen2`'s south edge
+are the safer, unblocked fronts in the meantime. `shop_screen` is otherwise RESOLVED not to be
+this session's answer -- its yard held only a recycled-dialogue NPC and a decorative object, no
+item, and its actual interior (behind the "MAGASIN" door) was never reached -- see Next question
+below.
 
 ## In-flight work (for resumability)
 
