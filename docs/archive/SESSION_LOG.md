@@ -1052,3 +1052,39 @@ riverside_south_room's figures) -- but an incidental hit during the chase (HUD h
 no OAM sprite adjacent in either snapshot) confirms it's a real contact-damage enemy, not neutral
 decoration. Archived here per `METAPLANNER.md#MP8` once `NEXT.md`'s own state carried the resolved
 one-line summary and `data/ram_registry.json`'s `room_labels['224/0']` carried the full detail.
+
+## Paradigm to question, RESOLVED -- mobile-sprite interaction testing (ratified as D11, September 10, 2026)
+
+Three separate sessions across three different rooms had failed to confirm interaction with a
+mobile creature, each for the same underlying reason: `Navigator`'s chase/approach helpers
+(`move!`, `nudge_axis!`) are built for static-target navigation and can't reliably land Link
+adjacent to something that's also moving before pressing `:a` -- `front_yard`'s wandering
+creature (September 9), `riverside_south_room`'s pale and tan figures (September 9-10, 4
+attempts), and `224/0`'s "totem" (tile=0x60, September 10). Per `AGENTS.md`'s anti-patch rule,
+that was the mandatory stop. **Owner's decision, September 10 2026**: middle ground, not either
+extreme -- don't build a real `lib/navigator.rb` chase primitive yet, but authorize exactly ONE
+bespoke, throwaway attempt using a genuinely different method (a tight per-tap loop re-reading the
+target's live OAM position every iteration, instead of `move!`/`nudge_axis!`'s single
+dead-reckoned computation). Result (see `data/ram_registry.json`'s
+`world_topology.riverside_south_room_adaptive_chase_experiment`, targeting `riverside_south_room`'s
+tan/brown creature): the method DID reach measured adjacency for the first time across all 5
+attempts on this family of creatures (dx=-7,dy=3 on a fresh re-read, iteration 13/18) -- real
+evidence the adaptive approach itself works better than dead reckoning at keeping pace with a
+wandering target. But the `:a` press still produced no dialogue box, and the session surfaced a
+separate, more fundamental confound: Link's own HRAM position jumped unexpectedly (up to ~20px) on
+ordinary single taps and even between the adjacency check and the `:a` press itself -- the same
+unexplained "diagonal slide" phenomenon already flagged elsewhere in this project
+(`room_labels['225/0']`'s NE-route note). A same-day follow-up root-caused that confound directly:
+reproducing a plain tap sequence with before/after screenshots + OAM reads found the wandering
+creature adjacent to Link right before every jump -- a contact/collision knockback, not an
+input-processing glitch (see `world_topology.riverside_south_room_adaptive_chase_experiment.confound_root_cause`).
+This reframed the open question entirely: some mobile sprites aren't NPCs at all, they're enemies,
+and no amount of chase-tooling precision would ever produce dialogue from one. The owner ratified
+**D11** the same day (`DECISIONS.md`): before attempting a dialogue chase on any not-yet-classified
+mobile sprite, run a cheap contact/proximity test first (approach to near-adjacency, watch HUD
+hearts and Link's own position for the jump signature) -- cheaper than a full adaptive
+chase-for-dialogue attempt and tells you whether that effort is worth spending at all.
+`visual_catalog` entries now carry a `hazard_status` field (`friendly`/`hostile`/`unknown`) for
+this. Archived here per `METAPLANNER.md#MP8` once `DECISIONS.md`'s D11 entry carried the ratified
+decision and `NEXT.md`'s own "Decisions in force" section pointed to it, leaving nothing left to
+know in this paragraph that isn't already covered elsewhere.

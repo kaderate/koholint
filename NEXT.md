@@ -46,7 +46,12 @@ grids -- already fulfilled and recorded under D8 in `DECISIONS.md`; no other fil
 D1 ratified (HRAM, not OAM, for position/room). D2 obsolete (superseded by D1). D3 decided: DMG
 hardware mode. D4 decided (September 8, 2026): exploration is on-demand, not exhaustive-per-screen.
 D5-D7 ratified (see `DECISIONS.md`). D8 ratified (September 8, 2026): VRAM tilemap reads are the
-terrain source of truth, live-probing kept as fallback. Full rationale for each: `DECISIONS.md`.
+terrain source of truth, live-probing kept as fallback. D9 ratified: per-room visual survey via
+OAM mobility diffing + cross-room CHR pattern comparison (`visual_catalog`). D11 ratified
+(September 10, 2026): before chasing a not-yet-classified mobile sprite for dialogue, run a cheap
+contact/proximity test first (watch HUD hearts and Link's own position for the jump/knockback
+signature) -- `visual_catalog` entries carry a `hazard_status` field (`friendly`/`hostile`/
+`unknown`) for this. Full rationale for each: `DECISIONS.md`.
 
 ## Standing conventions
 
@@ -71,50 +76,6 @@ terrain source of truth, live-probing kept as fallback. Full rationale for each:
   separation per `AGENTS.md`) with a self-contained prompt (context, tools, lessons learned,
   budget, exact report format). Never use `run_in_background`/Monitor inside an Explorer's own
   script -- run everything foreground/synchronous, it has gotten subagents stuck twice.
-
-## Paradigm to question (anti-patch, mobile-sprite interaction testing) -- OPEN September 10 2026
-
-Three separate sessions across three different rooms have now failed to confirm interaction with
-a mobile creature, each for the same underlying reason: `Navigator`'s chase/approach helpers
-(`move!`, `nudge_axis!`) are built for static-target navigation and can't reliably land Link
-adjacent to something that's also moving before pressing `:a` -- `front_yard`'s wandering
-creature (September 9), `riverside_south_room`'s pale and tan figures (September 9-10, 4 attempts),
-and `224/0`'s "totem" -- actually a mobile enemy sprite, tile=0x60 (September 10). All three are
-recorded `interaction: inconclusive, not negative` -- never a confirmed refutation, just a
-navigation-access gap, every time. Per `AGENTS.md`'s anti-patch rule, this is the mandatory stop:
-the fourth room won't fix it either. **Owner must decide**: is it worth building a real
-intercept/chase primitive for `Navigator` (tracks the target's OAM position live, adjusts approach
-each step, not a single dead-reckoned move) -- a genuine new capability, out of autonomous scope
-per "Autonomy executes, it does not design" -- or is chasing mobile-sprite dialogue not worth the
-investment right now given everything reachable so far this way has been a hazard warning, not
-plot-critical content? Also worth noting as a data point: two of these sessions (`224/0`, `225/0`)
-saw Link's HUD hearts drop (3->1 in one case) with no OAM sprite adjacent in either snapshot around
-the hit -- consistent with contact damage from the same fast-moving creatures, unconfirmed, and a
-reason NOT to keep probing this area ad hoc in scratchpad checkpoints without the tooling fixed
-first (no real save is at risk -- `main.dump` is untouched -- but it's a sign this area has real
-combat, not just dialogue, and blind chasing risks a checkpoint "death" state nobody's checked the
-game's handling of yet).
-
-**Owner's decision, September 10 2026**: middle ground, not either extreme -- don't build a real
-`lib/navigator.rb` chase primitive yet, but authorize exactly ONE bespoke, throwaway attempt using
-a genuinely different method (a tight per-tap loop re-reading the target's live OAM position every
-iteration, instead of `move!`/`nudge_axis!`'s single dead-reckoned computation). Result (see
-`data/ram_registry.json`'s `world_topology.riverside_south_room_adaptive_chase_experiment`,
-targeting `riverside_south_room`'s tan/brown creature): the method DID reach measured adjacency
-for the first time across all 5 attempts on this family of creatures (dx=-7,dy=3 on a fresh
-re-read, iteration 13/18) -- real evidence the adaptive approach itself works better than dead
-reckoning at keeping pace with a wandering target. But the `:a` press still produced no dialogue
-box, and the session surfaced a separate, more fundamental confound: Link's own HRAM position
-jumped unexpectedly (up to ~20px) on ordinary single taps and even between the adjacency check and
-the `:a` press itself -- the same unexplained "diagonal slide" phenomenon already flagged
-elsewhere in this project (`room_labels['225/0']`'s NE-route note), not something a chase
-primitive alone would fix. **Net assessment for a future real-tooling decision**: the live-tracking
-method looks worth formalizing into `lib/navigator.rb` if mobile-sprite interaction becomes a
-priority, but the Link-position-jump confound should be investigated first (or alongside), since it
-undermines the guarantee that reaching measured adjacency means the press actually lands there.
-This was the one authorized exception -- per the anti-patch rule at the meta level, this is the
-fourth and final data point on this question for now; no further creature/room attempts without a
-new owner decision.
 
 ## Next question
 
@@ -143,11 +104,24 @@ open gap for a future session. Full detail in `room_labels['224/0']`/`['225/0']`
 band east extent (from the original x=134,y=115 stop point) is now RESOLVED, same day: a real room
 transition at x=149,y=115 into a new room, `209/0` riverside_east_room, single-glance only -- see
 `world_topology.riverside_south_room_east_exit` and `room_labels['209/0']`, not chased deeper.
-Candidates once resumed: exploring `209/0` further (only a screenshot/probe_all/OAM glance so far);
-a dedicated multi-sample OAM-tracking session for riverside_south_room's 2 wandering figures
-(continuous per-frame position log, to actually catch genuine adjacency before pressing :a) -- the
-same technique would also settle `224/0`'s totem-creature and `225/0`'s NE-route question above;
-whether `225/0`'s water strip is genuinely Flippers-gated (untested, only inferred); whether other
+
+**D11 hazard-classification pass, September 10 2026 (Explorer session)**: `front_yard`'s creature
+(D9's byte-identical CHR match to `villager_screen`'s confirmed-friendly NPC) got a 4th navigation
+attempt using the adaptive live-OAM-tracking method D11 authorized -- still INCONCLUSIVE, not
+refuted: 2 sub-attempts stayed in `front_yard` (avoiding the known door-column trap) but both got
+wedged at a real obstacle, x=88,y=82-84 (a building-side wall, now independently reconfirmed by 2
+sessions/2 different chase heuristics -- see `visual_catalog.villager_wandering_creature`'s
+`interaction_tested['162/0']`). No `:a` was pressed; the creature's own interactivity is still
+unknown. Separately, `hazard_status` was added across `visual_catalog` per D11:
+`riverside_south_pale_creature` (tile=0x6c, never tested before) got 2 contact-test approaches --
+both produced a knockback-shaped position jump on Link, but the creature wasn't confirmed on-screen
+at the exact jump instant, so it's "unknown, suggestive of hostile" not a clean classification.
+`riverside_east_room` (209/0)'s two sprites (tile=0x62 and 0x68/0x6a) turned out, via a 4-sample
+idle animation log, to cycle through the SAME tile set (0x60/0x62/0x64/0x66/0x68/0x6a) as the
+already-confirmed-hostile `riverside_south_tan_creature` and `riverside_south_river_room_sprite`
+(224/0's totem) -- classified `hostile` mainly on that family match, plus one observed wrong-axis
+13px jump while a family-tile creature was in close range. See `visual_catalog.riverside_east_room_creatures`,
+`.riverside_south_pale_creature`, and `.villager_wandering_creature` for full detail. Whether other
 already-"refuted" doors in this project deserve a re-look under the same off-tile-grid-alignment
 hypothesis now confirmed for house2 (one confirmed case, not yet a proven general rule). Also
 deferred, not urgent: formalizing a navigation spec/format (raised by an external review, judged
@@ -222,7 +196,20 @@ own data model), not something to implement ad hoc.
   y=92 to y=90 and no further) -- not resolved which of the grid being stale or the creature/its
   shadow transiently occupying that cell is the cause; the creature's actual interactivity is
   still genuinely unknown, not refuted. See `visual_catalog.villager_wandering_creature`'s
-  `interaction_tested['162/0']` for the full 3-attempt detail before trying a 4th route.
+  `interaction_tested['162/0']` for the full 3-attempt detail before trying a 4th route. UPDATE
+  September 10 2026: a 4th attempt (adaptive live-OAM-tracking, D11-mandated) avoided the door
+  column successfully but got wedged at x=88,y=82-84 instead -- a real building-side wall,
+  independently reconfirmed by 2 sessions/2 methods now. Route AROUND it (clear x<80 or x>100
+  before descending below y=84) rather than a straight-north dominant-axis chase; don't retry a
+  5th straight-through attempt without that fix. Per the anti-patch rule this is now 3 distinct
+  sub-attempts within D11's mandate alone (6 total project-wide) -- needs a genuinely different
+  approach, not a 7th chase, if tried again.
+- Tile IDs 0x60/0x62/0x64/0x66/0x68/0x6a are NOT distinct creature species -- confirmed September
+  10 2026 via a 4-sample idle animation log in `riverside_east_room` (209/0): both of that room's
+  sprites cycle through the whole set frame to frame. Treat any single tile ID in this range as one
+  animation/directional frame of the same creature family (already confirmed hostile via
+  `riverside_south_tan_creature` and `riverside_south_river_room_sprite`/224's totem), not a new
+  species to re-catalog from scratch. See `visual_catalog.riverside_east_room_creatures`.
 - `screen3_north`'s OAM survey found up to 6 distinct moving patterns, not the room's 3-creature
   narrative count -- don't assume a 1:1 mapping without re-deriving it (unresolved, low priority).
 - Don't assume a stable `room_id`/`map_id` means "same screen" -- `224/0`
