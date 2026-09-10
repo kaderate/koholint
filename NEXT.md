@@ -128,12 +128,16 @@ interior (behind the "MAGASIN" door) was never reached -- see Next question belo
 
 ## In-flight work (for resumability)
 
-As of September 10, 2026, one subagent was dispatched and may still be running or may have
-completed with results not yet folded in here -- check `ListAgents` before assuming it is idle or
-before re-dispatching a duplicate:
+As of September 10, 2026, two subagents were dispatched and may still be running or may have
+completed with results not yet folded in here -- check `ListAgents` before assuming either is
+idle or before re-dispatching a duplicate:
 - **D9 rollout on `well_platform` + `building_screen`** (visual-catalog survey, same method as
   the `front_yard`/`villager_screen`/`crate_room`/`screen3_north` rollout already in
-  `DECISIONS.md`'s D9 entry).
+  `DECISIONS.md`'s D9 entry). Running unusually long (4h+ as of last check, vs. ~45-90 min for
+  similar tasks) -- a status check was sent; no reply folded in here yet.
+- **`225/0`/`224/0` re-push** ("Plage Coco" -- pushing past `225/0`'s NE route with the D11
+  knockback understanding, plus a fuller sweep of `224/0`, looking for the "bidule" NPC A
+  mentioned). See "Quest hypothesis" above for the full reasoning.
 
 `shop_screen` interior exploration is DONE (this session, September 10 2026) -- see the State
 table and Next question for the result (exterior yard only, door not reached).
