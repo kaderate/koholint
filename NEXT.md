@@ -34,7 +34,7 @@ grids -- already fulfilled and recorded under D8 in `DECISIONS.md`; no other fil
 
 | Indicator | Value |
 |---|---|
-| Rooms found | 16 labeled in `data/ram_registry.json`'s `room_labels` (8 "charted", 8 "glimpsed"/less -- `224/0` riverside_south_river_room and `225/0` riverside_flower_clearing, south/east of `riverside_south_room`, both now further explored: 224/0's scroll mechanism and "totem" identity resolved, 225/0's ground-accessible extent mapped to a dead-end pocket, September 10 2026 -- no 17th room found yet). Graph and screenshots published in the Koholint Atlas artifact (not yet updated with the 2 rooms or this session's findings). D9 visual-catalog `visual_survey` now covers 4/16 (`front_yard`, `villager_screen` pilot + `crate_room`, `screen3_north` rollout, same day, autonomous session) -- see `DECISIONS.md`'s D9 entry. |
+| Rooms found | 17 labeled in `data/ram_registry.json`'s `room_labels` (8 "charted", 9 "glimpsed"/less -- `224/0` riverside_south_river_room and `225/0` riverside_flower_clearing, south/east of `riverside_south_room`, both further explored (224/0's scroll mechanism and "totem" identity resolved, 225/0's ground-accessible extent mapped to a dead-end pocket); `209/0` riverside_east_room, found east of `riverside_south_room`'s south band (past the prior x=134,y=115 stop point), single-glance only, September 10 2026). Graph and screenshots published in the Koholint Atlas artifact (not yet updated with these rooms or this session's findings). D9 visual-catalog `visual_survey` now covers 4/17 (`front_yard`, `villager_screen` pilot + `crate_room`, `screen3_north` rollout, same day, autonomous session) -- see `DECISIONS.md`'s D9 entry. |
 | Dialogues / readable text | 13 confirmed entries in `ram_registry.json`'s `dialogues` (villager duo's shared line, room176's two save-mechanic NPC lines, crate_room's library fully read -- 4 books + 1 wall object, 9/9 tile objects resolved via OAM; house2_interior's 2 OAM-verified telephone objects; `riverside_flower_clearing_sign` (225/0) -- a signpost reading "Attention aux oursins !", NOT a chest/item, added September 10 2026 -- all hypothesis/verified_count 1). |
 | Terrain / collision | D8 live: reads BG tilemap signatures from VRAM (`lib/terrain.rb`), 93.1%-validated against live-probe oracle. Primary method; live probing kept as fallback. |
 | SELECT map (fog-of-war) | Widest-coverage checkpoint found: `lib_explorer_225_fresh_entry.dump` (8 lit cells, superset of `main.dump`'s own 6). Clean grid PNG + 5/8 lit-cell place names read (French, in-game text -- "Village des Mouettes", "Bibliothèque", "Sud du Village", "Plage Coco" x2) September 10 2026, `select_map_screen`'s SEVENTH SESSION entry; 3 cells (the chain's earliest 2 rooms + `192/0` riverside_screen) flagged not-yet-read, not guessed. Scratchpad images ready for the Atlas (`select_map_full_*.png`), not yet pulled in. |
@@ -118,16 +118,19 @@ water strip south/east that was never actually entered (swim-gated hypothesis, L
 yet, unconfirmed) -- `Navigator.probe_all` dead-ends at `down: blocked, right: blocked` in the SW
 pocket. No new room transition found in 225/0. One route (hugging the top row east past the sign
 toward the NE bush cluster) produced only unexplained diagonal slides, never reaching that area --
-open gap for a future session. Full detail in `room_labels['224/0']`/`['225/0']`. The south band's
-east extent from the original x=134,y=115 stop point (within 208/0 itself) is still unprobed.
-Candidates once resumed: a dedicated multi-sample OAM-tracking session for riverside_south_room's
-2 wandering figures (continuous per-frame position log, to actually catch genuine adjacency before
-pressing :a) -- the same technique would also settle `224/0`'s totem-creature and `225/0`'s NE-route
-question above; whether `225/0`'s water strip is genuinely Flippers-gated (untested, only inferred);
-whether other already-"refuted" doors in this project deserve a re-look under the same
-off-tile-grid-alignment hypothesis now confirmed for house2 (one confirmed case, not yet a proven
-general rule). Also deferred, not urgent: formalizing a navigation spec/format (raised by an
-external review, judged sound but not blocking).
+open gap for a future session. Full detail in `room_labels['224/0']`/`['225/0']`. `208/0`'s south
+band east extent (from the original x=134,y=115 stop point) is now RESOLVED, same day: a real room
+transition at x=149,y=115 into a new room, `209/0` riverside_east_room, single-glance only -- see
+`world_topology.riverside_south_room_east_exit` and `room_labels['209/0']`, not chased deeper.
+Candidates once resumed: exploring `209/0` further (only a screenshot/probe_all/OAM glance so far);
+a dedicated multi-sample OAM-tracking session for riverside_south_room's 2 wandering figures
+(continuous per-frame position log, to actually catch genuine adjacency before pressing :a) -- the
+same technique would also settle `224/0`'s totem-creature and `225/0`'s NE-route question above;
+whether `225/0`'s water strip is genuinely Flippers-gated (untested, only inferred); whether other
+already-"refuted" doors in this project deserve a re-look under the same off-tile-grid-alignment
+hypothesis now confirmed for house2 (one confirmed case, not yet a proven general rule). Also
+deferred, not urgent: formalizing a navigation spec/format (raised by an external review, judged
+sound but not blocking).
 
 **Real architecture question, owner-raised September 9 2026, not yet designed**: the current
 walkability model (D8's `Terrain::RoomClassifier`, `walkable`/`blocked` per tile signature) is a
