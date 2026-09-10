@@ -567,6 +567,34 @@
         "250/29": "y (3 of 9) -- already fully resolved before this session: 3 of the 9 OAM objects are interactive (dialogues.crate_room_book_c, crate_room_book_d, crate_room_wall_object), 6 are confirmed hard negatives (world_topology.crate_room_and_riverside_content). dialogues.crate_room_book_a/book_b are ALSO interactive but their relationship to these same 9 OAM objects is an unresolved open question there (the room's own note: 3 read + 6 negative already accounts for all 9, leaving no room for book_a/book_b among them) -- not re-investigated this session, only the static/mobile classification was in scope"
       },
       "first_seen": "2026-09-09"
+    },
+    "riverside_south_pale_creature": {
+      "status": "Follow-up session, September 10 2026 (planner, direct investigation, not a subagent): applied D9's CHR-byte cross-check to the two entrance figures already flagged in room_labels['208/0']. 8x16 sprite mode confirmed (LCDC bit 2 set) -- a first pass without this only captured the top half-tile of each sprite.",
+      "source": "ram_read_verified",
+      "verified_count": 1,
+      "confidence": "hypothesis",
+      "rooms_seen": ["208/0 (riverside_south_room)"],
+      "composition": "16x16 composite: left half tile 108/109 (top/bottom), right half the same tile 108/109 horizontally mirrored via the OAM attrs X-flip bit -- one tile reused and flipped for symmetry, not two distinct tiles.",
+      "chr_pattern_match": "tile 108 top-half = 00000000000007000906130d170b170b -- no match against villager_screen/front_yard/crate_room/screen3_north's catalogued patterns (screen3_north's tiles 88/90/92/112/114/126/38 re-derived directly from its own checkpoint for this check, not just registry text, since raw bytes weren't stored for those entries). Genuinely novel pattern, not yet seen in any of the other 4 surveyed rooms.",
+      "visual_description": "Decoded from CHR bytes + OBP0 palette (0x1c) and rendered as an image (not just read as hex) -- a compact, symmetric round silhouette: black outline ring, gray body, a white oval patch near the top center, a small black dot below it. Reads as a rounded blob/creature shape with no distinct limbs visible, purely from the pixel shape -- no claim made about in-game identity.",
+      "interaction_tested": {
+        "208/0": "n -- see room_labels['208/0']'s existing note, 4 chase attempts all inconclusive (navigation-access problem, not negative)"
+      },
+      "first_seen": "2026-09-10"
+    },
+    "riverside_south_tan_creature": {
+      "status": "Follow-up session, September 10 2026 (planner, direct investigation, not a subagent): same method as riverside_south_pale_creature.",
+      "source": "ram_read_verified",
+      "verified_count": 1,
+      "confidence": "hypothesis",
+      "rooms_seen": ["208/0 (riverside_south_room)"],
+      "composition": "16x16 composite: left half tile 104/105 (top/bottom), right half tile 106/107 (top/bottom), no flip on either half -- two distinct tile pairs forming one sprite, confirmed simultaneous (adjacent OAM slots 22/23, x=97/105, same y, same checkpoint instant), not two different-moment reads mistaken for one sprite.",
+      "chr_pattern_match": "tile 104 = 03000701cb06af44f74ff75ff75cf75e, tile 106 = e000d8e0d478bafcbafc92fcc2fcc27c -- no match against any of the other 4 surveyed rooms' catalogued patterns, including screen3_north's re-derived tiles. Genuinely novel pattern.",
+      "visual_description": "Decoded from CHR bytes + OBP0 palette and rendered as an image -- noticeably larger and more complex than riverside_south_pale_creature: a pointed/peaked top (two dark points, could read as ears or a hood), a busier mid-body pattern, and two lighter lower protrusions that read as legs -- more consistent with a bipedal silhouette than a blob. Visually and structurally distinct from the pale creature in the same room. No claim made about in-game identity -- pixel shape only.",
+      "interaction_tested": {
+        "208/0": "n -- see room_labels['208/0']'s existing note, same 4 inconclusive attempts covered both figures"
+      },
+      "first_seen": "2026-09-10"
     }
   }
 }
