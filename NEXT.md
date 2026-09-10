@@ -128,9 +128,9 @@ interior (behind the "MAGASIN" door) was never reached -- see Next question belo
 
 ## In-flight work (for resumability)
 
-As of September 10, 2026, three subagents were dispatched and may still be running or may have
-completed with results not yet folded in here -- check `ListAgents` before assuming any is idle
-or before re-dispatching a duplicate:
+As of September 10, 2026, two subagents were dispatched and may still be running or may have
+completed with results not yet folded in here -- check `ListAgents` before assuming either is
+idle or before re-dispatching a duplicate:
 - **D9 rollout on `well_platform` + `building_screen`** (visual-catalog survey, same method as
   the `front_yard`/`villager_screen`/`crate_room`/`screen3_north` rollout already in
   `DECISIONS.md`'s D9 entry). Running unusually long (4h+ as of last check, vs. ~45-90 min for
@@ -138,10 +138,18 @@ or before re-dispatching a duplicate:
 - **`225/0`/`224/0` re-push** ("Plage Coco" -- pushing past `225/0`'s NE route with the D11
   knockback understanding, plus a fuller sweep of `224/0`, looking for the "bidule" NPC A
   mentioned). See "Quest hypothesis" above for the full reasoning.
-- **`shop_screen`'s door, retry 2** -- the yard exploration (below) found the shop's actual
-  interior unreached after 8+ approaches; a follow-up session is trying a shifted tap-grid
-  parity, the same fix that resolved `house2_interior`'s door (see
-  `world_topology.shop_screen_door_approach`/`room177_exits`).
+
+`shop_screen`'s door, retry 2 is DONE (September 10 2026) -- clean null result, NOT a repeat of
+the same failure mode: swept off-grid tap offsets at the 3 already-known approach points
+(north/west-corner/mid-row), all uniformly blocked across 6-12px with zero exceptions -- the
+OPPOSITE signature from `house2_interior`'s real door (a narrow ~8px gap flanked by `:ok`
+neighbors). Rules out a narrow-parity-trigger door at these 3 specific points, not the door
+itself. Real gap now precisely identified: no checkpoint has ever stood directly south of the
+door's own x=86-104 column (y=90-110) -- the west dead-corner blocks reaching that exact cell
+from the tested side. Next attempt (not yet dispatched) needs a genuinely different route into
+that cell -- through the hedge maze's interior, or east from the yard NPC's spot near x=40,y=96
+-- not another sweep from the same 3 points. See `world_topology.shop_screen_door_approach` for
+the full attempt log.
 
 `shop_screen`'s YARD exploration is DONE (this session, September 10 2026) -- see the State
 table and Next question for that result (exterior yard only, no item, door not yet reached as of
