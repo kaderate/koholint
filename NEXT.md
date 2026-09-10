@@ -103,17 +103,24 @@ a procedure ("keep tapping `:right`, check room_id after each"), NOT at a fixed 
 `world_topology.riverside_south_room_south_exit`). `225/0`'s previously glimpsed-only "chest-like
 object" is RESOLVED, same day: it's a signpost ("Attention aux oursins !" -- a hazard warning, not
 an item; see `dialogues.riverside_flower_clearing_sign`), no HUD/inventory change. `224/0`'s
-anomaly (2nd visually distinct screen under the SAME room_id, plus idle-frame position drift) got
-a first real look: all 4 directions from the entry point (x=104,y=141) trigger the same kind of
-large jump, not just `:down` -- supports a scripted auto-scroll/screen-transition-strip hypothesis
-over a water current, not yet confirmed against alternatives; idle drift itself NOT
-re-investigated -- see `room_labels['224/0']`'s "FIRST REAL INVESTIGATION" note. The south band's
+anomaly got a real per-frame mechanism probe, September 10 2026: the "2nd screen" jump is a genuine
+SCY hardware scroll (0->128 over ~34-40 frames, LCDC/WY/WX/SCX unchanged throughout, triggered by
+any single directional tap), confirming the scripted-scroll hypothesis directly rather than only by
+axis-pattern inference. The idle-frame drift after the scroll is now also characterized: HRAM
+position keeps changing in discrete hold-then-jump steps with confirmed zero input (FakeKeys
+checked all-false), but in 2 fresh reproductions this session Link's own OAM sprite reads
+y=244 (hidden/off-screen) for nearly the entire drift -- the drift is NOT a visible sprite being
+pushed, more like unfinished scripted repositioning. UNRESOLVED: the earlier `south_jump` checkpoint
+shows the opposite (OAM visible, animating normally) during an otherwise similarly-shaped drift --
+not chased further this session per the anti-patch rule (3 probes already spent); see
+`room_labels['224/0']`'s "PER-FRAME MECHANISM PROBE" note for full detail and the new
+`lib_explorer_room224_post_scroll_hidden.dump` checkpoint. The south band's
 east extent from the original x=134,y=115 stop point (within 208/0 itself) is still unprobed.
 Candidates once resumed: a dedicated multi-sample OAM-tracking session for riverside_south_room's
 2 wandering figures (continuous per-frame position log, to actually catch genuine adjacency before
-pressing :a); a per-frame position/OAM log across 224/0's entry-point crossing and idle drift, to
-settle the auto-scroll-strip hypothesis; retest `riverside_screen`'s signpost with a positive
-control. Also deferred, not urgent: formalizing a
+pressing :a); reconciling why `south_jump`'s drift shows visible OAM against this session's two
+hidden-OAM reproductions (different entry edge into 224/0 is the leading unconfirmed guess); retest
+`riverside_screen`'s signpost with a positive control. Also deferred, not urgent: formalizing a
 navigation spec/format (raised by an external review, judged sound but not blocking); whether other
 already-"refuted" doors in this project deserve a re-look under the same off-tile-grid-alignment
 hypothesis now confirmed for house2 (not yet tested elsewhere -- one confirmed case, not yet a
@@ -195,18 +202,18 @@ own data model), not something to implement ad hoc.
   mapping between the two without re-deriving it; which tile group is which pre-tested creature
   is unresolved.
 - Don't assume a stable `room_id`/`map_id` means "same screen" -- `224/0`
-  (riverside_south_river_room) visually renders as 2 distinct screens under that one room_id, and
-  a single `Navigator.move!` step between them jumped ~94-115px in one axis (see
-  `room_labels['224/0']`). Check the screenshot, not just the room key, before concluding nothing
-  moved. Also unresolved there: position drifted over idle frames with zero input held -- don't
-  read that as a script bug before checking the room's own footage.
-- Don't assume 224/0's entry-point jump is specific to one direction (`:down`) -- confirmed
-  September 10 2026 that all 4 directions from the entry point (x=104,y=141) trigger it, with a
-  consistent axis pattern (vertical input leaves x fixed, horizontal input leaves y near-fixed) --
-  see `room_labels['224/0']`'s "FIRST REAL INVESTIGATION" note. Don't expect a fixed
-  `Navigator.move!` tap count for 208/0->224/0->225/0 either -- 2 independent runs crossed into
-  225/0 after 3 and 7 total `:right` taps respectively; the reliable procedure is "keep tapping
-  and check room_id after each," not a fixed count.
+  (riverside_south_river_room) visually renders as 2 distinct screens under that one room_id via a
+  genuine SCY hardware scroll (confirmed by direct telemetry, not just inference -- see
+  `room_labels['224/0']`'s "PER-FRAME MECHANISM PROBE"), triggered by any of the 4 directions from
+  the entry point (x=104,y=141), not just `:down`. Don't expect a fixed `Navigator.move!` tap count
+  for 208/0->224/0->225/0 either -- 2 independent runs crossed into 225/0 after 3 and 7 total
+  `:right` taps respectively; the reliable procedure is "keep tapping and check room_id after each."
+  The post-scroll idle drift (position changes over hundreds of frames with confirmed zero input)
+  is stepwise, not a smooth current, and in 2 fresh reproductions happens while Link's own OAM
+  sprite is hidden (y=244) -- don't read a visible, moving Link sprite into this without checking
+  OAM directly. Don't re-attempt a fresh reproduction chasing why `lib_explorer_room224_south_jump`
+  (an earlier, differently-sourced checkpoint) shows visible OAM during its own drift instead --
+  already 3 probes deep on this specific sub-question this session, stopped per the anti-patch rule.
 - `225/0`'s signpost (the room's only known interactive object, "Attention aux oursins !") is
   resolved -- don't re-approach it expecting an item; it's a hazard warning, not a chest, and
   produces no HUD/inventory change.
