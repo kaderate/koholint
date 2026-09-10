@@ -94,13 +94,6 @@ first (no real save is at risk -- `main.dump` is untouched -- but it's a sign th
 combat, not just dialogue, and blind chasing risks a checkpoint "death" state nobody's checked the
 game's handling of yet).
 
-## Paradigm to question (anti-patch, house2_interior) -- RESOLVED September 9 2026
-
-house2_interior's door was FOUND and CONFIRMED: not a wider `MAX_TAPS`, but an ~8px trigger column
-narrower than the 16px grid the earlier BFS reasoned in. Full evidence and the corrected route in
-`data/ram_registry.json`'s `world_topology.room177_exits` (search "DOOR FOUND AND CONFIRMED").
-Kept here only as a worked example of the anti-patch rule paying off -- no open action remains.
-
 ## Next question
 
 Paused, awaiting the owner's go-ahead (explicit "arrête-toi et ping moi" checkpoint). Session 4
@@ -187,7 +180,9 @@ own data model), not something to implement ad hoc.
   cache-respecting-only sweep). Check real room identity after every edge's actual move, not only
   on a classifier cache miss.
 - Don't re-run another BFS/walkability-map sweep on villager_screen looking for house2's door --
-  see "Paradigm to question" above, the mechanism itself was exhausted, not one attempt short.
+  already found and confirmed (see the State section above and `data/ram_registry.json`'s
+  `world_topology.room177_exits`); the BFS's 16px grid couldn't land on the actual ~8px trigger
+  column, not a case of the mechanism needing one more attempt.
 - Don't re-scan the BG tilemap looking for crate_room's objects -- confirmed dead end, it only
   holds floor decoration + the dialogue scratch-tile range while text is open. Its 9 objects
   (`tile=0x58`) are OAM sprites: 8 in the visible 2x4 floor grid (OAM y=48/96, x=28/60/108/140) +

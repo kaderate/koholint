@@ -1024,3 +1024,15 @@ all confirmed. Don't trust an OAM read showing another room's tile IDs (e.g. bui
 0x78/0x7a) as evidence those NPCs are present elsewhere -- confirmed stale/hidden leftover slots
 in both riverside_screen and room208 this session, not real content.
 ```
+
+---
+
+## Paradigm to question, RESOLVED -- house2_interior door found (September 9, 2026)
+
+house2_interior's door was FOUND and CONFIRMED: not a wider `MAX_TAPS`, but an ~8px trigger column
+narrower than the 16px grid the earlier BFS reasoned in. Full evidence and the corrected route in
+`data/ram_registry.json`'s `world_topology.room177_exits` (search "DOOR FOUND AND CONFIRMED"). This
+stood in `NEXT.md` as a worked example of the anti-patch rule paying off, until archived here per
+`METAPLANNER.md#MP8` (September 10, 2026) once its content was fully covered by `NEXT.md`'s own
+State section (house2_interior's FOUND-AND-CONFIRMED paragraph), which already restates the
+outcome and the corrected-route pointer on its own.

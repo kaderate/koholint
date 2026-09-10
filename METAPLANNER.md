@@ -222,3 +222,52 @@ against the timeout (e.g. because per-step cost is unmeasurable or unpredictable
 environment), prose asking the subagent to compute the budget isn't sufficient -- the fix needs a
 mechanical guard (e.g. a helper wrapper that always sets an explicit conservative per-batch
 `timeout` and hard-caps its own batch count) instead of restating the rule.
+
+## MP8: archive-on-resolution rule for `NEXT.md`, plus a one-time archival pass on house2_interior
+
+**Date**: September 10, 2026. Resolves `METAPLANNER_ESCALATIONS.md#ESC6`.
+
+**Context**: `NEXT.md` had grown to 239 lines despite `MP4`'s classification test, which routes
+*new* content to the right file at write time but has nothing to say about content that starts
+current and later *becomes* historical without any new line being added -- e.g. the
+house2_interior "Paradigm to question" section, marked RESOLVED September 9, was still sitting in
+`NEXT.md` in full, explicitly "kept ... as a worked example", instead of moving to
+`docs/archive/SESSION_LOG.md` (which `AGENTS.md` already designates for exactly this kind of
+resolved history, and which every other past session report already lives in). This is a
+timing gap in `MP4`'s test, not evidence the test itself is too permissive: it was never asked to
+watch content already written for a later change of status.
+
+**Options considered**:
+1. Treat this as `MP4`'s invalidation condition firing and tighten that test (e.g. a mechanical
+   line-count lint). Rejected: the test isn't the problem -- it correctly keeps genuinely-durable
+   conventions out of `NEXT.md` at write time. The gap is a missing *second* rule for a different
+   trigger (status change, not authorship), not a flaw in the first rule to fix by making it
+   stricter.
+2. A hard `NEXT.md` line-count cap enforced some other way (pre-commit hook, CI check). Rejected:
+   out of mandate to design tooling unilaterally from a short MetaPlanner session (same reasoning
+   as `MP5`'s rejection of an automated pre-commit script), and doesn't say *what* to cut, just
+   that something must be -- the actual judgment call (is this section truly resolved, is its
+   content duplicated elsewhere) still needs a rule, not just a trigger.
+3. Do the retroactive full split of `NEXT.md`'s current content now, beyond just the one RESOLVED
+   section named in the escalation. Rejected: same reasoning as `MP4`'s rejected option 1 -- most of
+   `NEXT.md`'s bulk is legitimately current state/indicators/traps, not historical filler, and
+   sorting that out wholesale is a judgment-heavy pass better left to whoever is actively tracking
+   which lines are still load-bearing, not a blind cold pass from this role. The escalation named
+   one clear, uncontroversial candidate (a section explicitly marked RESOLVED, whose content is
+   already duplicated in the State section); scope the fix to that.
+4. **Chosen**: add a standing "archive on resolution" rule to `AGENTS.md` (companion to `MP4`'s
+   test, not a replacement) -- the session that marks a `NEXT.md` section resolved must move its
+   full text to `docs/archive/SESSION_LOG.md` in the same edit, fix any dangling cross-reference
+   left behind, and leave at most a one-line pointer in `NEXT.md` (or nothing, if the outcome is
+   already restated elsewhere, e.g. the State section). Do the house2_interior section itself as the
+   one-time worked example the escalation asked for: moved to `SESSION_LOG.md`'s end (matching its
+   existing chronological entry style), deleted from `NEXT.md`, and the one dangling "what not to
+   redo" cross-reference to it rewritten to point at the State section and the registry directly.
+   Net effect: 239 -> 234 lines -- a small cut, because most of the file's length is legitimately
+   current, not historical; the rule matters more than this single pass's line count.
+
+**Invalidation condition**: if a future session marks a `NEXT.md` section resolved and leaves it in
+place anyway despite this rule being written (the same failure mode `MP4` already had, one level
+up), prose isn't sufficient for this either -- the fix needs a mechanical check (e.g. a lint that
+flags any line containing "RESOLVED" still present in `NEXT.md`, or a pre-commit hook), not a
+restated rule.

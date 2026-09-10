@@ -107,7 +107,7 @@ doesn't fit, and fall back to `MP3`'s poll-synchronously rule if a call backgrou
 
 ## ESC6: NEXT.md still exceeds its one-page limit despite ESC2/MP4's classification test
 
-**Status**: open
+**Status**: resolved
 **Opened**: September 10, 2026, by planner session
 **Context**: `NEXT.md` is at 239 lines. `MP4`'s classification test ("would this line still be
 true once the current question is forgotten?") stops new content from being misfiled into
@@ -118,4 +118,7 @@ September 9, is still sitting in full in `NEXT.md` rather than having moved to
 history). The file needs an archival pass, not just a going-forward filter.
 **Why process, not domain**: purely about how `NEXT.md`'s own size is maintained over time, not a
 game fact.
-**Resolution** (MetaPlanner fills in):
+**Resolution**: -> `METAPLANNER.md#MP8`, added a standing "archive on resolution" rule to
+`AGENTS.md` (a resolved `NEXT.md` section moves to `docs/archive/SESSION_LOG.md` in the same edit
+that resolves it, dangling cross-references fixed, at most a one-line pointer left behind) and did
+the house2_interior section itself as the one-time worked example.

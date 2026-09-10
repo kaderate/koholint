@@ -79,6 +79,17 @@ morning after a night of autonomy, by a fresh session with no history.
   Process section, not there. `NEXT.md` holds only what's bound to the current state of exploration:
   indicators, decisions-in-force pointers, the next question, and a bounded "what not to redo" list
   of recent traps. See `METAPLANNER.md#MP4`.
+- **Archive on resolution, not just classify on write**: the test above governs content at the
+  moment it's *written*. It says nothing about content that later *becomes* historical without
+  anyone adding a new line -- a "Paradigm to question" section reaching RESOLVED, a state paragraph
+  superseded by a newer one. The same session that marks such a section resolved must, in that same
+  edit, move its full text to `docs/archive/SESSION_LOG.md` (append at the end, chronological, in
+  that file's existing entry style) and either delete it from `NEXT.md` outright or leave at most a
+  one-line pointer -- never keep it in place "as a worked example" or "for reference". Before
+  deleting, check for and fix any other line in `NEXT.md` that cross-references the section being
+  archived (e.g. "see 'Paradigm to question' above"), since the archival makes that pointer dangle.
+  If the outcome is already fully restated elsewhere in `NEXT.md` (commonly the State section),
+  archiving loses nothing left to know. See `METAPLANNER.md#MP8`.
 
 ### Goal metrics, not means metrics
 
