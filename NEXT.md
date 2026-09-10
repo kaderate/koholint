@@ -77,6 +77,40 @@ signature) -- `visual_catalog` entries carry a `hazard_status` field (`friendly`
   budget, exact report format). Never use `run_in_background`/Monitor inside an Explorer's own
   script -- run everything foreground/synchronous, it has gotten subagents stuck twice.
 
+## Quest hypothesis (current best guess + blocker)
+
+Standing field: the single leading hypothesis for "what unblocks progress next" and what's
+stopping it -- not a full quest log. Update in place when the leading guess changes; don't let
+this section grow into a history (that belongs in `docs/archive/SESSION_LOG.md`).
+
+**Current hypothesis (September 10, 2026)**: the next real objective is finding/obtaining a
+sword. Evidence: (1) bushes are CONDITIONALLY-blocked terrain (cuttable, not permanently blocked
+scenery) per the architecture question above; (2) two crate_room hint books already read
+describe sword mechanics -- `dialogues.crate_room_book_b` (a charge-and-release spin-attack
+technique) and `dialogues.crate_room_book_c` (items that can replace the sword slot in combat);
+(3) no sword is confirmed obtained (inferred from the books' own "once a sword is found" framing,
+not directly probed).
+
+**Blocker**: Link's equipped-item/inventory RAM location is not yet identified in
+`ram_registry.json` -- this hypothesis is inferred, not confirmed, because we can't yet read
+directly whether Link has a sword. Also unknown: whether a sword is sitting somewhere
+already-explored but unrecognized as one, or whether `shop_screen` (see in-flight work below)
+sells/gives one.
+
+**Not yet tried**: locating the inventory/equipped-item RAM bytes (would confirm/refute this
+hypothesis directly); folding in `shop_screen`'s exploration result once that subagent completes.
+
+## In-flight work (for resumability)
+
+As of September 10, 2026, two subagents were dispatched and may still be running or may have
+completed with results not yet folded in here -- check `ListAgents` before assuming either is
+idle or before re-dispatching a duplicate:
+- **D9 rollout on `well_platform` + `building_screen`** (visual-catalog survey, same method as
+  the `front_yard`/`villager_screen`/`crate_room`/`screen3_north` rollout already in
+  `DECISIONS.md`'s D9 entry).
+- **`shop_screen` interior exploration** -- looking for the project's first item/progress since
+  the Shield; directly relevant to the quest hypothesis above if it turns up a sword.
+
 ## Next question
 
 Paused, awaiting the owner's go-ahead (explicit "arrête-toi et ping moi" checkpoint). Session 4
