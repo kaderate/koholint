@@ -71,6 +71,29 @@ terrain source of truth, live-probing kept as fallback. Full rationale for each:
   budget, exact report format). Never use `run_in_background`/Monitor inside an Explorer's own
   script -- run everything foreground/synchronous, it has gotten subagents stuck twice.
 
+## Paradigm to question (anti-patch, mobile-sprite interaction testing) -- OPEN September 10 2026
+
+Three separate sessions across three different rooms have now failed to confirm interaction with
+a mobile creature, each for the same underlying reason: `Navigator`'s chase/approach helpers
+(`move!`, `nudge_axis!`) are built for static-target navigation and can't reliably land Link
+adjacent to something that's also moving before pressing `:a` -- `front_yard`'s wandering
+creature (September 9), `riverside_south_room`'s pale and tan figures (September 9-10, 4 attempts),
+and `224/0`'s "totem" -- actually a mobile enemy sprite, tile=0x60 (September 10). All three are
+recorded `interaction: inconclusive, not negative` -- never a confirmed refutation, just a
+navigation-access gap, every time. Per `AGENTS.md`'s anti-patch rule, this is the mandatory stop:
+the fourth room won't fix it either. **Owner must decide**: is it worth building a real
+intercept/chase primitive for `Navigator` (tracks the target's OAM position live, adjusts approach
+each step, not a single dead-reckoned move) -- a genuine new capability, out of autonomous scope
+per "Autonomy executes, it does not design" -- or is chasing mobile-sprite dialogue not worth the
+investment right now given everything reachable so far this way has been a hazard warning, not
+plot-critical content? Also worth noting as a data point: two of these sessions (`224/0`, `225/0`)
+saw Link's HUD hearts drop (3->1 in one case) with no OAM sprite adjacent in either snapshot around
+the hit -- consistent with contact damage from the same fast-moving creatures, unconfirmed, and a
+reason NOT to keep probing this area ad hoc in scratchpad checkpoints without the tooling fixed
+first (no real save is at risk -- `main.dump` is untouched -- but it's a sign this area has real
+combat, not just dialogue, and blind chasing risks a checkpoint "death" state nobody's checked the
+game's handling of yet).
+
 ## Paradigm to question (anti-patch, house2_interior) -- RESOLVED September 9 2026
 
 house2_interior's door was FOUND and CONFIRMED: not a wider `MAX_TAPS`, but an ~8px trigger column

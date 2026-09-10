@@ -104,3 +104,18 @@ trap, not a game fact.
 under the foreground timeout" subsection to `AGENTS.md`: estimate a chained batch's worst case
 against the timeout in effect before issuing it, split into sequential foreground calls when it
 doesn't fit, and fall back to `MP3`'s poll-synchronously rule if a call backgrounds anyway.
+
+## ESC6: NEXT.md still exceeds its one-page limit despite ESC2/MP4's classification test
+
+**Status**: open
+**Opened**: September 10, 2026, by planner session
+**Context**: `NEXT.md` is at 239 lines. `MP4`'s classification test ("would this line still be
+true once the current question is forgotten?") stops new content from being misfiled into
+`NEXT.md` going forward, but does nothing about content that was already there and has since
+become historical -- e.g. the house2_interior "Paradigm to question" section, marked RESOLVED
+September 9, is still sitting in full in `NEXT.md` rather than having moved to
+`docs/archive/SESSION_LOG.md` (which `AGENTS.md` already designates as the place for resolved
+history). The file needs an archival pass, not just a going-forward filter.
+**Why process, not domain**: purely about how `NEXT.md`'s own size is maintained over time, not a
+game fact.
+**Resolution** (MetaPlanner fills in):
