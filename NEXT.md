@@ -34,11 +34,11 @@ grids -- already fulfilled and recorded under D8 in `DECISIONS.md`; no other fil
 
 | Indicator | Value |
 |---|---|
-| Rooms found | 14 labeled in `data/ram_registry.json`'s `room_labels` (8 "charted", 6 "glimpsed"/less -- adds `169/16` house2_interior, September 9 2026). Graph and screenshots published in the Koholint Atlas artifact (not yet updated with the new room). D9 visual-catalog `visual_survey` now covers 4/14 (`front_yard`, `villager_screen` pilot + `crate_room`, `screen3_north` rollout, same day, autonomous session) -- see `DECISIONS.md`'s D9 entry. |
+| Rooms found | 16 labeled in `data/ram_registry.json`'s `room_labels` (8 "charted", 8 "glimpsed"/less -- adds `224/0` riverside_south_river_room and `225/0` riverside_flower_clearing, September 10 2026, south/east of `riverside_south_room`). Graph and screenshots published in the Koholint Atlas artifact (not yet updated with the 2 new rooms). D9 visual-catalog `visual_survey` now covers 4/16 (`front_yard`, `villager_screen` pilot + `crate_room`, `screen3_north` rollout, same day, autonomous session) -- see `DECISIONS.md`'s D9 entry. |
 | Dialogues / readable text | 12 confirmed entries in `ram_registry.json`'s `dialogues` (villager duo's shared line, room176's two save-mechanic NPC lines, crate_room's library fully read -- 4 books + 1 wall object, 9/9 tile objects resolved via OAM; house2_interior's 2 OAM-verified telephone objects, both hypothesis/verified_count 1, September 9 2026). |
 | Terrain / collision | D8 live: reads BG tilemap signatures from VRAM (`lib/terrain.rb`), 93.1%-validated against live-probe oracle. Primary method; live probing kept as fallback. |
 | Save/continue | Mechanically verified end-to-end: hold A+B+START+SELECT opens the real save menu, "SAUVEGARDER & QUITTER" writes a real `.sav` (MD5-diffed), "REVENIR AU JEU" continues at the room's own door. This is the durable-progress path -- see "Standing conventions" below. |
-| Current position | `/tmp/zelda_checkpoints/main.dump` (continuous session state, not versioned -- see below), last saved September 8 17:05, around `riverside_south_room` (208/0) -- explored past the entrance September 9 2026 (world_topology.riverside_south_room_survey), but `main.dump` itself is untouched (Explorer scratchpad checkpoints only), so Link's real saved position is still right at the entrance. |
+| Current position | `/tmp/zelda_checkpoints/main.dump` (continuous session state, not versioned -- see below), last saved September 8 17:05, around `riverside_south_room` (208/0) -- explored past the entrance September 9 2026 (world_topology.riverside_south_room_survey) and its real south exit found September 10 2026 (world_topology.riverside_south_room_south_exit, leads to `224/0`), but `main.dump` itself is untouched (Explorer scratchpad checkpoints only), so Link's real saved position is still right at the entrance. |
 
 ## Decisions in force
 
@@ -103,7 +103,12 @@ entrance, same day: its two entrance figures turned out to be mobile/wandering (
 4 interaction attempts across the session found no dialogue but never confirmed genuine
 adjacency at the press -- INCONCLUSIVE, not negative, same call already made once for
 front_yard's wandering creature; see `world_topology.riverside_south_room_survey`. Its south band
-(an S-curved paved path) is only partly mapped, not a priority to finish alone. Candidates once
+(an S-curved paved path) has its south exit FOUND September 10 2026 -- a single move south crosses
+into `224/0` (riverside_south_river_room, see `world_topology.riverside_south_room_south_exit`),
+which itself has an unresolved anomaly (visually distinct 2nd screen under the SAME room_id, plus
+idle-frame position drift with no input held -- not explained, not a priority to chase alone) and
+leads on to a 3rd room glimpsed only (`225/0`). The south band's east extent from the original
+x=134,y=115 stop point is still unprobed. Candidates once
 resumed: a dedicated multi-sample OAM-tracking session for riverside_south_room's 2 wandering
 figures (continuous per-frame position log rather than isolated snapshots, to actually catch
 genuine adjacency before pressing :a); retest `riverside_screen`'s signpost with a positive
@@ -188,3 +193,9 @@ own data model), not something to implement ad hoc.
   moving patterns, not the room's existing 3-creature narrative count -- don't assume a 1:1
   mapping between the two without re-deriving it; which tile group is which pre-tested creature
   is unresolved.
+- Don't assume a stable `room_id`/`map_id` means "same screen" -- `224/0`
+  (riverside_south_river_room) visually renders as 2 distinct screens under that one room_id, and
+  a single `Navigator.move!` step between them jumped ~94px in one axis (see
+  `room_labels['224/0']`). Check the screenshot, not just the room key, before concluding nothing
+  moved. Also unresolved there: position drifted over idle frames with zero input held -- don't
+  read that as a script bug before checking the room's own footage.
