@@ -133,8 +133,12 @@
     },
     "163/16": {
       "label": "starting_house",
-      "description": "Single static interior screen (no scrolling), where Link spawns. Legacy-inherited name. Oracle-mapped in detail (37 cells).",
-      "status": "charted"
+      "description": "Single static interior screen (no scrolling), where Link spawns. Legacy-inherited name. Oracle-mapped in detail (37 cells). Full OAM table read (0xFE00-0xFE9F) September 10 2026 across 4 checkpoints (starting_house_settled, near_tarkin, after_dialogue, lib_after_shield_interior -- all confirmed room_id=163/map_id=16 by direct read, not assumed) found exactly 2 non-Link interactive sprite groups (plus Link's own 2-tile sprite, a hidden always-offscreen slot0 leftover, and a dialogue-box 'more text' arrow icon at slot6, visible only while a text box is open): a static NPC beside the east-side bench/table (tile=0x58/0x5a, OAM ~y=80,x=120/128, same tile family as crate_room's readable book objects) and a second static-appearing NPC near the beds on the room's west side (tile=0x6c/0x6e, alternating with 0x68/0x6a in an unused double-buffer slot -- overlaps the tile range of the confirmed-hostile riverside creature family, but position was identical across 3 independently-saved checkpoints from different sessions and a direct approach produced no HUD-heart change or position knockback, so treated as a distinct friendly character, not that hostile family, pending a proper live mobility diff -- 0xFF/uninitialized OAM reads after any wait_frames idle wait blocked a same-session live-diff attempt, see visual_survey below). Both were reached and given fresh :a presses this session -- see dialogues.starting_house_npc_bench and dialogues.starting_house_npc_beds.",
+      "status": "charted",
+      "visual_survey": {
+        "as_of": "lib_after_shield_interior.dump / B_approach.dump, September 10 2026, isolated Explorer subagent",
+        "method_note": "OAM reads immediately after Motherboard.load or a Navigator.tap are reliable; a read taken after CheckpointSupport.wait_frames-only idle progression (no tap) came back as all-0xFF (uninitialized/open-bus pattern) across 2 samples 60f apart -- matches the pre-existing PPU-bus-gating artifact noted in wram_unmapped.intro_door_gate's root_cause entry. Do not trust an OAM read taken after a pure idle wait; read right after a real tap or directly from a freshly loaded checkpoint instead. This blocked a proper D9 multi-sample mobility diff on the beds NPC this session -- its 'static' classification rests on cross-checkpoint position agreement, not a live diff."
+      }
     },
     "178/0": {
       "label": "overworld_screen2",
@@ -502,6 +506,30 @@
       "trigger": "from the room's entry point (x=18,y=48), Navigator.move!(:right) x1 then Navigator.move!(:up) x2 (second :up read :blocked but still registered dir=2/up and closed most of the remaining gap, landing at x=35,y=42, directly below/against the sign's base) then :a.",
       "text": "Attention aux oursins!",
       "note": "Single-page dialogue box, closed after 2 :a presses (clear_dialogue! with probe_direction: :down). This is the object previously described in room_labels['225/0'] as a 'brown box/chest-like object' from a glimpse-only screenshot -- APPROACHED AND CONFIRMED this session to be a signpost, not a chest: no item-get animation/fanfare, no HUD/inventory change (B-slot shield+N1, A-slot empty, rupee counter 000, hearts all unchanged before/after, compared across screenshots). The warning text corroborates the room's spiky round OAM sprites (tile=0x5C/0x5E pairs) being 'oursins' (sea urchins), a hazard near the room's water strip -- game content noted as observed text only, no assumption made about actual gameplay consequence (e.g. damage on contact) since that wasn't tested."
+    },
+    "starting_house_npc_bench": {
+      "status": "hypothesis -- isolated Explorer subagent, September 10 2026, single session, real Navigator.tap/tap_button calls and rendered-framebuffer transcription. Not yet independently reconfirmed.",
+      "source": "screen_render_verified",
+      "verified_count": 1,
+      "confidence": "hypothesis",
+      "room_id": 163,
+      "map_id": 16,
+      "object_note": "static 2-tile OAM sprite (tile=0x58/0x5a, attrs=0x2) beside the room's east-side bench/table, identical position (OAM y=80,x=120/128) across all 4 on-file checkpoints standing in this room.",
+      "trigger": "from lib_after_shield_interior.dump (Link already adjacent, HRAM x=102,y=76), Navigator.tap(:right) to face it (moved 2px, to x=104, then bumped), then Navigator.tap_button(:a); dialogue box opens at the TOP of the screen (speaker is below/right of it) and is multi-page, advanced with repeated :a presses.",
+      "text": "Au fait ! Y'a un autre bidule qui est resté sur la plage. Si tu y vas, fais attention aux monstres ! Car, depuis que t'es ici, [nom vide/non rendu], des monstres y'en a partout !",
+      "note": "Repeat-trigger dialogue (this is what a fresh :a press produces now, from a save state already past the room's very first encounter) -- NEW text, not previously in this registry. A DIFFERENT, older on-file checkpoint (near_tarkin.dump, from an early September 7 2026 session, inspected via its existing screenshot only, not re-triggered this session) shows a one-time-looking greeting instead: 'Salut [blank] ! T'es réveillé...' ('Hi [blank]! You're awake...') -- the name slot renders blank/truncated in both lines, an apparent text-variable rendering gap, not further investigated. The two lines are evidence of a story-flag-gated dialogue table (first-meeting vs. repeat), not randomness -- consistent with lib_after_shield_interior being chronologically later than near_tarkin/after_dialogue. English gloss of the repeat line: 'By the way! There's another thingy that stayed on the beach. If you go there, watch out for monsters! Because since you got here, monsters, there's some everywhere!'. Mentions 'un bidule' (an unspecified thingy/item) left on the beach and repeatedly warns about monsters south/on the beach -- no explicit mention of a sword or weapon; relevant to NEXT.md's quest hypothesis only as a pointer toward the beach, not a confirmation. Did not test whether further :a presses past this multi-page text cycle back to page 1 or exhaust to a no-op; stopped after the full text was captured (budget)."
+    },
+    "starting_house_npc_beds": {
+      "status": "hypothesis -- isolated Explorer subagent, September 10 2026, single session, real Navigator.move!/tap/tap_button calls and rendered-framebuffer transcription. Not yet independently reconfirmed.",
+      "source": "screen_render_verified",
+      "verified_count": 1,
+      "confidence": "hypothesis",
+      "room_id": 163,
+      "map_id": 16,
+      "object_note": "static-appearing 2-tile OAM sprite (tile=0x6c/0x6e, attrs=0x21) standing alone in the open floor near the two beds on the room's west side -- see room_labels['163/16'] for the tile-family caution (overlaps the confirmed-hostile riverside creature tile range, but this sprite showed no knockback/heart-loss on approach or contact, unlike that family).",
+      "trigger": "from lib_after_shield_interior.dump, Navigator.move!(:up) x2 then Navigator.move!(:left) x2 (last call reported :blocked but position still advanced from x=94 to x=90 -- a real, if partial, step, not a no-op) landed Link at (x=90,y=60), directly beside the sprite at (x=80-88,y=56); Navigator.tap(:left) to face it, then Navigator.tap_button(:a). Dialogue box opens at the BOTTOM of the screen (speaker is above/left of it), multi-page.",
+      "text": "Suis la route du Sud, vers la plage là où je t'ai trouvé. Depuis que tu as échoué ici, des monstres terribles rôdent dans le coin. Sois prudent...",
+      "note": "Entirely new dialogue, not previously on file for this room (starting_house had zero dialogue entries before this session). English gloss: 'Follow the road to the South, towards the beach where I found you. Since you washed up here, terrible monsters have been prowling around here. Be careful...'. Confirms Link arrived at/near this beach (matches starting_house_npc_bench's 'depuis que t'es ici' framing) and independently repeats the same beach + monster warning as the bench NPC -- two different characters both pointing south, toward the beach. No sword/weapon mention. HUD hearts (0xDB5A) read 24 before and after the whole interaction, no change -- no combat/knockback signal, consistent with a friendly NPC. After the 5-page text closed, one more :a press (Link still facing the NPC) reopened the SAME page-1 line rather than anything new (checked once), so this NPC's dialogue is a short repeating loop, not story-progressing content. Position agreed exactly across 3 independently-saved checkpoints (near_tarkin, after_dialogue, lib_after_shield_interior) from different past sessions, but no same-session live OAM mobility diff was obtained (see room_labels['163/16'].visual_survey's method_note on the wait_frames OAM-read artifact) -- 'static' is a cross-checkpoint inference, not a direct multi-sample confirmation."
     }
   },
   "visual_catalog": {
