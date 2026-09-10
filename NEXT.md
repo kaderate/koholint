@@ -95,6 +95,27 @@ first (no real save is at risk -- `main.dump` is untouched -- but it's a sign th
 combat, not just dialogue, and blind chasing risks a checkpoint "death" state nobody's checked the
 game's handling of yet).
 
+**Owner's decision, September 10 2026**: middle ground, not either extreme -- don't build a real
+`lib/navigator.rb` chase primitive yet, but authorize exactly ONE bespoke, throwaway attempt using
+a genuinely different method (a tight per-tap loop re-reading the target's live OAM position every
+iteration, instead of `move!`/`nudge_axis!`'s single dead-reckoned computation). Result (see
+`data/ram_registry.json`'s `world_topology.riverside_south_room_adaptive_chase_experiment`,
+targeting `riverside_south_room`'s tan/brown creature): the method DID reach measured adjacency
+for the first time across all 5 attempts on this family of creatures (dx=-7,dy=3 on a fresh
+re-read, iteration 13/18) -- real evidence the adaptive approach itself works better than dead
+reckoning at keeping pace with a wandering target. But the `:a` press still produced no dialogue
+box, and the session surfaced a separate, more fundamental confound: Link's own HRAM position
+jumped unexpectedly (up to ~20px) on ordinary single taps and even between the adjacency check and
+the `:a` press itself -- the same unexplained "diagonal slide" phenomenon already flagged
+elsewhere in this project (`room_labels['225/0']`'s NE-route note), not something a chase
+primitive alone would fix. **Net assessment for a future real-tooling decision**: the live-tracking
+method looks worth formalizing into `lib/navigator.rb` if mobile-sprite interaction becomes a
+priority, but the Link-position-jump confound should be investigated first (or alongside), since it
+undermines the guarantee that reaching measured adjacency means the press actually lands there.
+This was the one authorized exception -- per the anti-patch rule at the meta level, this is the
+fourth and final data point on this question for now; no further creature/room attempts without a
+new owner decision.
+
 ## Next question
 
 Paused, awaiting the owner's go-ahead (explicit "arrête-toi et ping moi" checkpoint). Session 4
