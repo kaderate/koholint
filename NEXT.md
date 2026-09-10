@@ -149,15 +149,16 @@ checked so far). Important caveat on file: a direct `mmu.write` to `0xDB5A` does
 visible HUD heart icons (they only redraw via the game's own damage-handling code) -- read this
 byte directly, don't trust the on-screen hearts after a manual write.
 
-**RESOLVED, September 10 2026 (owner decision, now D12 in `DECISIONS.md`)**: RAM writes to HP
-(or any other gameplay-state byte) are case-by-case, asked every time -- NOT a standing tool for
-pushing past this specific blocker. So the Plage Coco thread stays genuinely paused until either a
-real in-game heal is found, a route around the hostile creature is found, or the owner explicitly
-approves a write for that specific push. `shop_screen`'s door and `overworld_screen2`'s south edge
-are the safer, unblocked fronts in the meantime. `shop_screen` is otherwise RESOLVED not to be
-this session's answer -- its yard held only a recycled-dialogue NPC and a decorative object, no
-item, and its actual interior (behind the "MAGASIN" door) was never reached -- see Next question
-below.
+**RESOLVED, September 10 2026 (owner decision, D12 in `DECISIONS.md`)**: RAM writes to HP are
+case-by-case by default. **AMENDED same day**: the owner then granted a SCOPED standing approval
+specifically for this thread ("Oui pour toute poussée nécessaire à la découverte de l'épée, sur la
+plage coco") -- HP writes on scratch checkpoints no longer need a fresh ask for each individual
+Plage Coco push, though every other room/purpose still does. IMPORTANT: don't read "Plage Coco
+paused" as "abandoned" in any future summary -- this remains the project's single strongest lead
+(both starting_house NPCs, the game's own place name, the signpost). A prior status report
+conflated "paused pending a specific ask" with "closed/exhausted" and the owner caught it --
+logged as `METAPLANNER_ESCALATIONS.md`'s ESC7. A follow-up push using this new permission is now
+running -- see In-flight work below.
 
 `shop_screen`'s door, retry 3 is DONE (September 10 2026) -- CLOSED, anti-patch budget spent, do
 not attempt a 4th routing try. Both the NPC-east/NE route and the hedge-maze route failed cleanly
@@ -175,7 +176,12 @@ retest before assuming it needs a whole new route.
 
 ## In-flight work (for resumability)
 
-Nothing dispatched as of this update (September 10, 2026, ~19:00 UTC).
+As of September 10, 2026, ~19:00 UTC, one subagent is dispatched -- check `ListAgents` before
+assuming it is idle or before re-dispatching a duplicate:
+- **Plage Coco push, with HP-write permission** -- resuming from the prior session's checkpoint
+  chain (`lib_226_*.dump`/`lib_224_*.dump`) to sweep `226/0`'s unswept NW corner and `224/0`'s area
+  past x=68,y=48, now allowed to top up HP via `0xDB5A` under D12's September 10 amendment
+  (scratch checkpoints only, scoped to this cluster/goal). Looking for the "bidule".
 
 **Bush contact/`:a` test is DONE (September 10 2026, Explorer session)** -- first-ever direct
 interaction test on a bush, not another door-routing attempt. From `lib_shop_wide3.dump`
