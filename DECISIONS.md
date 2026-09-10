@@ -349,3 +349,11 @@ to be ratified), `taken without validation` (inherited from the spike, to be rev
 - **Invalidated if**: the owner later grants a standing blanket approval for a specific mechanic
   (e.g. "always top up HP before an Explorer session, no need to ask") -- until then, default to
   asking.
+- **Amendment (September 10, 2026, same day)**: the owner granted a SCOPED standing approval,
+  narrower than a full blanket ("Oui pour toute poussée nécessaire à la découverte de l'épée, sur
+  la plage coco") -- HP writes via `0xDB5A` on scratch checkpoints (never `main.dump`) no longer
+  need a fresh ask for each individual push into the "Plage Coco" cluster (`riverside_ne_cove`
+  226/0, `riverside_south_river_room` 224/0, `riverside_flower_clearing` 225/0) specifically in
+  service of the sword-hypothesis search there. This does NOT extend to any other room, mechanic,
+  or goal -- a write to unblock a different room, or for a purpose unrelated to finding the sword
+  lead, still needs its own ask under the base rule above.
