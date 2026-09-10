@@ -34,7 +34,7 @@ grids -- already fulfilled and recorded under D8 in `DECISIONS.md`; no other fil
 
 | Indicator | Value |
 |---|---|
-| Rooms found | 19 labeled in `data/ram_registry.json`'s `room_labels` (8 "charted", 11 "glimpsed"/less -- `224/0` riverside_south_river_room and `225/0` riverside_flower_clearing, south/east of `riverside_south_room`, both further explored (224/0's scroll mechanism and "totem" identity resolved, 225/0's ground-accessible extent mapped plus its NE route now resolved into a real room transition); `209/0` riverside_east_room, found east of `riverside_south_room`'s south band (past the prior x=134,y=115 stop point), single-glance only, September 10 2026; `179/0` shop_screen, first actually explored September 10 2026 -- turns out to be the shop's EXTERIOR yard, not its interior; see `world_topology.shop_screen_door_approach` and Next question below; `226/0` riverside_ne_cove, NEW September 10 2026 -- reached from `225/0`'s previously-abandoned NE route, entry point only, see Next question below). Graph and screenshots published in the Koholint Atlas artifact (not yet updated with these rooms or this session's findings). D9 visual-catalog `visual_survey` now covers 6/19 (`front_yard`, `villager_screen` pilot + `crate_room`, `screen3_north` rollout + `well_platform`, `building_screen` rollout, fresh restart of an abandoned attempt, September 10 2026) -- see `DECISIONS.md`'s D9 entry. |
+| Rooms found | 19 labeled in `data/ram_registry.json`'s `room_labels` (8 "charted", 11 "glimpsed"/less -- `224/0` riverside_south_river_room and `225/0` riverside_flower_clearing, south/east of `riverside_south_room`, both further explored (224/0's scroll mechanism and "totem" identity resolved, 225/0's ground-accessible extent mapped plus its NE route now resolved into a real room transition); `209/0` riverside_east_room, found east of `riverside_south_room`'s south band (past the prior x=134,y=115 stop point), swept west/center this session (September 10 2026), east half still unreached; `179/0` shop_screen, first actually explored September 10 2026 -- turns out to be the shop's EXTERIOR yard, not its interior; see `world_topology.shop_screen_door_approach` and Next question below; `226/0` riverside_ne_cove, NEW September 10 2026 -- reached from `225/0`'s previously-abandoned NE route, entry point only, see Next question below). Graph and screenshots published in the Koholint Atlas artifact (not yet updated with these rooms or this session's findings). D9 visual-catalog `visual_survey` now covers 6/19 (`front_yard`, `villager_screen` pilot + `crate_room`, `screen3_north` rollout + `well_platform`, `building_screen` rollout, fresh restart of an abandoned attempt, September 10 2026) -- see `DECISIONS.md`'s D9 entry. |
 | Dialogues / readable text | 14 confirmed entries in `ram_registry.json`'s `dialogues` (villager duo's shared line, room176's two save-mechanic NPC lines, crate_room's library fully read -- 4 books + 1 wall object, 9/9 tile objects resolved via OAM; house2_interior's 2 OAM-verified telephone objects; `riverside_flower_clearing_sign` (225/0) -- a signpost reading "Attention aux oursins !", NOT a chest/item; `shop_screen_yard_npc` (179/0) -- a friendly yard NPC reciting the SAME save-tip line as room176's pair, first confirmed case of a reused dialogue asset, September 10 2026 -- all hypothesis/verified_count 1). |
 | Terrain / collision | D8 live: reads BG tilemap signatures from VRAM (`lib/terrain.rb`), 93.1%-validated against live-probe oracle. Primary method; live probing kept as fallback. |
 | SELECT map (fog-of-war) | Widest-coverage checkpoint: `lib_explorer_225_fresh_entry.dump` (8 lit cells, superset of `main.dump`'s own 6). 6/8 cells now have a place name read from a checkpoint standing IN that exact cell's room ("Village des Mouettes", "Bibliothèque", "Sud du Village" x2 -- `176/0` and `192/0` share it, "Plage Coco" x2), `select_map_screen`'s SEVENTH + EIGHTH SESSION entries (`192/0` riverside_screen closed EIGHTH SESSION, new working route: nudge x to ~88 from `room176_entry_from_room160.dump`, then plain `:down` taps, no special alignment needed -- corrects the earlier "x=94, 8 calls" figure, which doesn't reproduce). Remaining 2 cells (the chain's earliest 2 rooms) confirmed NOT free-readable from any on-file checkpoint (checked EIGHTH SESSION) -- would need a from-boot replay. Scratchpad images ready for the Atlas (`select_map_full_*.png`), not yet pulled in. |
@@ -176,6 +176,18 @@ place name) is NOT invalidated by this -- only the specific guess that the item 
 these three rooms' already-glimpsed corners is looking weaker. Full route detail: `room_labels`'s
 "THIRD PUSH"/"FOURTH PUSH" addenda and "In-flight work" below.
 
+**UPDATE 5, September 10 2026 (same day, follow-up Explorer session, `riverside_east_room`/209/0's
+first full sweep)**: still NO "bidule" found. This was the last untested ground in Plage Coco (the
+rest of the cluster was exhaustively swept per UPDATE 4) -- roughly its west half and center are
+now swept clean too (only the hostile creature family, a non-interactive flower wall, hedge, and
+unentered water found), but its east half and north-of-hedge area remain genuinely unreached, not
+ruled out: a 2-creature pocket in the room's center blocked every push this session (6+ distinct
+attempts, closed under the anti-patch rule). **This continues to weaken, without fully closing, the
+"bidule is in an already-glimpsed corner of Plage Coco" reading** -- the cluster's ground truly
+still unswept is now down to just two small pockets: `226/0`'s east/south side past x=46,y=26, and
+`209/0`'s east half past its center creature pocket. The sword-hypothesis lead itself is still not
+invalidated. Full detail: `room_labels['209/0']` and "In-flight work" below.
+
 `shop_screen`'s door, retry 3 is DONE (September 10 2026) -- CLOSED, anti-patch budget spent, do
 not attempt a 4th routing try. Both the NPC-east/NE route and the hedge-maze route failed cleanly
 (hedge maze turns out to be `shop_screen`'s own north boundary, connecting to the already-known
@@ -192,23 +204,39 @@ retest before assuming it needs a whole new route.
 
 ## In-flight work (for resumability)
 
-As of September 10, 2026, ~20:15 UTC, one subagent is dispatched -- check `ListAgents` before
-assuming it is idle or before re-dispatching a duplicate:
-- **`riverside_east_room` (209/0) full exploration** -- this room has NO `room_labels` entry at
-  all yet, single-glance only. Leading candidate for the "bidule" now that the rest of the Plage
-  Coco cluster (`224/0`/`225/0`/`226/0`) is exhaustively swept with nothing found. Clue-directed
-  (see `dialogues.starting_house_npc_bench`/`starting_house_npc_beds`), explicitly told to also
-  test non-OAM `:a` interactions, not just scan sprites (per this project's own house2/225-0
-  precedent). Has D12-scope HP-write permission for this cluster.
-  **NOTE**: a first dispatch of this exact task (agentId `a56b5bf024fd34d81`) was LOST to a
-  container restart before it reported or committed anything -- this is a clean restart, not
-  something to resume/merge with. If `a56b5bf024fd34d81` ever surfaces a late notification, it can
-  be safely ignored (nothing was in flight for it to have produced).
+Nothing dispatched as of this update (September 10, 2026, ~23:00 UTC).
+
+**`riverside_east_room` (209/0) full exploration is DONE (September 10 2026, clean redispatch after
+the earlier container-restart loss noted below)** -- still NO "bidule" found, but the room now has
+a full `room_labels['209/0']` entry (previously none at all) and its connection to `208/0` is
+pinned down precisely: a plain horizontal transition on the shared y=115 row, confirmed BOTH
+directions now (`world_topology.riverside_south_room_east_exit` promoted to `verified`,
+`verified_count: 2`). Swept roughly the room's west half and center (entry column, the west
+river-edge dead-end pocket, and a creature-infested center pocket up to about x=94,y=74) -- found
+only environmental hazards (2+ instances of the same tile=0x60-family hostile creature already
+known from the rest of Plage Coco), a non-interactive flower-cluster wall (`:a` tested, no effect),
+hedge, and unentered water. The room's east half (past x~95, including the hedge-bounded north
+area) is CLOSED for this session under the anti-patch rule -- 6+ distinct attempts to push past the
+2-creature center pocket all oscillated without net progress; a future session wanting the rest of
+this room needs a genuinely different tactic (e.g. a real intercept/avoidance primitive, per
+`world_topology.riverside_south_room_adaptive_chase_experiment`'s assessment), not another straight
+push. HP-write permission (D12 Plage Coco amendment) used twice (`0xDB5A` 8->24 each time, both on
+scratch checkpoints, both logged with cause) plus one no-op call (already at max, logged anyway for
+transparency). Full detail in `room_labels['209/0']`. See "Quest hypothesis" below for what this
+means for the sword lead.
 
 **Container restart, September 10 2026, ~20:15 UTC**: this session's container restarted, killing
 all in-flight subagents with no loss to git (last commit `0856ffe` survived) or to
 `/tmp/zelda_checkpoints/` (survived intact, 278 files). Lost work: the first 209/0 dispatch above
 (no progress had been saved) and the already-considered-abandoned D9-rollout zombie
+**CORRECTION (September 10 2026, this session's redispatch)**: "no progress had been saved" was
+not quite right -- 8 stray `lib_e209_*.dump`/1 `.png` checkpoints timestamped 22:05-22:19 (just
+before the restart) survived in `/tmp/zelda_checkpoints/` from that lost dispatch, reaching the
+same west dead-end pocket (x=4-6,y=90-112) this session independently reached too. Not treated as
+authoritative (per this session's "clean fresh start" mandate, everything in `room_labels['209/0']`
+was independently re-derived), but inspected for orientation and cross-checked: no item visible in
+any of them either, consistent with this session's own findings. Worth noting for a future cold
+reviewer so "no progress saved" isn't taken as literally zero trace on disk.
 (`a1ace155a0a80c4b1`, moot -- superseded by its own fresh restart hours earlier, `53afb77`).
 Also lost: two unrecognized background shell watchers referencing task ids `be9wylr1b`/`b7uea137o`
 ("wait until the backgrounded NE-push script's ruby process exits" / a `cat`-on-output loop) that
