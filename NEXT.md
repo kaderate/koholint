@@ -97,22 +97,32 @@ names "un autre bidule qui est resté sur la plage" (another unspecified thingy 
 beach). Neither mentions a sword by name, but an unidentified item at a specific, nameable
 location is the most concrete lead this project has had for the sword hypothesis so far.
 
-**Blocker (CORRECTED TWICE, same day -- see `world_topology.world_map_reconstruction`, a full
-coordinate-grid cross-check against the SELECT map built after the owner pushed back on sloppy
-adjacency claims in conversation; check THAT entry before asserting what is/isn't explored, don't
-re-derive from prose memory)**: south from `front_yard` IS already charted, to `overworld_screen2`
-(178/0). Of 178/0's own 4 edges, N (front_yard), W (villager_screen, NOT untested -- an earlier
-version of this note wrongly said so), and E (`shop_screen`/179/0) are all confirmed; only its
-**SOUTH edge is genuinely untested** -- the single most on-narrative frontier edge on the whole
-map, since `starting_house_npc_beds` literally says "Suis la route du Sud" (follow the south
-road). `world_map_reconstruction.frontier_untested_edges` lists 7 other untested/soft edges
-project-wide for context. Link's equipped-item/inventory RAM location is still not identified
-either, so even reaching the beach won't let us confirm a sword found there IS a sword without
-visual/dialogue confirmation.
+**Blocker (CORRECTED A THIRD TIME, same day -- see `world_topology.world_map_reconstruction`; the
+owner caught each of the first two mistakes by asking "are you sure?" instead of trusting the
+claim, which is exactly the discipline to keep applying here)**: the beach is very likely NOT an
+unexplored edge at all -- it's almost certainly already reached. `select_map_screen`'s own in-game
+place-name reads name BOTH `riverside_south_river_room` (224/0) AND `riverside_flower_clearing`
+(225/0) "Plage Coco" (Coco Beach), and `225/0`'s own signpost reads "Attention aux oursins !"
+(watch out for sea urchins -- a beach detail, not a river one). Both rooms are already charted,
+reached via `well_platform` -> `building_screen` -> `riverside_screen` -> `riverside_south_room`
+(west then south from front_yard, NOT south from `overworld_screen2` -- that edge is still a
+genuine frontier per `world_map_reconstruction` but is a different, unconnected direction on the
+grid and has no naming evidence tying it to "la plage"). The real gap: `225/0` has a known,
+never-resolved NE route past the signpost, abandoned at the time because it produced "unexplained
+diagonal slides" -- which D11's later contact-knockback finding (see Decisions in force above)
+now explains as probable enemy-collision knockback, not a real wall never actually blocking
+progress. `224/0` is also flagged in its own entry as "not fully explored past its entry+drift
+probe". The "bidule" NPC A mentioned is most plausibly sitting somewhere in one of these two
+already-reached rooms, unfound because earlier sessions had no reason to search this hard or to
+route around the knockback. Link's equipped-item/inventory RAM location is still not identified
+either, so even finding an item there won't let us confirm it's a sword without visual/dialogue
+confirmation.
 
-**Not yet tried**: testing `overworld_screen2`'s (178/0) south edge for a transition (the
-concrete next navigation step toward the "bidule" NPC A mentioned); locating the
-inventory/equipped-item RAM bytes; folding in `shop_screen`'s exploration result once that
+**Not yet tried**: a fresh push past `225/0`'s NE route (this time routing around/through the
+knockback rather than treating it as a wall, per D11) and a fuller sweep of `224/0` beyond its
+entry point, specifically looking for the "bidule"; separately (lower priority now), testing
+`overworld_screen2`'s (178/0) south edge remains a real but less on-narrative frontier; locating
+the inventory/equipped-item RAM bytes; folding in `shop_screen`'s exploration result once that
 subagent completes.
 
 ## In-flight work (for resumability)
