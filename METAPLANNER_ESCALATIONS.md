@@ -83,3 +83,21 @@ because any process step audits for it.
 status, not a fact about the game itself.
 **Resolution**: -> `METAPLANNER.md#MP5`, assigned as a standing checklist item of the existing
 Reviewer role and cold-review cadence, in `AGENTS.md`'s role table and provenance rule.
+
+## ESC5: multi-step Explorer helpers risk exceeding the foreground Bash timeout and auto-backgrounding
+
+**Status**: open
+**Opened**: September 10, 2026, by planner session
+**Context**: an Explorer session this day found that a single `Navigator.move!` call took
+13-30s wall-clock in this environment, and a `nudge_axis!`-style helper chaining ~20 such calls
+exceeded a 300s foreground Bash timeout and got auto-backgrounded. `AGENTS.md`'s existing
+"Subagent prompts: never end on a wait for a notification" rule (from `METAPLANNER.md#MP3`)
+already covers a subagent that deliberately waits on a background task -- but this is a different,
+easier-to-hit variant: a subagent that starts a long *foreground* multi-step helper call not
+expecting it to background, has it silently backgrounded by a timeout, and only avoids the MP3
+trap by luck/habit (this session's Explorer broke work into single/paired `move!` calls per
+invocation instead, but nothing tells a future Explorer to do that). This recurred as a live risk,
+not yet as an actual stuck-subagent incident -- catching it now, before it becomes one.
+**Why process, not domain**: about how Explorer scripts should be structured to avoid a tooling
+trap, not a game fact.
+**Resolution** (MetaPlanner fills in):
