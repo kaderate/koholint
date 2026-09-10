@@ -83,22 +83,30 @@ Standing field: the single leading hypothesis for "what unblocks progress next" 
 stopping it -- not a full quest log. Update in place when the leading guess changes; don't let
 this section grow into a history (that belongs in `docs/archive/SESSION_LOG.md`).
 
-**Current hypothesis (September 10, 2026)**: the next real objective is finding/obtaining a
-sword. Evidence: (1) bushes are CONDITIONALLY-blocked terrain (cuttable, not permanently blocked
-scenery) per the architecture question above; (2) two crate_room hint books already read
-describe sword mechanics -- `dialogues.crate_room_book_b` (a charge-and-release spin-attack
-technique) and `dialogues.crate_room_book_c` (items that can replace the sword slot in combat);
-(3) no sword is confirmed obtained (inferred from the books' own "once a sword is found" framing,
-not directly probed).
+**Current hypothesis (September 10, 2026, UPDATED same day)**: the next real objective is
+finding/obtaining a sword, and there's now a concrete place to look for it. Evidence: (1) bushes
+are CONDITIONALLY-blocked terrain (cuttable, not permanently blocked scenery) per the
+architecture question above; (2) two crate_room hint books already read describe sword mechanics
+-- `dialogues.crate_room_book_b` (a charge-and-release spin-attack technique) and
+`dialogues.crate_room_book_c` (items that can replace the sword slot in combat); (3) no sword is
+confirmed obtained (inferred, not directly probed); (4) **NEW**: `starting_house` (163/16) turned
+out to hold 2 never-before-interacted OAM NPCs (owner-prompted re-visit, September 10 2026 --
+see `dialogues.starting_house_npc_bench`/`starting_house_npc_beds`) -- both independently point
+south to "la plage" (the beach where Link washed up) and warn of monsters there; NPC A explicitly
+names "un autre bidule qui est resté sur la plage" (another unspecified thingy left on the
+beach). Neither mentions a sword by name, but an unidentified item at a specific, nameable
+location is the most concrete lead this project has had for the sword hypothesis so far.
 
-**Blocker**: Link's equipped-item/inventory RAM location is not yet identified in
-`ram_registry.json` -- this hypothesis is inferred, not confirmed, because we can't yet read
-directly whether Link has a sword. Also unknown: whether a sword is sitting somewhere
-already-explored but unrecognized as one, or whether `shop_screen` (see in-flight work below)
-sells/gives one.
+**Blocker**: the beach itself hasn't been located/visited yet -- south of `starting_house`/
+`front_yard` is unmapped in `world_topology` (all charted rooms so far are north/west of
+front_yard, or reached via the villager_screen/riverside chain further afield; a beach south of
+the *starting* area is a different, untried direction). Link's equipped-item/inventory RAM
+location is still not identified either, so even reaching the beach won't let us confirm a sword
+found there IS a sword without visual/dialogue confirmation.
 
-**Not yet tried**: locating the inventory/equipped-item RAM bytes (would confirm/refute this
-hypothesis directly); folding in `shop_screen`'s exploration result once that subagent completes.
+**Not yet tried**: navigating south from `starting_house`/`front_yard` to find this beach and the
+"bidule" NPC A mentioned; locating the inventory/equipped-item RAM bytes; folding in
+`shop_screen`'s exploration result once that subagent completes.
 
 ## In-flight work (for resumability)
 
