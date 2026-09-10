@@ -21,6 +21,14 @@ In this order, and nothing else before you have a session question:
 `docs/archive/EXPLORATION_LOG.md` is the spike's narrative log. It's an archive: you look up a
 specific fact in it, you don't read it to resume the project.
 
+## Atlas
+
+[Koholint Atlas](https://claude.ai/code/artifact/e67f636d-0b55-4762-976a-21b7cd5fc5bb) -- a visual
+report of everything charted so far (room graph, screenshots, walkability overlays, dialogue),
+generated from this repo's own data (`data/ram_registry.json`, checkpoints) and rebuilt after
+meaningful exploration progress. Read it to see the state of the world; read `NEXT.md` to resume
+working on it.
+
 ## Layout
 
 | Path | Role |
