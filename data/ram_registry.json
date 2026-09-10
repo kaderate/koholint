@@ -493,7 +493,7 @@
       "rooms_seen": ["162/0 (front_yard)", "161/0 (screen3_north)"],
       "mobility": "mobile -- moves in lockstep with its paired creature, same per-sample deltas, constant relative offset, in both rooms",
       "tile_ids_seen": { "162/0": [26], "161/0": [26] },
-      "chr_pattern_match": "CONFIRMED byte-identical: tile 26 = 00c00060007100330037003600160014 in both front_yard's and screen3_north's checkpoints (bank 0). Still no match found against villager_screen's tile set.",
+      "chr_pattern_match": "CONFIRMED byte-identical: tile 26 = 00c00060007100330037003600160014 in both front_yard's and screen3_north's checkpoints (bank 0). Still no match found against villager_screen's tile set. Rendered as an image September 10 2026 (2bpp decode + palette, not read as hex) to check the \"shadow\" label directly: the shape is 4 spiky vertical light-gray tufts, not a flat dark oval -- doesn't look like a ground shadow. Reads more like grass/reed tufts than a shadow. Renaming from \"shadow\" to \"tuft companion sprite\" pending a clearer read; the lockstep position tracking (real, confirmed) doesn't depend on which label is right.",
       "interaction_tested": {
         "162/0": "n -- not tested; the lockstep-offset pattern is consistent with a shadow underlay (not independently interactable), but that's a read from position data only, not confirmed by an actual :a probe",
         "161/0": "n -- not tested this session; same reasoning as 162/0, and it rides under screen3_north_wide_ranging_pair, one of the room's already-exhaustively-negative-tested creatures (see room_labels['161/0'])"
