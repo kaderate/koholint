@@ -123,16 +123,27 @@ it was never a wall, just two stacked hazards (an invisible knockback creature p
 sea-urchin/flower terrain) that a held shield mostly gets past (see Next question below for full
 detail). It leads to a brand-new room, `226/0` riverside_ne_cove -- but the "bidule" was NOT found
 there, or anywhere else this session; only the room's entry point was glimpsed (budget went
-entirely to solving the route). The search for the "bidule" is still open, now one room further
-along than before.
+entirely to solving the route).
 
-**Not yet tried**: a fuller sweep of `226/0` past its entry point (probe_all there reads
-up/left/right all open -- genuine unexplored ground, not a dead end) and of `224/0` beyond its
-entry point, both specifically looking for the "bidule"; separately (lower priority now), testing
-`overworld_screen2`'s (178/0) south edge remains a real but less on-narrative frontier; locating
-the inventory/equipped-item RAM bytes. `shop_screen` is RESOLVED not to be this session's answer --
-its yard held only a recycled-dialogue NPC and a decorative object, no item, and its actual
-interior (behind the "MAGASIN" door) was never reached -- see Next question below.
+**UPDATE 2, September 10 2026 (same day, follow-up Explorer session)**: `226/0`'s 3 open
+directions and 2 new directions in `224/0` were swept -- still NO "bidule" found anywhere, and a
+real new blocker surfaced: both rooms are dominated by the same hostile tile=0x60-family
+creature, the shield-hold tactic only mitigates (not eliminates) damage, and every route pushed
+this session ended with Link at ~1 heart (of an as-yet-unpinned max) -- see
+`room_labels["226/0"]`/`["224/0"]`'s latest addenda for the exact routes/damage log. **No healing
+mechanism is confirmed anywhere in this project yet** -- that's now the practical blocker on
+pushing this specific thread further, not navigation. A follow-up session is testing whether
+`house2_interior`'s beds restore HP (see In-flight work below) before any 3rd push into this
+hostile territory.
+
+**Not yet tried**: resolving whether a healing mechanism exists (house2_interior's beds, in
+flight -- see below) before any further push into `226/0`'s unswept NW corner or `224/0`'s area
+past x=68,y=48, both of which cost real health to reach per this session's log; separately (lower
+priority now), testing `overworld_screen2`'s (178/0) south edge remains a real but less
+on-narrative frontier; locating the inventory/equipped-item RAM bytes. `shop_screen` is RESOLVED
+not to be this session's answer -- its yard held only a recycled-dialogue NPC and a decorative
+object, no item, and its actual interior (behind the "MAGASIN" door) was never reached -- see Next
+question below.
 
 ## In-flight work (for resumability)
 
@@ -141,8 +152,17 @@ completed with results not yet folded in here -- check `ListAgents` before assum
 idle or before re-dispatching a duplicate:
 - **D9 rollout on `well_platform` + `building_screen`** (visual-catalog survey, same method as
   the `front_yard`/`villager_screen`/`crate_room`/`screen3_north` rollout already in
-  `DECISIONS.md`'s D9 entry). Running unusually long (4h+ as of last check, vs. ~45-90 min for
-  similar tasks) -- a status check was sent; no reply folded in here yet.
+  `DECISIONS.md`'s D9 entry). Running unusually long (5h+ as of last check, vs. ~45-90 min for
+  similar tasks) -- two messages sent (a status check, then an explicit stop-and-report
+  instruction), no reply folded in here yet. Likely genuinely stuck; if still silent next check,
+  treat as abandoned and re-dispatch fresh rather than waiting indefinitely.
+- **`house2_interior` bed-healing test** -- does resting on a bed restore HP? Directly unblocks
+  further `224/0`/`226/0` exploration if confirmed (both are currently a health sink with no known
+  recovery). Low-risk, small budget.
+
+`226/0`/`224/0`'s sweep for the "bidule" is DONE for this round (September 10 2026) -- not found,
+both rooms confirmed to cost real health with no healing mechanism on file -- see "Quest
+hypothesis" above for the full finding and why the next step is the bed test, not a 3rd push.
 
 `225/0`'s NE re-push is DONE (September 10 2026) -- resolved into a real room transition into
 `226/0` riverside_ne_cove. `224/0`'s secondary sweep was NOT done this session (budget went
