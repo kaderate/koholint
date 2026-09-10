@@ -151,6 +151,29 @@ time, before being written down anywhere a future dispatch would read cold (see
 - `run_in_background`/`Monitor` are dispatcher-side tools. Never instruct a subagent to use them on
   itself.
 
+### Subagent prompts: bound multi-step helper calls under the foreground timeout
+
+A different, easier-to-hit door onto the same trap: a subagent's own foreground tool call -- not a
+deliberate wait, just an ordinary call chaining many slow steps (e.g. a `nudge_axis!`-style helper
+issuing ~20 `Navigator.move!` calls at 13-30s wall-clock each in this environment) -- can itself
+exceed the tool's foreground timeout and get silently auto-backgrounded mid-call. The subagent
+never chose to wait; the platform just handed it back a running background task instead of a
+result. From there it's the exact same stuck-subagent trap the rule above already names, just
+reached without anyone writing a "wait for notification" instruction. Caught as a live risk on
+September 10, 2026, before it produced an actual incident (see `METAPLANNER.md#MP7`).
+
+- Before chaining several slow primitive calls (measured or conservatively estimated wall-clock,
+  never guessed) into one foreground tool invocation, keep the batch's worst case (steps x
+  per-step worst case) safely under the timeout actually in effect -- the tool's default, or an
+  explicit `timeout` you set, whichever applies. Don't assume slack you haven't checked for.
+- If a batch's worst case can't fit under that ceiling, split it into multiple sequential
+  foreground calls issued back-to-back within the same turn, instead of one call spanning the
+  whole chain.
+- If a call still comes back auto-backgrounded despite the above (the estimate was wrong, or the
+  environment ran slower than expected), handle it exactly per the rule above: poll it
+  synchronously within the same turn until it resolves. Never treat the backgrounding itself as
+  license to stop mid-turn waiting for a notification.
+
 ### MetaPlanner: amending the workflow itself
 
 Cascades the planner -> worker split one level up. The planner (whoever is driving day-to-day

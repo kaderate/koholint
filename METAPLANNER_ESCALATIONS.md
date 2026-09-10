@@ -100,4 +100,7 @@ invocation instead, but nothing tells a future Explorer to do that). This recurr
 not yet as an actual stuck-subagent incident -- catching it now, before it becomes one.
 **Why process, not domain**: about how Explorer scripts should be structured to avoid a tooling
 trap, not a game fact.
-**Resolution** (MetaPlanner fills in):
+**Resolution**: -> `METAPLANNER.md#MP7`, added a "Subagent prompts: bound multi-step helper calls
+under the foreground timeout" subsection to `AGENTS.md`: estimate a chained batch's worst case
+against the timeout in effect before issuing it, split into sequential foreground calls when it
+doesn't fit, and fall back to `MP3`'s poll-synchronously rule if a call backgrounds anyway.

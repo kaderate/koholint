@@ -180,3 +180,45 @@ dispatch without mentioning this requirement, leaving it one bad copy-paste away
 **Invalidation condition**: if a dispatch still omits `source_url`/`source_revision` despite this
 being stated in `AGENTS.md`, the fix needs to move from documentation to a checklist the dispatching
 session is forced to fill in, not another restatement.
+
+## MP7: bound multi-step Explorer helper calls under the foreground timeout, as a named variant of MP3's trap
+
+**Date**: September 10, 2026. Resolves `METAPLANNER_ESCALATIONS.md#ESC5`.
+
+**Context**: an Explorer session on September 10, 2026 found that a single `Navigator.move!` call
+took 13-30s wall-clock in this environment, and a `nudge_axis!`-style helper chaining ~20 such calls
+would exceed the foreground Bash timeout and get silently auto-backgrounded. `AGENTS.md`'s existing
+"Subagent prompts: never end on a wait for a notification" rule (`METAPLANNER.md#MP3`) already
+covers a subagent that deliberately waits on a background task, but this is a different root cause:
+an ordinary foreground call, never intended to background at all, crossing the timeout by sheer
+chained duration and landing the subagent in the same stuck state by accident. That session avoided
+it only by habit (breaking work into single/paired `move!` calls per invocation), with nothing
+written down telling a future Explorer to do the same. Caught as a live risk, not yet an actual
+stuck-subagent incident.
+
+**Options considered**:
+1. A dispatcher-side watchdog that detects an auto-backgrounded subagent task and force-resumes it.
+   Rejected: same reasoning as `MP3`'s option 1 -- treats the symptom, adds a mechanism to maintain,
+   and the poll-synchronously fix already in `AGENTS.md` handles it once it happens without any new
+   machinery.
+2. A fixed hardcoded batch-size cap (e.g. "never more than 10 `move!` calls per invocation").
+   Rejected: hardcoding a step count ties the rule to today's measured 13-30s figure and to this one
+   helper; a future helper with different per-step cost would be either needlessly restricted or
+   unsafely permitted. Reasoning from measured/estimated cost against the timeout actually in effect
+   generalizes past `Navigator.move!`.
+3. Rely on `MP3`'s existing rule alone, on the theory poll-synchronously already covers any
+   backgrounding. Rejected: `MP3` tells you what to do once a call is already backgrounded, but a
+   subagent that never expects an ordinary foreground call to background at all has no cue this can
+   happen outside a deliberate wait -- a distinct root cause (call-duration budget vs. deliberate
+   wait pattern) that needs naming so a future dispatch prompt anticipates it, not just survives it
+   by luck.
+4. **Chosen**: add a new "Subagent prompts: bound multi-step helper calls under the foreground
+   timeout" subsection to `AGENTS.md`, requiring a worst-case-vs-timeout check before chaining slow
+   primitive calls, splitting into sequential foreground calls when the estimate doesn't fit, and
+   falling back to `MP3`'s poll-synchronously rule if a call backgrounds anyway.
+
+**Invalidation condition**: if a subagent still gets stuck this way despite estimating batch sizes
+against the timeout (e.g. because per-step cost is unmeasurable or unpredictable in a given
+environment), prose asking the subagent to compute the budget isn't sufficient -- the fix needs a
+mechanical guard (e.g. a helper wrapper that always sets an explicit conservative per-batch
+`timeout` and hard-caps its own batch count) instead of restating the rule.
