@@ -157,8 +157,24 @@ Plage Coco push, though every other room/purpose still does. IMPORTANT: don't re
 paused" as "abandoned" in any future summary -- this remains the project's single strongest lead
 (both starting_house NPCs, the game's own place name, the signpost). A prior status report
 conflated "paused pending a specific ask" with "closed/exhausted" and the owner caught it --
-logged as `METAPLANNER_ESCALATIONS.md`'s ESC7. A follow-up push using this new permission is now
-running -- see In-flight work below.
+logged as `METAPLANNER_ESCALATIONS.md`'s ESC7.
+
+**UPDATE 4, September 10 2026 (same day, follow-up Explorer session, using the new HP-write
+permission)**: the "bidule" is STILL NOT FOUND, and this push closes out both rooms' remaining
+unswept ground rather than leaving it open. `224/0`'s area past x=68,y=48 (`up` and `left`, both
+previously untried) and `226/0`'s NW cul-de-sac `up` wall (previously only probed, never pushed
+to an exhausted/HP-safe conclusion) were both fully resolved this session: every route either
+led into already-fully-explored territory via a newly-found room connection (`224/0` now has a
+second door into `225/0` at its north edge, and a second door into `208/0` at its NW corner,
+neither opening new ground) or hit a real, reproduced dead-end wall (`224/0`'s west edge;
+`226/0`'s north wall, confirmed blocked at 2 different columns after repeated identical hits).
+**This significantly weakens the "bidule is hiding in an unswept corner of Plage Coco" reading**
+-- the cluster's three rooms (`224/0`, `225/0`, `226/0`) now have no known unexplored ground left
+except `226/0`'s own east/south side past x=46,y=26 (right/down still read `:ok` there, never
+pushed). The sword-hypothesis lead itself (the starting_house NPCs' dialogue, the "Plage Coco"
+place name) is NOT invalidated by this -- only the specific guess that the item sits in one of
+these three rooms' already-glimpsed corners is looking weaker. Full route detail: `room_labels`'s
+"THIRD PUSH"/"FOURTH PUSH" addenda and "In-flight work" below.
 
 `shop_screen`'s door, retry 3 is DONE (September 10 2026) -- CLOSED, anti-patch budget spent, do
 not attempt a 4th routing try. Both the NPC-east/NE route and the hedge-maze route failed cleanly
@@ -176,12 +192,26 @@ retest before assuming it needs a whole new route.
 
 ## In-flight work (for resumability)
 
-As of September 10, 2026, ~19:00 UTC, one subagent is dispatched -- check `ListAgents` before
-assuming it is idle or before re-dispatching a duplicate:
-- **Plage Coco push, with HP-write permission** -- resuming from the prior session's checkpoint
-  chain (`lib_226_*.dump`/`lib_224_*.dump`) to sweep `226/0`'s unswept NW corner and `224/0`'s area
-  past x=68,y=48, now allowed to top up HP via `0xDB5A` under D12's September 10 amendment
-  (scratch checkpoints only, scoped to this cluster/goal). Looking for the "bidule".
+Nothing dispatched as of this update (September 10, 2026, ~20:00 UTC).
+
+**Plage Coco push with HP-write permission is DONE (September 10 2026, Explorer session, D12
+amendment scope)** -- still NO "bidule" found anywhere. `224/0`'s area past x=68,y=48 (both `up`
+and `left`) and `226/0`'s NW cul-de-sac `up` wall were both pushed to a clean conclusion rather
+than another early safety-stop: every direction either resolved into a confirmed room transition
+into already-fully-explored territory (`224/0` gained a SECOND, previously-unknown connection
+each to `225/0`, along the north edge at y=26, and to `208/0`, at its NW corner -- both new doors
+between already-charted rooms, not new ground) or a genuine, reproduced dead-end wall (`224/0`'s
+west edge at x=20; `226/0`'s north wall, reconfirmed blocked at 2 different x columns after 3
+consecutive identical hits, closing it under the anti-patch rule). No item, chest, signpost, or
+dialogue trigger appeared in any screenshot taken this session. HP-write permission (D12's
+September 10 amendment) was used 5 times, all `mmu.write(0xDB5A, 24)` on scratch checkpoints only
+(never `main.dump`): 2 resumes from a prior session's ~1-heart safety-stop point (one per room),
+2 top-ups before pushing into fresh ground at 1.5-2 hearts remaining, and 1 top-up at 5/6 health
+that was earlier than the "safety net, not habit" guidance intends (worth flagging honestly, not
+a case of ignoring the creature -- just one write issued a bit ahead of the actual risk). Full
+route-by-route detail, exact checkpoint chain, and HP figures in `room_labels["224/0"]`/`["226/0"]`'s
+newest addenda ("THIRD PUSH"/"FOURTH PUSH"). See "Quest hypothesis" below for what this means for
+the sword lead.
 
 **Bush contact/`:a` test is DONE (September 10 2026, Explorer session)** -- first-ever direct
 interaction test on a bush, not another door-routing attempt. From `lib_shop_wide3.dump`
