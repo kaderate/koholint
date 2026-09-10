@@ -324,3 +324,28 @@ to be ratified), `taken without validation` (inherited from the spike, to be rev
   unrelated to any sprite) -- then the test needs a second confirming signal (e.g. explicit
   distance-to-nearest-OAM-sprite at the moment of the jump) before being trusted as a friendly/
   hostile classifier on its own.
+
+## D12 — RAM writes to gameplay state (HP, and by extension any writable mechanic) are case-by-case, owner-validated each time
+
+- **Status**: ratified (September 10, 2026).
+- **Context**: a bed-healing test needed a genuine below-max HP state to be meaningful, and no
+  safe in-game way to reach one existed near `house2_interior` without retracing into a hostile
+  area already flagged as risky -- the test session used a direct `mmu.write(0xDB5A, 8)` on a
+  fresh scratch checkpoint to manufacture the condition, which incidentally confirmed and promoted
+  `wram_unmapped.link_health` (0xDB5A current HP / 0xDB5B heart containers) to `verified`. This
+  surfaced a real question: now that HP is a known, writable byte, a future session could top HP
+  back up with a direct write before pushing further into `riverside_ne_cove`/`riverside_south_river_room`
+  ("Plage Coco"), which are otherwise blocked by real, unavoidable contact damage with no
+  confirmed healing mechanism. Whether that's in scope was not this project's call to make
+  unilaterally -- it changes what "exploring" means (reading/navigating vs. also writing state),
+  even though it would never touch `main.dump`.
+- **Choice**: RAM writes to gameplay state (HP today; any other writable mechanic found later)
+  are permitted ONLY for isolated, narrowly-scoped tests where the write itself is the method
+  being tested or is needed to set up a clean test condition (e.g. the bed-healing test itself --
+  writing HP down to test whether something restores it). They are NOT permitted to advance
+  exploration past a real in-game obstacle (e.g. topping HP back up to push deeper into a
+  hostile-creature area) without asking the owner first, every time -- this is not a one-time
+  blanket approval, each specific use needs its own go-ahead. Never on `main.dump` either way.
+- **Invalidated if**: the owner later grants a standing blanket approval for a specific mechanic
+  (e.g. "always top up HP before an Explorer session, no need to ask") -- until then, default to
+  asking.
