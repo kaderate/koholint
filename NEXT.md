@@ -159,15 +159,24 @@ this session's answer -- its yard held only a recycled-dialogue NPC and a decora
 item, and its actual interior (behind the "MAGASIN" door) was never reached -- see Next question
 below.
 
+`shop_screen`'s door, retry 3 is DONE (September 10 2026) -- CLOSED, anti-patch budget spent, do
+not attempt a 4th routing try. Both the NPC-east/NE route and the hedge-maze route failed cleanly
+(hedge maze turns out to be `shop_screen`'s own north boundary, connecting to the already-known
+`clover_field`/163-0 -- new topology fact, appended to `world_topology.shop_screen_door_approach`,
+not yet reflected in the coordinate grid/graph). Real finding via pixel analysis: the door's south
+approach band splits in two -- part is open ground nothing reaches, part (y~96-110, right under
+the door) is covered by 2 bush clusters. Consistent with, and new live evidence for, this
+project's standing "bushes are conditionally-blocked, need a cutting item" hypothesis
+(`hypothesis`/`verified_count: 1`, no direct cut test performed). **This is the SAME blocker type
+as the sword hypothesis's core evidence** -- a second, independent location (this door) is gated
+by the identical conditional terrain as the crate_room hint books predicted. Not re-tested against
+an actual cutting item (Link has none yet) -- if/when one is found, this door is worth a cheap
+retest before assuming it needs a whole new route.
+
 ## In-flight work (for resumability)
 
-As of September 10, 2026, one subagent is dispatched and may still be running or may have
-completed with results not yet folded in here -- check `ListAgents` before assuming it is idle or
-before re-dispatching a duplicate:
-- **`shop_screen` door, retry 3** -- via the hedge maze / from the yard NPC's position, aiming at
-  the one cell (y=90-110 under the door) no prior attempt has ever stood in. 3rd distinct approach
-  per `world_topology.shop_screen_door_approach` -- anti-patch budget for this door is now fully
-  spent after this attempt, win or lose.
+Nothing dispatched as of this update (September 10, 2026, ~16:45 UTC) -- check `ListAgents` in
+case this is stale by the time it's read.
 
 **D9 rollout on `well_platform` + `building_screen` is DONE (September 10 2026, fresh restart, ~20
 minutes, well inside budget)** -- the earlier 6h+ abandoned attempt is superseded, not resumed.
