@@ -192,7 +192,32 @@ retest before assuming it needs a whole new route.
 
 ## In-flight work (for resumability)
 
-Nothing dispatched as of this update (September 10, 2026, ~20:00 UTC).
+As of September 10, 2026, ~20:15 UTC, one subagent is dispatched -- check `ListAgents` before
+assuming it is idle or before re-dispatching a duplicate:
+- **`riverside_east_room` (209/0) full exploration** -- this room has NO `room_labels` entry at
+  all yet, single-glance only. Leading candidate for the "bidule" now that the rest of the Plage
+  Coco cluster (`224/0`/`225/0`/`226/0`) is exhaustively swept with nothing found. Clue-directed
+  (see `dialogues.starting_house_npc_bench`/`starting_house_npc_beds`), explicitly told to also
+  test non-OAM `:a` interactions, not just scan sprites (per this project's own house2/225-0
+  precedent). Has D12-scope HP-write permission for this cluster.
+  **NOTE**: a first dispatch of this exact task (agentId `a56b5bf024fd34d81`) was LOST to a
+  container restart before it reported or committed anything -- this is a clean restart, not
+  something to resume/merge with. If `a56b5bf024fd34d81` ever surfaces a late notification, it can
+  be safely ignored (nothing was in flight for it to have produced).
+
+**Container restart, September 10 2026, ~20:15 UTC**: this session's container restarted, killing
+all in-flight subagents with no loss to git (last commit `0856ffe` survived) or to
+`/tmp/zelda_checkpoints/` (survived intact, 278 files). Lost work: the first 209/0 dispatch above
+(no progress had been saved) and the already-considered-abandoned D9-rollout zombie
+(`a1ace155a0a80c4b1`, moot -- superseded by its own fresh restart hours earlier, `53afb77`).
+Also lost: two unrecognized background shell watchers referencing task ids `be9wylr1b`/`b7uea137o`
+("wait until the backgrounded NE-push script's ruby process exits" / a `cat`-on-output loop) that
+this planner did not knowingly create -- these look like a subagent using `run_in_background`
+internally despite the standing rule against it (`AGENTS.md`'s "Explorer subagents" convention,
+"it has gotten subagents stuck twice" -- possibly a third instance, and possibly a contributing
+factor to this restart, though not confirmed). No specific subagent was identified as the source
+since the session that ran it is gone. Flagged here rather than chased further; worth an
+escalation if the pattern recurs.
 
 **Plage Coco push with HP-write permission is DONE (September 10 2026, Explorer session, D12
 amendment scope)** -- still NO "bidule" found anywhere. `224/0`'s area past x=68,y=48 (both `up`
