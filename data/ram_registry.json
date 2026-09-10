@@ -507,6 +507,7 @@
   "visual_catalog": {
     "_readme": "D9 pilot (September 9, 2026): per-room visual survey combining OAM mobility diffing (4 samples over emulated time, no input, from a checkpoint -- same technique proven for crate_room's object survey) with cross-room CHR pattern-byte comparison (0x8000 + tile_id*16, 16 bytes per tile -- actual pixel data, not raw tile IDs, which D8's own caveats already showed are unreliable across tilesets/rooms). One entry per distinct visual pattern (matched by identical CHR bytes, not tile ID). Piloted on 2 rooms only (villager_screen, front_yard) per DECISIONS.md's D9 -- not yet a standing convention for all charted rooms. Rolled out to 2 more rooms (crate_room, screen3_north) September 9 2026 using DECISIONS.md D9's flagged OamMatch nearest-neighbor helper (scratchpad/walkability/oam_match.rb) instead of the pilot's per-slot eyeballing -- 2 more confirmed cross-room CHR matches found (front_yard_creature_shadow and villager_screen_companion_sprite both recur in screen3_north), still not ratified as a standing convention.",
     "villager_wandering_creature": {
+      "hazard_status": "friendly -- confirmed interactive, dialogues.room177_wandering_sprite (\"YOUPI! J'ai la p\u00eache! Et toi?\"), same text as the room's static NPC. Added September 10 2026 per D11.",
       "status": "pilot Explorer session, September 9, 2026. OAM position diffed across 4 samples (~2s emulated time apart, no input, same checkpoint) in both rooms; CHR bytes read for tile 80 and tile 82 in both rooms and compared byte-for-byte. Interaction follow-up attempted September 9 2026 (see interaction_tested.162/0) -- inconclusive, a navigation-access problem, not a negative interaction result.",
       "source": "ram_read_verified",
       "verified_count": 1,
@@ -524,6 +525,7 @@
       "first_seen": "2026-09-09"
     },
     "villager_static_npc": {
+      "hazard_status": "friendly -- confirmed interactive, dialogues.room177_static_sprite, same text as the wandering pair. Added September 10 2026 per D11.",
       "status": "pilot Explorer session, September 9, 2026. OAM position identical across 4 samples; only its tile ID flickers (animation, not translation) -- reproduces the existing dialogues.room177_static_sprite/world_topology.room177_sprites finding, used here as the pilot's sanity check.",
       "source": "ram_read_verified",
       "verified_count": 1,
@@ -652,6 +654,7 @@
       "first_seen": "2026-09-10"
     },
     "riverside_south_tan_creature": {
+      "hazard_status": "hostile -- contact/collision knockback confirmed September 10 2026 (world_topology.riverside_south_room_adaptive_chase_experiment.confound_root_cause), reproduced twice with visual + positional evidence. Adjacency reached via adaptive tracking, no dialogue triggered.",
       "status": "Follow-up session, September 10 2026 (planner, direct investigation, not a subagent): same method as riverside_south_pale_creature.",
       "source": "ram_read_verified",
       "verified_count": 1,
@@ -666,6 +669,7 @@
       "first_seen": "2026-09-10"
     },
     "riverside_south_river_room_sprite": {
+      "hazard_status": "hostile -- confirmed September 9-10 2026, a contact hit with no OAM sprite adjacent in either snapshot dropped HUD hearts during an approach attempt (room_labels['224/0']). Never confirmed as an NPC; this is the \"totem\" object, actually a mobile enemy sprite.",
       "status": "hypothesis -- isolated Explorer subagent, September 10 2026, single OAM read at room 224/0's entry point. Not interacted with or tracked across multiple samples -- out of this session's scope.",
       "source": "ram_read_verified",
       "verified_count": 1,
