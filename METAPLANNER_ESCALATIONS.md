@@ -122,3 +122,23 @@ game fact.
 `AGENTS.md` (a resolved `NEXT.md` section moves to `docs/archive/SESSION_LOG.md` in the same edit
 that resolves it, dangling cross-references fixed, at most a one-line pointer left behind) and did
 the house2_interior section itself as the one-time worked example.
+
+## ESC7: planner status summaries conflate "closed/exhausted" with "paused pending a specific ask", drifting the owner's read of live state
+
+**Status**: open
+**Opened**: September 10, 2026, by planner session
+**Context**: D12 (RAM writes to gameplay state are case-by-case, asked every time -- not a
+standing tool) was ratified after the owner answered an `AskUserQuestion` about the Plage Coco
+health blocker. The planner then folded that into a status report by grouping "Plage Coco (en
+pause, D12)" under a "high-confidence leads are now exhausted" summary, alongside genuinely closed
+threads (`shop_screen`'s door, the bush-contact test). The owner caught this immediately ("Pourquoi
+tu as éliminé la plage ?") -- Plage Coco was never eliminated, D12 explicitly left a live path open
+(ask per specific instance), and the planner never actually made that specific ask before writing
+the summary. The underlying gap: nothing in `AGENTS.md`/the reporting convention distinguishes, in
+writing, a thread that is genuinely closed (anti-patch budget spent, no further avenue identified)
+from one that is paused behind a standing case-by-case gate the planner hasn't yet exercised for
+this instance -- both ended up rendered identically ("en pause"/lumped into "épuisé") in the status
+artifact and the chat summary, with no visual or textual distinction.
+**Why process, not domain**: about how the planner represents thread status to the owner (report
+structure/wording discipline), not a game fact or a navigation finding.
+**Resolution** (MetaPlanner fills in): -> pending.
