@@ -161,15 +161,17 @@ below.
 
 ## In-flight work (for resumability)
 
-As of September 10, 2026, one subagent remains dispatched and may still be running or may have
-completed with results not yet folded in here -- check `ListAgents` before assuming it is idle or
-before re-dispatching a duplicate:
-- **D9 rollout on `well_platform` + `building_screen`** (visual-catalog survey, same method as
-  the `front_yard`/`villager_screen`/`crate_room`/`screen3_north` rollout already in
-  `DECISIONS.md`'s D9 entry). Running unusually long (5h+ as of last check, vs. ~45-90 min for
-  similar tasks) -- two messages sent (a status check, then an explicit stop-and-report
-  instruction), no reply folded in here yet. Likely genuinely stuck; if still silent next check,
-  treat as abandoned and re-dispatch fresh rather than waiting indefinitely.
+As of September 10, 2026, two subagents are dispatched and may still be running or may have
+completed with results not yet folded in here -- check `ListAgents` before assuming either is
+idle or before re-dispatching a duplicate:
+- **D9 rollout on `well_platform` + `building_screen`, RESTARTED** -- the original attempt hit 6h
+  with no reply to 2 check-in messages and is treated as abandoned (its own task-id is orphaned,
+  don't resume it, don't fold in a late reply from it without cross-checking against whatever this
+  fresh attempt finds). This is a clean fresh dispatch of the same task.
+- **`shop_screen` door, retry 3** -- via the hedge maze / from the yard NPC's position, aiming at
+  the one cell (y=90-110 under the door) no prior attempt has ever stood in. 3rd distinct approach
+  per `world_topology.shop_screen_door_approach` -- anti-patch budget for this door is now fully
+  spent after this attempt, win or lose.
 
 `house2_interior`'s bed-healing test is DONE (September 10 2026) -- beds do NOT heal, tested
 cleanly; see "Quest hypothesis" UPDATE 3 above for the full result and the open
