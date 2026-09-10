@@ -34,8 +34,8 @@ grids -- already fulfilled and recorded under D8 in `DECISIONS.md`; no other fil
 
 | Indicator | Value |
 |---|---|
-| Rooms found | 17 labeled in `data/ram_registry.json`'s `room_labels` (8 "charted", 9 "glimpsed"/less -- `224/0` riverside_south_river_room and `225/0` riverside_flower_clearing, south/east of `riverside_south_room`, both further explored (224/0's scroll mechanism and "totem" identity resolved, 225/0's ground-accessible extent mapped to a dead-end pocket); `209/0` riverside_east_room, found east of `riverside_south_room`'s south band (past the prior x=134,y=115 stop point), single-glance only, September 10 2026). Graph and screenshots published in the Koholint Atlas artifact (not yet updated with these rooms or this session's findings). D9 visual-catalog `visual_survey` now covers 4/17 (`front_yard`, `villager_screen` pilot + `crate_room`, `screen3_north` rollout, same day, autonomous session) -- see `DECISIONS.md`'s D9 entry. |
-| Dialogues / readable text | 13 confirmed entries in `ram_registry.json`'s `dialogues` (villager duo's shared line, room176's two save-mechanic NPC lines, crate_room's library fully read -- 4 books + 1 wall object, 9/9 tile objects resolved via OAM; house2_interior's 2 OAM-verified telephone objects; `riverside_flower_clearing_sign` (225/0) -- a signpost reading "Attention aux oursins !", NOT a chest/item, added September 10 2026 -- all hypothesis/verified_count 1). |
+| Rooms found | 18 labeled in `data/ram_registry.json`'s `room_labels` (8 "charted", 10 "glimpsed"/less -- `224/0` riverside_south_river_room and `225/0` riverside_flower_clearing, south/east of `riverside_south_room`, both further explored (224/0's scroll mechanism and "totem" identity resolved, 225/0's ground-accessible extent mapped to a dead-end pocket); `209/0` riverside_east_room, found east of `riverside_south_room`'s south band (past the prior x=134,y=115 stop point), single-glance only, September 10 2026; `179/0` shop_screen, first actually explored September 10 2026 -- turns out to be the shop's EXTERIOR yard, not its interior; see `world_topology.shop_screen_door_approach` and Next question below). Graph and screenshots published in the Koholint Atlas artifact (not yet updated with these rooms or this session's findings). D9 visual-catalog `visual_survey` now covers 4/18 (`front_yard`, `villager_screen` pilot + `crate_room`, `screen3_north` rollout, same day, autonomous session) -- see `DECISIONS.md`'s D9 entry. |
+| Dialogues / readable text | 14 confirmed entries in `ram_registry.json`'s `dialogues` (villager duo's shared line, room176's two save-mechanic NPC lines, crate_room's library fully read -- 4 books + 1 wall object, 9/9 tile objects resolved via OAM; house2_interior's 2 OAM-verified telephone objects; `riverside_flower_clearing_sign` (225/0) -- a signpost reading "Attention aux oursins !", NOT a chest/item; `shop_screen_yard_npc` (179/0) -- a friendly yard NPC reciting the SAME save-tip line as room176's pair, first confirmed case of a reused dialogue asset, September 10 2026 -- all hypothesis/verified_count 1). |
 | Terrain / collision | D8 live: reads BG tilemap signatures from VRAM (`lib/terrain.rb`), 93.1%-validated against live-probe oracle. Primary method; live probing kept as fallback. |
 | SELECT map (fog-of-war) | Widest-coverage checkpoint: `lib_explorer_225_fresh_entry.dump` (8 lit cells, superset of `main.dump`'s own 6). 6/8 cells now have a place name read from a checkpoint standing IN that exact cell's room ("Village des Mouettes", "Bibliothèque", "Sud du Village" x2 -- `176/0` and `192/0` share it, "Plage Coco" x2), `select_map_screen`'s SEVENTH + EIGHTH SESSION entries (`192/0` riverside_screen closed EIGHTH SESSION, new working route: nudge x to ~88 from `room176_entry_from_room160.dump`, then plain `:down` taps, no special alignment needed -- corrects the earlier "x=94, 8 calls" figure, which doesn't reproduce). Remaining 2 cells (the chain's earliest 2 rooms) confirmed NOT free-readable from any on-file checkpoint (checked EIGHTH SESSION) -- would need a from-boot replay. Scratchpad images ready for the Atlas (`select_map_full_*.png`), not yet pulled in. |
 | Save/continue | Mechanically verified end-to-end: hold A+B+START+SELECT opens the real save menu, "SAUVEGARDER & QUITTER" writes a real `.sav` (MD5-diffed), "REVENIR AU JEU" continues at the room's own door. This is the durable-progress path -- see "Standing conventions" below. |
@@ -122,19 +122,21 @@ confirmation.
 knockback rather than treating it as a wall, per D11) and a fuller sweep of `224/0` beyond its
 entry point, specifically looking for the "bidule"; separately (lower priority now), testing
 `overworld_screen2`'s (178/0) south edge remains a real but less on-narrative frontier; locating
-the inventory/equipped-item RAM bytes; folding in `shop_screen`'s exploration result once that
-subagent completes.
+the inventory/equipped-item RAM bytes. `shop_screen` is RESOLVED not to be this session's answer --
+its yard held only a recycled-dialogue NPC and a decorative object, no item, and its actual
+interior (behind the "MAGASIN" door) was never reached -- see Next question below.
 
 ## In-flight work (for resumability)
 
-As of September 10, 2026, two subagents were dispatched and may still be running or may have
-completed with results not yet folded in here -- check `ListAgents` before assuming either is
-idle or before re-dispatching a duplicate:
+As of September 10, 2026, one subagent was dispatched and may still be running or may have
+completed with results not yet folded in here -- check `ListAgents` before assuming it is idle or
+before re-dispatching a duplicate:
 - **D9 rollout on `well_platform` + `building_screen`** (visual-catalog survey, same method as
   the `front_yard`/`villager_screen`/`crate_room`/`screen3_north` rollout already in
   `DECISIONS.md`'s D9 entry).
-- **`shop_screen` interior exploration** -- looking for the project's first item/progress since
-  the Shield; directly relevant to the quest hypothesis above if it turns up a sword.
+
+`shop_screen` interior exploration is DONE (this session, September 10 2026) -- see the State
+table and Next question for the result (exterior yard only, door not reached).
 
 ## Next question
 
@@ -163,6 +165,18 @@ open gap for a future session. Full detail in `room_labels['224/0']`/`['225/0']`
 band east extent (from the original x=134,y=115 stop point) is now RESOLVED, same day: a real room
 transition at x=149,y=115 into a new room, `209/0` riverside_east_room, single-glance only -- see
 `world_topology.riverside_south_room_east_exit` and `room_labels['209/0']`, not chased deeper.
+`shop_screen` (179/0) actually explored for the first time, same day: it's the shop's EXTERIOR
+YARD, not the interior a prior session's Atlas note assumed -- a "MAGASIN" building facade ringed
+by static flower-bush obstacles plus a hedge maze east side. The door itself was never reached
+despite 8+ distinct routing attempts covering all 3 open sides (north over the roof, west and east
+at ground level) -- every one hit a wall before the door's own column; see
+`world_topology.shop_screen_door_approach` for the full attempt log and an open hypothesis (an
+off-tile-grid trigger column, same shape as `house2_interior`'s door -- see D11 paragraph below).
+Found and interaction-tested in the yard: a friendly NPC (tile=0x70/0x72) reciting the EXACT SAME
+save-tip line as `room176_pair_a`/`room176_pair_b` -- first confirmed case in this registry of a
+dialogue line reused verbatim across rooms (`dialogues.shop_screen_yard_npc`) -- and a decorative
+plant/bush object, confirmed non-interactive. No shopkeeper, no buy/sell mechanic, no HUD/inventory
+change -- because the interior was never reached, not because a shop mechanic was ruled out.
 
 **D11 hazard-classification pass, September 10 2026 (Explorer session)**: `front_yard`'s creature
 (D9's byte-identical CHR match to `villager_screen`'s confirmed-friendly NPC) got a 4th navigation
@@ -180,11 +194,12 @@ idle animation log, to cycle through the SAME tile set (0x60/0x62/0x64/0x66/0x68
 already-confirmed-hostile `riverside_south_tan_creature` and `riverside_south_river_room_sprite`
 (224/0's totem) -- classified `hostile` mainly on that family match, plus one observed wrong-axis
 13px jump while a family-tile creature was in close range. See `visual_catalog.riverside_east_room_creatures`,
-`.riverside_south_pale_creature`, and `.villager_wandering_creature` for full detail. Whether other
-already-"refuted" doors in this project deserve a re-look under the same off-tile-grid-alignment
-hypothesis now confirmed for house2 (one confirmed case, not yet a proven general rule). Also
-deferred, not urgent: formalizing a navigation spec/format (raised by an external review, judged
-sound but not blocking).
+`.riverside_south_pale_creature`, and `.villager_wandering_creature` for full detail. The
+off-tile-grid-alignment hypothesis first confirmed for house2's door now has a SECOND candidate
+case (`shop_screen`'s own unreached door, see above) -- still not a proven general rule, but worth
+trying on any future "walled-off door" before assuming it's a genuine dead end. Also deferred, not
+urgent: formalizing a navigation spec/format (raised by an external review, judged sound but not
+blocking).
 
 **Real architecture question, owner-raised September 9 2026, not yet designed**: the current
 walkability model (D8's `Terrain::RoomClassifier`, `walkable`/`blocked` per tile signature) is a
