@@ -35,10 +35,10 @@ grids -- already fulfilled and recorded under D8 in `DECISIONS.md`; no other fil
 | Indicator | Value |
 |---|---|
 | Rooms found | 16 labeled in `data/ram_registry.json`'s `room_labels` (8 "charted", 8 "glimpsed"/less -- adds `224/0` riverside_south_river_room and `225/0` riverside_flower_clearing, September 10 2026, south/east of `riverside_south_room`). Graph and screenshots published in the Koholint Atlas artifact (not yet updated with the 2 new rooms). D9 visual-catalog `visual_survey` now covers 4/16 (`front_yard`, `villager_screen` pilot + `crate_room`, `screen3_north` rollout, same day, autonomous session) -- see `DECISIONS.md`'s D9 entry. |
-| Dialogues / readable text | 12 confirmed entries in `ram_registry.json`'s `dialogues` (villager duo's shared line, room176's two save-mechanic NPC lines, crate_room's library fully read -- 4 books + 1 wall object, 9/9 tile objects resolved via OAM; house2_interior's 2 OAM-verified telephone objects, both hypothesis/verified_count 1, September 9 2026). |
+| Dialogues / readable text | 13 confirmed entries in `ram_registry.json`'s `dialogues` (villager duo's shared line, room176's two save-mechanic NPC lines, crate_room's library fully read -- 4 books + 1 wall object, 9/9 tile objects resolved via OAM; house2_interior's 2 OAM-verified telephone objects; `riverside_flower_clearing_sign` (225/0) -- a signpost reading "Attention aux oursins !", NOT a chest/item, added September 10 2026 -- all hypothesis/verified_count 1). |
 | Terrain / collision | D8 live: reads BG tilemap signatures from VRAM (`lib/terrain.rb`), 93.1%-validated against live-probe oracle. Primary method; live probing kept as fallback. |
 | Save/continue | Mechanically verified end-to-end: hold A+B+START+SELECT opens the real save menu, "SAUVEGARDER & QUITTER" writes a real `.sav` (MD5-diffed), "REVENIR AU JEU" continues at the room's own door. This is the durable-progress path -- see "Standing conventions" below. |
-| Current position | `/tmp/zelda_checkpoints/main.dump` (continuous session state, not versioned -- see below), last saved September 8 17:05, around `riverside_south_room` (208/0) -- explored past the entrance September 9 2026 (world_topology.riverside_south_room_survey) and its real south exit found September 10 2026 (world_topology.riverside_south_room_south_exit, leads to `224/0`), but `main.dump` itself is untouched (Explorer scratchpad checkpoints only), so Link's real saved position is still right at the entrance. |
+| Current position | `/tmp/zelda_checkpoints/main.dump` (continuous session state, not versioned -- see below), last saved September 8 17:05, around `riverside_south_room` (208/0) -- explored past the entrance September 9 2026 (world_topology.riverside_south_room_survey); its south exit into `224/0` and onward into `225/0` is now `verified`/`verified_count: 2` (world_topology.riverside_south_room_south_exit, September 10 2026, 2 independent Explorer sessions), but the route's exact tap count varies run to run (see 224/0's anomaly below) -- `main.dump` itself is untouched (Explorer scratchpad checkpoints only), so Link's real saved position is still right at the entrance. |
 
 ## Decisions in force
 
@@ -91,27 +91,28 @@ beyond the entry glance. Explorer checkpoint (not the canonical Builder one):
 ## Next question
 
 Paused, awaiting the owner's go-ahead (explicit "arrête-toi et ping moi" checkpoint). Session 4
-(PLAN.md) is now fully complete -- see the State section above. SELECT-map fog-of-war is CONFIRMED
-and d-pad-cursor-while-box-open is tested negative (32 combinations; double-A/`:b`/select-release/
-pre-existing-hold untested but not a priority) -- both resolved, no longer open questions. Crate_room's
-library is fully read, 9/9 objects (September 9 2026) -- also resolved, see "What NOT to redo".
-`house2_interior` (169/16) explored past the entry glance, same day: no NPCs or items, but 2
-OAM-verified interactive objects (a telephone giving a hint-flavored monologue, and the phone
-itself ringing into a comedic wrong-number call) -- see `dialogues.house2_telephone_examine`/
-`house2_telephone_call` -- also resolved. `riverside_south_room` (208/0) also explored past the
-entrance, same day: its two entrance figures turned out to be mobile/wandering (not static), and
-4 interaction attempts across the session found no dialogue but never confirmed genuine
-adjacency at the press -- INCONCLUSIVE, not negative, same call already made once for
-front_yard's wandering creature; see `world_topology.riverside_south_room_survey`. Its south band
-(an S-curved paved path) has its south exit FOUND September 10 2026 -- a single move south crosses
-into `224/0` (riverside_south_river_room, see `world_topology.riverside_south_room_south_exit`),
-which itself has an unresolved anomaly (visually distinct 2nd screen under the SAME room_id, plus
-idle-frame position drift with no input held -- not explained, not a priority to chase alone) and
-leads on to a 3rd room glimpsed only (`225/0`). The south band's east extent from the original
-x=134,y=115 stop point is still unprobed. Candidates once
-resumed: a dedicated multi-sample OAM-tracking session for riverside_south_room's 2 wandering
-figures (continuous per-frame position log rather than isolated snapshots, to actually catch
-genuine adjacency before pressing :a); retest `riverside_screen`'s signpost with a positive
+(PLAN.md) is now fully complete -- see the State section above. SELECT-map fog-of-war, crate_room's
+library (9/9 objects), and `house2_interior`'s 2 telephone objects are all resolved -- see "What
+NOT to redo" and `dialogues.*` for detail, not repeated here. `riverside_south_room` (208/0)'s two
+entrance figures are mobile/wandering; 4 interaction attempts found no dialogue but never confirmed
+genuine adjacency at the press -- INCONCLUSIVE, not negative (see
+`world_topology.riverside_south_room_survey`). Its south exit into `224/0`
+(riverside_south_river_room) and onward into `225/0` (riverside_flower_clearing) is now
+`verified`/`verified_count: 2` (2 independent Explorer sessions, September 10 2026) -- reliable as
+a procedure ("keep tapping `:right`, check room_id after each"), NOT at a fixed tap count (see
+`world_topology.riverside_south_room_south_exit`). `225/0`'s previously glimpsed-only "chest-like
+object" is RESOLVED, same day: it's a signpost ("Attention aux oursins !" -- a hazard warning, not
+an item; see `dialogues.riverside_flower_clearing_sign`), no HUD/inventory change. `224/0`'s
+anomaly (2nd visually distinct screen under the SAME room_id, plus idle-frame position drift) got
+a first real look: all 4 directions from the entry point (x=104,y=141) trigger the same kind of
+large jump, not just `:down` -- supports a scripted auto-scroll/screen-transition-strip hypothesis
+over a water current, not yet confirmed against alternatives; idle drift itself NOT
+re-investigated -- see `room_labels['224/0']`'s "FIRST REAL INVESTIGATION" note. The south band's
+east extent from the original x=134,y=115 stop point (within 208/0 itself) is still unprobed.
+Candidates once resumed: a dedicated multi-sample OAM-tracking session for riverside_south_room's
+2 wandering figures (continuous per-frame position log, to actually catch genuine adjacency before
+pressing :a); a per-frame position/OAM log across 224/0's entry-point crossing and idle drift, to
+settle the auto-scroll-strip hypothesis; retest `riverside_screen`'s signpost with a positive
 control. Also deferred, not urgent: formalizing a
 navigation spec/format (raised by an external review, judged sound but not blocking); whether other
 already-"refuted" doors in this project deserve a re-look under the same off-tile-grid-alignment
@@ -195,7 +196,17 @@ own data model), not something to implement ad hoc.
   is unresolved.
 - Don't assume a stable `room_id`/`map_id` means "same screen" -- `224/0`
   (riverside_south_river_room) visually renders as 2 distinct screens under that one room_id, and
-  a single `Navigator.move!` step between them jumped ~94px in one axis (see
+  a single `Navigator.move!` step between them jumped ~94-115px in one axis (see
   `room_labels['224/0']`). Check the screenshot, not just the room key, before concluding nothing
   moved. Also unresolved there: position drifted over idle frames with zero input held -- don't
   read that as a script bug before checking the room's own footage.
+- Don't assume 224/0's entry-point jump is specific to one direction (`:down`) -- confirmed
+  September 10 2026 that all 4 directions from the entry point (x=104,y=141) trigger it, with a
+  consistent axis pattern (vertical input leaves x fixed, horizontal input leaves y near-fixed) --
+  see `room_labels['224/0']`'s "FIRST REAL INVESTIGATION" note. Don't expect a fixed
+  `Navigator.move!` tap count for 208/0->224/0->225/0 either -- 2 independent runs crossed into
+  225/0 after 3 and 7 total `:right` taps respectively; the reliable procedure is "keep tapping
+  and check room_id after each," not a fixed count.
+- `225/0`'s signpost (the room's only known interactive object, "Attention aux oursins !") is
+  resolved -- don't re-approach it expecting an item; it's a hazard warning, not a chest, and
+  produces no HUD/inventory change.
