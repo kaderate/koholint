@@ -37,6 +37,7 @@ grids -- already fulfilled and recorded under D8 in `DECISIONS.md`; no other fil
 | Rooms found | 16 labeled in `data/ram_registry.json`'s `room_labels` (8 "charted", 8 "glimpsed"/less -- `224/0` riverside_south_river_room and `225/0` riverside_flower_clearing, south/east of `riverside_south_room`, both now further explored: 224/0's scroll mechanism and "totem" identity resolved, 225/0's ground-accessible extent mapped to a dead-end pocket, September 10 2026 -- no 17th room found yet). Graph and screenshots published in the Koholint Atlas artifact (not yet updated with the 2 rooms or this session's findings). D9 visual-catalog `visual_survey` now covers 4/16 (`front_yard`, `villager_screen` pilot + `crate_room`, `screen3_north` rollout, same day, autonomous session) -- see `DECISIONS.md`'s D9 entry. |
 | Dialogues / readable text | 13 confirmed entries in `ram_registry.json`'s `dialogues` (villager duo's shared line, room176's two save-mechanic NPC lines, crate_room's library fully read -- 4 books + 1 wall object, 9/9 tile objects resolved via OAM; house2_interior's 2 OAM-verified telephone objects; `riverside_flower_clearing_sign` (225/0) -- a signpost reading "Attention aux oursins !", NOT a chest/item, added September 10 2026 -- all hypothesis/verified_count 1). |
 | Terrain / collision | D8 live: reads BG tilemap signatures from VRAM (`lib/terrain.rb`), 93.1%-validated against live-probe oracle. Primary method; live probing kept as fallback. |
+| SELECT map (fog-of-war) | Widest-coverage checkpoint found: `lib_explorer_225_fresh_entry.dump` (8 lit cells, superset of `main.dump`'s own 6). Clean grid PNG + 5/8 lit-cell place names read (French, in-game text -- "Village des Mouettes", "Bibliothèque", "Sud du Village", "Plage Coco" x2) September 10 2026, `select_map_screen`'s SEVENTH SESSION entry; 3 cells (the chain's earliest 2 rooms + `192/0` riverside_screen) flagged not-yet-read, not guessed. Scratchpad images ready for the Atlas (`select_map_full_*.png`), not yet pulled in. |
 | Save/continue | Mechanically verified end-to-end: hold A+B+START+SELECT opens the real save menu, "SAUVEGARDER & QUITTER" writes a real `.sav` (MD5-diffed), "REVENIR AU JEU" continues at the room's own door. This is the durable-progress path -- see "Standing conventions" below. |
 | Current position | `/tmp/zelda_checkpoints/main.dump` (continuous session state, not versioned -- see below), last saved September 8 17:05, around `riverside_south_room` (208/0) -- explored past the entrance September 9 2026 (world_topology.riverside_south_room_survey); its south exit into `224/0` and onward into `225/0` is now `verified`/`verified_count: 2` (world_topology.riverside_south_room_south_exit, September 10 2026, 2 independent Explorer sessions), but the route's exact tap count varies run to run (see 224/0's anomaly below) -- `main.dump` itself is untouched (Explorer scratchpad checkpoints only), so Link's real saved position is still right at the entrance. |
 
@@ -108,18 +109,10 @@ genuine adjacency at the press -- INCONCLUSIVE, not negative (see
 a procedure ("keep tapping `:right`, check room_id after each"), NOT at a fixed tap count (see
 `world_topology.riverside_south_room_south_exit`). `225/0`'s previously glimpsed-only "chest-like
 object" is RESOLVED, same day: it's a signpost ("Attention aux oursins !" -- a hazard warning, not
-an item; see `dialogues.riverside_flower_clearing_sign`), no HUD/inventory change. `224/0`'s scroll mechanism is now FULLY RESOLVED, September 10 2026 (4th independent Explorer
-session): it's a pure TIME-based scripted intro scroll (SCY 0->128 over ~40-60f) that starts the
-instant the room loads and runs with confirmed ZERO input (plain idle-wait reproduces it identically
-to any tap or even an `:a` press) -- the earlier "any directional input triggers it" theory is
-superseded, it was coincidental frame-window overlap, not a real input trigger. `224/0`'s "totem/
-statue near the entry point" is also identified, same session: it's the mobile OAM creature
-(tile=0x60 family, same wandering group as 0x62/64/66/68/6A already in this room) caught in an early
-static-looking pose, not fixed BG art. A clean face+`:a` dialogue test on it was NOT completed (it
-wanders off before a controlled post-scroll approach lines up, same difficulty already logged for
-riverside_south_room's figures) -- but an incidental hit during the chase (HUD hearts dropped with
-no OAM sprite adjacent in either snapshot) confirms it's a real contact-damage enemy, not neutral
-decoration. `225/0` was explored past the signpost, same session: it does NOT scroll (fixed single
+an item; see `dialogues.riverside_flower_clearing_sign`), no HUD/inventory change. `224/0`'s scroll
+mechanism and "totem" identity are FULLY RESOLVED (time-based scripted scroll, totem = a mobile
+contact-damage enemy sprite) -- archived to `docs/archive/SESSION_LOG.md`, full detail still in
+`room_labels['224/0']`. `225/0` was explored past the signpost, same session: it does NOT scroll (fixed single
 screen, confirmed), and its ground-accessible area is small and enclosed -- hedges north/west, a
 water strip south/east that was never actually entered (swim-gated hypothesis, Link has no Flippers
 yet, unconfirmed) -- `Navigator.probe_all` dead-ends at `down: blocked, right: blocked` in the SW

@@ -1036,3 +1036,19 @@ stood in `NEXT.md` as a worked example of the anti-patch rule paying off, until 
 `METAPLANNER.md#MP8` (September 10, 2026) once its content was fully covered by `NEXT.md`'s own
 State section (house2_interior's FOUND-AND-CONFIRMED paragraph), which already restates the
 outcome and the corrected-route pointer on its own.
+
+## `224/0`'s scroll mechanism and "totem" identity, RESOLVED (September 10, 2026)
+
+`224/0`'s scroll mechanism is FULLY RESOLVED, September 10 2026 (4th independent Explorer
+session): it's a pure TIME-based scripted intro scroll (SCY 0->128 over ~40-60f) that starts the
+instant the room loads and runs with confirmed ZERO input (plain idle-wait reproduces it identically
+to any tap or even an `:a` press) -- the earlier "any directional input triggers it" theory is
+superseded, it was coincidental frame-window overlap, not a real input trigger. `224/0`'s "totem/
+statue near the entry point" is also identified, same session: it's the mobile OAM creature
+(tile=0x60 family, same wandering group as 0x62/64/66/68/6A already in this room) caught in an early
+static-looking pose, not fixed BG art. A clean face+`:a` dialogue test on it was NOT completed (it
+wanders off before a controlled post-scroll approach lines up, same difficulty already logged for
+riverside_south_room's figures) -- but an incidental hit during the chase (HUD hearts dropped with
+no OAM sprite adjacent in either snapshot) confirms it's a real contact-damage enemy, not neutral
+decoration. Archived here per `METAPLANNER.md#MP8` once `NEXT.md`'s own state carried the resolved
+one-line summary and `data/ram_registry.json`'s `room_labels['224/0']` carried the full detail.
