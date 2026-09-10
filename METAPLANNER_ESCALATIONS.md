@@ -142,3 +142,39 @@ artifact and the chat summary, with no visual or textual distinction.
 **Why process, not domain**: about how the planner represents thread status to the owner (report
 structure/wording discipline), not a game fact or a navigation finding.
 **Resolution** (MetaPlanner fills in): -> pending.
+
+## ESC8: no standing process for narrative-clue cross-referencing, so a "puzzle" gets misread as unfinished "mapping"
+
+**Status**: open
+**Opened**: September 10, 2026, by planner session (owner-prompted introspection)
+**Context**: several sessions spent real budget doing spatial/navigational exploration (sweeping
+`riverside_ne_cove`/`riverside_south_river_room` for an item) after multiple dialogue clues
+already pointed at a specific place ("la plage"/"Plage Coco", both starting_house NPCs plus the
+game's own SELECT-map place name). The owner had to prompt the connection each time ("tu es sûr
+que tu dois partir au sud...", "pourquoi tu as éliminé la plage") rather than the planner making
+it proactively. The underlying gap: `dialogues` entries capture text with full provenance, but the
+GAMEPLAY IMPLICATION of each line lives only in a free-text `note` field, never cross-referenced
+against other clues or against newly-found spatial facts (a new room name, a new sign) as a
+deliberate, repeatable step. There's no signal that distinguishes "this area needs more mapping"
+from "this area is mapped, the answer is a clue I haven't connected yet" -- both look the same
+(a stalled Explorer thread) from the planner's seat, and the planner has been defaulting to "map
+more" when "re-read what's already known" was the right move at least twice tonight. Also worth
+noting: some interactive objects in this game are confirmed to be invisible BG-tile/no-OAM
+triggers (the `225/0` signpost, `house2_interior`'s telephone-adjacent floor trigger) -- an
+Explorer scanning for OAM sprites or new rooms could walk right past the actual answer if it's an
+untested `:a`-interaction at an already-visited position, not a new room at all.
+**Why process, not domain**: about how the planner should recognize and route a narrative/clue
+puzzle differently from an open-ended spatial mapping task -- a workflow gap, not a game fact
+(no specific clue's *meaning* is asserted here, only that clue cross-referencing isn't a step).
+**Resolution** (MetaPlanner fills in): -> pending. Planner's own proposal, offered as a starting
+point, not a final answer: (1) a lightweight `quest_clues` registry section, one entry per
+interpreted clue (source dialogue key, literal quote, current interpretation, status
+unresolved/partial/resolved, linked location once found) -- separate from `dialogues`' raw
+provenance, so clues are a trackable/queryable set, not buried prose; (2) a standing
+cross-reference step, run whenever a new spatial fact (room, place name, sign) or new dialogue is
+captured: does it resolve or refine an existing unresolved `quest_clues` entry? (3) Explorer
+mandates should say explicitly whether the task is "spatial" (map an edge/room) or "clue-directed"
+(test whether a specific already-known location/object matches a specific already-known clue),
+the latter citing the clue up front rather than exploring blind; (4) fold a
+"any `quest_clues` unresolved in an already-fully-mapped area?" check into the existing Reviewer
+cold-review cadence (same shape as the provenance-bar audit `MP5` already assigned it).
