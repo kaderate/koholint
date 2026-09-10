@@ -294,3 +294,33 @@ to be ratified), `taken without validation` (inherited from the spike, to be rev
   visual layering but with no real collision, like a floor decal) -- in that case marking its cell
   blocked would be a false negative, and the model needs a third state (sprite present, but not
   necessarily an obstacle) rather than the binary treatment assumed here.
+
+## D11 — Mobile sprites get a friendly/hostile classification, tested before chased
+
+- **Status**: ratified (September 10, 2026).
+- **Context**: an Explorer session's adaptive live-tracking experiment (the anti-patch
+  "middle ground" the owner authorized) reached genuine adjacency with `riverside_south_room`'s
+  tan creature for the first time across 5 total attempts, and still got no dialogue. A follow-up
+  investigation (reproducing a plain tap sequence with before/after screenshots + OAM reads) found
+  why: Link's own position was jumping in a direction opposite the input, and in both captured
+  instances the wandering creature was adjacent right before the jump -- a contact/collision
+  knockback, not a navigation-access problem or an input glitch. This reframes the open
+  mobile-sprite-interaction question: some of these sprites aren't NPCs at all, they're enemies,
+  and no amount of chase-tooling precision would ever produce dialogue from one. Not all mobile
+  sprites are the same kind of object -- D9 already has one CHR-confirmed counterexample
+  (`front_yard`'s creature matches `villager_screen`'s confirmed-friendly, dialogue-bearing NPC
+  byte-for-byte).
+- **Choice**: before attempting a dialogue chase on any not-yet-classified mobile sprite, run a
+  cheap contact/proximity test first (approach to near-adjacency, watch HUD hearts and Link's own
+  position for an unexplained jump) -- this is now a known, reproducible signature, cheaper than a
+  full adaptive chase-for-dialogue attempt, and tells you whether that effort is worth spending at
+  all. `visual_catalog` entries gain a status field for this (`friendly` / `hostile` / `unknown`),
+  populated as sprites get tested, alongside the existing static/mobile classification. Don't build
+  a general `lib/navigator.rb` intercept primitive yet -- the one working instance tonight was a
+  throwaway adaptive-tracking script, and that pattern is reusable as-is for confirmed-`friendly`
+  targets without committing new Navigator code on the strength of a single success.
+- **Invalidated if**: the contact-test signature (position jump + no damage, or a heart drop)
+  turns out to have a different cause in some other room (e.g. a real environmental hazard
+  unrelated to any sprite) -- then the test needs a second confirming signal (e.g. explicit
+  distance-to-nearest-OAM-sprite at the moment of the jump) before being trusted as a friendly/
+  hostile classifier on its own.
