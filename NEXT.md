@@ -97,16 +97,21 @@ names "un autre bidule qui est resté sur la plage" (another unspecified thingy 
 beach). Neither mentions a sword by name, but an unidentified item at a specific, nameable
 location is the most concrete lead this project has had for the sword hypothesis so far.
 
-**Blocker**: the beach itself hasn't been located/visited yet -- south of `starting_house`/
-`front_yard` is unmapped in `world_topology` (all charted rooms so far are north/west of
-front_yard, or reached via the villager_screen/riverside chain further afield; a beach south of
-the *starting* area is a different, untried direction). Link's equipped-item/inventory RAM
-location is still not identified either, so even reaching the beach won't let us confirm a sword
-found there IS a sword without visual/dialogue confirmation.
+**Blocker (CORRECTED, same day -- the first version of this note wrongly claimed no south route
+exists at all)**: south from `front_yard` IS already charted -- it leads to `overworld_screen2`
+(178/0, `room_labels["178/0"]`), confirmed via `world_topology.front_yard_adjacent_rooms`. The
+real gap is one room further: `overworld_screen2`'s own SOUTH and WEST edges have never been
+tested -- only its north (back to front_yard) and east (to `shop_screen`/179/0, the shop) are
+confirmed in `world_topology.front_yard_adjacent_rooms`/`shop_room_confirmed`. The beach the 2
+starting_house NPCs described is most plausibly past that untested south/west edge, not in a
+totally unmapped direction. Link's equipped-item/inventory RAM location is still not identified
+either, so even reaching the beach won't let us confirm a sword found there IS a sword without
+visual/dialogue confirmation.
 
-**Not yet tried**: navigating south from `starting_house`/`front_yard` to find this beach and the
-"bidule" NPC A mentioned; locating the inventory/equipped-item RAM bytes; folding in
-`shop_screen`'s exploration result once that subagent completes.
+**Not yet tried**: testing `overworld_screen2`'s (178/0) south and west edges for a further
+transition (the concrete next navigation step toward the "bidule" NPC A mentioned); locating the
+inventory/equipped-item RAM bytes; folding in `shop_screen`'s exploration result once that
+subagent completes.
 
 ## In-flight work (for resumability)
 
