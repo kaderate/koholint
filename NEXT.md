@@ -97,19 +97,21 @@ names "un autre bidule qui est resté sur la plage" (another unspecified thingy 
 beach). Neither mentions a sword by name, but an unidentified item at a specific, nameable
 location is the most concrete lead this project has had for the sword hypothesis so far.
 
-**Blocker (CORRECTED, same day -- the first version of this note wrongly claimed no south route
-exists at all)**: south from `front_yard` IS already charted -- it leads to `overworld_screen2`
-(178/0, `room_labels["178/0"]`), confirmed via `world_topology.front_yard_adjacent_rooms`. The
-real gap is one room further: `overworld_screen2`'s own SOUTH and WEST edges have never been
-tested -- only its north (back to front_yard) and east (to `shop_screen`/179/0, the shop) are
-confirmed in `world_topology.front_yard_adjacent_rooms`/`shop_room_confirmed`. The beach the 2
-starting_house NPCs described is most plausibly past that untested south/west edge, not in a
-totally unmapped direction. Link's equipped-item/inventory RAM location is still not identified
+**Blocker (CORRECTED TWICE, same day -- see `world_topology.world_map_reconstruction`, a full
+coordinate-grid cross-check against the SELECT map built after the owner pushed back on sloppy
+adjacency claims in conversation; check THAT entry before asserting what is/isn't explored, don't
+re-derive from prose memory)**: south from `front_yard` IS already charted, to `overworld_screen2`
+(178/0). Of 178/0's own 4 edges, N (front_yard), W (villager_screen, NOT untested -- an earlier
+version of this note wrongly said so), and E (`shop_screen`/179/0) are all confirmed; only its
+**SOUTH edge is genuinely untested** -- the single most on-narrative frontier edge on the whole
+map, since `starting_house_npc_beds` literally says "Suis la route du Sud" (follow the south
+road). `world_map_reconstruction.frontier_untested_edges` lists 7 other untested/soft edges
+project-wide for context. Link's equipped-item/inventory RAM location is still not identified
 either, so even reaching the beach won't let us confirm a sword found there IS a sword without
 visual/dialogue confirmation.
 
-**Not yet tried**: testing `overworld_screen2`'s (178/0) south and west edges for a further
-transition (the concrete next navigation step toward the "bidule" NPC A mentioned); locating the
+**Not yet tried**: testing `overworld_screen2`'s (178/0) south edge for a transition (the
+concrete next navigation step toward the "bidule" NPC A mentioned); locating the
 inventory/equipped-item RAM bytes; folding in `shop_screen`'s exploration result once that
 subagent completes.
 
