@@ -175,13 +175,24 @@ retest before assuming it needs a whole new route.
 
 ## In-flight work (for resumability)
 
-As of September 10, 2026, ~16:45 UTC, one subagent is dispatched -- check `ListAgents` before
-assuming it is idle or before re-dispatching a duplicate:
-- **Bush contact/`:a` test** -- this project has classified bushes as "blocked" purely from the
-  BG-tilemap signature method (D8), never from an actual interaction test. Testing in
-  `shop_screen`'s (179/0) yard, at the same bush cluster that was just found blocking the shop
-  door's approach -- creature-free, safe. Directly relevant to the sword hypothesis: confirms or
-  refutes what "conditionally-blocked" actually looks like today.
+Nothing dispatched as of this update (September 10, 2026, ~19:00 UTC).
+
+**Bush contact/`:a` test is DONE (September 10 2026, Explorer session)** -- first-ever direct
+interaction test on a bush, not another door-routing attempt. From `lib_shop_wide3.dump`
+(`shop_screen`/179-0, full HP), reached a reachable bush cluster in the yard's SW area (visually
+confirmed adjacent in the rendered framebuffer; not the exact x=81-94 door cluster, which is still
+unreached -- reaching it would be a 4th door-routing attempt, already closed off). Result: plain
+contact is indistinguishable from a wall -- 10 raw `Navigator.tap(:right)` calls all produced
+zero net displacement, no partial slide. HP unchanged (24/24 throughout). `:a`-while-facing
+produced no dialogue box or any UI change (3 presses + 120 idle frames, framebuffers compared
+pixel-by-pixel against a known real dialogue box from the same room -- no match, only unrelated
+ambient animation). Movement worked normally afterward (no soft-lock). Answers this session's
+falsifiable question: option (a), plain-wall behavior, confirmed; (b)/(c) refuted for this
+cluster. Does not confirm what a cutting item would do (Link has none). Full method/result in
+`terrain_collision.background_tilemap_predicts_walkability`'s newest caveat and
+`world_topology.shop_screen_door_approach`'s FOURTH SESSION note. `verified_count: 1` (single
+session) -- a retest at the exact door cluster, or with a cutting item once found, would be a
+genuinely independent check.
 
 **D9 rollout on `well_platform` + `building_screen` is DONE (September 10 2026, fresh restart, ~20
 minutes, well inside budget)** -- the earlier 6h+ abandoned attempt is superseded, not resumed.
