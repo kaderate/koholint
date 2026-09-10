@@ -136,29 +136,41 @@ pushing this specific thread further, not navigation. A follow-up session is tes
 `house2_interior`'s beds restore HP (see In-flight work below) before any 3rd push into this
 hostile territory.
 
-**Not yet tried**: resolving whether a healing mechanism exists (house2_interior's beds, in
-flight -- see below) before any further push into `226/0`'s unswept NW corner or `224/0`'s area
-past x=68,y=48, both of which cost real health to reach per this session's log; separately (lower
-priority now), testing `overworld_screen2`'s (178/0) south edge remains a real but less
-on-narrative frontier; locating the inventory/equipped-item RAM bytes. `shop_screen` is RESOLVED
-not to be this session's answer -- its yard held only a recycled-dialogue NPC and a decorative
-object, no item, and its actual interior (behind the "MAGASIN" door) was never reached -- see Next
-question below.
+**UPDATE 3, September 10 2026 (same day)**: beds do NOT heal -- tested cleanly with genuine
+below-max HP (via `wram_unmapped.link_health`'s newly-found RAM byte, see below), zero HP change
+across contact/`:a`/150-frame-idle at both reachable approach angles. No healing mechanism is
+confirmed ANYWHERE in this project as of now. Real side-finding, though: `link_health` is now
+RESOLVED (`wram_unmapped.link_health`, promoted `verified`/`verified_count: 2`) -- current HP is
+`0xDB5A` (eighth-heart units, 8 per heart), max/containers is `0xDB5B` (reads 3 everywhere
+checked so far). Important caveat on file: a direct `mmu.write` to `0xDB5A` does NOT refresh the
+visible HUD heart icons (they only redraw via the game's own damage-handling code) -- read this
+byte directly, don't trust the on-screen hearts after a manual write.
+
+**OPEN QUESTION for the owner, not decided here**: now that `0xDB5A` is a known, writable HP
+byte, a 3rd Plage Coco push COULD top HP back up with a direct write before continuing rather than
+finding a real in-game heal. That's a genuine paradigm choice (save-editing/state-injection vs.
+staying inside legitimate play, even on throwaway scratch checkpoints), not something to decide
+unilaterally -- flagged rather than acted on. Until the owner weighs in, this thread stays paused;
+`shop_screen`'s door and `overworld_screen2`'s south edge are safer, unblocked fronts in the
+meantime. `shop_screen` is otherwise RESOLVED not to be this session's answer -- its yard held
+only a recycled-dialogue NPC and a decorative object, no item, and its actual interior (behind the
+"MAGASIN" door) was never reached -- see Next question below.
 
 ## In-flight work (for resumability)
 
-As of September 10, 2026, two subagents were dispatched and may still be running or may have
-completed with results not yet folded in here -- check `ListAgents` before assuming either is
-idle or before re-dispatching a duplicate:
+As of September 10, 2026, one subagent remains dispatched and may still be running or may have
+completed with results not yet folded in here -- check `ListAgents` before assuming it is idle or
+before re-dispatching a duplicate:
 - **D9 rollout on `well_platform` + `building_screen`** (visual-catalog survey, same method as
   the `front_yard`/`villager_screen`/`crate_room`/`screen3_north` rollout already in
   `DECISIONS.md`'s D9 entry). Running unusually long (5h+ as of last check, vs. ~45-90 min for
   similar tasks) -- two messages sent (a status check, then an explicit stop-and-report
   instruction), no reply folded in here yet. Likely genuinely stuck; if still silent next check,
   treat as abandoned and re-dispatch fresh rather than waiting indefinitely.
-- **`house2_interior` bed-healing test** -- does resting on a bed restore HP? Directly unblocks
-  further `224/0`/`226/0` exploration if confirmed (both are currently a health sink with no known
-  recovery). Low-risk, small budget.
+
+`house2_interior`'s bed-healing test is DONE (September 10 2026) -- beds do NOT heal, tested
+cleanly; see "Quest hypothesis" UPDATE 3 above for the full result and the open
+save-editing-vs-legitimate-play question it raised, still awaiting the owner's call.
 
 `226/0`/`224/0`'s sweep for the "bidule" is DONE for this round (September 10 2026) -- not found,
 both rooms confirmed to cost real health with no healing mechanism on file -- see "Quest
