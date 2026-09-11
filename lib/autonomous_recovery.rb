@@ -3,6 +3,7 @@
 require "json"
 require "fileutils"
 require "securerandom"
+require "time"
 
 module Koholint
   module AutonomousRecovery
@@ -117,7 +118,8 @@ module Koholint
     end
 
     class Context
-      def self.project(task, world_facts: [], tools: [], max_experiments: nil)
+      def self.project(task, world_facts: [], tools: [])
+        total = task.budget.fetch("max_experiments", 3)
         {
           "goal" => task.goal,
           "blocker" => task.blocker,
@@ -125,12 +127,7 @@ module Koholint
           "recent_experiments" => task.experiments.last(5).map(&:to_h),
           "world_facts" => world_facts,
           "tools" => tools,
-          "budget" => {
-            "remaining_experiments" => [
-              max_experiments || task.budget.fetch("max_experiments", 3) - task.experiments.length,
-              0
-            ].max
-          }
+          "budget" => {"remaining_experiments" => [total - task.experiments.length, 0].max}
         }
       end
     end
