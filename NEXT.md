@@ -229,6 +229,11 @@ retest before assuming it needs a whole new route.
 
 ## In-flight work (for resumability)
 
+**Owner correction, September 11 2026**: "Il y a 8 livres et pas 4 dans la bibliothèque" --
+crate_room's 6 "confirmed hard negative" grid crates were tested with repeated short `:a` taps,
+never one sustained ~110-frame hold -- the exact same bug class that hid `225/0`'s signpost 2nd
+page. Re-testing all 6 with a proper hold now, see below.
+
 As of September 11, 2026, ~01:35 UTC, one subagent remains dispatched -- check `ListAgents`
 before assuming it is idle or before re-dispatching a duplicate:
 - **`overworld_screen2`'s (178/0) untested SOUTH edge** -- with Plage Coco now believed
