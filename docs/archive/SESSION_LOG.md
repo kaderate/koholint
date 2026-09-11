@@ -1088,3 +1088,104 @@ chase-for-dialogue attempt and tells you whether that effort is worth spending a
 this. Archived here per `METAPLANNER.md#MP8` once `DECISIONS.md`'s D11 entry carried the ratified
 decision and `NEXT.md`'s own "Decisions in force" section pointed to it, leaving nothing left to
 know in this paragraph that isn't already covered elsewhere.
+
+## The Plage Coco / sword-hypothesis thread, September 10-11, 2026 (archived once superseded)
+
+**Current hypothesis (September 10, 2026)**: the next real objective is finding/obtaining a
+sword, and there's now a concrete place to look for it. Evidence: (1) bushes are
+CONDITIONALLY-blocked terrain (cuttable, not permanently blocked scenery); (2) two crate_room
+hint books already read describe sword mechanics -- `dialogues.crate_room_book_b` (a
+charge-and-release spin-attack technique) and `dialogues.crate_room_book_c` (items that can
+replace the sword slot in combat); (3) no sword is confirmed obtained; (4) `starting_house`
+(163/16) turned out to hold 2 never-before-interacted OAM NPCs (owner-prompted re-visit -- see
+`dialogues.starting_house_npc_bench`/`starting_house_npc_beds`) -- both independently point south
+to "la plage" (the beach where Link washed up) and warn of monsters there; NPC A explicitly names
+"un autre bidule qui est resté sur la plage" (another unspecified thingy left on the beach).
+
+**Blocker (corrected three times in conversation, each time by the owner asking "are you sure?"
+rather than trusting the claim -- see `METAPLANNER_ESCALATIONS.md`'s ESC7 for the process lesson
+this taught)**: the beach is `select_map_screen`'s own in-game place-name for BOTH
+`riverside_south_river_room` (224/0) AND `riverside_flower_clearing` (225/0) -- "Plage Coco".
+Both rooms are reached via `well_platform` -> `building_screen` -> `riverside_screen` ->
+`riverside_south_room` (west then south from front_yard), not literally south from front_yard.
+
+**UPDATE 1**: `225/0`'s previously-abandoned NE route (blocked by "unexplained diagonal slides")
+turned out to be a knockback + ordinary terrain, not a wall -- resolved into a brand-new room,
+`226/0` riverside_ne_cove. No bidule found there (entry point only, budget spent on the route).
+
+**UPDATE 2**: `226/0`'s 3 open directions and 2 new directions in `224/0` swept -- still no
+bidule, and a real blocker surfaced: both rooms are dominated by a hostile tile=0x60-family
+creature, shield-hold only mitigates (not eliminates) damage, every route ended near 1 heart, and
+no healing mechanism was known yet.
+
+**UPDATE 3**: `house2_interior`'s beds do NOT heal (tested cleanly with genuine below-max HP).
+Side-finding: `wram_unmapped.link_health` resolved -- current HP `0xDB5A` (8 units/heart), max
+`0xDB5B`. A direct `mmu.write` to `0xDB5A` does NOT refresh the HUD heart icons -- read the byte
+directly, never trust the icons after a manual write.
+
+**D12 + amendment**: RAM writes to HP are case-by-case by default (owner decision, ratified as
+D12). The owner then granted a SCOPED standing approval for this specific cluster/goal ("Oui pour
+toute poussée nécessaire à la découverte de l'épée, sur la plage coco") -- HP writes on scratch
+checkpoints no longer needed a fresh ask for further Plage Coco pushes specifically.
+
+**UPDATE 4**: using the new permission, `224/0`'s remaining ground and `226/0`'s NW cul-de-sac
+were pushed to a real conclusion -- two new room-to-room doors found (`224/0`<->`225/0` north
+edge, `224/0`<->`208/0` NW corner), no new ground, no bidule. Only `226/0`'s east/south side
+(past x=46,y=26) remained genuinely unswept.
+
+**UPDATE 5**: `riverside_east_room` (209/0) swept west/center -- no bidule; its east half blocked
+by a 2-creature pocket, closed under the anti-patch rule (6+ attempts).
+
+**D13**: 4 independent sessions had now hand-rolled the same shield+push+HP-top-up tactic across
+4 rooms -- D11's own "recur a few times first" condition for building a real `lib/navigator.rb`
+avoidance primitive was met. Owner ratified D13; a Builder session shipped
+`Navigator.avoid_hostiles_and_move!`/`avoid_hostiles_and_push!` (auto-shield-hold, OAM-hazard-bias),
+validated live against `209/0`'s east bottleneck -- the first-guess default (40px radius)
+performed WORSE than the ad-hoc tactic, retuned live to 16px, then reached x=140 (past the
+manual tactic's own ceiling). A genuine safety bug (HP floor checked only between whole steps,
+not every internal tap) was found and fixed mid-validation. Side-finding: the B-slot equipped-item
+byte, previously unlocated, is `0xDB00` (shield=4).
+
+**UPDATE 6**: D13's primitive closed both of UPDATE 5's remaining pockets (`209/0`'s east half,
+`226/0`'s east/south side, second validation with NO retuning needed). **The entire Plage Coco
+cluster (224/0, 225/0, 226/0, 209/0) is exhaustively swept -- no bidule found anywhere in any of
+the four rooms**, across this whole multi-session search. This substantially weakened the
+"bidule is in Plage Coco" reading.
+
+**UPDATE 7**: pivoted to `overworld_screen2`'s (178/0) never-tested SOUTH edge -- the literal
+"suis la route du Sud" reading, distinct from Plage Coco's actual west-then-south route. **Result:
+REFUTED** -- a genuine uniform wall across 5 swept columns, confirmed via `Terrain.signature_at`
+(no door-shaped break, unlike a real door elsewhere in this project). No hostile sprite present,
+zero HP spent.
+
+**Owner-prompted crate_room correction**: "Il y a 8 livres et pas 4 dans la bibliothèque" --
+crate_room's 6 "confirmed hard negative" grid crates had only ever been tested with short `:a`
+taps, never a genuine ~110-frame hold (the same bug class that hid `225/0`'s signpost's 2nd page,
+also found this session: "Se protéger avec un bouclier !", confirming the shield is meant to block
+sea-urchin damage specifically). Re-tested properly: **all 6 were real, unread books** -- the
+room has 8 total, matching the owner's count exactly. Two reproduce `book_a`/`book_b`'s
+already-known text (at genuinely distinct physical crates, correcting a same-day
+checkpoint-naming-collision misdiagnosis that had wrongly concluded book_a/b didn't physically
+exist as separate objects). Four are brand new: `book_e` (shield-parry mechanic, hints at a
+laser-blocking shield variant beyond the standard one), `book_f` (Warp holes exist on Koholint,
+untested anywhere in this project -- a real navigation lead), `book_g` (opens the real SELECT-map
+atlas UI directly from its own dialogue), `book_h` (item-gated -- refuses without "la Loupe", a
+magnifying glass -- the first confirmed reference to a specific named item this project hasn't
+found). A real methodological trap found along the way: each crate's true interactive hitbox is
+narrow (~8px); an approach column off by 5-6px silently walks through the gap between crates with
+every `Navigator.move!` reading `:ok`, producing a false "tested, no response" the same way a
+`house2_interior`-style narrow door trigger does.
+
+**Owner also provided the official game manual** (PDF, read in full, distilled into
+`docs/GAME_MANUAL_NOTES.md` per D14 -- copyrighted material, not committed verbatim). Its
+`!?`/"message" SELECT-map marker system was tested against this project's own map data and
+REFUTED as a per-cell marker (the "icon legend" region it was compared against turned out to be
+off-screen VRAM never shown to a real player -- a real terminology correction). Manual-derived
+leads not yet dispatched: pushing (no item needed) and diving (`B` in water) are both untested
+mechanics in this project; Plage Coco's water strips were always treated as boundaries, never
+actually dived into.
+
+**State at time of archival**: the sword hypothesis stands, broadened by two new named leads
+(Warp holes, "la Loupe") that don't relocate to a specific room yet. See `NEXT.md`'s current
+"Quest hypothesis" section for the live state -- this whole block is historical detail, not
+needed to resume.
