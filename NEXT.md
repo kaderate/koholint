@@ -35,7 +35,8 @@ grids -- already fulfilled and recorded under D8 in `DECISIONS.md`; no other fil
 | Indicator | Value |
 |---|---|
 | Rooms found | 19 labeled in `data/ram_registry.json`'s `room_labels` (8 "charted", 11 "glimpsed"/less -- `224/0` riverside_south_river_room and `225/0` riverside_flower_clearing, south/east of `riverside_south_room`, both further explored (224/0's scroll mechanism and "totem" identity resolved, 225/0's ground-accessible extent mapped plus its NE route now resolved into a real room transition); `209/0` riverside_east_room, found east of `riverside_south_room`'s south band (past the prior x=134,y=115 stop point), fully swept September 10-11 2026 (west/center then, east half via the D13 primitive) -- no bidule found anywhere in it; `179/0` shop_screen, first actually explored September 10 2026 -- turns out to be the shop's EXTERIOR yard, not its interior; see `world_topology.shop_screen_door_approach` and Next question below; `226/0` riverside_ne_cove, reached from `225/0`'s previously-abandoned NE route September 10 2026, fully swept September 11 2026 via the D13 primitive (status promoted glimpsed -> charted) -- no bidule found anywhere in it either, see Next question below). Graph and screenshots published in the Koholint Atlas artifact (not yet updated with these rooms or this session's findings). D9 visual-catalog `visual_survey` now covers 6/19 (`front_yard`, `villager_screen` pilot + `crate_room`, `screen3_north` rollout + `well_platform`, `building_screen` rollout, fresh restart of an abandoned attempt, September 10 2026) -- see `DECISIONS.md`'s D9 entry. |
-| Dialogues / readable text | 14 confirmed entries in `ram_registry.json`'s `dialogues` (villager duo's shared line, room176's two save-mechanic NPC lines, crate_room's library fully read -- 4 books + 1 wall object, 9/9 tile objects resolved via OAM; house2_interior's 2 OAM-verified telephone objects; `riverside_flower_clearing_sign` (225/0) -- a two-page signpost, "Attention aux oursins !" then "Se protéger avec un bouclier !" (2nd page found September 11 2026, needs a long `:a` hold to reveal), NOT a chest/item; `shop_screen_yard_npc` (179/0) -- a friendly yard NPC reciting the SAME save-tip line as room176's pair, first confirmed case of a reused dialogue asset, September 10 2026 -- all hypothesis/verified_count 1). |
+| Dialogues / readable text | 19 confirmed entries in `ram_registry.json`'s `dialogues` (villager duo's shared line, room176's two save-mechanic NPC lines, crate_room's library fully read -- 8 books + 1 wall object, 9/9 tile objects resolved via OAM
+(corrected September 11 2026 from an earlier, buggy "4 books" count -- see In-flight work below); house2_interior's 2 OAM-verified telephone objects; `riverside_flower_clearing_sign` (225/0) -- a two-page signpost, "Attention aux oursins !" then "Se protéger avec un bouclier !" (2nd page found September 11 2026, needs a long `:a` hold to reveal), NOT a chest/item; `shop_screen_yard_npc` (179/0) -- a friendly yard NPC reciting the SAME save-tip line as room176's pair, first confirmed case of a reused dialogue asset, September 10 2026 -- all hypothesis/verified_count 1). |
 | Terrain / collision | D8 live: reads BG tilemap signatures from VRAM (`lib/terrain.rb`), 93.1%-validated against live-probe oracle. Primary method; live probing kept as fallback. |
 | SELECT map (fog-of-war) | Widest-coverage checkpoint: `lib_explorer_225_fresh_entry.dump` (8 lit cells, superset of `main.dump`'s own 6). 6/8 cells now have a place name read from a checkpoint standing IN that exact cell's room ("Village des Mouettes", "Bibliothèque", "Sud du Village" x2 -- `176/0` and `192/0` share it, "Plage Coco" x2), `select_map_screen`'s SEVENTH + EIGHTH SESSION entries (`192/0` riverside_screen closed EIGHTH SESSION, new working route: nudge x to ~88 from `room176_entry_from_room160.dump`, then plain `:down` taps, no special alignment needed -- corrects the earlier "x=94, 8 calls" figure, which doesn't reproduce). Remaining 2 cells (the chain's earliest 2 rooms) confirmed NOT free-readable from any on-file checkpoint (checked EIGHTH SESSION) -- would need a from-boot replay. Scratchpad images ready for the Atlas (`select_map_full_*.png`), not yet pulled in. **NINTH SESSION, September 11 2026**: owner's game-manual-sourced `!?`/"message"-marker hypothesis tested directly -- REFUTED for the literal claim (no interior cell ever reuses the off-screen icon-legend block's own tile IDs, checked within-checkpoint across 7 checkpoints), but found a genuinely new fact: interior lit cells use 3 visually distinct glyphs, not one uniform "visited" dot -- a new glyph (`0xfd`) covers 4 rooms (`192/0`,`208/0`,`224/0`,`225/0`) at once, keyed to trail ROW not room content (reproduced across both coordinate-anchor families). Doesn't correlate cleanly with which rooms have confirmed dialogue, so likely decorative/distance-based, not a location hint -- see `select_map_screen`'s note for full detail, `hypothesis`/`verified_count: 1`. |
 | Save/continue | Mechanically verified end-to-end: hold A+B+START+SELECT opens the real save menu, "SAUVEGARDER & QUITTER" writes a real `.sav` (MD5-diffed), "REVENIR AU JEU" continues at the room's own door. This is the durable-progress path -- see "Standing conventions" below. |
@@ -257,10 +258,35 @@ Also flagged, not yet dispatched: pushing (no item needed, distinct from pulling
 in water) are both untested mechanics in this project -- Plage Coco's water strips were always
 treated as boundaries, never actually dived into.
 
-**Owner correction, September 11 2026**: "Il y a 8 livres et pas 4 dans la bibliothèque" --
-crate_room's 6 "confirmed hard negative" grid crates were tested with repeated short `:a` taps,
-never one sustained ~110-frame hold -- the exact same bug class that hid `225/0`'s signpost 2nd
-page. Re-testing all 6 with a proper hold now, see below.
+**Owner correction, September 11 2026 -- RESOLVED, same day (Explorer subagent)**: "Il y a 8
+livres et pas 4 dans la bibliothèque" -- crate_room's 6 "confirmed hard negative" grid crates
+were tested with repeated short `:a` taps, never one sustained ~110-frame hold -- the exact same
+bug class that hid `225/0`'s signpost 2nd page. CONFIRMED: all 6 are real book stands. Fresh
+(never-before-interacted) approaches from `crate_room_entry.dump`, holding `:a` ~110-120 frames
+via `mmu.joypad.key_state`, triggered a dialogue on every single one -- 6/6, not some subset. Two
+of the six (top row cols 2/3) turn out to reproduce `dialogues.crate_room_book_a`/`book_b`'s
+already-known text verbatim, which also corrects the Sept 11 (same-day, earlier) "unresolved
+puzzle resolved" paragraph below: book_a/book_b ARE real, physically distinct objects (columns
+2/3), not the same sprite as book_c/book_d (column 1) under a naming collision as that session
+concluded -- see `world_topology.crate_room_and_riverside_content`'s newest correction paragraph.
+The other 4 (top col4, bottom cols 2-4) are brand-new content, now `dialogues.crate_room_book_e`
+(shield-parry mechanic + a laser-blocking shield variant), `book_f` (Warp holes on Cocolint --
+untested elsewhere in this project, a real navigation lead), `book_g` (opens the actual
+SELECT-map atlas UI directly from its own dialogue, a mechanic not seen before), and `book_h`
+(item-gated -- refuses without "la Loupe", a magnifying glass, the first confirmed reference to
+an item this project hasn't found). The room's book count is now 8, not 2 -- matches the owner's
+"8 livres" exactly (2 known + 6 newly confirmed). A real positioning trap found along the way,
+also logged in the registry: each crate's true interactive hitbox is narrow (~8px), and an
+approach column that misses it by 5-6px silently walks straight past through the gap to the next
+row/the wall, every `Navigator.move!` call reporting `:ok` -- easy to misread as "reached and
+tested" when the room floor is actually still open there. Fixed by aligning x to within ~2-4px of
+the target BEFORE approaching vertically and stopping on the first `:blocked`, not a fixed tap
+count. Full text of all 4 new books and the corrected room content: `data/ram_registry.json`'s
+`dialogues.crate_room_book_e/f/g/h` and `world_topology.crate_room_and_riverside_content`. All
+new/updated entries `hypothesis`/`verified_count: 1` (single session) -- not yet independently
+reconfirmed. Does not relocate the "bidule" or touch the sword/Plage Coco thread -- purely a
+bookkeeping correction plus 4 new gameplay-mechanic leads (shield parry+laser shield, Warp holes,
+the map-atlas book, the Loupe-gated book).
 
 As of September 11, 2026, ~01:35 UTC, one subagent remains dispatched -- check `ListAgents`
 before assuming it is idle or before re-dispatching a duplicate:
@@ -623,8 +649,18 @@ own data model), not something to implement ad hoc.
   holds floor decoration + the dialogue scratch-tile range while text is open. Its 9 objects
   (`tile=0x58`) are OAM sprites: 8 in the visible 2x4 floor grid (OAM y=48/96, x=28/60/108/140) +
   1 embedded in the north wall (OAM y=14, x=84, attrs=0x2). Read OAM (`0xFE00-0xFE9F`) directly.
-- Don't re-test crate_room's 6 decorative grid positions (top/bottom rows, cols 2-4) -- exhaustively
-  confirmed negative, including a side-approach and a 5x-tap deep retest on one of them.
+- CORRECTED September 11 2026: crate_room's 6 "decorative" grid positions (top/bottom rows, cols
+  2-4) are NOT decorative -- all 6 are real book stands, confirmed the same day via a sustained
+  ~110-120 frame `:a` hold from a fresh approach. The prior "exhaustively confirmed negative"
+  claim (including a side-approach and a 5x-tap retest) was itself the bug: short taps, even
+  repeated ones with long settle waits between them, don't trigger these objects. Don't re-test
+  them again expecting a negative -- see `dialogues.crate_room_book_a/b/e/f/g/h` and
+  `world_topology.crate_room_and_riverside_content`'s correction paragraph for the full text and
+  root cause. If a future session revisits this room, watch for the companion positioning trap
+  found alongside this fix: an approach column off by more than ~5-6px from a crate's true
+  ~8px-wide hitbox silently walks straight past it (every `move!` reads `:ok`) instead of
+  blocking -- align x tightly before the final vertical approach, don't trust "reached the row"
+  as "reached the crate."
 - Don't trust a `nudge_axis!` tolerance without checking where it actually lands -- `move!`
   advances in consistent ~8px steps from a given spawn parity, so a target that isn't itself on
   that step sequence (e.g. `y=106` from villager_screen's spawn parity) resolves to whichever
