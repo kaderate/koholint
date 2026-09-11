@@ -22,7 +22,7 @@ class AutonomousRecoveryTest < Minitest::Test
     Dir.mktmpdir do |dir|
       path = File.join(dir, "research.json")
       script = <<~RUBY
-        require_relative #{File.expand_path("../lib/autonomous_recovery", __dir__).inspect}
+        require #{File.expand_path("lib/autonomous_recovery", Dir.pwd).inspect}
         store = Koholint::AutonomousRecovery::Store.new(ARGV.fetch(0))
         task = Koholint::AutonomousRecovery::ResearchTask.new(
           id: "r1", goal: "open the door", blocker: {"status" => "blocked"},
