@@ -206,6 +206,13 @@ leading sword-hypothesis location, or reconsider the lead itself (e.g. the NPCs'
 reference might point somewhere not yet reached, not necessarily this specific cluster). Full
 detail: `room_labels['226/0']`'s newest addendum and "In-flight work" below.
 
+**UPDATE 7, September 11 2026 (pivot)**: the lead now moves to `overworld_screen2`'s (178/0)
+SOUTH edge -- never tested, despite being the single most literal reading of `starting_house_npc_beds`'s
+"suis la route du Sud" (Plage Coco was reached via WEST then south, a different geometric
+direction from `front_yard`). Flagged hours ago in `world_map_reconstruction.frontier_untested_edges`
+as "the single most on-narrative untested edge in the whole known map" but never actually pursued
+-- attention went to Plage Coco's place-name match instead. In flight now, see below.
+
 `shop_screen`'s door, retry 3 is DONE (September 10 2026) -- CLOSED, anti-patch budget spent, do
 not attempt a 4th routing try. Both the NPC-east/NE route and the hedge-maze route failed cleanly
 (hedge maze turns out to be `shop_screen`'s own north boundary, connecting to the already-known
@@ -222,7 +229,15 @@ retest before assuming it needs a whole new route.
 
 ## In-flight work (for resumability)
 
-No subagent currently dispatched.
+As of September 11, 2026, ~01:15 UTC, one subagent is dispatched -- check `ListAgents` before
+assuming it is idle or before re-dispatching a duplicate:
+- **`overworld_screen2`'s (178/0) untested SOUTH edge** -- with Plage Coco now believed
+  exhaustively swept (no bidule), this is the pivot: the literal, most direct "south road" reading
+  of the starting_house NPCs' clue, never actually pursued (attention went to Plage Coco instead).
+  See `world_topology.world_map_reconstruction.frontier_untested_edges` for why this was always
+  flagged as "the single most on-narrative untested edge" but never tested. Clue-directed, has
+  access to D13's new avoidance primitive if needed; does NOT have D12's Plage-Coco HP-write scope
+  (new room/purpose, would need a fresh ask).
 
 **`226/0`'s last unswept pocket is DONE, September 11 2026 (independent Explorer subagent, D13's
 second validation data point)** -- still NO "bidule" found, and this closes out the ENTIRE Plage
