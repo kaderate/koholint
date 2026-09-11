@@ -418,3 +418,37 @@ to be ratified), `taken without validation` (inherited from the spike, to be rev
   item-ID-to-"shield" mapping is inferred from being the only inventory change this project has
   ever observed (Tarin's gift), not cross-checked against any external item-ID table.
   **Validation retest result**: see the same entry's next addendum below.
+- **Validation retest, September 11 2026 (same Builder session), 209/0's east bottleneck**: per
+  D13's own invalidation clause, retested against `riverside_east_room`'s creature-pocket
+  bottleneck (room_labels['209/0']) from `lib_e209_final_state.dump` (x=60,y=74, the exact point
+  the ad-hoc baseline session stopped at, CLOSED under the anti-patch rule after "6+ distinct
+  tries... oscillated between x~52-70 without reaching the room's east half", HP dropping "as low
+  as 8/24 twice", east area x>95 explicitly logged UNREACHED). FIRST FINDING (a real regression,
+  not hidden): the initially-shipped default (`HAZARD_PROXIMITY_PX = 40`, ~2.5 tiles) did WORSE
+  than the ad-hoc tactic in this exact spot -- 2 calls, 12 damage, and the avoidance bias walked
+  Link backward into the room's already-fully-explored west dead-end pocket (x=52 -> x=4) chasing
+  the locally-optimal-but-wrong "up" direction against a hazard sitting south, then took another
+  16 damage over 2 more calls making zero position progress once there (a real wall, not a
+  transient block). A 0px-radius control (avoidance disabled, shield-hold only, i.e. exactly the
+  ad-hoc tactic minus manual scripting) fared much better in the same spot: 8 calls, only 4 total
+  damage, though net ZERO position progress (matches the baseline's own "oscillated... without
+  reaching" outcome closely, just cheaper). A 16px-radius variant (~1 tile, closer to contact
+  range than anticipation range) beat both: 22 total calls across 4 healed batches, 56 total
+  damage, and -- unlike either the 40px or 0px runs, and unlike the entire ad-hoc baseline session
+  -- reached genuinely new ground: x=60 -> x=140 (past the x>95 boundary the baseline never
+  crossed), y drifting from 74 down to 46, before hitting the room's real east wall (x=140,
+  reproduced blocked across a full batch) and a real north wall further up. No `bidule`/item/
+  chest/signpost found anywhere in the newly-reached area (screenshots checked at every stop) --
+  see room_labels['209/0']'s own addendum for the full detail and checkpoint chain. Shipped
+  default changed to `HAZARD_PROXIMITY_PX = 16` based on this evidence (see the constant's own
+  comment in `lib/navigator.rb`) -- `AVOIDANCE_WEIGHT` was not independently retuned this session,
+  flagged as a follow-up knob if a future room shows the same over-eager-bias failure mode at 16px.
+  3 D12-scoped HP-writes used, all on scratch checkpoints (`lib_e209_variantC_batch*.dump` chain),
+  never `main.dump`, logged transparently at each use.
+  **VERDICT**: measurably helped, once retuned -- the untested/first-guess default did not, and
+  that gap would have gone unnoticed without this retest. Reaching x=140 (versus the baseline's
+  hard stop at ~x=94, closed under the anti-patch rule for a full session) is the clearest signal:
+  the primitive finished what the ad-hoc tactic gave up on, in the same room, at a comparable
+  damage order of magnitude. D13 stays ratified; its `HAZARD_PROXIMITY_PX` default is now
+  evidence-based rather than a first guess, and the 40px failure mode is recorded so it isn't
+  silently reintroduced by a future "seems more thorough" tweak.

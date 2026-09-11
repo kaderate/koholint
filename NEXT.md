@@ -34,7 +34,7 @@ grids -- already fulfilled and recorded under D8 in `DECISIONS.md`; no other fil
 
 | Indicator | Value |
 |---|---|
-| Rooms found | 19 labeled in `data/ram_registry.json`'s `room_labels` (8 "charted", 11 "glimpsed"/less -- `224/0` riverside_south_river_room and `225/0` riverside_flower_clearing, south/east of `riverside_south_room`, both further explored (224/0's scroll mechanism and "totem" identity resolved, 225/0's ground-accessible extent mapped plus its NE route now resolved into a real room transition); `209/0` riverside_east_room, found east of `riverside_south_room`'s south band (past the prior x=134,y=115 stop point), swept west/center this session (September 10 2026), east half still unreached; `179/0` shop_screen, first actually explored September 10 2026 -- turns out to be the shop's EXTERIOR yard, not its interior; see `world_topology.shop_screen_door_approach` and Next question below; `226/0` riverside_ne_cove, NEW September 10 2026 -- reached from `225/0`'s previously-abandoned NE route, entry point only, see Next question below). Graph and screenshots published in the Koholint Atlas artifact (not yet updated with these rooms or this session's findings). D9 visual-catalog `visual_survey` now covers 6/19 (`front_yard`, `villager_screen` pilot + `crate_room`, `screen3_north` rollout + `well_platform`, `building_screen` rollout, fresh restart of an abandoned attempt, September 10 2026) -- see `DECISIONS.md`'s D9 entry. |
+| Rooms found | 19 labeled in `data/ram_registry.json`'s `room_labels` (8 "charted", 11 "glimpsed"/less -- `224/0` riverside_south_river_room and `225/0` riverside_flower_clearing, south/east of `riverside_south_room`, both further explored (224/0's scroll mechanism and "totem" identity resolved, 225/0's ground-accessible extent mapped plus its NE route now resolved into a real room transition); `209/0` riverside_east_room, found east of `riverside_south_room`'s south band (past the prior x=134,y=115 stop point), fully swept September 10-11 2026 (west/center then, east half via the D13 primitive) -- no bidule found anywhere in it; `179/0` shop_screen, first actually explored September 10 2026 -- turns out to be the shop's EXTERIOR yard, not its interior; see `world_topology.shop_screen_door_approach` and Next question below; `226/0` riverside_ne_cove, NEW September 10 2026 -- reached from `225/0`'s previously-abandoned NE route, entry point only, see Next question below). Graph and screenshots published in the Koholint Atlas artifact (not yet updated with these rooms or this session's findings). D9 visual-catalog `visual_survey` now covers 6/19 (`front_yard`, `villager_screen` pilot + `crate_room`, `screen3_north` rollout + `well_platform`, `building_screen` rollout, fresh restart of an abandoned attempt, September 10 2026) -- see `DECISIONS.md`'s D9 entry. |
 | Dialogues / readable text | 14 confirmed entries in `ram_registry.json`'s `dialogues` (villager duo's shared line, room176's two save-mechanic NPC lines, crate_room's library fully read -- 4 books + 1 wall object, 9/9 tile objects resolved via OAM; house2_interior's 2 OAM-verified telephone objects; `riverside_flower_clearing_sign` (225/0) -- a signpost reading "Attention aux oursins !", NOT a chest/item; `shop_screen_yard_npc` (179/0) -- a friendly yard NPC reciting the SAME save-tip line as room176's pair, first confirmed case of a reused dialogue asset, September 10 2026 -- all hypothesis/verified_count 1). |
 | Terrain / collision | D8 live: reads BG tilemap signatures from VRAM (`lib/terrain.rb`), 93.1%-validated against live-probe oracle. Primary method; live probing kept as fallback. |
 | SELECT map (fog-of-war) | Widest-coverage checkpoint: `lib_explorer_225_fresh_entry.dump` (8 lit cells, superset of `main.dump`'s own 6). 6/8 cells now have a place name read from a checkpoint standing IN that exact cell's room ("Village des Mouettes", "Bibliothèque", "Sud du Village" x2 -- `176/0` and `192/0` share it, "Plage Coco" x2), `select_map_screen`'s SEVENTH + EIGHTH SESSION entries (`192/0` riverside_screen closed EIGHTH SESSION, new working route: nudge x to ~88 from `room176_entry_from_room160.dump`, then plain `:down` taps, no special alignment needed -- corrects the earlier "x=94, 8 calls" figure, which doesn't reproduce). Remaining 2 cells (the chain's earliest 2 rooms) confirmed NOT free-readable from any on-file checkpoint (checked EIGHTH SESSION) -- would need a from-boot replay. Scratchpad images ready for the Atlas (`select_map_full_*.png`), not yet pulled in. |
@@ -208,14 +208,18 @@ retest before assuming it needs a whole new route.
 
 ## In-flight work (for resumability)
 
-As of September 11, 2026, ~00:15 UTC, one subagent is dispatched -- check `ListAgents` before
-assuming it is idle or before re-dispatching a duplicate:
-- **D13 Builder task: hostile-avoidance `lib/navigator.rb` primitive** -- owner-approved (see
-  `DECISIONS.md`'s D13) after 4 Explorer sessions independently hand-rolled the same
-  shield-hold+push+HP-top-up tactic across the Plage Coco cluster. Building a real, committed
-  method (not a scratchpad script), validated by a live retest against one of the 2 remaining
-  unswept pockets (`226/0` east/south past x=46,y=26, or `209/0` east half). Report is expected to
-  lead with whether the investment actually paid off -- don't assume yes.
+**D13 Builder task DONE, September 11, 2026** -- `lib/navigator.rb` gained
+`Navigator.avoid_hostiles_and_move!`/`avoid_hostiles_and_push!` (OAM-hazard-biased, auto-shield-hold
+via a new `Navigator.shield_equipped?`/`move_holding!` pair), validated live against `209/0`'s east
+bottleneck (the pocket the ad-hoc tactic left CLOSED under the anti-patch rule, see below). VERDICT:
+measurably helped, but only after a live-found correction -- the first-guess default
+(`HAZARD_PROXIMITY_PX=40`) performed WORSE than the ad-hoc tactic (walked Link backward into the
+room's own west dead-end, 28 damage for zero progress); retuned to `16` based on that same retest,
+which then reached x=140 (past the x>95 boundary the ad-hoc session never crossed) for 56 damage
+across 22 calls. No bidule found in the newly-reached ground. Side finding: the B-slot equipped-item
+byte, previously unlocated, is now `0xDB00` (hypothesis, `verified_count: 1`) --
+`data/ram_registry.json`'s `wram_unmapped.equipped_b_item`. Full detail: `DECISIONS.md`'s D13 entry
+(2 addenda: API choice, validation retest) and `room_labels['209/0']`'s own addendum.
 
 **`riverside_east_room` (209/0) full exploration is DONE (September 10 2026, clean redispatch after
 the earlier container-restart loss noted below)** -- still NO "bidule" found, but the room now has
@@ -235,6 +239,10 @@ push. HP-write permission (D12 Plage Coco amendment) used twice (`0xDB5A` 8->24 
 scratch checkpoints, both logged with cause) plus one no-op call (already at max, logged anyway for
 transparency). Full detail in `room_labels['209/0']`. See "Quest hypothesis" below for what this
 means for the sword lead.
+**UPDATE, September 11 2026 (D13 Builder validation)**: the "genuinely different tactic" this note
+asked for now exists and closed the rest of this room -- see "In-flight work"'s D13 entry above.
+East half swept to the room's real x=140 east wall and a real north wall further up; still no
+bidule anywhere in the room.
 
 **Container restart, September 10 2026, ~20:15 UTC**: this session's container restarted, killing
 all in-flight subagents with no loss to git (last commit `0856ffe` survived) or to

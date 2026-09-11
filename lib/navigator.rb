@@ -144,8 +144,14 @@ module Koholint
     EQUIPPED_B_ITEM_ADDRESS = 0xDB00
     SHIELD_ITEM_ID = 4
 
-    HAZARD_PROXIMITY_PX = 40 # ~2.5 tiles -- starts biasing before contact range, not just after it
-    AVOIDANCE_WEIGHT = 1.5 # outweighs straight-line progress once a hazard is inside the radius
+    # D13's own validation retest (209/0's east bottleneck) found 40px (~2.5 tiles) biased away
+    # from hazards far too eagerly in this room's dense multi-creature pocket -- it walked Link
+    # backward into an already-explored dead end and took MORE damage than plain shield+push with
+    # avoidance disabled entirely (radius: 0). 16px (~1 tile, closer to contact range) is what
+    # actually reached genuinely new ground east of the bottleneck in the same room -- see this
+    # entry's own validation addendum in DECISIONS.md for the full comparison.
+    HAZARD_PROXIMITY_PX = 16
+    AVOIDANCE_WEIGHT = 1.5 # outweighs straight-line progress once a hazard is inside the radius; not itself retuned this session
 
     UNIT_VECTOR = { up: [0, -1], down: [0, 1], left: [-1, 0], right: [1, 0] }.freeze
 
@@ -196,8 +202,13 @@ module Koholint
     # #tap_button's per-tap clear -- releasing the shield mid-sequence is exactly what left every
     # ad-hoc Plage Coco script's shield mitigating only "most of the time", not reliably
     # (room_labels['225/0']: "a later shield-held attempt... still took a full heart of damage").
-    # Not folded into #move! itself, to avoid changing that method's behavior for existing callers.
-    def self.move_holding!(motherboard, direction, hold)
+    # `min_hp`, if given, is checked after EVERY internal tap (not just once per #move!-sized call)
+    # and bails out early -- found necessary during D13's own validation retest: a single
+    # 8-internal-tap call standing next to 2 active hostiles cost 20 HP (12 then 8, both inside one
+    # call) before a between-calls-only check could ever see it, taking Link from 12/24 to 0/24 in
+    # one #avoid_hostiles_and_move! step. Not folded into #move! itself, to avoid changing that
+    # method's behavior for existing callers.
+    def self.move_holding!(motherboard, direction, hold, min_hp: nil)
       axis = AXIS.fetch(direction)
       sign = SIGN.fetch(direction)
       start = position(motherboard.mmu)[axis]
@@ -215,27 +226,29 @@ module Koholint
           result = :ok
           break
         end
+        break if min_hp && motherboard.mmu.read(LINK_HP_ADDRESS) <= min_hp
       end
       Array(hold).each { |k| keys.send(:"#{k}=", false) }
       result
     end
 
-    def self.shielded_move!(motherboard, direction) = move_holding!(motherboard, direction, :b)
+    def self.shielded_move!(motherboard, direction, min_hp: nil) = move_holding!(motherboard, direction, :b, min_hp:)
 
     # The D13 primitive: one avoidance-biased step toward `target_direction`, holding the shield
     # automatically if #shield_equipped?. Hazards are sampled once, before the step -- a wandering
-    # creature can still land the family's invisible mid-tap knockback (D11) inside #move!'s/
-    # #shielded_move!'s own internal tap loop, same as every ad-hoc script hit; this reports what
-    # happened afterward (hp_before/hp_after/damage) rather than assuming the biased direction was
-    # ever really safe.
-    def self.avoid_hostiles_and_move!(motherboard, target_direction, radius: HAZARD_PROXIMITY_PX)
+    # creature can still land the family's invisible mid-tap knockback (D11) inside #move_holding!'s
+    # own internal tap loop, same as every ad-hoc script hit; this reports what happened afterward
+    # (hp_before/hp_after/damage) rather than assuming the biased direction was ever really safe.
+    # Pass `min_hp` to bail out of the internal tap loop early (see #move_holding!) instead of only
+    # finding out about a dangerous step after it already happened.
+    def self.avoid_hostiles_and_move!(motherboard, target_direction, radius: HAZARD_PROXIMITY_PX, min_hp: nil)
       mmu = motherboard.mmu
       link_pos = position(mmu)
       hazards = nearby_hazards(motherboard, from: link_pos, radius:)
       chosen = hazards.empty? ? target_direction : biased_direction(link_pos, hazards, target_direction)
       shield = shield_equipped?(mmu)
       hp_before = mmu.read(LINK_HP_ADDRESS)
-      result = shield ? shielded_move!(motherboard, chosen) : move!(motherboard, chosen)
+      result = move_holding!(motherboard, chosen, shield ? :b : [], min_hp:)
       hp_after = motherboard.mmu.read(LINK_HP_ADDRESS)
       { direction: chosen, target_direction:, result:, hazards_seen: hazards.size,
         shield_held: shield, hp_before:, hp_after:, damage: hp_before - hp_after }
@@ -245,12 +258,12 @@ module Koholint
     # to/through `min_hp` -- callers decide whether/how to top HP back up between pushes (D12's
     # scoped Plage Coco permission); this only refuses to walk into a KO by itself. Returns one
     # result hash per step actually taken (see #avoid_hostiles_and_move!).
-    def self.avoid_hostiles_and_push!(motherboard, target_direction, max_steps:, min_hp: 4, radius: HAZARD_PROXIMITY_PX)
+    def self.avoid_hostiles_and_push!(motherboard, target_direction, max_steps:, min_hp: 8, radius: HAZARD_PROXIMITY_PX)
       results = []
       max_steps.times do
         break if motherboard.mmu.read(LINK_HP_ADDRESS) <= min_hp
 
-        step = avoid_hostiles_and_move!(motherboard, target_direction, radius:)
+        step = avoid_hostiles_and_move!(motherboard, target_direction, radius:, min_hp:)
         results << step
         break if step[:hp_after] <= min_hp
       end
