@@ -27,8 +27,8 @@ order, `NEXT.md` before any action.
   every-N-commits/mornings cadence `PLAN.md` already runs cold reviews on (see
   `METAPLANNER.md#MP5`).
 - **Pre-trained knowledge**: the game's memory map (community disassembly) is a source of
-  hypotheses to verify, consistent with the provenance model. *Game* knowledge (where the sword
-  is, who an NPC is) is forbidden: it is observed, never assumed.
+  hypotheses to verify, consistent with the provenance model. *Game* knowledge (where the sword is,
+  who an NPC is) is forbidden: it is observed, never assumed.
 
 ## Process
 
@@ -59,6 +59,37 @@ by the next. The rules below exist so it doesn't happen again. They override you
 
 You never judge your own build. A review is triggered by the owner every N commits or every
 morning after a night of autonomy, by a fresh session with no history.
+
+### Claude context recovery: durable handoff, disposable context
+
+Claude Code is the Planner/game agent. There is no separate Ruby Planner runtime. A Claude
+conversation is working memory, not project memory, and must be safe to discard.
+
+When a bounded game goal is blocked, or the current context becomes stale/redundant, do not keep
+retrying until the context limit forces a failure. Use the autonomous recovery handoff:
+
+1. Stop the failing loop and capture a `BlockedResult` with the checkpoint, blocker, observations,
+   failed actions, and constraints.
+2. Create or update the persisted `ResearchTask` before leaving the context.
+3. End/reset the Claude context. Do not carry the old transcript forward just because it is
+   available.
+4. In the new context, read `AGENTS.md`, `NEXT.md`, `DECISIONS.md`, the active `ResearchTask`, the
+   relevant World Model/registry data, and the checkpoint metadata needed to reproduce the state.
+5. Reconstruct only the bounded research context. Choose one falsifiable hypothesis and one
+   bounded experiment; do not rehydrate the old conversation.
+6. Run the experiment from its checkpoint through the recovery seam. Record its observation and
+   outcome immediately in the durable task.
+7. If more evidence is required, another fresh Claude context is preferred over growing one
+   research conversation indefinitely.
+8. When the evidence threshold resolves the blocker, return to the original game goal. If the
+   research budget is exhausted, escalate to the owner rather than inventing retries.
+
+The durable handoff is the data, not the transcript: `NEXT.md`, `DECISIONS.md`, World Model,
+checkpoints, action history, and `ResearchTask` must be sufficient for a fresh context to continue.
+See `docs/AUTONOMOUS_RECOVERY.md` for the detailed protocol and safety invariants.
+
+This rule applies before the token limit as well as at the token limit. A context reset is a normal
+control-flow operation whenever the bounded work would benefit from a clean investigator.
 
 ### Decisions, not narratives
 
@@ -131,8 +162,8 @@ You don't decide, you propose with options and their costs:
 
 ### Memory is specs and data
 
-- Every fact measured about the game becomes **a checkpoint spec** or **a registry entry with
-  provenance**.
+- Every fact measured about the game becomes **a checkpoint spec** or a registry entry with
+  provenance.
 - No essay-comments in the code. An exploration that produced neither a spec nor a registry entry
   produced nothing.
 
@@ -155,10 +186,10 @@ time, before being written down anywhere a future dispatch would read cold (see
 
 - Never write a subagent prompt that tells it to wait for a `Monitor` notification, another
   session's completion, or any other external event and then continue. If the subagent's task
-  depends on an external condition, either poll it synchronously in a loop within the subagent's
-  own turn (tool calls only, never relying on being re-invoked), or don't delegate that step at all
-  -- keep the waiting in the dispatching session, which can actually be resumed by an external
-  event, and have the subagent return a status report instead.
+depends on an external condition, either poll it synchronously in a loop within the subagent's own
+turn (tool calls only, never relying on being re-invoked), or don't delegate that step at all -- keep
+the waiting in the dispatching session, which can actually be resumed by an external event, and have
+the subagent return a status report instead.
 - `run_in_background`/`Monitor` are dispatcher-side tools. Never instruct a subagent to use them on
   itself.
 
@@ -167,23 +198,22 @@ time, before being written down anywhere a future dispatch would read cold (see
 A different, easier-to-hit door onto the same trap: a subagent's own foreground tool call -- not a
 deliberate wait, just an ordinary call chaining many slow steps (e.g. a `nudge_axis!`-style helper
 issuing ~20 `Navigator.move!` calls at 13-30s wall-clock each in this environment) -- can itself
-exceed the tool's foreground timeout and get silently auto-backgrounded mid-call. The subagent
-never chose to wait; the platform just handed it back a running background task instead of a
-result. From there it's the exact same stuck-subagent trap the rule above already names, just
-reached without anyone writing a "wait for notification" instruction. Caught as a live risk on
-September 10, 2026, before it produced an actual incident (see `METAPLANNER.md#MP7`).
+exceed the tool's foreground timeout and get silently auto-backgrounded mid-call. The subagent never
+chose to wait; the platform just handed it back a running background task instead of a result. From
+there it's the exact same stuck-subagent trap the rule above already names, just reached without
+anyone writing a "wait for notification" instruction. Caught as a live risk on September 10, 2026,
+before it produced an actual incident (see `METAPLANNER.md#MP7`).
 
 - Before chaining several slow primitive calls (measured or conservatively estimated wall-clock,
-  never guessed) into one foreground tool invocation, keep the batch's worst case (steps x
-  per-step worst case) safely under the timeout actually in effect -- the tool's default, or an
-  explicit `timeout` you set, whichever applies. Don't assume slack you haven't checked for.
-- If a batch's worst case can't fit under that ceiling, split it into multiple sequential
-  foreground calls issued back-to-back within the same turn, instead of one call spanning the
-  whole chain.
+  never guessed) into one foreground tool invocation, keep the batch's worst case (steps x per-step
+  worst case) safely under the timeout actually in effect -- the tool's default, or an explicit
+  `timeout` you set, whichever applies. Don't assume slack you haven't checked for.
+- If a batch's worst case can't fit under that ceiling, split it into multiple sequential foreground
+  calls issued back-to-back within the same turn, instead of one call spanning the whole chain.
 - If a call still comes back auto-backgrounded despite the above (the estimate was wrong, or the
-  environment ran slower than expected), handle it exactly per the rule above: poll it
-  synchronously within the same turn until it resolves. Never treat the backgrounding itself as
-  license to stop mid-turn waiting for a notification.
+  environment ran slower than expected), handle it exactly per the rule above: poll it synchronously
+  within the same turn until it resolves. Never treat the backgrounding itself as license to stop
+  mid-turn waiting for a notification.
 
 ### MetaPlanner: amending the workflow itself
 
@@ -197,15 +227,15 @@ to fix exactly that, and nothing else.
   rules (not its content), `PLAN.md`, subagent-prompt conventions. Never `DECISIONS.md`, never
   `data/ram_registry.json`, never anything that is a fact about the game or a decision about how to
   play it. If a proposed change touches game/domain territory, it isn't a MetaPlanner change --
-  it's a planner decision, logged in `DECISIONS.md` like any other.
+  it's a planner decision, logged in `DECISIONS.md` like any other game decision.
 - **Trigger**: event-based, not a fixed timer or a schedule. A planner session that hits a
   process-level snag escalates it (see below); the owner can also launch a MetaPlanner session
   directly at any time. The planner may dispatch MetaPlanner itself via `create_session` the moment
   it appends an `open` escalation -- except the very first such dispatch, which requires an
   explicit `AskUserQuestion` confirmation from the owner first, to observe real behavior before
-  trusting it unattended (see `METAPLANNER.md#MP2`). After that first observed run, later
-  dispatches proceed without asking. **The dispatch call must set `source_url`/`source_revision`
-  explicitly**: `create_session`'s "inherits the calling session's environment" phrasing covers the
+  trusting it unattended (see `METAPLANNER.md#MP2`). After that first observed run, later dispatches
+  proceed without asking. **The dispatch call must set `source_url`/`source_revision` explicitly**:
+  `create_session`'s "inherits the calling session's environment" phrasing covers the
   `environment_id` only, not an automatic repo checkout -- omitting them lands the new session in an
   empty container with nothing to act on (see `METAPLANNER.md#MP6`).
 - **Session shape**: same discipline as "One session, one question" above, cascaded up -- short (5
@@ -217,11 +247,11 @@ to fix exactly that, and nothing else.
   the workflow instead of the game. Written only by MetaPlanner sessions.
 - **Handoff**: `METAPLANNER_ESCALATIONS.md` is the shared queue between the two roles, separate from
   `METAPLANNER.md` so the access boundary is a file, not a section inside one. The planner may only
-  *append* an entry with status `open` (context, symptom, why it's process and not domain) --
-  never edit or resolve one itself. MetaPlanner drains the queue: marks an entry `resolved` with a
-  pointer to the `METAPLANNER.md` entry that addressed it, and prunes old resolved entries
-  periodically (archive or trim) so the queue doesn't drift into the same one-page violation
-  `NEXT.md` already hit once.
+  *append* an entry with status `open` (context, symptom, why it's process and not domain) -- never
+  edit or resolve one itself. MetaPlanner drains the queue: marks an entry `resolved` with a pointer
+  to the `METAPLANNER.md` entry that addressed it, and prunes old resolved entries periodically
+  (archive or trim) so the queue doesn't drift into the same one-page violation `NEXT.md` already
+  hit once.
 - Same rule as everywhere else in this project: a change with no entry in `METAPLANNER.md` and no
   resolved line in `METAPLANNER_ESCALATIONS.md` didn't happen, as far as the next cold session is
   concerned.
