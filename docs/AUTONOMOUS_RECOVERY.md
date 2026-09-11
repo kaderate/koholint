@@ -25,7 +25,7 @@ Persistent World State
        Persistent state
 ```
 
-MetaPlanner remains separate. It repairs the workflow and coordination process; it does not solve game blockers.
+MetaPlanner remains separate. It repairs workflow and coordination; it does not solve game blockers.
 
 ## Blocked task contract
 
@@ -66,13 +66,11 @@ Research produces observations; it does not silently promote observations into g
 9. Promote reusable evidence to the World Model or Builder when justified.
 10. Re-enter Planner with a fresh context.
 
-Experiments must not silently modify durable progression. The existing D12 rule remains in force for RAM writes that could bypass genuine game obstacles.
+The current implementation deliberately does not choose hypotheses or promote facts itself; it provides the durable seam those higher-level decisions use.
 
 ## Checkpoint isolation
 
 The runner restores the supplied experimental checkpoint before every experiment. Durable progression is outside the runner's mutation contract.
-
-The intended lifecycle is:
 
 ```text
  durable state
@@ -112,6 +110,12 @@ The Planner-level router has four modes:
 
 `escalate` means owner escalation for an unresolved game problem. A workflow/process failure remains a MetaPlanner escalation under `AGENTS.md`.
 
+## Safety and loop bounds
+
+Research is bounded by `max_experiments`. The task rejects duplicate `(hypothesis, action)` experiments so superficial retries cannot consume autonomy indefinitely. A caller must still supply a distinct checkpoint and experiment action for genuinely different tests.
+
+RAM writes that bypass genuine gameplay remain subject to the existing D12 rule and are not enabled by this seam.
+
 ## Example
 
 If `house2_interior` navigation fails:
@@ -132,18 +136,6 @@ Execute
 
 This is the pattern already demonstrated manually during the house2 discovery; the runtime seam makes the recovery state durable and repeatable.
 
-## Autonomy boundary
-
-Stop and notify the owner for:
-
-- destructive or irreversible progression changes;
-- actions explicitly requiring owner authorization;
-- exhausted research budget;
-- contradictory evidence that cannot be resolved automatically;
-- infrastructure failures rather than game-state uncertainty.
-
-A normal game blocker is not, by itself, a reason to ask the owner.
-
 ## Implemented seam
 
 The first implementation provides:
@@ -154,6 +146,6 @@ The first implementation provides:
 - compact fresh-context projection through `Context`;
 - checkpoint-first `ExperimentRunner`;
 - Planner routing through `Router`;
-- deterministic tests covering persistence/reload, checkpoint restoration, and budget exhaustion.
+- deterministic tests covering persistence/reload, checkpoint restoration, duplicate protection, and budget exhaustion.
 
 The seam deliberately does not yet invoke an LLM, mutate the World Model, or run expensive live exploration. The next integration step is to connect a real Planner blocked result to this persisted task and supply an existing checkpoint/tool executor.
