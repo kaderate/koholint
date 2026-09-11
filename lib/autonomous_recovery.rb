@@ -188,6 +188,20 @@ module Koholint
           }
         }
       end
+
+      def self.handoff(task, required_reads: %w[AGENTS.md NEXT.md DECISIONS.md])
+        task.validate!
+        {
+          "research_task_id" => task.id,
+          "mode" => task.status == "open" ? "research" : "resume",
+          "original_goal" => task.goal,
+          "checkpoint" => task.blocker.fetch("checkpoint"),
+          "required_reads" => required_reads,
+          "context_policy" => "fresh",
+          "remaining_experiments" => [task.budget.fetch("max_experiments") - task.experiments.length, 0].max,
+          "next_step" => task.status == "open" ? "choose_one_bounded_experiment" : "resume_original_goal"
+        }
+      end
     end
 
     class ExperimentRunner
