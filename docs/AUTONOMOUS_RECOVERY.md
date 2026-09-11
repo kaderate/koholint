@@ -17,9 +17,37 @@ Claude Code = Planner / game agent
   +-- process failure -> MetaPlanner
 ```
 
-There is intentionally no Ruby Planner runtime and no second LLM runtime to wire. The Ruby recovery layer is a deterministic persistence and safety seam that Claude Code uses between sessions.
+There is intentionally no Ruby Planner runtime and no second LLM runtime to wire. The recovery skill is the glue between Claude's behavior and the deterministic Ruby recovery seam.
+
+```text
+Claude Code / Planner
+        |
+        | autonomous-recovery skill
+        v
+lib/autonomous_recovery.rb
+        |
+        +-- ResearchTask / Store
+        +-- checkpoints
+        +-- bounded experiments
+        +-- fingerprint protection
+        +-- evidence bookkeeping
+```
 
 The Claude conversation context is disposable. The durable state is the contract that survives it: World Model, `NEXT.md`, `DECISIONS.md`, checkpoints, action history, and the persisted `ResearchTask`.
+
+## Agent glue: `autonomous-recovery` skill
+
+The skill at `.claude/skills/autonomous-recovery/SKILL.md` conditions the Planner's behavior. It does not become another agent and it does not contain game strategy. It tells Claude **when to enter recovery, which Ruby primitives to use, what must be persisted, when to rotate context, and when to resume the original objective**.
+
+The division of responsibility is deliberate:
+
+- **Claude / Planner** owns judgment: identify a genuine blocker, formulate hypotheses, choose an experiment, interpret observations, and decide whether the original goal can resume.
+- **The skill** supplies the recovery procedure and context discipline.
+- **Ruby** enforces deterministic persistence and safety invariants.
+- **World Model / registries** hold durable game knowledge.
+- **MetaPlanner** handles process/workflow problems only.
+
+The skill must never be treated as a substitute for the Planner. It is the protocol that makes the Planner's cognition survive context rotation.
 
 ## Contracts
 
@@ -41,11 +69,11 @@ Research produces observations; it does not silently promote observations into g
 - `RecoveryCoordinator`: turns a blocked execution into a persisted research task, asks for one bounded experiment, executes it, records the observation, updates hypothesis evidence/status, and returns to execute/research/escalate.
 - `Router`: maps successful execution to `execute`, an unexhausted blocker to `research`, and an exhausted blocker to `escalate`.
 
-These classes do **not** create, resume, or replace a Claude session. They make the state handed from one Claude context to the next explicit and safe.
+These classes do **not** create, resume, or replace a Claude session. They are invoked by the Planner through the skill/protocol and make the state handed from one Claude context to the next explicit and safe.
 
 ## Claude context handoff protocol
 
-A context reset is a normal control-flow operation, not an emergency reserved for hitting the token limit. Claude Code should use a fresh context when a bounded game goal is blocked, when a research experiment needs a clean observer, when the current context has accumulated stale/redundant history, or when the session reaches its agreed turn/time budget.
+A context reset is a normal control-flow operation, not an emergency reserved for hitting the token limit. The skill instructs Claude Code to use a fresh context when a bounded game goal is blocked, when a research experiment needs a clean observer, when the current context has accumulated stale/redundant history, or when the session reaches its agreed turn/time budget.
 
 ### 1. Before leaving the current context
 
@@ -56,7 +84,7 @@ When Execute or Explore is genuinely blocked:
 3. Create or update the durable `ResearchTask`.
 4. Persist the task before ending the context.
 5. Record the original game goal so research remains subordinate to it.
-6. Do **not** dump the whole conversation into the durable state. Persist facts, hypotheses, experiments, checkpoints, and concise failure observations only.
+6. Do **not** dump the whole conversation into durable state. Persist facts, hypotheses, experiments, checkpoints, and concise failure observations only.
 
 If the task is not blocked but the context is simply getting stale or large, update `NEXT.md` with the bounded session report and start the next context from durable state rather than carrying the transcript forward.
 
@@ -135,20 +163,21 @@ The tests exercise two independent supporting experiments before resolution, fin
 ```text
 Claude Execute
   -> blocked
+  -> autonomous-recovery skill
   -> persist ResearchTask
   -> end context
 
 New Claude context
   -> read AGENTS / NEXT / DECISIONS / World Model / ResearchTask
   -> hypothesis A
-  -> bounded experiment #1
+  -> bounded experiment #1 through Ruby seam
   -> observation: supports
   -> persist
   -> end context
 
 New Claude context
   -> read durable state
-  -> independent experiment #2
+  -> independent experiment #2 through Ruby seam
   -> observation: supports
   -> hypothesis supported
   -> promote verified result through existing provenance rules
