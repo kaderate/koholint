@@ -44,6 +44,38 @@ class AutonomousRecoveryTest < Minitest::Test
     end
   end
 
+  def test_context_handoff_is_compact_and_points_to_durable_state
+    task = ResearchTask.new(
+      id: "r1", goal: "open the door", blocker: {"checkpoint" => "start"},
+      hypotheses: [Hypothesis.new(id: "h1", statement: "The key is in B")]
+    )
+
+    handoff = Context.handoff(task, required_reads: %w[AGENTS.md NEXT.md DECISIONS.md data/world_model.json])
+
+    assert_equal "r1", handoff["research_task_id"]
+    assert_equal "research", handoff["mode"]
+    assert_equal "open the door", handoff["original_goal"]
+    assert_equal "start", handoff["checkpoint"]
+    assert_equal "fresh", handoff["context_policy"]
+    assert_equal 3, handoff["remaining_experiments"]
+    assert_equal "choose_one_bounded_experiment", handoff["next_step"]
+    assert_equal %w[AGENTS.md NEXT.md DECISIONS.md data/world_model.json], handoff["required_reads"]
+    refute handoff.key?("conversation")
+  end
+
+  def test_resolved_handoff_returns_to_original_goal
+    task = ResearchTask.new(
+      id: "r1", goal: "open the door", blocker: {"checkpoint" => "start"},
+      hypotheses: [Hypothesis.new(id: "h1", statement: "The key is in B", status: "supported")],
+      status: "resolved"
+    )
+
+    handoff = Context.handoff(task)
+
+    assert_equal "resume", handoff["mode"]
+    assert_equal "resume_original_goal", handoff["next_step"]
+  end
+
   def test_experiment_is_bounded_and_preserves_durable_state
     checkpoints = Checkpoints.new("none", "same")
     runner = ExperimentRunner.new(
