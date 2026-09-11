@@ -39,7 +39,7 @@ class AutonomousRecoveryTest < Minitest::Test
 
       store = Store.new(path)
       reloaded = store.load
-      context = Context.project(reloaded, world_facts: Array.new(100) { |i| {"room" => i} }, tools: Array.new(50, "tool") )
+      context = Context.project(reloaded, world_facts: Array.new(100) { |i| {"room" => i} }, tools: Array.new(50, "tool"))
       handoff = store.load_handoff
 
       assert_equal "open the door", context["goal"]
@@ -287,15 +287,19 @@ class AutonomousRecoveryTest < Minitest::Test
 
         def save(task)
           @saves += 1
-          raise IOError, "disk full" if @saves == 3
+          raise IOError, "disk full" if @saves == 4
 
           super
         end
       end.new(path)
       checkpoints = Checkpoints.new("none", "same")
+      executed = false
       runner = ExperimentRunner.new(
         checkpoints: checkpoints,
-        executor: ->(_action, max_frames:) { {observation: "tested", outcome: "supports", frames: 1, state_fingerprint: "same"} }
+        executor: ->(_action, max_frames:) do
+          executed = true
+          {observation: "tested", outcome: "supports", frames: 1, state_fingerprint: "same"}
+        end
       )
       coordinator = RecoveryCoordinator.new(
         store: store,
@@ -309,6 +313,7 @@ class AutonomousRecoveryTest < Minitest::Test
         })
       end
 
+      assert executed
       pending = Store.new(path).load.experiments.first
       assert_nil pending.outcome
       assert_equal "inspect", pending.action
