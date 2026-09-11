@@ -230,6 +230,14 @@ it comes back empty: transcribe `160/0`'s never-read second SELECT-box line (#4 
 
 ## In-flight work (for resumability)
 
+**Major discrepancy found, September 11 2026**: `data/world_model.json` (an older "spike"-era hand-curated
+file, never fully reconciled with the current registry) records `house2_interior`'s (169/16)
+4-tile OAM block (y=64/80, x=72/80, tile 112/114/116/118) as **Pépé le Ramollo himself** -- a real
+visible NPC, not the "invisible trigger" the current `room_labels['169/16']` describes -- and says
+there's only ONE NPC here, not two separate "telephone" objects. The current registry's own note
+also cites world_model.json with a WRONG room ("building_screen 176/0" -- that room doesn't exist
+in that file; Pépé is recorded under `house2_interior` itself). Dispatched a reconciliation below.
+
 As of September 11, 2026, ~03:30 UTC, one subagent is dispatched (model: Opus, not the usual
 Sonnet -- owner-requested for reasoning/synthesis strength, see the conversation) -- check
 `ListAgents` before assuming it is idle or before re-dispatching a duplicate:
