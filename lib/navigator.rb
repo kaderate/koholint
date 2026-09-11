@@ -107,5 +107,154 @@ module Koholint
       end
       [edges, Motherboard.load(snapshot)]
     end
+
+    # D13: hostile-avoidance primitive. Formalizes the tactic 4 independent Explorer sessions
+    # hand-rolled across the Plage Coco cluster (224/0, 225/0, 226/0, 209/0 -- see
+    # data/ram_registry.json's room_labels): hold B continuously via mmu.joypad.key_state (not
+    # #tap_button, which clears every key between taps and would drop the shield mid-sequence),
+    # tap toward a target while biasing away from the nearest hostile/unknown OAM sprite, watch HP.
+
+    OAM_BASE = 0xFE00
+    OAM_SPRITE_COUNT = 40
+    OAM_HIDDEN_Y_THRESHOLD = 160 # sentinel for "not drawn this frame" -- room_labels['224/0']'s
+                                  # post-scroll SCY investigation found y=244 on a hidden Link;
+                                  # nothing legitimately on-screen exceeds the 144px LCD height.
+
+    # D11-confirmed hostile family: riverside_south_tan_creature, riverside_south_river_room_sprite,
+    # riverside_east_room_creatures. One OAM entry's tile byte per 8x16-mode composite half (tile
+    # id is always even -- the odd partner is the auto-paired bottom half, never a raw OAM value).
+    # The family cycles through all 6 ids frame to frame (visual_catalog's 4-sample idle log) --
+    # one species' animation/facing frames, not 6 distinct creatures.
+    HOSTILE_TILE_IDS = [0x60, 0x62, 0x64, 0x66, 0x68, 0x6a].freeze
+    # riverside_south_pale_creature: hazard_status "unknown, suggestive of hostile" (D11 contact
+    # test inconclusive -- the creature read absent from OAM at both jump instants). Deliberately
+    # NOT pulling in every other visual_catalog entry marked "unknown" (e.g.
+    # building_screen_flutter_object) -- those have no established contact/damage signature and
+    # are outside D13's motivating scope (Plage Coco).
+    UNKNOWN_HAZARD_TILE_IDS = [0x6c].freeze
+    HAZARD_TILE_IDS = (HOSTILE_TILE_IDS + UNKNOWN_HAZARD_TILE_IDS).freeze
+
+    LINK_HP_ADDRESS = 0xDB5A # wram_unmapped.link_health, verified (D12)
+
+    # Hypothesis, found this session (data/ram_registry.json's wram_unmapped.equipped_b_item):
+    # 0xDB00 read 4 on every post-shield checkpoint sampled (8, spanning 6+ rooms and several past
+    # sessions) and 0 on a fresh pre-shield boot; 0xDB01 stayed 0 throughout every sample, which is
+    # only consistent with "the A slot" since no non-empty A-slot state exists yet to contrast
+    # against -- not independently confirmed as the A-slot address.
+    EQUIPPED_B_ITEM_ADDRESS = 0xDB00
+    SHIELD_ITEM_ID = 4
+
+    HAZARD_PROXIMITY_PX = 40 # ~2.5 tiles -- starts biasing before contact range, not just after it
+    AVOIDANCE_WEIGHT = 1.5 # outweighs straight-line progress once a hazard is inside the radius
+
+    UNIT_VECTOR = { up: [0, -1], down: [0, 1], left: [-1, 0], right: [1, 0] }.freeze
+
+    def self.shield_equipped?(mmu) = mmu.read(EQUIPPED_B_ITEM_ADDRESS) == SHIELD_ITEM_ID
+
+    # Raw OAM census, bypassing the PPU bus gate -- plain mmu.read returns 0xFF here outside
+    # vblank/HBlank (world_topology.riverside_south_room_adaptive_chase_experiment hit this first).
+    # Skips hidden/inactive slots.
+    def self.oam_sprites(motherboard)
+      mmu = motherboard.mmu
+      (0...OAM_SPRITE_COUNT).filter_map do |i|
+        base = OAM_BASE + (i * 4)
+        y = mmu.debug_read(base)
+        next if y.zero? || y >= OAM_HIDDEN_Y_THRESHOLD
+
+        { y:, x: mmu.debug_read(base + 1), tile: mmu.debug_read(base + 2), attrs: mmu.debug_read(base + 3) }
+      end
+    end
+
+    # D11/visual_catalog-classified hostile-or-unknown OAM sprites within `radius` px of `from`
+    # (world/screen pixel units, same frame as #position -- D9 confirmed Link's own OAM position
+    # matches his HRAM position exactly in every room checked so far, no +8/+16 offset to correct).
+    def self.nearby_hazards(motherboard, from:, radius: HAZARD_PROXIMITY_PX)
+      oam_sprites(motherboard).select do |s|
+        HAZARD_TILE_IDS.include?(s[:tile]) && Math.hypot(s[:x] - from[:x], s[:y] - from[:y]) <= radius
+      end
+    end
+
+    # Picks whichever cardinal direction's unit vector best matches `target_direction`'s pull
+    # biased away from the single nearest hazard -- a 4-way dot-product choice, not a path search.
+    # Pure function of positions (no motherboard access), so it's cheap to exercise standalone.
+    def self.biased_direction(link_pos, hazards, target_direction)
+      vx, vy = UNIT_VECTOR.fetch(target_direction)
+      nearest = hazards.min_by { |h| Math.hypot(h[:x] - link_pos[:x], h[:y] - link_pos[:y]) }
+      if nearest
+        dx = link_pos[:x] - nearest[:x]
+        dy = link_pos[:y] - nearest[:y]
+        dist = Math.hypot(dx, dy)
+        if dist.positive?
+          vx += AVOIDANCE_WEIGHT * dx / dist
+          vy += AVOIDANCE_WEIGHT * dy / dist
+        end
+      end
+      UNIT_VECTOR.max_by { |_, (ux, uy)| (ux * vx) + (uy * vy) }.first
+    end
+
+    # Same tap loop as #move!, but holds `hold` pressed across every internal tap instead of
+    # #tap_button's per-tap clear -- releasing the shield mid-sequence is exactly what left every
+    # ad-hoc Plage Coco script's shield mitigating only "most of the time", not reliably
+    # (room_labels['225/0']: "a later shield-held attempt... still took a full heart of damage").
+    # Not folded into #move! itself, to avoid changing that method's behavior for existing callers.
+    def self.move_holding!(motherboard, direction, hold)
+      axis = AXIS.fetch(direction)
+      sign = SIGN.fetch(direction)
+      start = position(motherboard.mmu)[axis]
+      keys = motherboard.mmu.joypad.key_state
+      cpu, ppu, apu = motherboard.cpu, motherboard.ppu, motherboard.apu
+      Array(hold).each { |k| keys.press(k) }
+      result = :blocked
+      MAX_TAPS.times do
+        keys.press(direction)
+        run_cycles(cpu, ppu, apu, TRIGGER_FRAMES * FRAME_CYCLES)
+        keys.send(:"#{direction}=", false)
+        run_cycles(cpu, ppu, apu, SETTLE_FRAMES * FRAME_CYCLES)
+        delta = (position(motherboard.mmu)[axis] - start) * sign
+        if delta >= COMMIT_THRESHOLD
+          result = :ok
+          break
+        end
+      end
+      Array(hold).each { |k| keys.send(:"#{k}=", false) }
+      result
+    end
+
+    def self.shielded_move!(motherboard, direction) = move_holding!(motherboard, direction, :b)
+
+    # The D13 primitive: one avoidance-biased step toward `target_direction`, holding the shield
+    # automatically if #shield_equipped?. Hazards are sampled once, before the step -- a wandering
+    # creature can still land the family's invisible mid-tap knockback (D11) inside #move!'s/
+    # #shielded_move!'s own internal tap loop, same as every ad-hoc script hit; this reports what
+    # happened afterward (hp_before/hp_after/damage) rather than assuming the biased direction was
+    # ever really safe.
+    def self.avoid_hostiles_and_move!(motherboard, target_direction, radius: HAZARD_PROXIMITY_PX)
+      mmu = motherboard.mmu
+      link_pos = position(mmu)
+      hazards = nearby_hazards(motherboard, from: link_pos, radius:)
+      chosen = hazards.empty? ? target_direction : biased_direction(link_pos, hazards, target_direction)
+      shield = shield_equipped?(mmu)
+      hp_before = mmu.read(LINK_HP_ADDRESS)
+      result = shield ? shielded_move!(motherboard, chosen) : move!(motherboard, chosen)
+      hp_after = motherboard.mmu.read(LINK_HP_ADDRESS)
+      { direction: chosen, target_direction:, result:, hazards_seen: hazards.size,
+        shield_held: shield, hp_before:, hp_after:, damage: hp_before - hp_after }
+    end
+
+    # Repeats #avoid_hostiles_and_move! toward one target direction, stopping before HP would drop
+    # to/through `min_hp` -- callers decide whether/how to top HP back up between pushes (D12's
+    # scoped Plage Coco permission); this only refuses to walk into a KO by itself. Returns one
+    # result hash per step actually taken (see #avoid_hostiles_and_move!).
+    def self.avoid_hostiles_and_push!(motherboard, target_direction, max_steps:, min_hp: 4, radius: HAZARD_PROXIMITY_PX)
+      results = []
+      max_steps.times do
+        break if motherboard.mmu.read(LINK_HP_ADDRESS) <= min_hp
+
+        step = avoid_hostiles_and_move!(motherboard, target_direction, radius:)
+        results << step
+        break if step[:hp_after] <= min_hp
+      end
+      results
+    end
   end
 end
