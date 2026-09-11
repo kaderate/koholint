@@ -67,7 +67,8 @@ module Koholint
 
       def initialize(**kwargs)
         super(
-          hypotheses: [], experiments: [], budget: {"max_experiments" => 3},
+          hypotheses: [], experiments: [],
+          budget: {"max_experiments" => 3, "min_supporting_experiments" => 2},
           status: "open", promoted_facts: [], **kwargs
         )
         validate!
@@ -93,10 +94,21 @@ module Koholint
         hypothesis = hypotheses.find { |item| item.id == id }
         raise ArgumentError, "unknown hypothesis" unless hypothesis
 
+        evidence = Array(evidence)
+        if status == "supported" && evidence_count(id) + evidence.length < budget.fetch("min_supporting_experiments")
+          hypothesis.evidence.concat(evidence)
+          return false
+        end
+
         hypothesis.status = status
-        hypothesis.evidence.concat(Array(evidence))
+        hypothesis.evidence.concat(evidence)
         self.status = "resolved" if status == "supported"
         self.status = "exhausted" if status == "refuted" && exhausted?
+        true
+      end
+
+      def evidence_count(id)
+        experiments.count { |experiment| experiment.hypothesis_id == id && experiment.outcome == "supports" }
       end
 
       def to_h
@@ -111,10 +123,14 @@ module Koholint
         raise ArgumentError, "missing research task id" if id.to_s.empty?
         raise ArgumentError, "invalid research status" unless STATUSES.include?(status)
         max = budget.fetch("max_experiments")
+        min_support = budget.fetch("min_supporting_experiments", 2)
         raise ArgumentError, "invalid research budget" unless max.is_a?(Integer) && max.positive?
+        raise ArgumentError, "invalid supporting evidence threshold" unless min_support.is_a?(Integer) && min_support.positive? && min_support <= max
         ids = hypotheses.map(&:id)
         raise ArgumentError, "duplicate hypothesis id" unless ids.uniq.length == ids.length
         raise ArgumentError, "experiment references unknown hypothesis" if experiments.any? { |e| !ids.include?(e.hypothesis_id) }
+        raise ArgumentError, "duplicate experiment" unless experiments.map { |e| [e.hypothesis_id, e.action] }.uniq.length == experiments.length
+        raise ArgumentError, "experiment budget exceeded" if experiments.length > max
       end
 
       def self.from_h(hash)
@@ -166,34 +182,45 @@ module Koholint
           "recent_experiments" => task.experiments.last(MAX_EXPERIMENTS).map(&:to_h),
           "world_facts" => world_facts.last(MAX_FACTS),
           "tools" => tools.first(MAX_TOOLS),
-          "budget" => {"remaining_experiments" => [total - task.experiments.length, 0].max}
+          "budget" => {
+            "remaining_experiments" => [total - task.experiments.length, 0].max,
+            "min_supporting_experiments" => task.budget.fetch("min_supporting_experiments", 2)
+          }
         }
       end
     end
 
     class ExperimentRunner
-      def initialize(checkpoints:, executor:, max_frames: 10_000)
+      def initialize(checkpoints:, executor:, max_frames: 10_000, require_durable_fingerprint: true)
         raise ArgumentError, "max_frames must be positive" unless max_frames.is_a?(Integer) && max_frames.positive?
         @checkpoints = checkpoints
         @executor = executor
         @max_frames = max_frames
+        @require_durable_fingerprint = require_durable_fingerprint
       end
 
       def run(experiment, checkpoint:)
         @checkpoints.restore(checkpoint)
         before = durable_fingerprint
+        if @require_durable_fingerprint && before.nil?
+          raise ArgumentError, "checkpoint adapter must expose durable_fingerprint"
+        end
+
         result = @executor.call(experiment.action, max_frames: @max_frames)
         frames = result.fetch(:frames, 0)
-        raise ArgumentError, "experiment frame budget exceeded" if frames > @max_frames
+        raise ArgumentError, "experiment frame budget exceeded" unless frames.is_a?(Integer) && frames.between?(0, @max_frames)
         after = durable_fingerprint
         raise ArgumentError, "experiment mutated durable state" unless before == after
+        if result.key?(:state_fingerprint) && !result[:state_fingerprint].nil? && result[:state_fingerprint] != after
+          raise ArgumentError, "experiment state fingerprint mismatch"
+        end
 
         Experiment.new(**experiment.to_h.transform_keys(&:to_sym).merge(
           checkpoint: checkpoint,
           observation: result.fetch(:observation),
           outcome: result.fetch(:outcome),
           cost: frames,
-          state_fingerprint: result[:state_fingerprint],
+          state_fingerprint: after,
           created_at: Time.now.utc.iso8601
         ))
       end
