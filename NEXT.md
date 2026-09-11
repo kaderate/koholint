@@ -229,8 +229,14 @@ retest before assuming it needs a whole new route.
 
 ## In-flight work (for resumability)
 
-As of September 11, 2026, ~01:15 UTC, one subagent is dispatched -- check `ListAgents` before
-assuming it is idle or before re-dispatching a duplicate:
+As of September 11, 2026, ~01:35 UTC, two subagents are dispatched -- check `ListAgents` before
+assuming either is idle or before re-dispatching a duplicate:
+- **Owner-prompted: resolve crate_room's book_a/book_b mystery** -- the owner directly hinted
+  "read all the library's books" and "the beach signpost's message too". `world_topology.crate_room_and_riverside_content`'s
+  own "UNRESOLVED PUZZLE" note flags that book_a/book_b's text never matched any of the 9
+  OAM-scanned objects in the room -- their original checkpoints (`lib_crate_probe_A1*.dump`/
+  `lib_crate_probe_B1*.dump`) are still on disk, making this newly tractable. Also re-testing
+  `225/0`'s signpost for a possible untried second page/angle.
 - **`overworld_screen2`'s (178/0) untested SOUTH edge** -- with Plage Coco now believed
   exhaustively swept (no bidule), this is the pivot: the literal, most direct "south road" reading
   of the starting_house NPCs' clue, never actually pursued (attention went to Plage Coco instead).
