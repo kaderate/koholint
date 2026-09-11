@@ -208,6 +208,12 @@ retest before assuming it needs a whole new route.
 
 ## In-flight work (for resumability)
 
+As of September 11, 2026, ~00:45 UTC, one subagent is dispatched -- check `ListAgents` before
+assuming it is idle or before re-dispatching a duplicate:
+- **`226/0`'s last unswept pocket (past x=46,y=26), using D13's new primitive** -- the last
+  untested ground in the entire Plage Coco cluster. Also serves as D13's second validation data
+  point (a different room than its first test).
+
 **D13 Builder task DONE, September 11, 2026** -- `lib/navigator.rb` gained
 `Navigator.avoid_hostiles_and_move!`/`avoid_hostiles_and_push!` (OAM-hazard-biased, auto-shield-hold
 via a new `Navigator.shield_equipped?`/`move_holding!` pair), validated live against `209/0`'s east
