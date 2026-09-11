@@ -33,23 +33,24 @@ Research produces observations; it does not silently promote observations into g
 ## Runtime seam
 
 - `BlockedResult`: structured blocked execution result.
-- `Store`: atomic JSON persistence and reload of research state.
-- `Context`: compact projection for a fresh Planner/Research invocation.
-- `ExperimentRunner`: restores an experimental checkpoint before executing a bounded experiment.
+- `Store`: atomic JSON persistence and reload of research state, with validation on load/save.
+- `Context`: bounded projection for a fresh Planner/Research invocation.
+- `ExperimentRunner`: restores an experimental checkpoint, enforces a frame budget, and rejects detected durable-state mutation when the checkpoint adapter exposes a durable fingerprint.
 - `ResearchTask#record_experiment!`: enforces the experiment budget and rejects duplicate `(hypothesis, action)` retries.
+- `RecoveryCoordinator`: turns a blocked execution into a persisted research task, asks a bounded researcher for one experiment, executes it, records the observation, updates hypothesis status, and returns to execute or escalates when exhausted.
 - `Router`: maps successful execution to `execute`, an unexhausted blocker to `research`, and an exhausted blocker to `escalate`.
 
 ## Safety
 
-The seam does not invoke an LLM, mutate the World Model, or enable RAM writes. D12 remains in force. A successful scratch experiment is not automatically durable progression or a verified game fact.
+The recovery seam does not invoke an LLM by itself, mutate the World Model, or enable RAM writes. D12 remains in force. Experimental executors must honor the supplied frame budget and must not mutate durable progression; adapters that expose a durable fingerprint are checked after each experiment.
 
-Research exhaustion is an owner escalation. Workflow/process failures remain MetaPlanner escalations under `AGENTS.md`.
+A successful scratch experiment is not automatically durable progression or a verified game fact. Research exhaustion is an owner escalation. Workflow/process failures remain MetaPlanner escalations under `AGENTS.md`.
 
 ## Fresh-context acceptance property
 
-A persisted `ResearchTask` can be loaded independently of the previous conversation and projected into a compact context containing the goal, blocker, unresolved hypotheses, recent experiments, relevant facts/tools, and remaining budget. This is the mechanism that makes LLM context disposable rather than authoritative.
+A persisted `ResearchTask` is written to disk and loaded by a separate Ruby process, so the recovery state does not depend on the previous in-memory context. `Context.project` then applies fixed bounds to hypotheses, experiments, facts, and tools so the reset cannot simply recreate the original context-bloat problem.
 
-The deterministic test suite covers persistence/reload, checkpoint restoration, duplicate protection, and budget exhaustion. The next integration is to connect a real Planner blocked result to this seam and supply the existing checkpoint/tool executor.
+The deterministic test suite covers fresh-process persistence, bounded execution, durable-state mutation detection, duplicate protection, validation, coordinator orchestration, and budget exhaustion. The remaining integration is to connect a real Planner blocked result to this seam and supply the existing checkpoint/tool executor.
 
 ## Example
 
@@ -59,9 +60,9 @@ Execute
   -> persist ResearchTask
   -> fresh Research context
        -> hypothesis
-       -> checkpoint-backed experiment
+       -> bounded checkpoint-backed experiment
        -> observation
-       -> replicate/control
+       -> supported/refuted hypothesis
        -> Builder / World Model promotion
   -> Execute again
 ```
