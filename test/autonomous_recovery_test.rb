@@ -18,6 +18,10 @@ class AutonomousRecoveryTest < Minitest::Test
     end
   end
 
+  def test_default_store_has_a_canonical_path
+    assert_equal ".koholint/research_task.json", Store.default.path
+  end
+
   def test_blocked_task_survives_a_fresh_process
     Dir.mktmpdir do |dir|
       path = File.join(dir, "research.json")
@@ -25,22 +29,26 @@ class AutonomousRecoveryTest < Minitest::Test
         require #{File.expand_path("lib/autonomous_recovery", Dir.pwd).inspect}
         store = Koholint::AutonomousRecovery::Store.new(ARGV.fetch(0))
         task = Koholint::AutonomousRecovery::ResearchTask.new(
-          id: "r1", goal: "open the door", blocker: {"status" => "blocked"},
+          id: "r1", goal: "open the door", blocker: {"status" => "blocked", "checkpoint" => "start"},
           hypotheses: [Koholint::AutonomousRecovery::Hypothesis.new(id: "h1", statement: "The key is in room B")]
         )
         store.save(task)
+        store.save_handoff(task)
       RUBY
       system(RbConfig.ruby, "-e", script, path, exception: true)
 
-      reloaded = Store.new(path).load
-      context = Context.project(reloaded, world_facts: Array.new(100) { |i| {"room" => i} }, tools: Array.new(50, "tool"))
+      store = Store.new(path)
+      reloaded = store.load
+      context = Context.project(reloaded, world_facts: Array.new(100) { |i| {"room" => i} }, tools: Array.new(50, "tool") )
+      handoff = store.load_handoff
 
       assert_equal "open the door", context["goal"]
       assert_equal "The key is in room B", context["hypotheses"].first["statement"]
       assert_equal 40, context["world_facts"].length
       assert_equal 20, context["tools"].length
       assert_equal 3, context["budget"]["remaining_experiments"]
-      assert_equal 2, context["budget"]["min_supporting_experiments"]
+      assert_equal "r1", handoff["research_task_id"]
+      assert_equal "start", handoff["checkpoint"]
     end
   end
 
@@ -63,6 +71,12 @@ class AutonomousRecoveryTest < Minitest::Test
     refute handoff.key?("conversation")
   end
 
+  def test_handoff_rejects_a_task_without_checkpoint
+    task = ResearchTask.new(id: "r1", goal: "door", blocker: {})
+
+    assert_raises(ArgumentError) { Context.handoff(task) }
+  end
+
   def test_resolved_handoff_returns_to_original_goal
     task = ResearchTask.new(
       id: "r1", goal: "open the door", blocker: {"checkpoint" => "start"},
@@ -74,6 +88,16 @@ class AutonomousRecoveryTest < Minitest::Test
 
     assert_equal "resume", handoff["mode"]
     assert_equal "resume_original_goal", handoff["next_step"]
+  end
+
+  def test_new_task_can_add_a_hypothesis_durably
+    task = ResearchTask.new(id: "r1", goal: "door", blocker: {"checkpoint" => "start"})
+
+    hypothesis = task.add_hypothesis!(id: "h1", statement: "Object X sets the interaction flag")
+
+    assert_equal "h1", hypothesis.id
+    assert_equal "Object X sets the interaction flag", task.hypotheses.first.statement
+    assert_raises(ArgumentError) { task.add_hypothesis!(id: "h1", statement: "duplicate") }
   end
 
   def test_experiment_is_bounded_and_preserves_durable_state
@@ -109,6 +133,23 @@ class AutonomousRecoveryTest < Minitest::Test
     experiment = Experiment.new(id: "e1", hypothesis_id: "h1", action: "write")
 
     assert_raises(ArgumentError) { runner.run(experiment, checkpoint: "start") }
+    assert_equal "before", checkpoints.fingerprint
+  end
+
+  def test_experiment_restores_durable_state_when_executor_raises
+    checkpoints = Checkpoints.new("none", "before")
+    runner = ExperimentRunner.new(
+      checkpoints: checkpoints,
+      executor: ->(_action, max_frames:) do
+        checkpoints.fingerprint = "after"
+        raise "executor failed"
+      end
+    )
+    experiment = Experiment.new(id: "e1", hypothesis_id: "h1", action: "write")
+
+    assert_raises(RuntimeError) { runner.run(experiment, checkpoint: "start") }
+    assert_equal "start", checkpoints.restored
+    assert_equal "before", checkpoints.fingerprint
   end
 
   def test_experiment_rejects_reported_fingerprint_mismatch
@@ -177,6 +218,30 @@ class AutonomousRecoveryTest < Minitest::Test
     end
   end
 
+  def test_recovery_coordinator_handles_a_fresh_blocker_without_preseeded_hypotheses
+    Dir.mktmpdir do |dir|
+      store = Store.new(File.join(dir, "research.json"))
+      checkpoints = Checkpoints.new("none", "same")
+      runner = ExperimentRunner.new(
+        checkpoints: checkpoints,
+        executor: ->(_action, max_frames:) { {observation: "tested", outcome: "refutes", frames: 2, state_fingerprint: "same"} }
+      )
+      coordinator = RecoveryCoordinator.new(
+        store: store,
+        runner: runner,
+        researcher: ->(_context) { {hypothesis_id: "h1", statement: "Object X sets the flag", action: "inspect X"} }
+      )
+
+      result = coordinator.handle(execution: {
+        status: "blocked", goal: "open the door", location: "A", checkpoint: "start", hypotheses: []
+      })
+
+      assert_equal "research", result[:mode]
+      assert_equal "Object X sets the flag", store.load.hypotheses.first.statement
+      assert_equal 1, store.load.experiments.length
+    end
+  end
+
   def test_recovery_coordinator_runs_two_independent_supporting_iterations_and_persists_them
     Dir.mktmpdir do |dir|
       store = Store.new(File.join(dir, "research.json"))
@@ -208,6 +273,45 @@ class AutonomousRecoveryTest < Minitest::Test
       assert_equal "resolved", second[:task].status
       assert_equal 2, second[:task].experiments.length
       assert_equal "resolved", store.load.status
+    end
+  end
+
+  def test_persistence_failure_after_execution_leaves_a_durable_pending_attempt
+    Dir.mktmpdir do |dir|
+      path = File.join(dir, "research.json")
+      store = Class.new(Store) do
+        def initialize(path)
+          super
+          @saves = 0
+        end
+
+        def save(task)
+          @saves += 1
+          raise IOError, "disk full" if @saves == 3
+
+          super
+        end
+      end.new(path)
+      checkpoints = Checkpoints.new("none", "same")
+      runner = ExperimentRunner.new(
+        checkpoints: checkpoints,
+        executor: ->(_action, max_frames:) { {observation: "tested", outcome: "supports", frames: 1, state_fingerprint: "same"} }
+      )
+      coordinator = RecoveryCoordinator.new(
+        store: store,
+        runner: runner,
+        researcher: ->(_context) { {hypothesis_id: "h1", statement: "test", action: "inspect"} }
+      )
+
+      assert_raises(IOError) do
+        coordinator.handle(execution: {
+          status: "blocked", goal: "door", location: "A", checkpoint: "start", hypotheses: []
+        })
+      end
+
+      pending = Store.new(path).load.experiments.first
+      assert_nil pending.outcome
+      assert_equal "inspect", pending.action
     end
   end
 
