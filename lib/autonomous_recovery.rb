@@ -25,15 +25,10 @@ module Koholint
 
       def to_h
         {
-          "status" => "blocked",
-          "goal" => goal,
-          "location" => location,
-          "checkpoint" => checkpoint,
-          "attempts" => attempts,
-          "blocker_type" => blocker_type,
-          "observations" => observations,
-          "failed_actions" => failed_actions,
-          "known_constraints" => known_constraints
+          "status" => "blocked", "goal" => goal, "location" => location,
+          "checkpoint" => checkpoint, "attempts" => attempts,
+          "blocker_type" => blocker_type, "observations" => observations,
+          "failed_actions" => failed_actions, "known_constraints" => known_constraints
         }
       end
     end
@@ -74,6 +69,15 @@ module Koholint
 
       def exhausted?
         experiments.length >= budget.fetch("max_experiments", 3)
+      end
+
+      def record_experiment!(experiment)
+        raise ArgumentError, "research budget exhausted" if exhausted?
+        if experiments.any? { |e| e.hypothesis_id == experiment.hypothesis_id && e.action == experiment.action }
+          raise ArgumentError, "duplicate research experiment"
+        end
+
+        experiments << experiment
       end
 
       def to_h
