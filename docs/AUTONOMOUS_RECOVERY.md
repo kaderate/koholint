@@ -23,7 +23,9 @@ The Planner context is disposable. World Model, checkpoints, action history, and
 
 `BlockedResult` captures goal, location, checkpoint, blocker type, attempts, failed actions, observations, and known constraints.
 
-`ResearchTask` owns a bounded hypothesis/experiment ledger. Hypotheses have status and evidence. Experiments record checkpoint, action, observation, outcome, cost, and optional state fingerprint.
+`ResearchTask` owns a bounded hypothesis/experiment ledger. Hypotheses have status and evidence. Experiments record checkpoint, action, observation, outcome, cost, and the durable state fingerprint observed after execution.
+
+A supporting observation is evidence, not immediate proof: by default a hypothesis needs two distinct supporting experiments before it becomes `supported`. A refutation can mark a hypothesis `refuted` immediately. Duplicate `(hypothesis, action)` experiments are rejected so the support threshold requires independent actions.
 
 Research produces observations; it does not silently promote observations into game facts. Promotion into the World Model or a Builder task remains an explicit step governed by existing provenance rules.
 
@@ -32,9 +34,9 @@ Research produces observations; it does not silently promote observations into g
 - `BlockedResult`: structured blocked execution result.
 - `Store`: atomic JSON persistence and reload of research state, with validation on load/save.
 - `Context`: bounded projection for a fresh Planner invocation.
-- `ExperimentRunner`: restores an experimental checkpoint, enforces a frame budget, and rejects detected durable-state mutation when the checkpoint adapter exposes a durable fingerprint.
+- `ExperimentRunner`: restores an experimental checkpoint, enforces a frame budget, requires a durable fingerprint by default, rejects durable-state mutation, and verifies any executor-reported fingerprint against the post-experiment fingerprint.
 - `ResearchTask#record_experiment!`: enforces the experiment budget and rejects duplicate `(hypothesis, action)` retries.
-- `RecoveryCoordinator`: turns a blocked execution into a persisted research task, asks for one bounded experiment, executes it, records the observation, updates hypothesis status, and returns to execute or escalates when exhausted.
+- `RecoveryCoordinator`: turns a blocked execution into a persisted research task, asks for one bounded experiment, executes it, records the observation, updates hypothesis evidence/status, and returns to execute/research/escalate.
 - `Router`: maps successful execution to `execute`, an unexhausted blocker to `research`, and an exhausted blocker to `escalate`.
 
 ## Planner integration
@@ -53,21 +55,21 @@ Planner context
   -> Execute again, or escalate when research is exhausted
 ```
 
-The integration boundary is intentionally small: the Planner emits a `BlockedResult`, invokes the recovery layer with the existing checkpoint/tool executor and relevant persistent facts, then consumes the returned route/result. The recovery layer is therefore a harness around successive Planner contexts, not a replacement for the Planner or its session loop.
+The recovery layer is a harness around successive Planner contexts, not a replacement for the Planner. The repository currently does not contain a concrete Planner/session runtime implementation to wire directly, so this branch makes the integration contract executable at the recovery seam without inventing a second agent runtime.
 
-A concrete integration should preserve the existing execution and tool ownership: recovery supplies bounded experiments and durable handoff; the Planner remains responsible for deciding whether to execute, explore, research, promote a verified discovery, or escalate a process failure to MetaPlanner.
+The existing Planner loop must supply the `BlockedResult`, persistent World Model facts/tools, checkpoint adapter, and executor; it then consumes the coordinator's `execute`, `research`, or `escalate` route. A fresh Planner invocation reconstructs its prompt from `Context.project` rather than carrying the previous LLM context forward.
 
 ## Safety
 
-The recovery seam does not invoke an LLM by itself, mutate the World Model, or enable RAM writes. D12 remains in force. Experimental executors must honor the supplied frame budget and must not mutate durable progression; adapters that expose a durable fingerprint are checked after each experiment.
+The recovery seam does not invoke an LLM by itself, mutate the World Model, or enable RAM writes. D12 remains in force. Experimental executors must honor the supplied frame budget and must not mutate durable progression. A checkpoint adapter without `durable_fingerprint` is rejected by default; callers may only relax that requirement when they explicitly accept the weaker isolation contract.
 
 A successful scratch experiment is not automatically durable progression or a verified game fact. Research exhaustion is an owner escalation. Workflow/process failures remain MetaPlanner escalations under `AGENTS.md`.
 
 ## Fresh-context acceptance property
 
-A persisted `ResearchTask` is written to disk and loaded by a separate Ruby process, so the recovery state does not depend on the previous in-memory context. `Context.project` then applies fixed bounds to hypotheses, experiments, facts, and tools so the reset cannot simply recreate the original context-bloat problem.
+A persisted `ResearchTask` is written to disk and loaded by a separate Ruby process, so recovery state does not depend on the previous in-memory context. `Context.project` then applies fixed bounds to hypotheses, experiments, facts, and tools so the reset cannot simply recreate the original context-bloat problem.
 
-The deterministic test suite covers fresh-process persistence, bounded execution, durable-state mutation detection, duplicate protection, validation, coordinator orchestration, and budget exhaustion. The remaining integration is wiring the existing Planner agent/session loop to this seam and supplying its real checkpoint/tool executor.
+The tests also exercise two independent supporting experiments before resolution, fingerprint mismatch/mutation rejection, duplicate protection, validation, coordinator orchestration, and budget exhaustion.
 
 ## Example
 
@@ -77,9 +79,12 @@ Execute
   -> persist ResearchTask
   -> fresh Planner context
        -> hypothesis
-       -> bounded checkpoint-backed experiment
-       -> observation
-       -> supported/refuted hypothesis
+       -> bounded checkpoint-backed experiment #1
+       -> observation: supports
+       -> fresh Planner context
+       -> bounded checkpoint-backed experiment #2
+       -> observation: supports
+       -> hypothesis supported
        -> Builder / World Model promotion
   -> Execute again
 ```
