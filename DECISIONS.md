@@ -357,3 +357,34 @@ to be ratified), `taken without validation` (inherited from the spike, to be rev
   service of the sword-hypothesis search there. This does NOT extend to any other room, mechanic,
   or goal -- a write to unblock a different room, or for a purpose unrelated to finding the sword
   lead, still needs its own ask under the base rule above.
+
+## D13 — Build a real hostile-avoidance primitive in lib/navigator.rb
+
+- **Status**: ratified (September 11, 2026).
+- **Context**: D11 deliberately deferred building a general `lib/navigator.rb` intercept/avoidance
+  primitive, on the grounds that one adaptive-tracking success was not enough evidence to justify
+  the investment -- explicitly conditioned on the pattern recurring "a few times" first. Since
+  then, the same hostile-creature-avoidance problem (hold the shield, tap-push toward a target,
+  watch HP, manually top it up via D12's scoped write permission when low) has been independently
+  re-derived from scratch by at least 4 separate Explorer sessions across 4 rooms in the
+  "Plage Coco" cluster (`riverside_south_river_room` 224/0, `riverside_flower_clearing` 225/0,
+  `riverside_ne_cove` 226/0, `riverside_east_room` 209/0), each spending real session budget
+  reimplementing the same tactic rather than reusing a shared tool. D11's own invalidation
+  condition ("this pattern recurring a few times") is now met -- owner-confirmed, September 11.
+- **Choice**: a Builder task (implements a decision already made, no new paradigm invention) to
+  formalize this into a real, reusable `lib/navigator.rb` primitive. Reference implementation to
+  build from: `world_topology.riverside_south_room_adaptive_chase_experiment`'s throwaway script
+  (the one D11 itself is built on) plus every Plage Coco session's own ad-hoc scripts referenced in
+  `room_labels["224/0"]`/`["225/0"]`/`["226/0"]`/`["209/0"]`. Scope: read nearby OAM sprites
+  already classified `hazard_status: hostile` (D11) or `unknown`, hold B automatically if a shield
+  is confirmed equipped (B-slot check), and bias movement to increase distance from the nearest
+  hostile sprite while still making net progress toward a target direction/position -- the exact
+  method name/API shape is the Builder's call within this scope, not dictated here. Validate by a
+  live re-test against one of the two still-unswept Plage Coco pockets (`226/0`'s east/south past
+  x=46,y=26, or `209/0`'s east half past its creature bottleneck) and report whether it measurably
+  reduces damage/session time versus the ad-hoc scripts' own logged figures.
+- **Not in scope**: full pathfinding/AI; non-hostile obstacle handling (D8/D10's job already);
+  changing hostile/friendly classification itself (D11 owns that).
+- **Invalidated if**: a live retest with the new primitive doesn't measurably reduce damage or
+  session time versus the ad-hoc scripts it replaces -- then the investment didn't pay off and
+  should be reconsidered openly, not kept silently on the strength of intent alone.
