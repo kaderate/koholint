@@ -15,7 +15,8 @@ class AutonomousRecoveryTest < Minitest::Test
 
   def test_blocked_task_survives_a_fresh_context
     Dir.mktmpdir do |dir|
-      store = Store.new(File.join(dir, "research.json"))
+      path = File.join(dir, "research.json")
+      store = Store.new(path)
       blocked = BlockedResult.new(
         goal: "open the door", location: "A", checkpoint: "start",
         attempts: 2, blocker_type: "unknown_route"
@@ -26,7 +27,7 @@ class AutonomousRecoveryTest < Minitest::Test
       )
       store.save(task)
 
-      reloaded = Store.new(store.instance_variable_get(:@path)).load
+      reloaded = Store.new(path).load
       context = Context.project(reloaded, world_facts: [{"room" => "B"}])
 
       assert_equal "open the door", context["goal"]
@@ -39,7 +40,7 @@ class AutonomousRecoveryTest < Minitest::Test
     checkpoints = Checkpoints.new
     runner = ExperimentRunner.new(
       checkpoints: checkpoints,
-      executor: ->(action) { {observation: "key found", outcome: "supports", state_fingerprint: "after"} }
+      executor: ->(_action) { {observation: "key found", outcome: "supports", state_fingerprint: "after"} }
     )
     experiment = Experiment.new(id: "e1", hypothesis_id: "h1", action: "inspect B", cost: 1)
 
@@ -48,6 +49,18 @@ class AutonomousRecoveryTest < Minitest::Test
     assert_equal "start", checkpoints.restored
     assert_equal "key found", result.observation
     assert_equal "supports", result.outcome
+  end
+
+  def test_research_task_rejects_duplicate_experiments_and_enforces_budget
+    task = ResearchTask.new(id: "r1", goal: "door", blocker: {}, budget: {"max_experiments" => 1})
+    experiment = Experiment.new(id: "e1", hypothesis_id: "h1", action: "inspect")
+
+    task.record_experiment!(experiment)
+    assert_raises(ArgumentError) { task.record_experiment!(experiment) }
+    assert task.exhausted?
+    assert_raises(ArgumentError) do
+      task.record_experiment!(Experiment.new(id: "e2", hypothesis_id: "h2", action: "different"))
+    end
   end
 
   def test_blocked_research_exhaustion_escalates
