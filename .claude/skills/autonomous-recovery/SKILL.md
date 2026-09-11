@@ -1,3 +1,8 @@
+---
+name: autonomous-recovery
+description: Recover from a genuine Koholint game blocker using a durable ResearchTask, bounded checkpoint-backed experiments, and fresh Claude contexts. Use when a game objective is genuinely blocked or a recovery context must be rotated without losing the objective.
+---
+
 # Autonomous Recovery
 
 You are the Planner and game-playing agent for Koholint. There is no separate Planner runtime. Use this skill to turn a blocked game objective into a bounded research loop while keeping the conversational context disposable.
@@ -7,6 +12,18 @@ You are the Planner and game-playing agent for Koholint. There is no separate Pl
 The repository is the durable memory; the Claude conversation is working memory.
 
 Never keep a large conversational history alive merely because it contains useful game knowledge. Persist useful knowledge first, then start the next context from the durable artifacts.
+
+## Canonical durable seam
+
+The canonical active research task is `.koholint/research_task.json` via `Koholint::AutonomousRecovery::Store.default`.
+
+From the repository root, a fresh Claude context can inspect it with:
+
+```sh
+ruby -Ilib -e 'require "./lib/autonomous_recovery"; s=Koholint::AutonomousRecovery::Store.default; t=s.load; abort "no active ResearchTask" unless t; puts JSON.pretty_generate(Koholint::AutonomousRecovery::Context.project(t)); puts JSON.pretty_generate(s.load_handoff || Koholint::AutonomousRecovery::Context.handoff(t))'
+```
+
+Use the Ruby API rather than inventing another persistence location. The handoff manifest is stored beside the task as `.koholint/research_task.json.handoff.json`.
 
 ## When to enter recovery
 
@@ -39,9 +56,13 @@ Do not replace the original goal with the research problem.
 
 ### 2. Persist the research task
 
-Create or load the durable `ResearchTask` using the AutonomousRecovery Ruby layer.
+Create or load the durable `ResearchTask` using the AutonomousRecovery Ruby layer and the canonical `Store.default` location.
 
 The task is the handoff between Claude contexts. It must contain the hypotheses, bounded experiment budget, and experiment ledger. Do not rely on the current conversation to carry any of this state forward.
+
+If the blocker has no hypotheses yet, create them durably with `ResearchTask#add_hypothesis!` before running an experiment. A proposal must include `hypothesis_id`, `statement`, and `action`.
+
+Before ending the context, persist both the task and its handoff manifest with `Store#save` followed by `Store#save_handoff`.
 
 ### 3. Form falsifiable hypotheses
 
@@ -73,6 +94,8 @@ Do not modify game state directly to make the hypothesis true. D12 still applies
 
 Do not repeat an identical `(hypothesis, action)` experiment. Let the Ruby layer reject duplicates and budget violations.
 
+The coordinator durably records the experiment as `pending` before execution. This means a persistence failure after execution cannot make the attempt disappear and be silently repeated by the next context.
+
 ### 5. Treat evidence conservatively
 
 One supporting observation is evidence, not proof. By default, a hypothesis needs two independent supporting experiments before being marked `supported`.
@@ -86,7 +109,7 @@ Only after the research result satisfies the evidence threshold should the Plann
 Before ending a context, ensure the durable state contains:
 
 - the ResearchTask;
-- the latest experiment result;
+- the latest experiment result, or a durable `pending` attempt if the result could not be persisted;
 - the checkpoint reference;
 - any newly verified registry/World Model facts;
 - the original game goal and its current status;
@@ -114,14 +137,17 @@ At the beginning of a fresh Koholint context:
 1. Read `AGENTS.md`.
 2. Read `NEXT.md`.
 3. Read `DECISIONS.md`.
-4. Inspect the active `ResearchTask`, if any.
+4. Load `.koholint/research_task.json` with `Store.default`.
 5. Inspect the relevant World Model / RAM registry data.
 6. Inspect the referenced checkpoint and recent action history when needed.
-7. Decide the next bounded action from durable state only.
+7. Use `Context.project` and `Store#load_handoff` to rebuild the bounded working context.
+8. Decide the next bounded action from durable state only.
 
 Do not assume that anything said in the previous Claude conversation is still available or correct.
 
 If an active ResearchTask exists, recovery has priority over unrelated new exploration until the task is resolved, refuted, or explicitly escalated.
+
+A `pending` experiment is an already-reserved attempt. Do not execute a second identical action. Recover its durable result if available; otherwise treat the attempt as consumed and choose the next allowed action rather than replaying it.
 
 ## Returning to the game objective
 
@@ -132,8 +158,9 @@ When a hypothesis is sufficiently supported:
 1. promote only the facts justified by the evidence and provenance rules;
 2. update the World Model/registry or create the appropriate Builder task;
 3. mark the ResearchTask resolved;
-4. return to the original blocked game objective;
-5. do not keep researching the same blocker without a new falsifiable question.
+4. persist the resolved task and handoff manifest;
+5. return to the original blocked game objective;
+6. do not keep researching the same blocker without a new falsifiable question.
 
 If the research budget is exhausted without resolution, stop guessing and escalate. Do not silently turn exhausted research into unbounded exploration.
 
@@ -149,11 +176,13 @@ Use `lib/autonomous_recovery.rb` as the deterministic enforcement layer. The Rub
 
 - `BlockedResult` structure;
 - `ResearchTask` persistence and validation;
+- durable hypothesis creation;
 - hypothesis/experiment budgets and duplicate rejection;
 - checkpoint restoration;
 - bounded experiment execution;
 - durable-state fingerprint protection;
-- evidence bookkeeping.
+- evidence bookkeeping;
+- durable pending-attempt reservation.
 
 The skill owns the agent behavior: when to invoke those primitives, what to research, when to rotate context, and when to resume the original objective.
 
