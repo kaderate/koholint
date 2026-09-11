@@ -40,6 +40,7 @@ class AutonomousRecoveryTest < Minitest::Test
       assert_equal 40, context["world_facts"].length
       assert_equal 20, context["tools"].length
       assert_equal 3, context["budget"]["remaining_experiments"]
+      assert_equal 2, context["budget"]["min_supporting_experiments"]
     end
   end
 
@@ -50,7 +51,7 @@ class AutonomousRecoveryTest < Minitest::Test
       max_frames: 10,
       executor: ->(_action, max_frames:) do
         assert_equal 10, max_frames
-        {observation: "key found", outcome: "supports", frames: 7, state_fingerprint: "after"}
+        {observation: "key found", outcome: "supports", frames: 7, state_fingerprint: "same"}
       end
     )
     experiment = Experiment.new(id: "e1", hypothesis_id: "h1", action: "inspect B")
@@ -61,6 +62,7 @@ class AutonomousRecoveryTest < Minitest::Test
     assert_equal 7, result.cost
     assert_equal "key found", result.observation
     assert_equal "supports", result.outcome
+    assert_equal "same", result.state_fingerprint
   end
 
   def test_experiment_rejects_durable_state_mutation
@@ -77,11 +79,61 @@ class AutonomousRecoveryTest < Minitest::Test
     assert_raises(ArgumentError) { runner.run(experiment, checkpoint: "start") }
   end
 
+  def test_experiment_rejects_reported_fingerprint_mismatch
+    checkpoints = Checkpoints.new("same", "same")
+    runner = ExperimentRunner.new(
+      checkpoints: checkpoints,
+      executor: ->(_action, max_frames:) { {observation: "ok", outcome: "supports", frames: 1, state_fingerprint: "wrong"} }
+    )
+    experiment = Experiment.new(id: "e1", hypothesis_id: "h1", action: "inspect")
+
+    assert_raises(ArgumentError) { runner.run(experiment, checkpoint: "start") }
+  end
+
+  def test_runner_requires_durable_fingerprint_by_default
+    checkpoints = Object.new
+    def checkpoints.restore(_name); end
+    runner = ExperimentRunner.new(
+      checkpoints: checkpoints,
+      executor: ->(_action, max_frames:) { {observation: "ok", outcome: "supports", frames: 1} }
+    )
+    experiment = Experiment.new(id: "e1", hypothesis_id: "h1", action: "inspect")
+
+    assert_raises(ArgumentError) { runner.run(experiment, checkpoint: "start") }
+  end
+
+  def test_research_task_requires_repeated_support_and_refutes_immediately
+    task = ResearchTask.new(
+      id: "r1", goal: "door", blocker: {},
+      hypotheses: [Hypothesis.new(id: "h1", statement: "inspect")],
+      budget: {"max_experiments" => 3, "min_supporting_experiments" => 2}
+    )
+
+    first = Experiment.new(id: "e1", hypothesis_id: "h1", action: "inspect-left", outcome: "supports", observation: "maybe")
+    second = Experiment.new(id: "e2", hypothesis_id: "h1", action: "inspect-right", outcome: "supports", observation: "confirmed")
+    task.record_experiment!(first)
+    refute task.mark_hypothesis!("h1", "supported", [first.observation])
+    assert_equal "open", task.status
+
+    task.record_experiment!(second)
+    assert task.mark_hypothesis!("h1", "supported", [second.observation])
+    assert_equal "resolved", task.status
+
+    refuted = ResearchTask.new(
+      id: "r2", goal: "door", blocker: {},
+      hypotheses: [Hypothesis.new(id: "h2", statement: "wrong")]
+    )
+    experiment = Experiment.new(id: "e3", hypothesis_id: "h2", action: "test", outcome: "refutes", observation: "no")
+    refuted.record_experiment!(experiment)
+    assert refuted.mark_hypothesis!("h2", "refuted", [experiment.observation])
+    assert_equal "open", refuted.status
+  end
+
   def test_research_task_rejects_duplicate_experiments_and_enforces_budget
     task = ResearchTask.new(
       id: "r1", goal: "door", blocker: {},
       hypotheses: [Hypothesis.new(id: "h1", statement: "inspect")],
-      budget: {"max_experiments" => 1}
+      budget: {"max_experiments" => 1, "min_supporting_experiments" => 1}
     )
     experiment = Experiment.new(id: "e1", hypothesis_id: "h1", action: "inspect")
 
@@ -93,31 +145,36 @@ class AutonomousRecoveryTest < Minitest::Test
     end
   end
 
-  def test_recovery_coordinator_runs_one_research_iteration_and_persists_it
+  def test_recovery_coordinator_runs_two_independent_supporting_iterations_and_persists_them
     Dir.mktmpdir do |dir|
       store = Store.new(File.join(dir, "research.json"))
       checkpoints = Checkpoints.new("none", "same")
       runner = ExperimentRunner.new(
         checkpoints: checkpoints,
-        executor: ->(_action, max_frames:) { {observation: "found", outcome: "supports", frames: 2} }
+        executor: ->(action, max_frames:) { {observation: "found #{action}", outcome: "supports", frames: 2, state_fingerprint: "same"} }
       )
+      calls = 0
       coordinator = RecoveryCoordinator.new(
         store: store,
         runner: runner,
-        researcher: ->(_context) { {hypothesis_id: "h1", action: "inspect B"} }
+        researcher: ->(_context) do
+          calls += 1
+          {hypothesis_id: "h1", action: calls == 1 ? "inspect B" : "inspect C"}
+        end
       )
 
-      result = coordinator.handle(
-        execution: {
-          status: "blocked", goal: "open the door", location: "A", checkpoint: "start",
-          hypotheses: [{id: "h1", statement: "The key is in B"}]
-        }
-      )
+      execution = {
+        status: "blocked", goal: "open the door", location: "A", checkpoint: "start",
+        hypotheses: [{id: "h1", statement: "The key is in B"}]
+      }
+      first = coordinator.handle(execution: execution)
+      assert_equal "research", first[:mode]
+      assert_equal "open", first[:task].status
 
-      assert_equal "execute", result[:mode]
-      assert_equal "resolved", result[:task].status
-      assert_equal 1, result[:task].experiments.length
-      assert_equal "supported", result[:task].hypotheses.first.status
+      second = coordinator.handle(execution: execution, research_task: store.load)
+      assert_equal "execute", second[:mode]
+      assert_equal "resolved", second[:task].status
+      assert_equal 2, second[:task].experiments.length
       assert_equal "resolved", store.load.status
     end
   end
@@ -136,7 +193,7 @@ class AutonomousRecoveryTest < Minitest::Test
     task = ResearchTask.new(
       id: "r1", goal: "door", blocker: {},
       hypotheses: [Hypothesis.new(id: "h1", statement: "x")],
-      budget: {"max_experiments" => 1}
+      budget: {"max_experiments" => 1, "min_supporting_experiments" => 1}
     )
     task.experiments << Experiment.new(id: "e1", hypothesis_id: "h1", action: "x")
 
