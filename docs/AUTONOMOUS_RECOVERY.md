@@ -64,6 +64,7 @@ Research produces observations; it does not silently promote observations into g
 - `BlockedResult`: structured blocked execution result.
 - `Store`: atomic JSON persistence and reload of research state, with validation on load/save.
 - `Context`: bounded projection for a fresh Claude invocation.
+- `Context.handoff`: emits a compact handoff manifest identifying the active task, original goal, checkpoint, required cold-start reads, remaining budget, and next recovery step.
 - `ExperimentRunner`: restores an experimental checkpoint, enforces a frame budget, requires a durable fingerprint by default, rejects durable-state mutation, and verifies any executor-reported fingerprint against the post-experiment fingerprint.
 - `ResearchTask#record_experiment!`: enforces the experiment budget and rejects duplicate `(hypothesis, action)` retries.
 - `RecoveryCoordinator`: turns a blocked execution into a persisted research task, asks for one bounded experiment, executes it, records the observation, updates hypothesis evidence/status, and returns to execute/research/escalate.
@@ -83,8 +84,9 @@ When Execute or Explore is genuinely blocked:
 2. Write a structured `BlockedResult` with the current checkpoint and observed blocker.
 3. Create or update the durable `ResearchTask`.
 4. Persist the task before ending the context.
-5. Record the original game goal so research remains subordinate to it.
-6. Do **not** dump the whole conversation into durable state. Persist facts, hypotheses, experiments, checkpoints, and concise failure observations only.
+5. Emit/store the `Context.handoff` manifest for the next context.
+6. Record the original game goal so research remains subordinate to it.
+7. Do **not** dump the whole conversation into durable state. Persist facts, hypotheses, experiments, checkpoints, and concise failure observations only.
 
 If the task is not blocked but the context is simply getting stale or large, update `NEXT.md` with the bounded session report and start the next context from durable state rather than carrying the transcript forward.
 
@@ -104,7 +106,7 @@ It must not ask the previous context what happened. The durable artifacts are th
 
 ### 3. Reconstruct only the bounded working context
 
-The fresh session should use `Context.project` (or an equivalent bounded projection) to reconstruct the research problem. Keep hypotheses, recent experiments, relevant World Model facts, and available tools bounded. Do not rehydrate the old transcript merely because it exists.
+The fresh session should use `Context.project` (or an equivalent bounded projection) and `Context.handoff` to reconstruct the research problem. Keep hypotheses, recent experiments, relevant World Model facts, and available tools bounded. Do not rehydrate the old transcript merely because it exists.
 
 The first question in the fresh context is: **what is the smallest falsifiable experiment that can distinguish the leading hypotheses without mutating durable progression?**
 
@@ -134,6 +136,7 @@ The recovery loop is successful only if the next Claude session can resume the g
 blocked
   -> BlockedResult
   -> persist ResearchTask
+  -> emit handoff manifest
   -> end / reset Claude context
   -> cold Claude session reads durable state
   -> choose hypothesis
@@ -154,7 +157,7 @@ A successful scratch experiment is not automatically durable progression or a ve
 
 ## Acceptance property
 
-A persisted `ResearchTask` is written to disk and loaded by a separate Ruby process, so recovery state does not depend on the previous in-memory context. `Context.project` then applies fixed bounds to hypotheses, experiments, facts, and tools so a fresh session cannot simply recreate the original context-bloat problem.
+A persisted `ResearchTask` is written to disk and loaded by a separate Ruby process, so recovery state does not depend on the previous in-memory context. `Context.project` and `Context.handoff` provide bounded, explicit input for a fresh Claude session so it cannot simply recreate the original context-bloat problem.
 
 The tests exercise two independent supporting experiments before resolution, fingerprint mismatch/mutation rejection, duplicate protection, validation, coordinator orchestration, and budget exhaustion.
 
@@ -164,7 +167,7 @@ The tests exercise two independent supporting experiments before resolution, fin
 Claude Execute
   -> blocked
   -> autonomous-recovery skill
-  -> persist ResearchTask
+  -> persist ResearchTask + handoff manifest
   -> end context
 
 New Claude context
