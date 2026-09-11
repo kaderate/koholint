@@ -3,6 +3,7 @@
 require "minitest/autorun"
 require "tmpdir"
 require "rbconfig"
+require "open3"
 require_relative "../lib/autonomous_recovery"
 
 class AutonomousRecoveryTest < Minitest::Test
@@ -55,6 +56,86 @@ class AutonomousRecoveryTest < Minitest::Test
       assert_equal 3, context["budget"]["remaining_experiments"]
       assert_equal "r1", handoff["research_task_id"]
       assert_equal "start", handoff["checkpoint"]
+    end
+  end
+
+  def test_cold_processes_complete_recovery_across_two_experiments
+    Dir.mktmpdir do |dir|
+      lib_dir = File.expand_path("../lib", __dir__)
+      child = <<~RUBY
+        require "json"
+        require "autonomous_recovery"
+
+        include Koholint::AutonomousRecovery
+        phase = ARGV.fetch(0)
+        store = Store.default
+        checkpoints = Struct.new(:fingerprint) do
+          def restore(_name); end
+          def durable_fingerprint; fingerprint; end
+        end.new("same")
+        runner = ExperimentRunner.new(
+          checkpoints: checkpoints,
+          max_frames: 10,
+          executor: ->(action, max_frames:) do
+            {observation: "observed \#{action}", outcome: "supports", frames: 2, state_fingerprint: "same"}
+          end
+        )
+
+        if phase == "1"
+          coordinator = RecoveryCoordinator.new(
+            store: store,
+            runner: runner,
+            researcher: ->(_context) do
+              {hypothesis_id: "h1", statement: "The key is in B", action: "inspect B"}
+            end
+          )
+          result = coordinator.handle(execution: {
+            status: "blocked", goal: "open the door", location: "A", checkpoint: "start", hypotheses: []
+          })
+          abort "phase 1 did not research" unless result[:mode] == "research"
+          abort "phase 1 did not persist an open task" unless store.load.status == "open"
+          abort "phase 1 did not persist experiment 1" unless store.load.experiments.length == 1
+          puts JSON.generate(mode: result[:mode], experiments: store.load.experiments.length, status: store.load.status)
+        else
+          task = store.load
+          abort "phase 2 did not discover the persisted task" unless task && task.goal == "open the door"
+          coordinator = RecoveryCoordinator.new(
+            store: store,
+            runner: runner,
+            researcher: ->(_context) do
+              {hypothesis_id: "h1", action: "inspect C"}
+            end
+          )
+          result = coordinator.handle(execution: {
+            status: "blocked", goal: "open the door", location: "A", checkpoint: "start", hypotheses: []
+          }, research_task: task)
+          reloaded = store.load
+          abort "phase 2 did not resume" unless result[:mode] == "execute"
+          abort "phase 2 did not resolve the task" unless reloaded.status == "resolved"
+          abort "phase 2 did not persist experiment 2" unless reloaded.experiments.length == 2
+          abort "original goal was lost" unless reloaded.goal == "open the door"
+          puts JSON.generate(mode: result[:mode], experiments: reloaded.experiments.length, status: reloaded.status, goal: reloaded.goal)
+        end
+      RUBY
+
+      first_out, first_err, first_status = Dir.chdir(dir) do
+        Open3.capture3(RbConfig.ruby, "-I#{lib_dir}", "-e", child, "1")
+      end
+      assert first_status.success?, "phase 1 failed: #{first_err}"
+      assert_equal({"mode" => "research", "experiments" => 1, "status" => "open"}, JSON.parse(first_out))
+
+      second_out, second_err, second_status = Dir.chdir(dir) do
+        Open3.capture3(RbConfig.ruby, "-I#{lib_dir}", "-e", child, "2")
+      end
+      assert second_status.success?, "phase 2 failed: #{second_err}"
+      assert_equal(
+        {"mode" => "execute", "experiments" => 2, "status" => "resolved", "goal" => "open the door"},
+        JSON.parse(second_out)
+      )
+
+      final_task = Store.new(File.join(dir, ".koholint", "research_task.json")).load
+      assert_equal "resolved", final_task.status
+      assert_equal 2, final_task.experiments.length
     end
   end
 
