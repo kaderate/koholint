@@ -117,139 +117,35 @@ as boundaries, never actually dived into; worth revisiting given the cluster is 
 same conditional-terrain blocker as the sword hypothesis's core evidence. Worth a cheap retest
 once any cutting item is found, not a routing problem.
 
-### Clue-weighting synthesis, September 11 2026 (synthesis session, no new measurement)
-
-Cold re-read of `AGENTS.md`, `DECISIONS.md` D11-D14, `docs/GAME_MANUAL_NOTES.md`, all 19
-`dialogues.*` entries, `select_map_screen` and `data/world_model.json`. Nothing here is a new
-observation -- it is a ranking of facts already on file. Archive this block once its recommended
-action has been run and its outcome folded into the state above.
-
-**Weighting rule used** (re-apply it, don't re-derive it): rank a clue by (a) whether it names a
-PLACE / PERSON / ACTION or only describes a generic mechanic, (b) whether it has already been acted
-on to exhaustion, (c) whether it was captured before this project knew short `:a` taps truncate real
-content -- two confirmed instances so far (`riverside_flower_clearing_sign`'s page 2, and
-`crate_room_book_a/b/e/f/g/h`'s initial trigger). Anything transcribed with `Navigator.tap_button`
-defaults and never re-held is a candidate third instance.
-
-1. **`house2_telephone_examine` (169/16) -- the strongest untested lead on file.** The only dialogue
-   in the registry naming a character, a mechanism and a place at once ("Téléphone... A
-   l'extérieur... Pépé le Ramollo n'a pas l'air d'être un grand causeur..."). Independent
-   corroboration from the game itself: `select_map_screen`'s EIGHTH SESSION read `177/0`'s own
-   in-game place name as **"Chez Pépé le Ramollo"** and `162/0`'s as "Chez Marine et Tarkin" -- the
-   only two rooms in this project carrying a "Chez <name>" label, and the other one is the household
-   that gave Link the shield and both beach clues. `169/16` is the interior of `177/0`'s building
-   (`room_labels['169/16']`, `world_topology.room177_exits`, which found exactly one door), so the
-   telephone and the named character are the SAME location. **Discrepancy to settle, flagged not
-   resolved**: the owner's framing is "ma petite maison à côté de celle de Pépé le Ramollo" (next
-   door); on-file data says same house. Cheap to settle -- read the SELECT place-name box while
-   standing in `169/16`, or recount `177/0`'s enterable doors. Two errors in this entry's own note
-   have kept the thread under-weighted: it cross-references "`world_model.json`'s building_screen
-   entry (176/0, a different room)" when `world_model.json` actually catalogues Pépé le Ramollo in
-   `house2_interior` ITSELF, as an NPC, with a 4-page capture and a 2-cell approach test proving the
-   two OAM pairs are one 2x2 body; and it calls that 4-tile block "an invisible interactive trigger,
-   not a rendered object" because no BG furniture matches its position -- but OAM sprites are not BG
-   furniture, and `world_model.json` records the same block's tiles as 112/114/116/118
-   (0x70/0x72/0x74/0x76, flags 2), the same family as `visual_catalog.shop_screen_yard_npc`
-   (0x70/0x72, a confirmed humanoid). If the speaker is a character rather than a thought-bubble,
-   the line reads as a hint CHANNEL ("hints come by telephone, and telephones are outside"), not a
-   one-off remark -- and `docs/GAME_MANUAL_NOTES.md` independently lists a telephone booth among the
-   island's generic location types (D14 mechanic knowledge, not a claim about where one is here).
-   Never acted on: no session has ever looked for a telephone outside, and neither `177/0` NPC has
-   been re-approached since September 8. Captured with `tap_button` defaults (12 `:a`), before the
-   truncation bug was known.
-2. **`house2_telephone_call` (169/16) -- "always a wrong number" is NOT established.** One session,
-   one object; the single retest only confirmed the sequence restarts from "DRING DRING!", it never
-   re-read the ending. Fixed vs. random vs. state-gated is genuinely open, and a "who do you want to
-   call" `Oui/Non`-shaped prompt of the kind every crate_room book turned out to have would be
-   invisible to a short tap. Note the shape: an indoor rotary phone giving a gag is exactly what
-   entry 1's text predicts if the real hint instrument is a booth outside.
-3. **`starting_house_npc_beds` + `_bench` (163/16) -- highest-trust source, clue largely spent.** Two
-   characters in the household the game names "Chez Marine et Tarkin" both point south to "la plage";
-   the bench NPC names "un autre bidule qui est resté sur la plage". Still the most directionally
-   specific clue on file, but acted on to exhaustion (Plage Coco swept, `178/0`'s south edge a
-   confirmed wall). NOT refuted -- two live outs: "la plage" need not be limited to the two rooms the
-   SELECT map calls "Plage Coco", and the bench line is the REPEAT-state line of a story-flag-gated
-   table (its first-meeting line differs, on file), so it can change when a flag flips. Also never
-   re-held: its own entry says it stopped without testing whether more `:a` presses exhaust or loop.
-4. **The SELECT box's second line ("le message du hibou") -- rendered on screen, never transcribed.**
-   `crate_room_book_a` describes that box as place name + owl message; the manual's "message mark" is
-   the same system generically. Six place names are on file, but exactly ONE room ever produced a
-   second line -- `160/0` well_platform, "Village des Mouettes" -- and `select_map_screen`'s note
-   records only that `a_hold=110f` "completed the 2nd line", never what it said (its screenshot is in
-   a scratchpad that may not survive). A real, cheap, un-harvested in-game hint.
-5. **`crate_room_book_h` -- "la Loupe".** The only named item never found; proves it exists. Zero
-   locational content, and the manual confirms hint books are deliberately non-spoiling about
-   locations. A flag to check back against, not a destination.
-6. **`crate_room_book_f` -- Warp holes.** Self-gating by its own text (you cannot warp to a hole that
-   has not appeared on screen yet), so worth nothing until one is physically found. Useful mainly as
-   a reason to stop reading unfamiliar BG art as ordinary terrain.
-7. **`riverside_flower_clearing_sign` page 2 -- "se protéger avec un bouclier".** Already acted on
-   (shield-hold, then D13). Tells you how to survive one room's hazard, not where to go; its real
-   value was methodological (truncation instance #1).
-8. **`crate_room_book_e` -- the laser-blocking shield.** Forward-looking only, no location, and it
-   names an enemy class never encountered -- weak evidence we are still very early.
-9. **`book_b`/`book_c`/`book_d`, `crate_room_book_g`, `crate_room_wall_object`.** Mechanics and
-   flavour. Worth noting: `book_b`'s title is the ONLY occurrence of "épée" anywhere in the registry
-   -- no character has ever mentioned a sword.
-10. **`room176_pair_a`/`_b`, `shop_screen_yard_npc`, `room177_static_sprite`/`_wandering_sprite`.**
-    Near-zero weight, and the calibration examples: the save-tip line is byte-identical across two
-    rooms (recycled asset, confirmed) and `177/0`'s two sprites recite one identical flavour line.
-    One cheap exception: dialogue here is story-flag-gated (proven at `starting_house`), and `177/0`'s
-    pair has not been re-approached since September 8.
-
-**Sword and shield, plainly.** Shield: closed as a lead -- owned and observed (`0xDB00`=4), and every
-clue since is about USING it; only book_e's laser variant is open, and it names no location. Sword:
-never observed and never mentioned by any character -- the hypothesis rests entirely on indirect
-inference (conditionally-blocked bushes, two books teaching sword mechanics, an empty A-slot), with
-"un bidule" (unspecified) as the closest first-person clue. Hold it as a hypothesis, not as an
-observed objective.
-
-**Whose words carry the most weight**: Tarin/Marin's household first by trust -- they gave a real item
-and two convergent directional clues -- but their clue is spent in reachable territory. Pépé le
-Ramollo is second by trust and FIRST by remaining value: the only other character the game itself
-honours with a "Chez <name>" screen, the only one whose line names a mechanism for receiving future
-hints, and the only one nobody has ever followed up on. The children and the books are background;
-they explain systems, and per D14's manual notes that is by design.
-
-**Recommended next action (one).** Dispatch an Explorer to `house2_interior` (169/16) from
-`lib_house2_interior.dump` and re-run BOTH telephone objects with the sustained-hold method (~110-120
-frames per `:a` via `mmu.joypad.key_state.press`/`clear`, never `tap_button`'s default), rendering
-every frame and stepping away between objects to avoid the documented re-trigger trap -- and, in the
-same visit, read OAM slots 12-15's tile IDs and screenshot the room. Falsifiable question: *does
-either house2_interior telephone object hide content that short taps truncated (a further page, a
-Oui/Non prompt, a different call outcome), and is the 4-tile block at (y=64-80, x=72-80) a rendered
-humanoid rather than an invisible trigger?* Why this over everything else: it is the owner's own
-flagged lead; it is the cheapest session on the board (interior, zero hostiles, confirmed route,
-existing checkpoint, no D12 write needed); it targets the exact bug class that produced two real
-finds tonight, on an object transcribed before that bug was known; and it resolves two documented
-errors in the registry's own note. It routes the session after it either way -- a branch or a named
-place becomes a destination, and a confirmed-fixed gag promotes "téléphone... à l'extérieur" into a
-concrete search for a booth among the frontier's unexplored village-side rooms (`146/0`
-north_corridor_room, `163/0` clover_field, both glimpsed-only with zero exits explored). Runner-up if
-it comes back empty: transcribe `160/0`'s never-read second SELECT-box line (#4 above).
+**`house2_interior`'s telephone/Pépé discrepancy RESOLVED, September 11 2026** (the earlier
+synthesis session's #1-ranked recommended action, run same day by a dedicated Explorer session --
+full reasoning trail and outcome archived at `docs/archive/SESSION_LOG.md`). One-line answer:
+it's BOTH two genuinely separate interactive objects (Pépé le Ramollo's own 4-page dialogue, and a
+separate phone-on-the-table's 4-page wrong-number gag, proven simultaneously visible on screen at
+once) AND Pépé's own sprite is a real, visible, solid, named NPC -- the registry had wrongly
+called his sprite an "invisible trigger". Both `dialogues.house2_telephone_examine`/`_call` were
+re-verified live with sustained `:a` holds: no hidden extra pages, no branch, in either. Corrected
+in place in `data/ram_registry.json` (`room_labels['169/16']` and both dialogue entries), plus a
+stale wrong cross-reference to `world_model.json`'s non-existent "building_screen (176/0)" entry.
+Not settled: whether a genuinely separate OUTDOOR telephone booth exists near `villager_screen`
+(177/0) -- Pépé's own line points "outside", and no second building has been found there on file,
+but this wasn't chased beyond a topology re-check this session. **Next pick, per the archived
+synthesis' own runner-up**: transcribe `160/0`'s never-read second SELECT-box line ("le message du
+hibou") -- rendered once, never captured.
 
 ## In-flight work (for resumability)
 
-**Major discrepancy found, September 11 2026**: `data/world_model.json` (an older "spike"-era hand-curated
-file, never fully reconciled with the current registry) records `house2_interior`'s (169/16)
-4-tile OAM block (y=64/80, x=72/80, tile 112/114/116/118) as **Pépé le Ramollo himself** -- a real
-visible NPC, not the "invisible trigger" the current `room_labels['169/16']` describes -- and says
-there's only ONE NPC here, not two separate "telephone" objects. The current registry's own note
-also cites world_model.json with a WRONG room ("building_screen 176/0" -- that room doesn't exist
-in that file; Pépé is recorded under `house2_interior` itself). Dispatched a reconciliation below.
+None currently open. The `house2_interior` telephone/Pépé discrepancy (flagged September 11 2026)
+is RESOLVED, same day, by a dedicated Explorer session -- full detail archived at
+`docs/archive/SESSION_LOG.md`'s "`house2_interior`'s telephone discrepancy resolved" entry;
+corrected facts live in `data/ram_registry.json`'s `room_labels['169/16']` and
+`dialogues.house2_telephone_examine`/`_call`. One-line answer: it's BOTH structurally two separate
+interactive objects (matching the current registry) AND one of them is Pépé le Ramollo himself, a
+real visible NPC (matching `world_model.json`) -- the registry had mischaracterized his sprite as
+an invisible trigger. Also fixed: the registry's wrong "`world_model.json`'s building_screen entry
+(176/0)" cross-reference, and two stale analogies to the old "invisible trigger" framing in
+`room_labels['225/0']`/`dialogues.riverside_flower_clearing_sign`.
 
-As of September 11, 2026, ~03:30 UTC, one subagent is dispatched (model: Opus, not the usual
-Sonnet -- owner-requested for reasoning/synthesis strength, see the conversation) -- check
-`ListAgents` before assuming it is idle or before re-dispatching a duplicate:
-- **Synthesis task, not live exploration**: rank every dialogue clue in the registry by how much
-  weight it deserves for "where to go next", covering the sword, shield (+ `book_e`'s laser-shield
-  mention), "la Loupe", Warp holes, and specifically the owner's own flagged lead --
-  `house2_interior`'s telephone (`dialogues.house2_telephone_examine`/`_call`) explicitly
-  namechecks Pépé le Ramollo (`villager_screen`'s NPC, next door) and was only ever tested once for
-  a single fixed outcome. Expected to end in ONE concrete recommended next action, appended to this
-  section by the agent itself. Tonight's dispatch history (D9 restart, Plage Coco
-pushes, D13 build+validation, the south-edge test, the crate_room library correction, the SELECT
-marker scan) is archived at `docs/archive/SESSION_LOG.md` -- resolved, not needed to resume.
 ## Next question
 
 Session 4 (PLAN.md) is fully complete -- see the State section above. NOT currently paused (that

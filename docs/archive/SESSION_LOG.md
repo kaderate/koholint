@@ -1189,3 +1189,106 @@ actually dived into.
 (Warp holes, "la Loupe") that don't relocate to a specific room yet. See `NEXT.md`'s current
 "Quest hypothesis" section for the live state -- this whole block is historical detail, not
 needed to resume.
+
+## `house2_interior`'s telephone discrepancy resolved: one NPC AND one separate phone object (September 11 2026)
+
+**Question**: does `house2_interior` (169/16) hold ONE NPC (Pépé le Ramollo, per `data/world_model.json`'s
+spike-era finding) whose dialogue merely varies between approaches, or TWO genuinely separate
+interactive objects (an "examine" trigger plus a "telephone" object, per the current registry's
+`room_labels['169/16']` and `dialogues.house2_telephone_examine`/`_call`)? Dispatched as an
+Explorer session specifically to settle this by live re-test, not by picking a side from the
+existing text.
+
+**Answer: BOTH sources were half right.** It IS two genuinely separate interactive objects
+(structurally matching the current registry's claim), but one of them -- the block the registry
+called an "invisible trigger... no matching visible BG furniture" -- is in fact a plainly
+rendered, animated, SOLID humanoid NPC: Pépé le Ramollo, exactly as `world_model.json` already
+established. The registry's description of that block was simply wrong (most likely written from
+raw OAM coordinates without checking them against a rendered screenshot); `world_model.json`'s
+identification of the NPC was right, but its own OAM scan never tested the OTHER sprite (the
+telephone-on-table prop) as a separate object, so its "only one NPC in this room, not two" note
+-- while correct on its own narrow claim (the y=64 and y=80 OAM pairs are the upper/lower half of
+ONE 2x2-tile sprite body, not two duplicate NPCs) -- doesn't actually contradict a second, distinct
+interactive object existing a few tiles away.
+
+**How it was settled**: loaded `lib_house2_interior.dump` (untouched checkpoint, no prior
+interaction), did a full raw 40-slot OAM read (`0xFE00`-`0xFE9F`, all 40 slots printed, not just
+the non-hidden filter) -- confirmed exactly 2 non-Link sprite groups exist in the whole room and
+nothing else (38 slots at the y=244 hidden sentinel): slots 12-15 (4-tile block, y=64/80,
+x=72/80, animating between tile pairs 112/114/116/118 and 120/122/124/126) and slots 18-19
+(2-tile pair, y=43, x=40/48). A screenshot taken at the entry checkpoint shows the first group as
+an unambiguous small humanoid figure standing in the open floor -- not invisible, not BG art.
+Approaching it with `Navigator.move!` produced a real `:blocked` result on contact (solid
+collision), and interacting (sustained ~115-frame `:a` holds via `mmu.joypad.key_state`, not
+`tap_button` defaults, specifically to rule out truncated content) opened the exact 4-page dialogue
+`world_model.json` had already captured ("Heu... Hum... Comment dire?" / "Téléphone... A
+l'extérieur..." / "Pépé le Ramollo n'a pas l'air" / "d'être un grand causeur..."), cycling
+page1->2->3->4->close->page1 -- independently reproducing `world_model.json`'s own "11-interact()
+capture run" cycle finding (its interact #5 = close, #6 = reopen; this session's press #4 = close,
+#5 = reopen), via a different hold-duration method. Separately approaching the second sprite
+group (the phone-on-table, several tiles northwest) and interacting produced a completely
+different 4-page dialogue (the comedic wrong-number call, "DRING DRING!... Madonna... faux
+numéro!"), also a clean fixed loop with no hidden branch. The decisive proof of genuine
+separateness: a screenshot taken mid-phone-dialogue shows Pépé's own sprite STILL VISIBLE,
+unmoved, in the middle of the room WHILE Link stands at the phone in the corner -- both entities
+on screen simultaneously, ruling out "same sprite, different angle" definitively.
+
+**Also fixed**: the registry's cross-reference to `data/world_model.json`'s "building_screen entry
+(176/0, a different room)" was wrong -- `176/0` is an unrelated save-mechanic building (south of
+`well_platform`) that doesn't appear in `world_model.json` at all; Pépé is recorded there under
+`rooms_overworld.house2_interior` itself, i.e. this same room. Two stale cross-references in
+`room_labels['225/0']` and `dialogues.riverside_flower_clearing_sign` that had analogized the
+flower-clearing sign's "invisible BG-art trigger" to `house2_telephone_examine` were also
+corrected, since that analogy no longer holds.
+
+**Lower-priority side question** (owner's "cabine téléphonique à côté de chez Pépé" framing):
+checked `room_labels['177/0']` (villager_screen) and its neighbors on file -- only one building is
+recorded there (the one containing `house2_interior`/Pépé), and no second, unexplored building has
+been found adjacent to it in any topology entry on file. `docs/GAME_MANUAL_NOTES.md`'s own note
+already treats the interior phone as "plausibly" the manual's generic telephone-booth mention. Not
+chased further this session (out of budget per the dispatching mandate) -- a genuinely separate
+outdoor telephone booth remains neither confirmed nor ruled out; would need fresh exploration of
+`146/0`/`163/0` or other unexplored village-side rooms to settle, not a re-read of existing data.
+
+Full corrected detail lives in `data/ram_registry.json`'s `room_labels['169/16']`,
+`dialogues.house2_telephone_examine`, and `dialogues.house2_telephone_call` (each carries its own
+"CORRECTED September 11 2026" note in place, per this project's provenance discipline -- the
+original hypothesis text was amended, not deleted). `data/world_model.json` itself was left
+untouched, per the dispatching mandate -- it turned out to be the more accurate of the two sources
+on the NPC-identity question, and remains a legitimate, if incomplete, historical source.
+
+### Clue-weighting synthesis this session's recommendation was built on (archived verbatim, its own header said to archive it once acted on)
+
+The prior synthesis session (also September 11 2026, earlier the same night) ranked every
+dialogue clue on file for "where to go next" and recommended exactly the `house2_interior`
+re-test above as the single highest-value action. Kept here for the reasoning trail; the outcome
+is folded into `NEXT.md`'s "Quest hypothesis" state paragraph, this doesn't need to be re-read to
+resume.
+
+Weighting rule used: rank a clue by (a) whether it names a PLACE/PERSON/ACTION or only a generic
+mechanic, (b) whether it's already been acted on to exhaustion, (c) whether it predates this
+project's discovery that short `:a` taps truncate real content.
+
+1. `house2_telephone_examine` (169/16) -- the strongest untested lead: the only dialogue naming a
+   character, mechanism and place at once, corroborated by `select_map_screen`'s in-game place
+   name "Chez Pépé le Ramollo" for `177/0`. Flagged two errors in the registry's own note (the
+   wrong `world_model.json` cross-reference, and the "invisible trigger" mischaracterization) --
+   both now fixed, see this session's entry above.
+2. `house2_telephone_call` (169/16) -- "always a wrong number" wasn't established from one
+   session's single retest. Now re-verified: it is a clean fixed 4-page loop, no branch -- see
+   above.
+3. `starting_house_npc_beds`/`_bench` (163/16) -- highest-trust source, clue already spent (Plage
+   Coco exhaustively swept).
+4. The SELECT box's second line ("le message du hibou") -- rendered once (`160/0`, "Village des
+   Mouettes"), never transcribed. Runner-up if this session's action came back empty; still
+   un-harvested, now the natural next pick.
+5-10. `crate_room_book_h` ("la Loupe"), `book_f` (Warp holes), `riverside_flower_clearing_sign`
+   page 2, `book_e` (laser shield), `book_b`/`c`/`d`/`book_g`/`wall_object`, and the two `177/0`
+   flavour sprites -- all lower-weight background/mechanic clues or already-spent leads, unchanged
+   by this session's finding.
+
+Conclusion at the time: Pépé le Ramollo was ranked second-by-trust and first-by-remaining-value
+among NPCs (the only other "Chez <name>" character, the only one naming a hint mechanism, never
+followed up on). That follow-up is now done; see this session's own entry above for the outcome
+and what it does/doesn't open next (the SELECT box's 2nd line is now the natural next pick, and a
+genuinely separate outdoor telephone booth is a live but unconfirmed possibility, not yet chased).
