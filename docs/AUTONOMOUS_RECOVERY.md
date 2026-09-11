@@ -2,47 +2,34 @@
 
 ## Goal
 
-A blocked exploration task must become a bounded research problem before it becomes a human request.
+A blocked game-level task becomes a bounded research problem before it becomes a human request.
 
-Koholint already has persistent world state, checkpoints, deterministic navigation primitives, provenance, and Explorer/Builder roles. This design connects those pieces into a self-recovering loop.
+Koholint already has persistent world state, checkpoints, deterministic navigation primitives, provenance, and Explorer/Builder roles. This design connects those pieces into a recoverable runtime seam.
 
 ## Design principle
 
-Do not make Claude's context the system's memory. A Claude context is disposable. Persistent state is the source of truth.
+A Claude context is disposable. Persistent state is the source of truth.
 
 ```text
 Persistent World State
         |
         v
-    Controller
-     /  |  \
- Explore Research Execute
-          |
-       experiments
-          |
-          v
-    Observation
-          |
-          v
- Persistent World State
+      Planner
+     /   |    \
+ Execute Explore Research
+              |
+          experiments
+              |
+          observations
+              |
+       Persistent state
 ```
 
-## Controller vs. Meta Planner
-
-Avoid a mandatory Meta Planner -> Planner -> Worker hierarchy.
-
-The controller should select the smallest useful mode for the current state:
-
-- `execute`: known route/tool can achieve the goal;
-- `explore`: discover reachable unknown world state;
-- `research`: current plan is blocked and the cause is uncertain;
-- `escalate`: the research budget is exhausted or human authorization is required.
-
-A second planner is justified only when there is evidence that the controller cannot make this choice reliably. Hierarchy should be earned by demonstrated need, not added pre-emptively.
+MetaPlanner remains separate. It repairs the workflow and coordination process; it does not solve game blockers.
 
 ## Blocked task contract
 
-An Executor must be able to return a structured blocked result:
+An Executor can return a structured blocker before another reasoning context is created:
 
 ```json
 {
@@ -51,43 +38,79 @@ An Executor must be able to return a structured blocked result:
   "location": "169/16",
   "checkpoint": "villager_screen",
   "attempts": 8,
+  "blocker_type": "unknown_route",
   "observations": [],
-  "hypotheses": [],
-  "suggested_research": []
+  "failed_actions": [],
+  "known_constraints": []
 }
 ```
 
-The blocked result is persisted before any new reasoning context is created.
+The blocker is persisted as part of a `ResearchTask`. `attempts` is not treated as evidence: experiments must represent distinct tests of hypotheses.
+
+## Research task
+
+A `ResearchTask` contains a bounded hypothesis and experiment ledger. Each hypothesis has an explicit status and evidence references. Each experiment records the checkpoint used, action, observation, outcome, cost, and optional state fingerprint.
+
+Research produces observations; it does not silently promote observations into game facts. Promotion into the World Model or a Builder task is an explicit later step with the existing provenance rules.
 
 ## Research loop
 
-A Research task has a bounded budget and a hypothesis ledger.
-
-1. Load the blocked task and relevant World Model projection.
+1. Load the persisted blocker and a compact World Model projection.
 2. Generate a small set of falsifiable hypotheses.
-3. Rank experiments by expected information gain / cost.
-4. Restore an experimental checkpoint.
-5. Run one experiment using existing tools or a temporary script.
-6. Record observation and outcome.
+3. Select a bounded experiment.
+4. Restore the experimental checkpoint.
+5. Execute exactly that experiment through an existing tool/script boundary.
+6. Record the observation and outcome.
 7. Confirm, reject, or weaken the hypothesis.
-8. Promote reusable discoveries into the World Model or a Builder task.
-9. Re-enter the Controller with a fresh compact context.
+8. Require replication/control evidence before treating a discovery as verified.
+9. Promote reusable evidence to the World Model or Builder when justified.
+10. Re-enter Planner with a fresh context.
 
 Experiments must not silently modify durable progression. The existing D12 rule remains in force for RAM writes that could bypass genuine game obstacles.
 
+## Checkpoint isolation
+
+The runner restores the supplied experimental checkpoint before every experiment. Durable progression is outside the runner's mutation contract.
+
+The intended lifecycle is:
+
+```text
+ durable state
+      |
+      +---- experimental checkpoint
+                  |
+             experiment N
+                  |
+             observation
+                  |
+             discard/restore
+```
+
+An experiment is not a durable game action merely because it succeeds in its scratch state.
+
 ## Context lifecycle
 
-Each LLM invocation receives a projection, not the complete history:
+Each Planner/Research invocation receives a projection rather than the previous conversation:
 
-- current room/state;
-- active goal;
-- relevant World Model facts;
+- active goal and blocker;
 - unresolved hypotheses;
 - recent experiment outcomes;
+- relevant World Model facts;
 - available tools;
-- explicit constraints and budget.
+- remaining research budget.
 
-After a decision or research iteration, the context may be discarded. Persistent state carries the run forward.
+The persisted `ResearchTask` is the handoff boundary. A fresh process can reload it without access to the previous LLM context.
+
+## Routing
+
+The Planner-level router has four modes:
+
+- `execute`: the previous execution succeeded or a known route/tool remains appropriate;
+- `explore`: discover unknown reachable state;
+- `research`: execution is blocked and research budget remains;
+- `escalate`: execution is blocked and the research budget is exhausted.
+
+`escalate` means owner escalation for an unresolved game problem. A workflow/process failure remains a MetaPlanner escalation under `AGENTS.md`.
 
 ## Example
 
@@ -100,17 +123,18 @@ Execute
        -> hypothesis: target requires sub-tile alignment
        -> restore checkpoint
        -> experiment: vary approach alignment
-       -> success
-       -> record route/evidence
-       -> Builder promotes route into Navigator primitive
+       -> observation
+       -> replicate/control if needed
+       -> promote route/evidence
+       -> Builder task
   -> Execute again
 ```
 
-This is the pattern already demonstrated manually during the house2 discovery; this feature makes the recovery loop explicit and repeatable.
+This is the pattern already demonstrated manually during the house2 discovery; the runtime seam makes the recovery state durable and repeatable.
 
 ## Autonomy boundary
 
-The system should stop and notify the owner only for:
+Stop and notify the owner for:
 
 - destructive or irreversible progression changes;
 - actions explicitly requiring owner authorization;
@@ -120,16 +144,16 @@ The system should stop and notify the owner only for:
 
 A normal game blocker is not, by itself, a reason to ask the owner.
 
-## Initial implementation scope
+## Implemented seam
 
-This PR should initially implement the contracts and orchestration seam, not a new general-purpose Meta Planner:
+The first implementation provides:
 
-1. `BlockedResult` structured result.
-2. `ResearchTask` persisted representation.
-3. hypothesis/experiment records.
-4. checkpoint-backed experiment runner.
-5. compact context builder for controller/research invocations.
-6. Controller routing between execute/research/escalate.
-7. tests with deterministic fake experiments.
+- `Koholint::AutonomousRecovery::BlockedResult`;
+- persisted `ResearchTask`, `Hypothesis`, and `Experiment` records;
+- atomic JSON persistence through `Store`;
+- compact fresh-context projection through `Context`;
+- checkpoint-first `ExperimentRunner`;
+- Planner routing through `Router`;
+- deterministic tests covering persistence/reload, checkpoint restoration, and budget exhaustion.
 
-The first real acceptance test should be a synthetic blocker that discovers a known fact without human input. Only then should the loop be connected to expensive live exploration.
+The seam deliberately does not yet invoke an LLM, mutate the World Model, or run expensive live exploration. The next integration step is to connect a real Planner blocked result to this persisted task and supply an existing checkpoint/tool executor.
