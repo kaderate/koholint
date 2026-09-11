@@ -118,8 +118,16 @@ same conditional-terrain blocker as the sword hypothesis's core evidence. Worth 
 once any cutting item is found, not a routing problem.
 ## In-flight work (for resumability)
 
-Nothing dispatched as of this update (September 11, 2026, ~03:15 UTC) -- check `ListAgents` in
-case this is stale by the time it's read. Tonight's dispatch history (D9 restart, Plage Coco
+As of September 11, 2026, ~03:30 UTC, one subagent is dispatched (model: Opus, not the usual
+Sonnet -- owner-requested for reasoning/synthesis strength, see the conversation) -- check
+`ListAgents` before assuming it is idle or before re-dispatching a duplicate:
+- **Synthesis task, not live exploration**: rank every dialogue clue in the registry by how much
+  weight it deserves for "where to go next", covering the sword, shield (+ `book_e`'s laser-shield
+  mention), "la Loupe", Warp holes, and specifically the owner's own flagged lead --
+  `house2_interior`'s telephone (`dialogues.house2_telephone_examine`/`_call`) explicitly
+  namechecks Pépé le Ramollo (`villager_screen`'s NPC, next door) and was only ever tested once for
+  a single fixed outcome. Expected to end in ONE concrete recommended next action, appended to this
+  section by the agent itself. Tonight's dispatch history (D9 restart, Plage Coco
 pushes, D13 build+validation, the south-edge test, the crate_room library correction, the SELECT
 marker scan) is archived at `docs/archive/SESSION_LOG.md` -- resolved, not needed to resume.
 ## Next question
