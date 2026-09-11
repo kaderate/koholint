@@ -229,6 +229,15 @@ retest before assuming it needs a whole new route.
 
 ## In-flight work (for resumability)
 
+**Owner provided the official game manual, September 11 2026** -- read in full, distilled into
+`docs/GAME_MANUAL_NOTES.md` (paraphrased mechanics only, original PDF NOT committed, copyright --
+see `DECISIONS.md`'s D14). Best lead: the SELECT map has a `!?` marker ("important locations you
+need to visit") and a separate "message" marker (re-playable important dialogue), both previously
+assumed to be a fixed legend only, never checked as real per-cell markers. Dispatched below.
+Also flagged, not yet dispatched: pushing (no item needed, distinct from pulling) and diving (`B`
+in water) are both untested mechanics in this project -- Plage Coco's water strips were always
+treated as boundaries, never actually dived into.
+
 **Owner correction, September 11 2026**: "Il y a 8 livres et pas 4 dans la bibliothèque" --
 crate_room's 6 "confirmed hard negative" grid crates were tested with repeated short `:a` taps,
 never one sustained ~110-frame hold -- the exact same bug class that hid `225/0`'s signpost 2nd
