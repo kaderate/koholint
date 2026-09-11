@@ -34,7 +34,7 @@ grids -- already fulfilled and recorded under D8 in `DECISIONS.md`; no other fil
 
 | Indicator | Value |
 |---|---|
-| Rooms found | 19 labeled in `data/ram_registry.json`'s `room_labels` (8 "charted", 11 "glimpsed"/less -- `224/0` riverside_south_river_room and `225/0` riverside_flower_clearing, south/east of `riverside_south_room`, both further explored (224/0's scroll mechanism and "totem" identity resolved, 225/0's ground-accessible extent mapped plus its NE route now resolved into a real room transition); `209/0` riverside_east_room, found east of `riverside_south_room`'s south band (past the prior x=134,y=115 stop point), fully swept September 10-11 2026 (west/center then, east half via the D13 primitive) -- no bidule found anywhere in it; `179/0` shop_screen, first actually explored September 10 2026 -- turns out to be the shop's EXTERIOR yard, not its interior; see `world_topology.shop_screen_door_approach` and Next question below; `226/0` riverside_ne_cove, NEW September 10 2026 -- reached from `225/0`'s previously-abandoned NE route, entry point only, see Next question below). Graph and screenshots published in the Koholint Atlas artifact (not yet updated with these rooms or this session's findings). D9 visual-catalog `visual_survey` now covers 6/19 (`front_yard`, `villager_screen` pilot + `crate_room`, `screen3_north` rollout + `well_platform`, `building_screen` rollout, fresh restart of an abandoned attempt, September 10 2026) -- see `DECISIONS.md`'s D9 entry. |
+| Rooms found | 19 labeled in `data/ram_registry.json`'s `room_labels` (8 "charted", 11 "glimpsed"/less -- `224/0` riverside_south_river_room and `225/0` riverside_flower_clearing, south/east of `riverside_south_room`, both further explored (224/0's scroll mechanism and "totem" identity resolved, 225/0's ground-accessible extent mapped plus its NE route now resolved into a real room transition); `209/0` riverside_east_room, found east of `riverside_south_room`'s south band (past the prior x=134,y=115 stop point), fully swept September 10-11 2026 (west/center then, east half via the D13 primitive) -- no bidule found anywhere in it; `179/0` shop_screen, first actually explored September 10 2026 -- turns out to be the shop's EXTERIOR yard, not its interior; see `world_topology.shop_screen_door_approach` and Next question below; `226/0` riverside_ne_cove, reached from `225/0`'s previously-abandoned NE route September 10 2026, fully swept September 11 2026 via the D13 primitive (status promoted glimpsed -> charted) -- no bidule found anywhere in it either, see Next question below). Graph and screenshots published in the Koholint Atlas artifact (not yet updated with these rooms or this session's findings). D9 visual-catalog `visual_survey` now covers 6/19 (`front_yard`, `villager_screen` pilot + `crate_room`, `screen3_north` rollout + `well_platform`, `building_screen` rollout, fresh restart of an abandoned attempt, September 10 2026) -- see `DECISIONS.md`'s D9 entry. |
 | Dialogues / readable text | 14 confirmed entries in `ram_registry.json`'s `dialogues` (villager duo's shared line, room176's two save-mechanic NPC lines, crate_room's library fully read -- 4 books + 1 wall object, 9/9 tile objects resolved via OAM; house2_interior's 2 OAM-verified telephone objects; `riverside_flower_clearing_sign` (225/0) -- a signpost reading "Attention aux oursins !", NOT a chest/item; `shop_screen_yard_npc` (179/0) -- a friendly yard NPC reciting the SAME save-tip line as room176's pair, first confirmed case of a reused dialogue asset, September 10 2026 -- all hypothesis/verified_count 1). |
 | Terrain / collision | D8 live: reads BG tilemap signatures from VRAM (`lib/terrain.rb`), 93.1%-validated against live-probe oracle. Primary method; live probing kept as fallback. |
 | SELECT map (fog-of-war) | Widest-coverage checkpoint: `lib_explorer_225_fresh_entry.dump` (8 lit cells, superset of `main.dump`'s own 6). 6/8 cells now have a place name read from a checkpoint standing IN that exact cell's room ("Village des Mouettes", "Bibliothèque", "Sud du Village" x2 -- `176/0` and `192/0` share it, "Plage Coco" x2), `select_map_screen`'s SEVENTH + EIGHTH SESSION entries (`192/0` riverside_screen closed EIGHTH SESSION, new working route: nudge x to ~88 from `room176_entry_from_room160.dump`, then plain `:down` taps, no special alignment needed -- corrects the earlier "x=94, 8 calls" figure, which doesn't reproduce). Remaining 2 cells (the chain's earliest 2 rooms) confirmed NOT free-readable from any on-file checkpoint (checked EIGHTH SESSION) -- would need a from-boot replay. Scratchpad images ready for the Atlas (`select_map_full_*.png`), not yet pulled in. |
@@ -192,6 +192,20 @@ still unswept is now down to just two small pockets: `226/0`'s east/south side p
 `209/0`'s east half past its center creature pocket. The sword-hypothesis lead itself is still not
 invalidated. Full detail: `room_labels['209/0']` and "In-flight work" below.
 
+**UPDATE 6, September 11 2026 (D13 primitive sweeps, both remaining pockets)**: both of the two
+pockets UPDATE 5 named are now closed -- `209/0`'s east half (via D13's own validation retest,
+reaching a real east wall at x=140) and `226/0`'s east/south side (via a follow-up Explorer
+session using the same primitive as its primary method, reaching a real wall at x=124,y=26 and a
+water-bounded cul-de-sac at x=154,y=58). **The entire Plage Coco cluster (`224/0`, `225/0`,
+`226/0`, `209/0`) is now believed EXHAUSTIVELY swept -- no known unexplored ground left anywhere
+in it, not just "no gap currently open".** No "bidule" was found anywhere in any of the four
+rooms across this whole multi-session search. This substantially weakens the "bidule is
+somewhere in Plage Coco" reading that has driven this thread since `starting_house`'s NPCs were
+first read -- worth an explicit owner decision on whether to keep treating Plage Coco as the
+leading sword-hypothesis location, or reconsider the lead itself (e.g. the NPCs' "la plage"
+reference might point somewhere not yet reached, not necessarily this specific cluster). Full
+detail: `room_labels['226/0']`'s newest addendum and "In-flight work" below.
+
 `shop_screen`'s door, retry 3 is DONE (September 10 2026) -- CLOSED, anti-patch budget spent, do
 not attempt a 4th routing try. Both the NPC-east/NE route and the hedge-maze route failed cleanly
 (hedge maze turns out to be `shop_screen`'s own north boundary, connecting to the already-known
@@ -208,11 +222,30 @@ retest before assuming it needs a whole new route.
 
 ## In-flight work (for resumability)
 
-As of September 11, 2026, ~00:45 UTC, one subagent is dispatched -- check `ListAgents` before
-assuming it is idle or before re-dispatching a duplicate:
-- **`226/0`'s last unswept pocket (past x=46,y=26), using D13's new primitive** -- the last
-  untested ground in the entire Plage Coco cluster. Also serves as D13's second validation data
-  point (a different room than its first test).
+No subagent currently dispatched.
+
+**`226/0`'s last unswept pocket is DONE, September 11 2026 (independent Explorer subagent, D13's
+second validation data point)** -- still NO "bidule" found, and this closes out the ENTIRE Plage
+Coco cluster's remaining unswept ground (both `226/0`'s own pocket and, combined with the prior
+209/0 sweep, the whole cluster). Using `Navigator.avoid_hostiles_and_push!` (radius:16 shipped
+default, no retuning needed) as the PRIMARY method throughout: resumed from
+`lib_226_session_end.dump` (x=46,y=26), pushed east to a real, reconfirmed wall at x=124,y=26 (10
+consecutive `:blocked` results, zero position drift), pivoted south to x=119,y=59 (real progress),
+then further east to a genuine 3-way water-bounded cul-de-sac at x=154,y=58, and separately
+confirmed the area's only other open branch (`up` from x=119,y=59) loops back to the exact same
+x=124,y=26 wall rather than opening new ground -- the whole area is one contiguous, now fully
+bounded pocket. No item/chest/signpost/dialogue trigger in any of 7 screenshots taken along the
+route (pixel-diffed and color-histogrammed to rule out a stale render or an out-of-palette icon
+being missed). `226/0`'s `room_labels` status promoted `glimpsed` -> `charted`. D13 SECOND
+VALIDATION DATA POINT: the shipped `radius:16` default (already retuned once, in 209/0) worked
+here with NO further retuning -- correctly separated genuine walls from hazard-blocked pushes,
+reached real new ground twice (south, then further east). One usability caveat found and logged:
+the primitive doesn't itself detect "hit the same wall again" and stop early -- that judgment is
+still on the caller. 3 HP-writes, all scratch checkpoints (`e226_*.dump`), never `main.dump`, all
+logged. Full detail: `room_labels['226/0']`'s newest addendum and `DECISIONS.md`'s D13 entry (a
+3rd addendum may be worth adding there summarizing both validation retests together). See "Quest
+hypothesis" below for what this means for the sword lead -- the cluster is now believed
+EXHAUSTIVELY swept, not just "no known gap left".
 
 **D13 Builder task DONE, September 11, 2026** -- `lib/navigator.rb` gained
 `Navigator.avoid_hostiles_and_move!`/`avoid_hostiles_and_push!` (OAM-hazard-biased, auto-shield-hold

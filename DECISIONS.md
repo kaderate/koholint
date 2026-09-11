@@ -452,3 +452,18 @@ to be ratified), `taken without validation` (inherited from the spike, to be rev
   damage order of magnitude. D13 stays ratified; its `HAZARD_PROXIMITY_PX` default is now
   evidence-based rather than a first guess, and the 40px failure mode is recorded so it isn't
   silently reintroduced by a future "seems more thorough" tweak.
+- **Second validation data point, September 11 2026 (independent Explorer subagent), `226/0`'s
+  east/south pocket**: used as the PRIMARY method, `radius: 16` (the already-retuned default) with
+  NO further retuning needed. Reached a real, reconfirmed wall (x=124,y=26 -- 10 consecutive
+  `:blocked` results with zero position drift across two batches plus a clean full-HP re-probe),
+  then real new ground south (x=124,y=26 -> x=119,y=59) and further east to a genuine 3-way
+  water-bounded cul-de-sac (x=154,y=58), and correctly showed a third branch (`up` from x=119,y=59)
+  loops back to the same already-found wall rather than opening new ground -- i.e. it reliably told
+  real walls apart from hazard-blocked pushes across a genuinely different room shape than 209/0's
+  bottleneck. One usability gap found and logged (not a defect in the primitive's own job, but worth
+  naming for a future caller): it doesn't detect "the last N calls all hit the same wall" and stop
+  itself -- re-pushing the same blocked direction a second time still spent a full batch and real HP
+  before the caller applied that judgment manually. See `room_labels['226/0']`'s own addendum for
+  full route/checkpoint detail. Combined with the 209/0 retest above, D13 now has two independent
+  live validations in two differently-shaped rooms, both net positive with the retuned 16px default
+  -- strengthens confidence in the primitive as shipped, no further tuning indicated by either.
