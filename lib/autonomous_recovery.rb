@@ -34,17 +34,16 @@ module Koholint
     end
 
     Hypothesis = Struct.new(:id, :statement, :status, :evidence, keyword_init: true) do
-      STATUSES = %w[open supported refuted].freeze
-
       def initialize(**kwargs)
         super(status: "open", evidence: [], **kwargs)
-        raise ArgumentError, "invalid hypothesis status" unless STATUSES.include?(status)
+        raise ArgumentError, "invalid hypothesis status" unless Hypothesis::STATUSES.include?(status)
       end
 
       def to_h
         {"id" => id, "statement" => statement, "status" => status, "evidence" => evidence}
       end
     end
+    Hypothesis.const_set(:STATUSES, %w[open supported refuted].freeze)
 
     Experiment = Struct.new(
       :id, :hypothesis_id, :checkpoint, :action, :observation, :outcome,
@@ -63,8 +62,6 @@ module Koholint
       :id, :goal, :blocker, :hypotheses, :experiments, :budget, :status,
       :promoted_facts, keyword_init: true
     ) do
-      STATUSES = %w[open resolved exhausted].freeze
-
       def initialize(**kwargs)
         super(
           hypotheses: [], experiments: [],
@@ -141,7 +138,7 @@ module Koholint
 
       def validate!
         raise ArgumentError, "missing research task id" if id.to_s.empty?
-        raise ArgumentError, "invalid research status" unless STATUSES.include?(status)
+        raise ArgumentError, "invalid research status" unless ResearchTask::STATUSES.include?(status)
         max = budget.fetch("max_experiments")
         min_support = budget.fetch("min_supporting_experiments", 2)
         raise ArgumentError, "invalid research budget" unless max.is_a?(Integer) && max.positive?
@@ -163,6 +160,7 @@ module Koholint
         )
       end
     end
+    ResearchTask.const_set(:STATUSES, %w[open resolved exhausted].freeze)
 
     class Store
       DEFAULT_PATH = ".koholint/research_task.json"
@@ -360,13 +358,17 @@ module Koholint
 
       def new_task(execution)
         blocked = BlockedResult.new(**execution.reject { |key, _| key == :status })
-        task = ResearchTask.new(
-          id: SecureRandom.hex(8), goal: blocked.goal, blocker: blocked.to_h
+        ResearchTask.new(
+          id: SecureRandom.hex(8), goal: blocked.goal, blocker: blocked.to_h,
+          hypotheses: Array(execution[:hypotheses]).map do |hypothesis|
+            Hypothesis.new(
+              id: hypothesis.fetch(:id),
+              statement: hypothesis.fetch(:statement),
+              status: hypothesis.fetch(:status, "open"),
+              evidence: hypothesis.fetch(:evidence, [])
+            )
+          end
         )
-        Array(execution[:hypotheses]).each do |hypothesis|
-          task.add_hypothesis!(id: hypothesis.fetch(:id), statement: hypothesis.fetch(:statement))
-        end
-        task
       end
 
       def update_hypothesis(task, experiment)
