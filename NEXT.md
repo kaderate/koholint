@@ -206,12 +206,31 @@ leading sword-hypothesis location, or reconsider the lead itself (e.g. the NPCs'
 reference might point somewhere not yet reached, not necessarily this specific cluster). Full
 detail: `room_labels['226/0']`'s newest addendum and "In-flight work" below.
 
-**UPDATE 7, September 11 2026 (pivot)**: the lead now moves to `overworld_screen2`'s (178/0)
-SOUTH edge -- never tested, despite being the single most literal reading of `starting_house_npc_beds`'s
-"suis la route du Sud" (Plage Coco was reached via WEST then south, a different geometric
-direction from `front_yard`). Flagged hours ago in `world_map_reconstruction.frontier_untested_edges`
-as "the single most on-narrative untested edge in the whole known map" but never actually pursued
--- attention went to Plage Coco's place-name match instead. In flight now, see below.
+**UPDATE 7, September 11 2026 (pivot, then RESOLVED same day, Explorer session)**: the lead moved
+to `overworld_screen2`'s (178/0) SOUTH edge -- never tested, despite being the single most literal
+reading of `starting_house_npc_beds`'s "suis la route du Sud" (Plage Coco was reached via WEST then
+south, a different geometric direction from `front_yard`). Flagged hours ago in
+`world_map_reconstruction.frontier_untested_edges` as "the single most on-narrative untested edge
+in the whole known map" but never actually pursued until now. **Result: REFUTED as a route to
+anything new.** 5 x-columns swept (x=40, 60, 102 [directly under the room's central hedge
+landmark, on the theory a hidden door would sit under the room's one distinctive object -- same
+instinct as `house2_interior`'s real door], 120, 136 -- nearly the room's full visible width), all
+`Navigator.move!(:down)` reporting `:blocked` at the identical y=112, and `Terrain.signature_at`
+confirms one continuous BG tile signature ({22,23,32,33}/{20,21,30,31} alternating) across the
+whole row, directly against the HUD row below -- no door-shaped signature break anywhere in it
+(unlike a real door elsewhere in this project, which shows up as exactly such a break in an
+otherwise-uniform wall row). No hostile/unknown-hazard OAM sprite was present in the room during
+the sweep (only Link, the central hedge creature, and the D9-confirmed-friendly
+villager_wandering_creature companion tile), so D13's avoidance primitive wasn't needed and no HP
+was spent. No item, chest, signpost, or beach/water visual in any of the 5 route screenshots. This
+refutes the LITERAL "due south of front_yard" reading of the NPCs' clue specifically -- it does
+NOT refute the clue itself or the sword hypothesis. Plage Coco (UPDATE 6, exhaustively swept) and
+this edge were the two most concrete "south" candidates on file and both are now closed with no
+bidule found; the remaining untested edges in `world_map_reconstruction.frontier_untested_edges`
+(e.g. `riverside_south_room` WEST, `163/0` clover_field, `north_corridor_room`) are the next places
+to look, and/or the "la plage" reference may point somewhere not yet reached at all -- an explicit
+owner call on where to look next is warranted rather than another self-directed pivot. Full detail:
+`world_topology.overworld_screen2_south_edge`, `room_labels['178/0']`.
 
 `shop_screen`'s door, retry 3 is DONE (September 10 2026) -- CLOSED, anti-patch budget spent, do
 not attempt a 4th routing try. Both the NPC-east/NE route and the hedge-maze route failed cleanly
