@@ -112,7 +112,7 @@ module Koholint
         raise ArgumentError, "unknown hypothesis" unless hypothesis
 
         evidence = Array(evidence)
-        if status == "supported" && evidence_count(id) + evidence.length < budget.fetch("min_supporting_experiments")
+        if status == "supported" && evidence_count(id) < budget.fetch("min_supporting_experiments")
           hypothesis.evidence.concat(evidence)
           return false
         end
@@ -357,7 +357,7 @@ module Koholint
       private
 
       def new_task(execution)
-        blocked = BlockedResult.new(**execution.reject { |key, _| key == :status })
+        blocked = BlockedResult.new(**execution.reject { |key, _| key == :status || key == :hypotheses })
         ResearchTask.new(
           id: SecureRandom.hex(8), goal: blocked.goal, blocker: blocked.to_h,
           hypotheses: Array(execution[:hypotheses]).map do |hypothesis|
