@@ -467,3 +467,31 @@ to be ratified), `taken without validation` (inherited from the spike, to be rev
   full route/checkpoint detail. Combined with the 209/0 retest above, D13 now has two independent
   live validations in two differently-shaped rooms, both net positive with the retuned 16px default
   -- strengthens confidence in the primitive as shipped, no further tuning indicated by either.
+
+## D14 — The official game manual is a legitimate mechanic reference, not forbidden knowledge
+
+- **Status**: ratified (September 11, 2026).
+- **Context**: `AGENTS.md`'s "Pre-trained knowledge" rule forbids assuming game-specific facts
+  (where an item is, who an NPC "really" is) -- everything must be observed, never assumed from
+  the model's own training. This was written to stop the project from short-circuiting genuine
+  discovery. The owner directly provided the official Link's Awakening DX instruction booklet
+  (PDF) and asked that it be read and kept, after separately pointing out (in conversation) that
+  the project was missing an understanding of the game's own genre/gameplay-loop conventions
+  (explore + solve environmental puzzles; NPC dialogue and signs are the game's built-in hint
+  delivery system) needed to reason about "what's the right next step," not just spatial mapping.
+- **Choice**: the manual is now a legitimate source for GENERIC MECHANIC knowledge -- how systems
+  work (the SELECT map's `!?`/message markers, pushing vs. pulling, diving, shield timing, the
+  8-dungeon/heart-piece/named-shop structure) -- read once, distilled into original paraphrased
+  notes at `docs/GAME_MANUAL_NOTES.md` (not verbatim booklet text, and the booklet's own PDF/scans
+  are NOT committed to this repo -- copyrighted Nintendo material, same reasoning as `roms/` being
+  gitignored). This does NOT become a walkthrough or a license to assume specific facts about
+  koholint's current state (where an item actually is, whether a specific NPC has already given a
+  specific hint) -- those stay observed-only, exactly as before. The manual explains SYSTEMS; this
+  project still discovers STATE.
+- **Not in scope**: fan wikis, walkthroughs, or any other external spoiler source -- this decision
+  covers the one official manual the owner provided, not license to use pre-trained knowledge more
+  broadly.
+- **Invalidated if**: the distinction between "mechanic knowledge" and "assumed game state" proves
+  hard to hold in practice (e.g. a future session starts asserting specific unverified facts and
+  attributing them to "the manual") -- if that happens, tighten `docs/GAME_MANUAL_NOTES.md`'s own
+  scope or revisit this decision with the owner rather than let the boundary erode silently.
