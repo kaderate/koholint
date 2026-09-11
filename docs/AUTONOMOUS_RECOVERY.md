@@ -1,19 +1,14 @@
 # Autonomous Recovery
 
-## Goal
-
 A blocked game-level task becomes a bounded research problem before it becomes a human request.
 
-Koholint already has persistent world state, checkpoints, deterministic navigation primitives, provenance, and Explorer/Builder roles. This design connects those pieces into a recoverable runtime seam.
+## Architecture
 
-## Design principle
-
-A Claude context is disposable. Persistent state is the source of truth.
+Koholint's existing MetaPlanner remains a process/workflow role. Game recovery lives at Planner level:
 
 ```text
 Persistent World State
         |
-        v
       Planner
      /   |    \
  Execute Explore Research
@@ -25,52 +20,48 @@ Persistent World State
        Persistent state
 ```
 
-MetaPlanner remains separate. It repairs workflow and coordination; it does not solve game blockers.
+A Claude context is disposable. `ResearchTask` is the durable handoff between contexts.
 
 ## Contracts
 
-`BlockedResult` captures the goal, location, checkpoint, blocker type, attempts, failed actions, observations, and known constraints. It is persisted before another reasoning context is created.
+`BlockedResult` captures goal, location, checkpoint, blocker type, attempts, failed actions, observations, and known constraints.
 
 `ResearchTask` owns a bounded hypothesis/experiment ledger. Hypotheses have status and evidence. Experiments record checkpoint, action, observation, outcome, cost, and optional state fingerprint.
 
 Research produces observations; it does not silently promote observations into game facts. Promotion into the World Model or a Builder task remains an explicit step governed by existing provenance rules.
 
-## Research loop
+## Runtime seam
 
-1. Load the persisted blocker and a compact World Model projection.
-2. Generate a small set of falsifiable hypotheses.
-3. Select one bounded experiment.
-4. Restore its experimental checkpoint.
-5. Execute the experiment through an existing tool/script boundary.
-6. Record observation and outcome.
-7. Confirm, reject, or weaken the hypothesis.
-8. Replicate/control before treating a discovery as verified.
-9. Promote reusable evidence when justified.
-10. Re-enter Planner with a fresh context.
+- `BlockedResult`: structured blocked execution result.
+- `Store`: atomic JSON persistence and reload of research state.
+- `Context`: compact projection for a fresh Planner/Research invocation.
+- `ExperimentRunner`: restores an experimental checkpoint before executing a bounded experiment.
+- `ResearchTask#record_experiment!`: enforces the experiment budget and rejects duplicate `(hypothesis, action)` retries.
+- `Router`: maps successful execution to `execute`, an unexhausted blocker to `research`, and an exhausted blocker to `escalate`.
 
-## Isolation and bounds
+## Safety
 
-The runner restores the supplied checkpoint before every experiment. Durable progression is outside its mutation contract. Research is bounded by `max_experiments`, and duplicate `(hypothesis, action)` experiments are rejected so superficial retries cannot consume autonomy indefinitely.
+The seam does not invoke an LLM, mutate the World Model, or enable RAM writes. D12 remains in force. A successful scratch experiment is not automatically durable progression or a verified game fact.
 
-RAM writes that bypass genuine gameplay remain subject to the existing D12 rule and are not enabled by this seam.
+Research exhaustion is an owner escalation. Workflow/process failures remain MetaPlanner escalations under `AGENTS.md`.
 
-## Context lifecycle
+## Fresh-context acceptance property
 
-Each Planner/Research invocation receives a projection rather than the previous conversation: active goal/blocker, unresolved hypotheses, recent experiment outcomes, relevant World Model facts, available tools, and remaining budget.
+A persisted `ResearchTask` can be loaded independently of the previous conversation and projected into a compact context containing the goal, blocker, unresolved hypotheses, recent experiments, relevant facts/tools, and remaining budget. This is the mechanism that makes LLM context disposable rather than authoritative.
 
-The persisted `ResearchTask` is the handoff boundary. A fresh process can reload it without access to the previous LLM context.
+The deterministic test suite covers persistence/reload, checkpoint restoration, duplicate protection, and budget exhaustion. The next integration is to connect a real Planner blocked result to this seam and supply the existing checkpoint/tool executor.
 
-## Routing
+## Example
 
-- `execute`: known execution path succeeds/remains appropriate;
-- `explore`: discover unknown reachable state;
-- `research`: execution is blocked and research budget remains;
-- `escalate`: execution is blocked and research budget is exhausted.
-
-Game-problem `escalate` means owner escalation. Workflow/process failures continue to use MetaPlanner under `AGENTS.md`.
-
-## Implemented seam
-
-The first implementation provides `BlockedResult`, persisted `ResearchTask`/`Hypothesis`/`Experiment`, atomic JSON `Store`, compact `Context`, checkpoint-first `ExperimentRunner`, and Planner-level `Router`. Deterministic tests cover persistence/reload, checkpoint restoration, duplicate protection, and budget exhaustion.
-
-The seam deliberately does not yet invoke an LLM, mutate the World Model, or run expensive live exploration. The next integration step is to connect a real Planner blocked result to this task and supply an existing checkpoint/tool executor.
+```text
+Execute
+  -> blocked
+  -> persist ResearchTask
+  -> fresh Research context
+       -> hypothesis
+       -> checkpoint-backed experiment
+       -> observation
+       -> replicate/control
+       -> Builder / World Model promotion
+  -> Execute again
+```
