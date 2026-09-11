@@ -78,6 +78,18 @@ module Koholint
         experiments.length >= budget.fetch("max_experiments")
       end
 
+      def add_hypothesis!(id:, statement:)
+        raise ArgumentError, "research task is not open" unless status == "open"
+        raise ArgumentError, "missing hypothesis id" if id.to_s.empty?
+        raise ArgumentError, "missing hypothesis statement" if statement.to_s.empty?
+        raise ArgumentError, "duplicate hypothesis id" if hypotheses.any? { |h| h.id == id }
+        raise ArgumentError, "hypothesis limit exceeded" if hypotheses.length >= 8
+
+        hypotheses << Hypothesis.new(id: id, statement: statement)
+        validate!
+        hypotheses.last
+      end
+
       def record_experiment!(experiment)
         raise ArgumentError, "research task is not open" unless status == "open"
         raise ArgumentError, "research budget exhausted" if exhausted?
@@ -87,6 +99,14 @@ module Koholint
         raise ArgumentError, "unknown hypothesis" unless hypotheses.any? { |h| h.id == experiment.hypothesis_id }
 
         experiments << experiment
+      end
+
+      def complete_experiment!(experiment)
+        index = experiments.index { |item| item.id == experiment.id }
+        raise ArgumentError, "unknown research experiment" unless index
+        raise ArgumentError, "research experiment already completed" unless experiments[index].outcome.nil?
+
+        experiments[index] = experiment
       end
 
       def mark_hypothesis!(id, status, evidence)
@@ -145,9 +165,17 @@ module Koholint
     end
 
     class Store
-      def initialize(path)
+      DEFAULT_PATH = ".koholint/research_task.json"
+
+      def self.default
+        new(DEFAULT_PATH)
+      end
+
+      def initialize(path = DEFAULT_PATH)
         @path = path
       end
+
+      attr_reader :path
 
       def save(task)
         task.validate!
@@ -165,6 +193,25 @@ module Koholint
 
         ResearchTask.from_h(JSON.parse(File.read(@path)))
       end
+
+      def save_handoff(task, required_reads: %w[AGENTS.md NEXT.md DECISIONS.md])
+        handoff_path = "#{@path}.handoff.json"
+        manifest = Context.handoff(task, required_reads: required_reads)
+        tmp = "#{handoff_path}.tmp-#{Process.pid}-#{SecureRandom.hex(4)}"
+        FileUtils.mkdir_p(File.dirname(handoff_path))
+        File.write(tmp, JSON.pretty_generate(manifest) + "\n")
+        File.rename(tmp, handoff_path)
+        manifest
+      ensure
+        File.delete(tmp) if tmp && File.exist?(tmp)
+      end
+
+      def load_handoff
+        handoff_path = "#{@path}.handoff.json"
+        return nil unless File.file?(handoff_path)
+
+        JSON.parse(File.read(handoff_path))
+      end
     end
 
     class Context
@@ -174,8 +221,10 @@ module Koholint
       MAX_TOOLS = 20
 
       def self.project(task, world_facts: [], tools: [])
+        task.validate!
         total = task.budget.fetch("max_experiments")
         {
+          "research_task_id" => task.id,
           "goal" => task.goal,
           "blocker" => task.blocker,
           "hypotheses" => task.hypotheses.select { |h| h.status == "open" }.first(MAX_HYPOTHESES).map(&:to_h),
@@ -191,11 +240,14 @@ module Koholint
 
       def self.handoff(task, required_reads: %w[AGENTS.md NEXT.md DECISIONS.md])
         task.validate!
+        checkpoint = task.blocker["checkpoint"]
+        raise ArgumentError, "research task blocker must include checkpoint" if checkpoint.to_s.empty?
+
         {
           "research_task_id" => task.id,
           "mode" => task.status == "open" ? "research" : "resume",
           "original_goal" => task.goal,
-          "checkpoint" => task.blocker.fetch("checkpoint"),
+          "checkpoint" => checkpoint,
           "required_reads" => required_reads,
           "context_policy" => "fresh",
           "remaining_experiments" => [task.budget.fetch("max_experiments") - task.experiments.length, 0].max,
@@ -220,23 +272,28 @@ module Koholint
           raise ArgumentError, "checkpoint adapter must expose durable_fingerprint"
         end
 
-        result = @executor.call(experiment.action, max_frames: @max_frames)
-        frames = result.fetch(:frames, 0)
-        raise ArgumentError, "experiment frame budget exceeded" unless frames.is_a?(Integer) && frames.between?(0, @max_frames)
-        after = durable_fingerprint
-        raise ArgumentError, "experiment mutated durable state" unless before == after
-        if result.key?(:state_fingerprint) && !result[:state_fingerprint].nil? && result[:state_fingerprint] != after
-          raise ArgumentError, "experiment state fingerprint mismatch"
-        end
+        begin
+          result = @executor.call(experiment.action, max_frames: @max_frames)
+          frames = result.fetch(:frames, 0)
+          raise ArgumentError, "experiment frame budget exceeded" unless frames.is_a?(Integer) && frames.between?(0, @max_frames)
+          after = durable_fingerprint
+          raise ArgumentError, "experiment mutated durable state" unless before == after
+          if result.key?(:state_fingerprint) && !result[:state_fingerprint].nil? && result[:state_fingerprint] != after
+            raise ArgumentError, "experiment state fingerprint mismatch"
+          end
 
-        Experiment.new(**experiment.to_h.transform_keys(&:to_sym).merge(
-          checkpoint: checkpoint,
-          observation: result.fetch(:observation),
-          outcome: result.fetch(:outcome),
-          cost: frames,
-          state_fingerprint: after,
-          created_at: Time.now.utc.iso8601
-        ))
+          Experiment.new(**experiment.to_h.transform_keys(&:to_sym).merge(
+            checkpoint: checkpoint,
+            observation: result.fetch(:observation),
+            outcome: result.fetch(:outcome),
+            cost: frames,
+            state_fingerprint: after,
+            created_at: Time.now.utc.iso8601
+          ))
+        rescue Exception
+          restore_after_failure(checkpoint, before)
+          raise
+        end
       end
 
       private
@@ -245,6 +302,14 @@ module Koholint
         return @checkpoints.durable_fingerprint if @checkpoints.respond_to?(:durable_fingerprint)
 
         nil
+      end
+
+      def restore_after_failure(checkpoint, before)
+        @checkpoints.restore(checkpoint)
+        return if before.nil?
+
+        after_restore = durable_fingerprint
+        raise "failed to restore durable state after experiment failure" unless after_restore == before
       end
     end
 
@@ -260,17 +325,27 @@ module Koholint
         raise ArgumentError, "unsupported execution status" unless execution[:status] == "blocked"
 
         task = research_task || new_task(execution)
+        @store.save(task) unless research_task
         return {mode: "escalate", task: task} if task.exhausted?
 
         proposal = @researcher.call(Context.project(task))
+        hypothesis_id = proposal.fetch(:hypothesis_id)
+        unless task.hypotheses.any? { |hypothesis| hypothesis.id == hypothesis_id }
+          task.add_hypothesis!(id: hypothesis_id, statement: proposal.fetch(:statement))
+          @store.save(task)
+        end
+
         experiment = Experiment.new(
           id: SecureRandom.hex(8),
-          hypothesis_id: proposal.fetch(:hypothesis_id),
+          hypothesis_id: hypothesis_id,
           action: proposal.fetch(:action),
           checkpoint: execution.fetch(:checkpoint)
         )
+        task.record_experiment!(experiment)
+        @store.save(task)
+
         result = @runner.run(experiment, checkpoint: execution.fetch(:checkpoint))
-        task.record_experiment!(result)
+        task.complete_experiment!(result)
         update_hypothesis(task, result)
         @store.save(task)
 
@@ -285,12 +360,13 @@ module Koholint
 
       def new_task(execution)
         blocked = BlockedResult.new(**execution.reject { |key, _| key == :status })
-        ResearchTask.new(
-          id: SecureRandom.hex(8), goal: blocked.goal, blocker: blocked.to_h,
-          hypotheses: Array(execution[:hypotheses]).map do |hypothesis|
-            Hypothesis.new(id: hypothesis.fetch(:id), statement: hypothesis.fetch(:statement))
-          end
+        task = ResearchTask.new(
+          id: SecureRandom.hex(8), goal: blocked.goal, blocker: blocked.to_h
         )
+        Array(execution[:hypotheses]).each do |hypothesis|
+          task.add_hypothesis!(id: hypothesis.fetch(:id), statement: hypothesis.fetch(:statement))
+        end
+        task
       end
 
       def update_hypothesis(task, experiment)
