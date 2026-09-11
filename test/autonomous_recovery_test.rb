@@ -9,8 +9,14 @@ class AutonomousRecoveryTest < Minitest::Test
   include Koholint::AutonomousRecovery
 
   Checkpoints = Struct.new(:restored, :fingerprint) do
+    def initialize(restored, fingerprint)
+      super
+      @initial_fingerprint = fingerprint
+    end
+
     def restore(name)
       self.restored = name
+      self.fingerprint = @initial_fingerprint if name == "start"
     end
 
     def durable_fingerprint
