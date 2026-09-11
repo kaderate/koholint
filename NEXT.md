@@ -35,7 +35,7 @@ grids -- already fulfilled and recorded under D8 in `DECISIONS.md`; no other fil
 | Indicator | Value |
 |---|---|
 | Rooms found | 19 labeled in `data/ram_registry.json`'s `room_labels` (8 "charted", 11 "glimpsed"/less -- `224/0` riverside_south_river_room and `225/0` riverside_flower_clearing, south/east of `riverside_south_room`, both further explored (224/0's scroll mechanism and "totem" identity resolved, 225/0's ground-accessible extent mapped plus its NE route now resolved into a real room transition); `209/0` riverside_east_room, found east of `riverside_south_room`'s south band (past the prior x=134,y=115 stop point), fully swept September 10-11 2026 (west/center then, east half via the D13 primitive) -- no bidule found anywhere in it; `179/0` shop_screen, first actually explored September 10 2026 -- turns out to be the shop's EXTERIOR yard, not its interior; see `world_topology.shop_screen_door_approach` and Next question below; `226/0` riverside_ne_cove, reached from `225/0`'s previously-abandoned NE route September 10 2026, fully swept September 11 2026 via the D13 primitive (status promoted glimpsed -> charted) -- no bidule found anywhere in it either, see Next question below). Graph and screenshots published in the Koholint Atlas artifact (not yet updated with these rooms or this session's findings). D9 visual-catalog `visual_survey` now covers 6/19 (`front_yard`, `villager_screen` pilot + `crate_room`, `screen3_north` rollout + `well_platform`, `building_screen` rollout, fresh restart of an abandoned attempt, September 10 2026) -- see `DECISIONS.md`'s D9 entry. |
-| Dialogues / readable text | 14 confirmed entries in `ram_registry.json`'s `dialogues` (villager duo's shared line, room176's two save-mechanic NPC lines, crate_room's library fully read -- 4 books + 1 wall object, 9/9 tile objects resolved via OAM; house2_interior's 2 OAM-verified telephone objects; `riverside_flower_clearing_sign` (225/0) -- a signpost reading "Attention aux oursins !", NOT a chest/item; `shop_screen_yard_npc` (179/0) -- a friendly yard NPC reciting the SAME save-tip line as room176's pair, first confirmed case of a reused dialogue asset, September 10 2026 -- all hypothesis/verified_count 1). |
+| Dialogues / readable text | 14 confirmed entries in `ram_registry.json`'s `dialogues` (villager duo's shared line, room176's two save-mechanic NPC lines, crate_room's library fully read -- 4 books + 1 wall object, 9/9 tile objects resolved via OAM; house2_interior's 2 OAM-verified telephone objects; `riverside_flower_clearing_sign` (225/0) -- a two-page signpost, "Attention aux oursins !" then "Se protéger avec un bouclier !" (2nd page found September 11 2026, needs a long `:a` hold to reveal), NOT a chest/item; `shop_screen_yard_npc` (179/0) -- a friendly yard NPC reciting the SAME save-tip line as room176's pair, first confirmed case of a reused dialogue asset, September 10 2026 -- all hypothesis/verified_count 1). |
 | Terrain / collision | D8 live: reads BG tilemap signatures from VRAM (`lib/terrain.rb`), 93.1%-validated against live-probe oracle. Primary method; live probing kept as fallback. |
 | SELECT map (fog-of-war) | Widest-coverage checkpoint: `lib_explorer_225_fresh_entry.dump` (8 lit cells, superset of `main.dump`'s own 6). 6/8 cells now have a place name read from a checkpoint standing IN that exact cell's room ("Village des Mouettes", "Bibliothèque", "Sud du Village" x2 -- `176/0` and `192/0` share it, "Plage Coco" x2), `select_map_screen`'s SEVENTH + EIGHTH SESSION entries (`192/0` riverside_screen closed EIGHTH SESSION, new working route: nudge x to ~88 from `room176_entry_from_room160.dump`, then plain `:down` taps, no special alignment needed -- corrects the earlier "x=94, 8 calls" figure, which doesn't reproduce). Remaining 2 cells (the chain's earliest 2 rooms) confirmed NOT free-readable from any on-file checkpoint (checked EIGHTH SESSION) -- would need a from-boot replay. Scratchpad images ready for the Atlas (`select_map_full_*.png`), not yet pulled in. |
 | Save/continue | Mechanically verified end-to-end: hold A+B+START+SELECT opens the real save menu, "SAUVEGARDER & QUITTER" writes a real `.sav` (MD5-diffed), "REVENIR AU JEU" continues at the room's own door. This is the durable-progress path -- see "Standing conventions" below. |
@@ -229,14 +229,8 @@ retest before assuming it needs a whole new route.
 
 ## In-flight work (for resumability)
 
-As of September 11, 2026, ~01:35 UTC, two subagents are dispatched -- check `ListAgents` before
-assuming either is idle or before re-dispatching a duplicate:
-- **Owner-prompted: resolve crate_room's book_a/book_b mystery** -- the owner directly hinted
-  "read all the library's books" and "the beach signpost's message too". `world_topology.crate_room_and_riverside_content`'s
-  own "UNRESOLVED PUZZLE" note flags that book_a/book_b's text never matched any of the 9
-  OAM-scanned objects in the room -- their original checkpoints (`lib_crate_probe_A1*.dump`/
-  `lib_crate_probe_B1*.dump`) are still on disk, making this newly tractable. Also re-testing
-  `225/0`'s signpost for a possible untried second page/angle.
+As of September 11, 2026, ~01:35 UTC, one subagent remains dispatched -- check `ListAgents`
+before assuming it is idle or before re-dispatching a duplicate:
 - **`overworld_screen2`'s (178/0) untested SOUTH edge** -- with Plage Coco now believed
   exhaustively swept (no bidule), this is the pivot: the literal, most direct "south road" reading
   of the starting_house NPCs' clue, never actually pursued (attention went to Plage Coco instead).
@@ -408,6 +402,50 @@ the full attempt log.
 `shop_screen`'s YARD exploration is DONE (this session, September 10 2026) -- see the State
 table and Next question for that result (exterior yard only, no item, door not yet reached as of
 that pass).
+
+**Owner-prompted "read all the library's books" / signpost re-test is DONE, September 11 2026
+(Explorer session)** -- both parts resolved. (1) crate_room's book_a/book_b UNRESOLVED PUZZLE is
+RESOLVED: it was a checkpoint-naming collision, not 2 extra objects. The checkpoints the mandate
+believed were book_a/book_b's originals (`lib_crate_probe_A1*`/`lib_crate_probe_B1*`) are all
+timestamped September 9, not 8 -- direct OAM reads show they stand at the EXACT positions of
+book_c (top-row col1) and book_d (bottom-row col1), and independently replaying them from a fresh
+Motherboard reproduces book_c/d's text verbatim, not book_a/b's. True Sept 8 book_a/b checkpoints
+are not present anywhere on disk under any name -- this project cannot re-open them. The room still
+has exactly 9 `tile=0x58` objects, only 2 of the 8 grid crates are real book stands, no 10th+
+object exists. Real open question left behind (not chased, out of this session's scope): the SAME
+crate showed DIFFERENT dialogue text on the two separately-recorded live sessions -- book content
+at a given crate is observed NOT fixed, mechanism unknown. Full detail:
+`world_topology.crate_room_and_riverside_content`'s new resolution paragraph. (2) `225/0`'s
+signpost actually has a SECOND PAGE the prior session's 2 quick default `:a` presses dismissed
+before it rendered: holding the 2nd `:a` ~110 frames (same order of magnitude as the SELECT map's
+own render window) reveals "Se protéger avec un bouclier!" ("Protect yourself with a shield!")
+after "Attention aux oursins!" -- the project's first text directly linking the shield (from
+starting_house's NPCs) to the sea-urchin hazard by name. Re-approaching from down/left/right
+facings produced no dialogue (direction-sensitive as expected, not a second trigger angle). Not
+yet tested whether holding the shield actually blocks sea-urchin contact damage specifically.
+Full detail: `dialogues.riverside_flower_clearing_sign`. Neither finding relocates the "bidule";
+the owner's hint was about a bookkeeping gap and a truncated dialogue, not a hidden item. Both
+registry entries still `hypothesis`/`verified_count: 1` (single session each).
+
+```
+Question: Where are book_a/book_b actually located/triggered, and does resolving that reveal
+  anything new (a 10th+ object, new room state, new text) relevant to the sword hypothesis? Does
+  225/0's signpost have a second page or angle-sensitivity?
+Answer: confirmed (both). book_a=book_c's crate (top-row col1), book_b=book_d's crate
+  (bottom-row col1) -- a checkpoint-naming collision, not new objects; room stays at 9 objects,
+  2 real book stands. Signpost has a real, previously-missed 2nd page ("Se protéger avec un
+  bouclier!"), gated on a long :a hold, not a new facing angle.
+Indicators: game = unchanged (no sword, no new item found) | trip A->B = unchanged | verified
+  facts = unchanged (both new findings are hypothesis/verified_count 1, not yet promoted)
+Decisions made: none
+Next question proposed: none forced by this session -- overworld_screen2's south edge (already
+  in flight, see above) remains the live sword-hypothesis thread. If revisited, a real test of
+  whether the shield blocks sea-urchin damage specifically (not just the tile=0x60 family's
+  knockback) would directly exercise the signpost's new page 2 content.
+What NOT to redo: don't try to re-open book_a/book_b's "original" checkpoints again -- confirmed
+  not on disk under any name, by timestamp and by content, not just by filename guess. Don't
+  re-read 225/0's sign with a quick 2nd :a tap and conclude it's single-page.
+```
 
 ## Next question
 
@@ -600,9 +638,13 @@ own data model), not something to implement ad hoc.
   across 2 sessions). `224/0`'s "totem/statue" is the mobile tile=0x60 creature family, not static
   BG art -- don't expect a clean dialogue test on it without solving the same wandering-target
   chase problem already open for riverside_south_room's figures.
-- `225/0`'s signpost (the room's only known interactive object, "Attention aux oursins !") is
-  resolved -- don't re-approach it expecting an item; it's a hazard warning, not a chest, and
-  produces no HUD/inventory change. `225/0` does not scroll (single fixed screen) and its SW
+- `225/0`'s signpost (the room's only known interactive object) is resolved -- don't re-approach it
+  expecting an item; it's a hazard warning, not a chest, and produces no HUD/inventory change.
+  CORRECTED September 11 2026: it's a TWO-page dialogue ("Attention aux oursins!" then "Se protéger
+  avec un bouclier!"), not single-page -- a quick default-length 2nd `:a` tap dismisses it before
+  page 2 renders; a ~110-frame hold on the 2nd `:a` is needed to see it (see
+  `dialogues.riverside_flower_clearing_sign`). Don't re-read the single-page version as the full
+  text. `225/0` does not scroll (single fixed screen) and its SW
   ground pocket dead-ends at a hedge/water boundary (`probe_all` blocked both down and right
   there) -- don't re-walk that pocket expecting a new exit. The NE route past the sign is NO
   LONGER an open gap -- it's resolved into a real transition into `226/0`, see "Next question" for
