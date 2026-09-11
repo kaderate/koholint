@@ -388,3 +388,33 @@ to be ratified), `taken without validation` (inherited from the spike, to be rev
 - **Invalidated if**: a live retest with the new primitive doesn't measurably reduce damage or
   session time versus the ad-hoc scripts it replaces -- then the investment didn't pay off and
   should be reconsidered openly, not kept silently on the strength of intent alone.
+- **Built, September 11 2026 (Builder task)**: `lib/navigator.rb`'s `Navigator.avoid_hostiles_and_move!(motherboard, target_direction, radius:)`
+  is the primitive -- one avoidance-biased step, holding B automatically via a new
+  `Navigator.shielded_move!`/`Navigator.move_holding!` pair (holds the button across every
+  internal tap, unlike `#tap_button`'s per-tap clear, matching every ad-hoc script's own
+  workaround) whenever `Navigator.shield_equipped?` reads true. `Navigator.nearby_hazards` reads
+  OAM directly (`mmu.debug_read`, the PPU-bus-gate workaround already established) and filters by
+  a hardcoded `HAZARD_TILE_IDS` constant (0x60/0x62/0x64/0x66/0x68/0x6a confirmed hostile per D11
+  + 0x6c, the pale creature's "unknown, suggestive of hostile" entry) rather than parsing
+  `visual_catalog`'s free-text `hazard_status` field at runtime -- that field isn't reliably
+  machine-parseable (see the entries themselves), so the correlation is done once, in a comment
+  citing the exact catalog entries it's sourced from, not re-derived live every call. Deliberately
+  excludes every other visual_catalog entry marked "unknown" (e.g.
+  `building_screen_flutter_object`) as outside this decision's Plage Coco motivating scope.
+  `Navigator.biased_direction` is a pure 4-way dot-product choice (target-direction unit vector
+  plus a weighted push away from the nearest in-radius hazard), not a path search. A thin
+  `Navigator.avoid_hostiles_and_push!(motherboard, target_direction, max_steps:, min_hp:)` repeats
+  it with an HP safety floor, mirroring every ad-hoc script's own stop-before-KO behavior; it does
+  NOT itself perform any D12 HP-write top-up -- that stays the caller's explicit, logged decision.
+  Side finding, flagged per this project's provenance rule rather than assumed: the B-slot
+  equipped-item byte was not in `data/ram_registry.json` before this session (confirmed absent --
+  `lib/validation/checkpoint_after_shield_interior.rb`'s own comment already said so). Found by
+  diffing WRAM between a fresh pre-shield boot and 8 independently-created post-shield checkpoints
+  spanning 6+ rooms/several past sessions: `0xDB00` reads 0 pre-shield and 4 on every post-shield
+  checkpoint checked, stable regardless of room/HP/position; `0xDB01` read 0 throughout (consistent
+  with, not proof of, being the empty A-slot's counterpart address). Recorded in
+  `data/ram_registry.json`'s `wram_unmapped.equipped_b_item` as `hypothesis`/`verified_count: 1` --
+  this session's own correlation method only, not independently re-run by a second session; the
+  item-ID-to-"shield" mapping is inferred from being the only inventory change this project has
+  ever observed (Tarin's gift), not cross-checked against any external item-ID table.
+  **Validation retest result**: see the same entry's next addendum below.
