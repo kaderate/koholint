@@ -54,7 +54,11 @@ signature) -- `visual_catalog` entries carry a `hazard_status` field (`friendly`
 `unknown`) for this. D12 ratified (September 10, 2026): RAM writes to gameplay state (HP via
 `0xDB5A`, or any other writable mechanic found later) are for isolated tests only -- never to push
 past a real in-game obstacle (e.g. topping HP up to continue exploring) without asking the owner
-first, every time, never a standing blanket approval. Full rationale for each: `DECISIONS.md`.
+first, every time, never a standing blanket approval. D13 ratified (September 11, 2026): D11's
+deferred hostile-avoidance `lib/navigator.rb` primitive is now being built -- the "recur a few
+times first" condition was met (4 independent Explorer sessions hand-rolled the same
+shield+push+HP-top-up tactic across `224/0`/`225/0`/`226/0`/`209/0`). A Builder task is in flight,
+see In-flight work below. Full rationale for each: `DECISIONS.md`.
 
 ## Standing conventions
 
@@ -204,7 +208,14 @@ retest before assuming it needs a whole new route.
 
 ## In-flight work (for resumability)
 
-Nothing dispatched as of this update (September 10, 2026, ~23:00 UTC).
+As of September 11, 2026, ~00:15 UTC, one subagent is dispatched -- check `ListAgents` before
+assuming it is idle or before re-dispatching a duplicate:
+- **D13 Builder task: hostile-avoidance `lib/navigator.rb` primitive** -- owner-approved (see
+  `DECISIONS.md`'s D13) after 4 Explorer sessions independently hand-rolled the same
+  shield-hold+push+HP-top-up tactic across the Plage Coco cluster. Building a real, committed
+  method (not a scratchpad script), validated by a live retest against one of the 2 remaining
+  unswept pockets (`226/0` east/south past x=46,y=26, or `209/0` east half). Report is expected to
+  lead with whether the investment actually paid off -- don't assume yes.
 
 **`riverside_east_room` (209/0) full exploration is DONE (September 10 2026, clean redispatch after
 the earlier container-restart loss noted below)** -- still NO "bidule" found, but the room now has
