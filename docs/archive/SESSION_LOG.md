@@ -1292,3 +1292,62 @@ among NPCs (the only other "Chez <name>" character, the only one naming a hint m
 followed up on). That follow-up is now done; see this session's own entry above for the outcome
 and what it does/doesn't open next (the SELECT box's 2nd line is now the natural next pick, and a
 genuinely separate outdoor telephone booth is a live but unconfirmed possibility, not yet chased).
+
+---
+
+## Three bundled falsifiable questions closed: SELECT-box 2nd line, shop bush sustained-hold push, 225/0 dive test (September 12 2026)
+
+Explorer session, three small independent falsifiable questions bundled together per the owner's
+mandate (each a concrete next-pick already named in `NEXT.md`). All three resolved to a clean
+negative/refutation, no anti-patch violations, no D12 HP-writes needed (one D13-avoided
+re-navigation took zero damage).
+
+**Q1 -- `160/0`'s never-transcribed SELECT-box 2nd line ("le message du hibou")**: reopened the
+SELECT map from `room160_entry.dump` (standing in `160/0`/well_platform; the documented
+`@current_period_div_accumulator` post-load fix was applied defensively though this run didn't
+actually need it to avoid crashing), held SELECT then A continuously (never released) and sampled
+the framebuffer at 70/90/110/130/150/170 cumulative A-hold frames. RESULT: the "2nd line" is NOT a
+separate owl/message line at all -- it's the exact same place-name string this project already had
+on file ("Village des Mouettes"), simply word-wrapped onto 2 lines because it's longer than the
+other 5 already-read cells' single-line names. Typewriter progress: 70f shows "Village"+"d", 90f
+shows "Village"/"des Mouette" (missing the final s), 110f shows the complete stable text, and
+130-170f are pixel-identical to 110f -- no third line, no distinct icon, nothing further to find by
+holding longer. This also answers, for this one cell, the manual's `!?`/"message" marker question
+D14 flagged: whatever a real per-location owl marker looks like, it isn't what produces this box.
+Recorded as `dialogues.select_map_well_platform_place_name` (`hypothesis`/`verified_count: 1`).
+
+**Q2 -- push mechanic at `shop_screen`'s (179/0) bush wall, genuine sustained hold**: the prior
+(FOURTH SESSION) bush-contact test only ever used raw taps (2f press/28f release, cleared between
+each) -- never an actual continuous hold, which is what the manual describes for pushing. From
+`lib_shop_wide3.dump` nudged to y=106 (same reachable SW-corner bush cluster as before, the exact
+unreached door-approach cluster at x=81-94/96-130 still being unreachable), held a single
+uninterrupted `:right` press for 400 straight frames (no release, sampled every 20f). RESULT: zero
+displacement at all 20 samples, HP unchanged, framebuffer unchanged, no soft-lock (a real move!
+away worked immediately after release). CONFIRMS this bush cluster immovable under a real sustained
+hold too, not just taps -- refutes "just needed a real push" as the missing piece for this specific
+reachable instance. Doesn't reach or newly characterize the still-unreached exact door cluster.
+Appended to `world_topology.shop_screen_door_approach`'s FIFTH SESSION note and
+`terrain_collision.background_tilemap_predicts_walkability`'s caveats list.
+
+**Q3 -- dive mechanic at `riverside_flower_clearing`'s (225/0) SW water pocket**: re-navigated
+fresh from `lib_explorer_225_fresh_entry.dump` (per the standing instruction NOT to resume from the
+low-health `lib_explorer_225_route7.dump`) using `Navigator.avoid_hostiles_and_push!` for
+down/right/down, reaching x=44,y=96 with ZERO damage this run (no hostile ever in range -- a
+cleaner repro of the room's known route3->route6->route7 path). `probe_all` there read exactly the
+room's documented SW-pocket signature (`up: :ok, down: :blocked, left: :ok, right: :blocked`).
+Saved that as `lib_q3_pocket_attempt.dump`, then for EACH blocked direction (down, then right,
+reloading the checkpoint fresh each time): pressed the direction briefly to set facing, then held
+direction+B together continuously for 400 straight frames (mirroring the manual's "hold toward
+water, press B to dive"), sampling every 20f. RESULT: zero displacement in both directions across
+every sample, HP unchanged, room unchanged, no animation/screen change in before/held/after
+screenshots, no soft-lock. CONFIRMS the SW pocket's boundary is a hard wall with respect to diving
+too, not just ordinary movement -- at least without Flippers (Link's A-slot is still empty). Does
+not resolve what Flippers would change, and does not distinguish which specific edge (down vs.
+right) is "really" water versus hedge -- both tested identically blocked. Recorded as
+`world_topology.riverside_flower_clearing_sw_pocket_dive_test`
+(`hypothesis`/`verified_count: 1`), with a short pointer added to `room_labels['225/0']`.
+
+**Net effect on the quest hypothesis**: none of the three opened a new lead -- all three close out
+small, previously-flagged loose ends as negatives/refutations rather than advancing the sword
+search. The two still-open NAMED leads from the crate_room library session ("la Loupe",
+Warp holes) remain the most concrete untried threads; see `NEXT.md`'s Quest hypothesis section.

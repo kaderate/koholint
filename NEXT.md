@@ -35,8 +35,8 @@ grids -- already fulfilled and recorded under D8 in `DECISIONS.md`; no other fil
 | Indicator | Value |
 |---|---|
 | Rooms found | 19 labeled in `data/ram_registry.json`'s `room_labels` (8 "charted", 11 "glimpsed"/less -- `224/0` riverside_south_river_room and `225/0` riverside_flower_clearing, south/east of `riverside_south_room`, both further explored (224/0's scroll mechanism and "totem" identity resolved, 225/0's ground-accessible extent mapped plus its NE route now resolved into a real room transition); `209/0` riverside_east_room, found east of `riverside_south_room`'s south band (past the prior x=134,y=115 stop point), fully swept September 10-11 2026 (west/center then, east half via the D13 primitive) -- no bidule found anywhere in it; `179/0` shop_screen, first actually explored September 10 2026 -- turns out to be the shop's EXTERIOR yard, not its interior; see `world_topology.shop_screen_door_approach` and Next question below; `226/0` riverside_ne_cove, reached from `225/0`'s previously-abandoned NE route September 10 2026, fully swept September 11 2026 via the D13 primitive (status promoted glimpsed -> charted) -- no bidule found anywhere in it either, see Next question below). Graph and screenshots published in the Koholint Atlas artifact (not yet updated with these rooms or this session's findings). D9 visual-catalog `visual_survey` now covers 6/19 (`front_yard`, `villager_screen` pilot + `crate_room`, `screen3_north` rollout + `well_platform`, `building_screen` rollout, fresh restart of an abandoned attempt, September 10 2026) -- see `DECISIONS.md`'s D9 entry. |
-| Dialogues / readable text | 19 confirmed entries in `ram_registry.json`'s `dialogues` (villager duo's shared line, room176's two save-mechanic NPC lines, crate_room's library fully read -- 8 books + 1 wall object, 9/9 tile objects resolved via OAM
-(corrected September 11 2026 from an earlier, buggy "4 books" count -- see In-flight work below); house2_interior's 2 OAM-verified telephone objects; `riverside_flower_clearing_sign` (225/0) -- a two-page signpost, "Attention aux oursins !" then "Se protéger avec un bouclier !" (2nd page found September 11 2026, needs a long `:a` hold to reveal), NOT a chest/item; `shop_screen_yard_npc` (179/0) -- a friendly yard NPC reciting the SAME save-tip line as room176's pair, first confirmed case of a reused dialogue asset, September 10 2026 -- all hypothesis/verified_count 1). |
+| Dialogues / readable text | 20 confirmed entries in `ram_registry.json`'s `dialogues` (villager duo's shared line, room176's two save-mechanic NPC lines, crate_room's library fully read -- 8 books + 1 wall object, 9/9 tile objects resolved via OAM
+(corrected September 11 2026 from an earlier, buggy "4 books" count -- see "What NOT to redo" below); house2_interior's 2 OAM-verified telephone objects; `riverside_flower_clearing_sign` (225/0) -- a two-page signpost, "Attention aux oursins !" then "Se protéger avec un bouclier !" (2nd page found September 11 2026, needs a long `:a` hold to reveal), NOT a chest/item; `shop_screen_yard_npc` (179/0) -- a friendly yard NPC reciting the SAME save-tip line as room176's pair, first confirmed case of a reused dialogue asset, September 10 2026; `select_map_well_platform_place_name` (160/0) -- the SELECT box's 2-line place name ("Village des Mouettes"), September 12 2026, resolves the "2nd line" question as NOT a separate marker -- all hypothesis/verified_count 1). |
 | Terrain / collision | D8 live: reads BG tilemap signatures from VRAM (`lib/terrain.rb`), 93.1%-validated against live-probe oracle. Primary method; live probing kept as fallback. |
 | SELECT map (fog-of-war) | Widest-coverage checkpoint: `lib_explorer_225_fresh_entry.dump` (8 lit cells, superset of `main.dump`'s own 6). 6/8 cells now have a place name read from a checkpoint standing IN that exact cell's room ("Village des Mouettes", "Bibliothèque", "Sud du Village" x2 -- `176/0` and `192/0` share it, "Plage Coco" x2), `select_map_screen`'s SEVENTH + EIGHTH SESSION entries (`192/0` riverside_screen closed EIGHTH SESSION, new working route: nudge x to ~88 from `room176_entry_from_room160.dump`, then plain `:down` taps, no special alignment needed -- corrects the earlier "x=94, 8 calls" figure, which doesn't reproduce). Remaining 2 cells (the chain's earliest 2 rooms) confirmed NOT free-readable from any on-file checkpoint (checked EIGHTH SESSION) -- would need a from-boot replay. Scratchpad images ready for the Atlas (`select_map_full_*.png`), not yet pulled in. **NINTH SESSION, September 11 2026**: owner's game-manual-sourced `!?`/"message"-marker hypothesis tested directly -- REFUTED for the literal claim (no interior cell ever reuses the off-screen icon-legend block's own tile IDs, checked within-checkpoint across 7 checkpoints), but found a genuinely new fact: interior lit cells use 3 visually distinct glyphs, not one uniform "visited" dot -- a new glyph (`0xfd`) covers 4 rooms (`192/0`,`208/0`,`224/0`,`225/0`) at once, keyed to trail ROW not room content (reproduced across both coordinate-anchor families). Doesn't correlate cleanly with which rooms have confirmed dialogue, so likely decorative/distance-based, not a location hint -- see `select_map_screen`'s note for full detail, `hypothesis`/`verified_count: 1`. |
 | Save/continue | Mechanically verified end-to-end: hold A+B+START+SELECT opens the real save menu, "SAUVEGARDER & QUITTER" writes a real `.sav` (MD5-diffed), "REVENIR AU JEU" continues at the room's own door. This is the durable-progress path -- see "Standing conventions" below. |
@@ -58,8 +58,9 @@ past a real in-game obstacle (e.g. topping HP up to continue exploring) without 
 first, every time, never a standing blanket approval. D13 ratified (September 11, 2026): D11's
 deferred hostile-avoidance `lib/navigator.rb` primitive is now being built -- the "recur a few
 times first" condition was met (4 independent Explorer sessions hand-rolled the same
-shield+push+HP-top-up tactic across `224/0`/`225/0`/`226/0`/`209/0`). A Builder task is in flight,
-see In-flight work below. Full rationale for each: `DECISIONS.md`.
+shield+push+HP-top-up tactic across `224/0`/`225/0`/`226/0`/`209/0`). Built and validated twice
+(see `DECISIONS.md`'s D13 entry) -- `Navigator.avoid_hostiles_and_move!`/`avoid_hostiles_and_push!`
+are the shipped primitive, not in-flight anymore. Full rationale for each: `DECISIONS.md`.
 
 ## Standing conventions
 
@@ -110,8 +111,11 @@ Two new NAMED leads surfaced tonight, from crate_room's library turning out to h
 Also newly known, not yet acted on: `book_e` mentions a laser-blocking shield variant beyond the
 standard one (owned); `book_g` opens the real SELECT-map atlas directly from its own dialogue.
 The owner-provided game manual (`docs/GAME_MANUAL_NOTES.md`, D14) flagged pushing (no item needed)
-and diving (`B` in water) as untested mechanics -- Plage Coco's water strips were always treated
-as boundaries, never actually dived into; worth revisiting given the cluster is otherwise closed.
+and diving (`B` in water) as untested mechanics. Both got a first real test September 12 2026 (see
+below) and came back negative at the one spot each was tried -- Plage Coco's OTHER water strips
+(`224/0`'s river, `226/0`'s water) are still untested for diving, and the door-approach bush cluster
+specifically is still untested for pushing; worth trying there before calling either mechanic dead
+for this cluster.
 
 `shop_screen`'s door is CLOSED (anti-patch budget spent) -- bushes block its south approach, the
 same conditional-terrain blocker as the sword hypothesis's core evidence. Worth a cheap retest
@@ -129,27 +133,33 @@ in place in `data/ram_registry.json` (`room_labels['169/16']` and both dialogue 
 stale wrong cross-reference to `world_model.json`'s non-existent "building_screen (176/0)" entry.
 Not settled: whether a genuinely separate OUTDOOR telephone booth exists near `villager_screen`
 (177/0) -- Pépé's own line points "outside", and no second building has been found there on file,
-but this wasn't chased beyond a topology re-check this session. **Next pick, per the archived
-synthesis' own runner-up**: transcribe `160/0`'s never-read second SELECT-box line ("le message du
-hibou") -- rendered once, never captured.
+still not chased beyond a topology re-check (open lead, unresolved either way).
+
+**Three small bundled loose ends closed, September 12 2026** (Explorer session; full detail
+archived at `docs/archive/SESSION_LOG.md`, one-line outcomes here): (1) the SELECT box's "never-read
+2nd line" at `160/0` -- REFUTED as a separate owl/message line, it's just the same place name
+("Village des Mouettes") word-wrapped onto 2 lines, confirmed stable up to 170f, nothing further
+to find there (`dialogues.select_map_well_platform_place_name`). (2) `shop_screen`'s reachable bush
+cluster under a genuine 400-frame sustained hold (not taps) -- CONFIRMED immovable, refutes "just
+needed a real push" for that instance (`world_topology.shop_screen_door_approach`'s FIFTH SESSION
+note); the exact unreached door-approach cluster is still untested. (3) `225/0`'s SW pocket under a
+sustained direction+B hold (mirroring the manual's dive input) in both blocked directions --
+CONFIRMED a hard wall, zero displacement/HP change/visual change either way, at least without
+Flippers (`world_topology.riverside_flower_clearing_sw_pocket_dive_test`). None of the three opened
+a new lead -- the sword search's two live named threads remain **"la Loupe"** and **Warp holes**
+(below), plus the still-open outdoor-telephone-booth question above.
 
 ## In-flight work (for resumability)
 
-None currently open. The `house2_interior` telephone/Pépé discrepancy (flagged September 11 2026)
-is RESOLVED, same day, by a dedicated Explorer session -- full detail archived at
-`docs/archive/SESSION_LOG.md`'s "`house2_interior`'s telephone discrepancy resolved" entry;
-corrected facts live in `data/ram_registry.json`'s `room_labels['169/16']` and
-`dialogues.house2_telephone_examine`/`_call`. One-line answer: it's BOTH structurally two separate
-interactive objects (matching the current registry) AND one of them is Pépé le Ramollo himself, a
-real visible NPC (matching `world_model.json`) -- the registry had mischaracterized his sprite as
-an invisible trigger. Also fixed: the registry's wrong "`world_model.json`'s building_screen entry
-(176/0)" cross-reference, and two stale analogies to the old "invisible trigger" framing in
-`room_labels['225/0']`/`dialogues.riverside_flower_clearing_sign`.
+None currently open. See "Quest hypothesis" above for the live thread; resolved past work is
+archived at `docs/archive/SESSION_LOG.md`, not repeated here.
 
 ## Next question
 
 Session 4 (PLAN.md) is fully complete -- see the State section above. NOT currently paused (that
-framing is stale from an earlier session); see "Quest hypothesis" above for the live thread. Most
+framing is stale from an earlier session); see "Quest hypothesis" above for the live thread, which
+now also covers September 12 2026's three bundled closures (SELECT-box 2nd line, shop bush
+sustained-hold push, 225/0 dive test) -- not repeated here. Most
 of the detail below predates tonight's Plage Coco/crate_room/manual work (archived at
 `docs/archive/SESSION_LOG.md`) and is kept here only for topology/dialogue reference, not as an
 active question. SELECT-map fog-of-war, crate_room's
@@ -367,3 +377,18 @@ own data model), not something to implement ad hoc.
   deliberately continuing from the dead end. The exact per-leg tap counts on the NE route are not
   reproducible at a fixed count (same caveat as every other route in this room cluster) -- treat
   only the y-band strategy as durable, re-derive the taps live via `probe_all`/room_id checks.
+- `160/0`'s SELECT-box "2nd line" is NOT a separate owl/message marker -- confirmed September 12
+  2026 (hold SELECT+A up to 170f, pixel-stable from 110f on) it's just the room's own place name
+  ("Village des Mouettes") word-wrapped onto 2 lines because it's longer than this project's other
+  single-line place names. Don't re-investigate it as a distinct mechanic; see
+  `dialogues.select_map_well_platform_place_name`.
+- `shop_screen`'s reachable SW-corner bush cluster (near `lib_shop_wide3.dump`, NOT the still-
+  unreached door-approach cluster) is confirmed immovable under a genuine 400-frame continuous hold
+  (September 12 2026), not just the earlier raw-tap test -- don't re-run a "maybe it just needed a
+  real push" retest on this same reachable cluster; see `world_topology.shop_screen_door_approach`'s
+  FIFTH SESSION note. The exact door-approach cluster (x=81-94/96-130,y=96-111) is still untested by
+  any push method, reachable or not.
+- `225/0`'s SW pocket is confirmed a hard wall under a sustained direction+B hold too (both `down`
+  and `right`, 400 frames each, September 12 2026), not just ordinary movement -- don't re-test
+  "maybe diving does something" here without a cutting/swimming item Link doesn't have yet
+  (Flippers); see `world_topology.riverside_flower_clearing_sw_pocket_dive_test`.
