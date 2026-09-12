@@ -1,5 +1,5 @@
 {
-  "research_task_id": "loupe_20260912155506",
+  "research_task_id": "loupe_20260912160534_v2",
   "mode": "research",
   "original_goal": "Find 'la Loupe' (magnifying glass) -- crate_room_book_h (250/29) refuses to be read without it",
   "checkpoint": "/tmp/zelda_checkpoints/lib_front_yard.dump",
@@ -9,6 +9,6 @@
     "DECISIONS.md"
   ],
   "context_policy": "fresh",
-  "remaining_experiments": 3,
+  "remaining_experiments": 2,
   "next_step": "choose_one_bounded_experiment"
 }

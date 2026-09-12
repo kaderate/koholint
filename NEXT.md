@@ -103,7 +103,19 @@ Two new NAMED leads surfaced tonight, from crate_room's library turning out to h
 ~110 frames a real dialogue needs -- see `dialogues.crate_room_book_e/f/g/h`):
 - **"la Loupe" (magnifying glass)** -- `book_h` explicitly refuses to be read without it: "Il te
   faut la Loupe pour lire les petits caractères..." The first confirmed reference to a specific,
-  named, not-yet-found item in this whole project. Not located anywhere yet.
+  named, not-yet-found item in this whole project. Not located anywhere yet. **September 12 2026
+  dogfood session** (`experiment/autonomous-recovery-dogfood` branch, not yet merged, using the
+  not-yet-merged `feat/autonomous-recovery`'s `lib/autonomous_recovery.rb` for real): 2 bounded
+  `ResearchTask`s tested whether `clover_field` (163/0, glimpsed-only, east of `front_yard`) is
+  reachable straight-east from `lib_front_yard.dump` (x=88,y=92) -- REFUTED for that specific row:
+  16 real `Navigator.move!(:right)` calls advance x only to ~124 then hit a real wall, room never
+  changes (see `world_topology.front_yard_adjacent_rooms`'s dogfood addendum for the full
+  evidence). Does not refute the room's existence or the east transition itself, only this one
+  row/approach -- worth retrying via a different y before concluding `clover_field` needs an item.
+  `north_corridor_room` (146/0, the other glimpsed-only lead) was not reached this session --
+  budget went to `clover_field`. Both `ResearchTask`s (`loupe_20260912155506`, exhausted without
+  resolving; `loupe_20260912160534_v2`, hypothesis refuted) are preserved in git history on that
+  branch, not merged into `main`'s state.
 - **Warp holes** -- `book_f` describes teleporting between them ("il y a des trous Warp...").
   Never encountered/tested anywhere in this project. Could shortcut navigation if found.
 
