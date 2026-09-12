@@ -178,3 +178,40 @@ mandates should say explicitly whether the task is "spatial" (map an edge/room) 
 the latter citing the clue up front rather than exploring blind; (4) fold a
 "any `quest_clues` unresolved in an already-fully-mapped area?" check into the existing Reviewer
 cold-review cadence (same shape as the provenance-bar audit `MP5` already assigned it).
+
+**Addendum, September 12 2026 (planner session, owner-prompted "would a puzzle-solver proto
+help?")**: built and ran a throwaway ~60-line Ruby prototype (`/tmp/koholint_proto/puzzle_solver.rb`,
+not committed -- an Explorer-role spike, per the role table) to test proposal (2) above cheaply
+before any real design investment. Two mechanisms tried against the current `ram_registry.json`:
+(a) extract mid-sentence-capitalized words from `dialogues.*.text` (a French orthographic signal
+for a game-defined proper term) and check whether the term also appears anywhere in
+`room_labels`/`select_map_screen.note` ("grounded") or nowhere else ("ungrounded"); (b) cross-
+reference every dialogue text's own words, case-insensitive, against the SELECT map's own known
+place-name vocabulary (`select_map_screen.note`'s quoted names), to catch a place mentioned as an
+ordinary lowercase common noun.
+
+Result: (a) correctly flags "Loupe" and "Warp" as ungrounded (both already-known open threads,
+nothing new) and correctly recognizes "Ramollo" as already grounded -- but is fundamentally blind
+to exactly the case this ESC was opened over, because (b) shows why: `starting_house_npc_bench`/
+`starting_house_npc_beds`'s "va sur *la plage*" is a lowercase common noun in French, never
+capitalized by the game, so mechanism (a) would never have caught it. Mechanism (b) -- pure
+substring cross-referencing against the SELECT map's own vocabulary, no capitalization assumption
+-- DOES catch it: it independently reproduces the exact `starting_house` -> "Plage Coco" link the
+owner had to point out three times this session, from data already on file, with no owner prompt
+and no pre-trained game knowledge (only cross-referencing observed text against other observed
+text, consistent with `AGENTS.md`'s "observed, never assumed"). First run also surfaced a real bug
+in the prototype itself worth noting for any real implementation: naive "does this word appear
+anywhere else in the registry" grounding falsely marked "Loupe" as grounded, because our own
+English discussion notes (`world_topology.*.note`) repeat the word while discussing the very fact
+that it's unresolved -- grounding must be checked against fields that record an actual placed/
+observed fact (`room_labels`, `select_map_screen.note`), never against open-discussion prose, or
+every debated term reads as resolved.
+
+Bottom line for whoever resolves this ESC: proposal (2)'s cross-reference step is cheap and
+tractable -- mechanism (b) alone, run once per new dialogue/place-name fact, would have shortened
+this session's Plage Coco thread by at least the owner's first two corrections. Not yet evidence
+that a full `quest_clues` registry (proposal 1) is warranted -- this was one prototype run against
+a 19-entry dialogue corpus, re-deriving already-known findings, not yet tested on a genuinely fresh
+unread clue. Planner did not commit the script or wire it into any live session (D13's "recur a
+few times first" bar isn't met by a single validation run) -- leaving the resolution itself to
+MetaPlanner, per this file's standing rule that Planner may append evidence but not close an entry.
