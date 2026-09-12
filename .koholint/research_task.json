@@ -1,0 +1,44 @@
+{
+  "id": "loupe_20260912155506",
+  "goal": "Find 'la Loupe' (magnifying glass) -- crate_room_book_h (250/29) refuses to be read without it",
+  "blocker": {
+    "status": "blocked",
+    "goal": "Find 'la Loupe' (magnifying glass) -- crate_room_book_h (250/29) refuses to be read without it",
+    "location": "crate_room (250/29), refusal observed at book_h",
+    "checkpoint": "/tmp/zelda_checkpoints/lib_front_yard.dump",
+    "attempts": 0,
+    "blocker_type": "item_location_unknown",
+    "observations": [
+      "crate_room_book_h's refusal text: \"Impossible! Il te faut la Loupe pour lire les petits caracteres...\" (data/ram_registry.json dialogues.crate_room_book_h)",
+      "Plage Coco cluster (224/0, 225/0, 226/0, 209/0) exhaustively swept September 10-11 2026, no item found anywhere (NEXT.md quest hypothesis)",
+      "wram_unmapped.equipped_b_item (0xDB00) and the A-slot item byte have never read a magnifying-glass-shaped value in any checkpoint sampled so far"
+    ],
+    "failed_actions": [],
+    "known_constraints": [
+      "D12: no RAM write may bypass a real in-game obstacle without asking first; the existing HP-write grant is scoped to Plage Coco only, does not extend here",
+      "D13: hold the shield and use Navigator.avoid_hostiles_and_move!/avoid_hostiles_and_push! if the tile=0x60-0x6a hostile family is encountered",
+      "Never touch /tmp/zelda_checkpoints/main.dump -- scratch checkpoints only"
+    ]
+  },
+  "hypotheses": [
+    {
+      "id": "loupe_clover_field_163_0",
+      "statement": "la Loupe is somewhere in clover_field (163/0), east of front_yard -- glimpsed-only, never explored past its entry point (data/ram_registry.json room_labels['163/0']).",
+      "status": "open",
+      "evidence": []
+    },
+    {
+      "id": "loupe_north_corridor_146_0",
+      "statement": "la Loupe is somewhere in north_corridor_room (146/0), north of front_yard via the far-west corridor -- glimpsed-only, only the transition itself confirmed, no interior swept (data/ram_registry.json room_labels['146/0']).",
+      "status": "open",
+      "evidence": []
+    }
+  ],
+  "experiments": [],
+  "budget": {
+    "max_experiments": 3,
+    "min_supporting_experiments": 2
+  },
+  "status": "open",
+  "promoted_facts": []
+}
