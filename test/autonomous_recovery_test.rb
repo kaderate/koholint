@@ -417,6 +417,47 @@ class AutonomousRecoveryTest < Minitest::Test
     end
   end
 
+  def test_recovery_coordinator_keeps_the_handoff_manifest_in_sync
+    Dir.mktmpdir do |dir|
+      store = Store.new(File.join(dir, "research.json"))
+      checkpoints = Checkpoints.new("none", "same")
+      runner = ExperimentRunner.new(
+        checkpoints: checkpoints,
+        executor: ->(_action, max_frames:) { {observation: "tested", outcome: "refutes", frames: 2, state_fingerprint: "same"} }
+      )
+      coordinator = RecoveryCoordinator.new(
+        store: store,
+        runner: runner,
+        researcher: ->(_context) { {hypothesis_id: "h1", statement: "Object X sets the flag", action: "inspect X"} }
+      )
+      execution = {status: "blocked", goal: "open the door", location: "A", checkpoint: "start", hypotheses: []}
+
+      coordinator.handle(execution: execution)
+
+      handoff = store.load_handoff
+      refute_nil handoff, "save_handoff was never called"
+      assert_equal 2, handoff["remaining_experiments"], "handoff still claims the full budget after an experiment ran"
+    end
+  end
+
+  def test_research_task_reaches_exhausted_on_an_inconclusive_final_outcome
+    task = ResearchTask.new(
+      id: "r1", goal: "door", blocker: {"checkpoint" => "start"},
+      hypotheses: [Hypothesis.new(id: "h1", statement: "x")],
+      budget: {"max_experiments" => 1, "min_supporting_experiments" => 1}
+    )
+    pending = Experiment.new(id: "e1", hypothesis_id: "h1", action: "inspect")
+    task.record_experiment!(pending)
+    completed = Experiment.new(
+      id: "e1", hypothesis_id: "h1", action: "inspect", outcome: "inconclusive", observation: "unclear"
+    )
+
+    task.complete_experiment!(completed)
+
+    assert_equal "exhausted", task.status
+    assert_equal "resume", Context.handoff(task)["mode"]
+  end
+
   def test_blocked_research_exhaustion_escalates
     task = ResearchTask.new(
       id: "r1", goal: "door", blocker: {},

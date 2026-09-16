@@ -104,6 +104,12 @@ module Koholint
         raise ArgumentError, "research experiment already completed" unless experiments[index].outcome.nil?
 
         experiments[index] = experiment
+        # Exhaustion is a budget fact, not a hypothesis-outcome fact: mark_hypothesis! only ever
+        # reaches "exhausted" via a "refuted" call, so a run that spends its whole budget on
+        # "inconclusive" outcomes (never "supports" or "refutes") was left stuck at "open" forever,
+        # and Context.handoff's mode (keyed off status) kept telling a fresh context to keep
+        # researching past the point handle()'s own exhausted?-based routing had already escalated.
+        self.status = "exhausted" if status == "open" && exhausted?
       end
 
       def mark_hypothesis!(id, status, evidence)
@@ -323,14 +329,14 @@ module Koholint
         raise ArgumentError, "unsupported execution status" unless execution[:status] == "blocked"
 
         task = research_task || new_task(execution)
-        @store.save(task) unless research_task
+        persist!(task) unless research_task
         return {mode: "escalate", task: task} if task.exhausted?
 
         proposal = @researcher.call(Context.project(task))
         hypothesis_id = proposal.fetch(:hypothesis_id)
         unless task.hypotheses.any? { |hypothesis| hypothesis.id == hypothesis_id }
           task.add_hypothesis!(id: hypothesis_id, statement: proposal.fetch(:statement))
-          @store.save(task)
+          persist!(task)
         end
 
         experiment = Experiment.new(
@@ -340,12 +346,12 @@ module Koholint
           checkpoint: execution.fetch(:checkpoint)
         )
         task.record_experiment!(experiment)
-        @store.save(task)
+        persist!(task)
 
         result = @runner.run(experiment, checkpoint: execution.fetch(:checkpoint))
         task.complete_experiment!(result)
         update_hypothesis(task, result)
-        @store.save(task)
+        persist!(task)
 
         {
           mode: task.status == "resolved" ? "execute" : (task.exhausted? ? "escalate" : "research"),
@@ -355,6 +361,17 @@ module Koholint
       end
 
       private
+
+      # Every mutation gets saved AND handed off together -- `Store#save_handoff` was previously
+      # never called from here at all, so `<path>.handoff.json` stayed frozen at whatever it was
+      # when the task was first created (e.g. still claiming the full experiment budget after
+      # every experiment had already run) instead of tracking the task a cold context would
+      # actually resume.
+      def persist!(task)
+        @store.save(task)
+        @store.save_handoff(task)
+        task
+      end
 
       def new_task(execution)
         blocked = BlockedResult.new(**execution.reject { |key, _| key == :status || key == :hypotheses })
