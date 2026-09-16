@@ -262,6 +262,31 @@ Two new NAMED leads surfaced tonight, from crate_room's library turning out to h
   area (an NPC gift, a chest, or a dungeon entrance nobody has found yet) or a different method
   entirely (e.g. re-reading the project's own collected dialogue for a missed clue) rather than
   another edge re-sweep of already-closed territory.
+- **Combat-contact test, NINTH session (of this cluster), September 16 2026 (fresh cold-context
+  session)**: per the "different method entirely" option above, tested a genuinely new kind of
+  question instead of another edge sweep -- every prior session (D11/D13) built tactics to AVOID
+  hostile creatures; nobody had tested what deliberate contact does to the CREATURE, shielded vs
+  bare, not just to Link. From `lib_explorer_riverside_layout.dump` (208/0, hp=20, shield
+  equipped), 2 independent script runs deliberately walked Link into the confirmed-hostile
+  `riverside_south_tan_creature`: shielded (12-14 collision-seeking steps, closing to 8.1px) took
+  **zero damage**; an identical bare control took 3 confirmed 4-HP hits (12 total) at comparable
+  range. CLEAN NEGATIVE on the novel question: in neither condition did the creature's own OAM
+  entry ever vanish, change to an unfamiliar tile, or leave behind any new sprite (checked via a
+  full unfiltered OAM dump immediately after every damaging hit) -- contact has no observable
+  effect on the attacking creature either way, no drop, no despawn, no A-slot/inventory/rupee
+  change. Does NOT advance the sword/A-slot search. Genuinely NEW positive side-finding: this is
+  the project's first live, damage-differential confirmation that the equipped shield actually
+  functions as a combat mechanic (blocks contact damage entirely at this range), matching the
+  manual's "repels most enemy attacks" -- previously only an inventory-flag hypothesis (D13's
+  B-slot=4 read). Full method/result: `world_topology.riverside_south_room_combat_contact_test`,
+  `visual_catalog.riverside_south_tan_creature`'s `combat_contact_tested` addendum. Screenshots:
+  `data/screenshots/riverside_south_room_combat_contact_baseline.png`,
+  `_shielded_no_damage.png`, `_bare_damage.png`. **Next question, updated again**: SIX consecutive
+  sessions now (the five above plus this one) have found no A-slot lead -- both spatial edge-
+  sweeping and this session's mechanic-level test are exhausted for now. The search needs a
+  genuinely new area (an NPC gift, a chest, a dungeon entrance) or the one still-open spatial edge
+  (`riverside_screen` 192/0 EAST, untested) rather than another combat/edge retest on
+  already-covered ground.
 - **shop_screen's (179/0) door, SEVENTH session finding, September 16 2026** (fresh cold-context
   session -- first real use of `Koholint::AutonomousRecovery` on a genuine blocker, per
   `docs/AUTONOMOUS_RECOVERY.md`/`.claude/skills/autonomous-recovery/SKILL.md`): rather than a 7th
@@ -724,3 +749,11 @@ own data model), not something to implement ad hoc.
   if one is ever found); see `world_topology.riverside_south_room_survey`'s `west_edge_test`. All
   4 of `208/0`'s edges are now characterized -- don't re-run `probe_all`/edge characterization on
   this room again for the same reason `146/0` and `130/0` are already closed.
+- Deliberate hostile-creature contact (shielded and bare) against `riverside_south_tan_creature`
+  is confirmed to do NOTHING to the creature itself -- no despawn, no tile change outside its
+  already-known animation set, no drop -- across 12-14 contact-seeking steps per condition,
+  September 16 2026. Don't re-run this same test on the same creature/room expecting a different
+  result without a new reason (an actual weapon to attack WITH, which this project doesn't have
+  yet -- see `world_topology.riverside_south_room_combat_contact_test`). The shield fully blocking
+  contact damage at this range IS newly confirmed and durable -- don't re-verify that in isolation
+  either, it's now a live-tested fact, not a hypothesis to recheck.
