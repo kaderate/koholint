@@ -119,9 +119,24 @@ Two new NAMED leads surfaced tonight, from crate_room's library turning out to h
   east of `front_yard`) is reachable straight-east from `lib_front_yard.dump` (x=88,y=92) --
   REFUTED for that specific row: 16 real `Navigator.move!(:right)` calls advance x only to ~124
   then hit a real wall, room never changes. Does not refute the room's existence or the east
-  transition itself, only this one row/approach -- worth retrying via a different y before
-  concluding `clover_field` needs an item. `north_corridor_room` (146/0, the other glimpsed-only
-  lead) was not reached that session.
+  transition itself, only this one row/approach. `north_corridor_room` (146/0, the other
+  glimpsed-only lead) was not reached that session. **September 16 2026 follow-up (Explorer
+  subagent, 3 bounded sub-attempts, anti-patch cap reached)**: retested with a genuine 400-frame
+  continuous hold at y=92 (not a tap loop) -- REFUTED as a tap-timing artifact, reproduces the same
+  x=124 wall (contrast with `227/0`, where the same technique did cross a tap-false wall). Also
+  tried y=84 (partial, redirected into `starting_house`'s own door before reaching target) and
+  y=108 -- both blocked too. **Anti-patch rule triggered**: 3 sub-attempts, no progress on any goal
+  indicator, same mechanism (front_yard's east wall). Stopping here per `AGENTS.md`. Full detail:
+  `world_topology.front_yard_adjacent_rooms`'s FOLLOW-UP note.
+  **Paradigm to question (owner decision needed)**: front_yard's east edge into `clover_field` is
+  now blocked-confirmed at 3 rows via 2 methods each -- consistent with an item gate (same shape as
+  `shop_screen`'s door), but not proven as one. Candidates for the next session, not yet
+  prioritized: (a) try `clover_field` from a genuinely different edge/room, if one exists, instead
+  of front_yard's east wall again; (b) chase `north_corridor_room` (146/0, glimpsed-only, still
+  unreached) or the still-open outdoor-telephone-booth lead near `villager_screen` instead of
+  clover_field specifically; (c) treat "la Loupe" as gated behind finding the sword first and pivot
+  search effort toward Warp holes or a fresh angle on the sword itself. Owner's call on which to
+  spend the next session's budget on.
 - **Warp holes** -- `book_f` describes teleporting between them ("il y a des trous Warp...").
   Never encountered/tested anywhere in this project. Could shortcut navigation if found.
 
