@@ -229,13 +229,39 @@ Two new NAMED leads surfaced tonight, from crate_room's library turning out to h
   `data/screenshots/room208_west_edge_north_band.png`,
   `data/screenshots/room208_west_edge_south_band.png`,
   `data/screenshots/room208_west_edge_south_row_lower.png`.
-  **Next question, updated**: with `208/0` now also closed, the still-genuinely-open frontier
-  edges (per `world_topology.world_map_reconstruction`'s `frontier_untested_edges`, refreshed this
-  session) are `well_platform` (160/0) WEST's front-notch strip (y~40-75) and `riverside_screen`
-  (192/0) EAST's soft/undistinguished edge -- both untested, neither yet closed either way. No
-  A-slot item lead surfaced this session; the search still needs a genuinely new area (an NPC
-  gift, a chest, or a dungeon entrance) rather than another edge re-sweep of already-closed
-  territory.
+  **`well_platform` (160/0) WEST front-notch strip, ANSWERED September 16 2026 (fresh
+  cold-context session)**: the one untested fragment of 160/0's west edge (`y~40-75`) is ALSO a
+  genuine river/hedge boundary, not a hidden door. `room160_entry.dump` (the only on-file
+  checkpoint standing in 160/0) predates gemboy commit `d3278c7` and crashed on load with the
+  already-documented `@current_period_div_accumulator` nil bug -- fixed the same throwaway-script
+  way as `main.dump`/`front_yard_navigator.dump` before it (force each channel's period_divider
+  accumulator to 0 post-load). Routing to the target band surfaced a NEW blocker not previously on
+  file: the well/altar's 4 flanking pillar-shaped OAM decorations block a naive straight-west push
+  at `y=74-114` (separate from the hedge, x=100-132 band) -- had to route south below them, west to
+  the already-documented tree (x=68) and river wall (x=36), then north along the river bank into
+  the flagged band. Reached 2 independent points squarely inside it, `x=36,y=58` and `x=36,y=74`
+  (both at the corner where the hedge's west arm meets the river) -- both read `probe_all`
+  `left: :blocked` (y=58 also `up: :blocked`), and per this project's tap-vs-hold false-negative
+  lesson, each was rechecked with a genuine 380-frame sustained hold via `key_state`: zero
+  displacement, zero HP change, zero room change, every time. No chest, NPC, sign, or new room
+  found. `160/0`'s west edge is now fully characterized end to end (hedge base, pillar/well
+  decoration band, tree, river wall at multiple rows) -- nothing left unswept on this edge. Full
+  detail: `world_topology.room160_exits_and_content`'s `west_edge_notch_test`. Screenshots:
+  `data/screenshots/room160_notch_band_x36_y58_4x.png`,
+  `data/screenshots/room160_notch_band_y74_hold_4x.png`,
+  `data/screenshots/room160_notch_sw_blocked_4x.png` (the new pillar-decoration blocker),
+  `data/screenshots/room160_x68_y122_tree_4x.png`.
+  **Next question, updated**: with `208/0` AND `160/0`'s WEST edge now both closed, the only
+  still-genuinely-open frontier edge on file (per `world_topology.world_map_reconstruction`'s
+  `frontier_untested_edges`) is `riverside_screen` (192/0) EAST's soft/undistinguished edge --
+  untested, not yet closed either way. No A-slot item lead has surfaced across FIVE consecutive
+  edge-closure sessions now (Plage Coco, the outdoor-telephone-booth neighborhood, `130/0`,
+  `146/0`'s exits, `riverside_south_room`'s west edge, and now `160/0`'s own last strip) -- edge-by-
+  edge spatial sweeping of already-glimpsed rooms is running out of untested edges to sweep at all,
+  not just failing to find the item on the ones it tries. The search needs either a genuinely new
+  area (an NPC gift, a chest, or a dungeon entrance nobody has found yet) or a different method
+  entirely (e.g. re-reading the project's own collected dialogue for a missed clue) rather than
+  another edge re-sweep of already-closed territory.
 - **shop_screen's (179/0) door, SEVENTH session finding, September 16 2026** (fresh cold-context
   session -- first real use of `Koholint::AutonomousRecovery` on a genuine blocker, per
   `docs/AUTONOMOUS_RECOVERY.md`/`.claude/skills/autonomous-recovery/SKILL.md`): rather than a 7th
@@ -681,6 +707,16 @@ own data model), not something to implement ad hoc.
   `nudge_axis!`'s returned position is close to the requested target just because it returned --
   print the landed position and compare, and don't re-issue it blindly toward a target that's
   behind a sprite/furniture object already known (or suspected) to block that direction.
+- `well_platform` (160/0)'s WEST edge is now fully characterized, including its last untested
+  fragment (the front-notch strip, y~40-75) -- confirmed river/hedge boundary via 2 independent
+  points, taps AND 380-frame sustained holds, September 16 2026. Don't re-walk this edge again
+  without a new reason (e.g. a cutting item). `room160_entry.dump` (the only on-file checkpoint in
+  this room) needs the same `@current_period_div_accumulator` post-load fix as `main.dump`/
+  `front_yard_navigator.dump` before any input advances a frame -- see
+  `world_topology.room160_exits_and_content`'s `west_edge_notch_test`. Also: the well/altar's 4
+  pillar-shaped OAM decorations are a real, previously-uncatalogued blocker in the x=100-132/
+  y=74-114 band, separate from the hedge -- don't assume a naive straight-west push from the entry
+  checkpoint reaches the room's true west edge; route south below the pillars first.
 - `riverside_south_room` (208/0)'s WEST edge is a confirmed hard wall at x=20 (September 16 2026)
   -- reproduced at 3 independent y-bands (north hedge-maze band, south open-grass band upper and
   lower) via both ordinary taps and a 400-frame sustained hold each, zero drift/HP change every
