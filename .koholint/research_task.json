@@ -1,0 +1,57 @@
+{
+  "id": "81da96f2cb8607eb",
+  "goal": "Reach shop_screen's (179/0) door and its interior",
+  "blocker": {
+    "status": "blocked",
+    "goal": "Reach shop_screen's (179/0) door and its interior",
+    "location": "shop_screen (179/0), door-approach band x=80-130,y=90-111",
+    "checkpoint": "shop_screen",
+    "attempts": 6,
+    "blocker_type": "wall",
+    "observations": [
+      "6 sessions, 8+ push/sustained-hold routing attempts, all 3 open sides confirmed walled",
+      "anti-patch rule invoked in the 2nd, 3rd, and 6th sessions -- push-based method exhausted",
+      "registry's own SIXTH SESSION note names the exact next method: read the door cell's own lib/terrain.rb signature without live probing"
+    ],
+    "failed_actions": [
+      "push",
+      "sustained_hold_push",
+      "off_grid_tap_sweep",
+      "hedge_maze_route",
+      "npc_east_route"
+    ],
+    "known_constraints": [
+      "D12: no RAM writes to bypass a real obstacle",
+      "no cutting item confirmed owned yet"
+    ]
+  },
+  "hypotheses": [
+    {
+      "id": "h_door_band_sprite_not_uniform_wall",
+      "statement": "shop_screen's (179/0) unreached door-approach band (x=80-130,y=90-111) is not a uniform solid wall: reading its BG-tile signature (Terrain.signature_at, no live movement) against 2 already-confirmed real walls (roof-face x=104,y=16; NE-hedge x=122,y=32) and the already-confirmed grass+sprite SW pocket (x=60,y=106) should show at least one door-band cell sharing the grass+sprite signature/pattern rather than the solid-wall signature, with a previously uncatalogued static OAM sprite physically inside it -- mirroring the SW-pocket precedent (D9/D10) where BG terrain alone reads walkable but a static sprite still blocks it.",
+      "status": "open",
+      "evidence": [
+        "{:known_wall_signature=>[244, 246, 245, 247], :known_wall2_signature=>[244, 246, 245, 247], :known_grass_blocked_by_sprite_signature=>[90, 127, 127, 90], :known_open_grass_signature=>[90, 127, 127, 90], :door_band_signatures=>{:row5_col5=>[90, 127, 127, 90], :row5_col6=>[90, 127, 127, 90], :row6_col5=>[244, 246, 245, 247], :row6_col6=>[32, 33, 48, 49]}, :oam_sprites_in_door_band=>[{:y=>88, :x=>102, :tile=>94, :attrs=>65}]}"
+      ]
+    }
+  ],
+  "experiments": [
+    {
+      "id": "6a30f8783f0de942",
+      "hypothesis_id": "h_door_band_sprite_not_uniform_wall",
+      "checkpoint": "shop_screen",
+      "action": "read_bg_signatures_and_oam_census_shop_screen_door_band",
+      "observation": "{:known_wall_signature=>[244, 246, 245, 247], :known_wall2_signature=>[244, 246, 245, 247], :known_grass_blocked_by_sprite_signature=>[90, 127, 127, 90], :known_open_grass_signature=>[90, 127, 127, 90], :door_band_signatures=>{:row5_col5=>[90, 127, 127, 90], :row5_col6=>[90, 127, 127, 90], :row6_col5=>[244, 246, 245, 247], :row6_col6=>[32, 33, 48, 49]}, :oam_sprites_in_door_band=>[{:y=>88, :x=>102, :tile=>94, :attrs=>65}]}",
+      "outcome": "supports",
+      "cost": 0,
+      "state_fingerprint": "e9db76357b9d74c864f1cbf59116fcc3",
+      "created_at": "2026-09-16T14:50:54Z"
+    }
+  ],
+  "budget": {
+    "max_experiments": 3,
+    "min_supporting_experiments": 2
+  },
+  "status": "open",
+  "promoted_facts": []
+}

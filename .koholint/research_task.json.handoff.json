@@ -1,0 +1,14 @@
+{
+  "research_task_id": "81da96f2cb8607eb",
+  "mode": "research",
+  "original_goal": "Reach shop_screen's (179/0) door and its interior",
+  "checkpoint": "shop_screen",
+  "required_reads": [
+    "AGENTS.md",
+    "NEXT.md",
+    "DECISIONS.md"
+  ],
+  "context_policy": "fresh",
+  "remaining_experiments": 2,
+  "next_step": "choose_one_bounded_experiment"
+}

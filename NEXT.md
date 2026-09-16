@@ -34,9 +34,9 @@ grids -- already fulfilled and recorded under D8 in `DECISIONS.md`; no other fil
 
 | Indicator | Value |
 |---|---|
-| Rooms found | 23 labeled in `data/ram_registry.json`'s `room_labels` (9 "charted", 14 "glimpsed"/less -- `224/0` riverside_south_river_room and `225/0` riverside_flower_clearing, south/east of `riverside_south_room`, both further explored (224/0's scroll mechanism and "totem" identity resolved, 225/0's ground-accessible extent mapped plus its NE route now resolved into a real room transition); `209/0` riverside_east_room, found east of `riverside_south_room`'s south band (past the prior x=134,y=115 stop point), fully swept September 10-11 2026 (west/center then, east half via the D13 primitive) -- no bidule found anywhere in it; `179/0` shop_screen, first actually explored September 10 2026 -- turns out to be the shop's EXTERIOR yard, not its interior; see `world_topology.shop_screen_door_approach` and Next question below (now a SIXTH closed session, September 16 2026, still no route to the door); `226/0` riverside_ne_cove, reached from `225/0`'s previously-abandoned NE route September 10 2026, fully swept September 11 2026 via the D13 primitive (status promoted glimpsed -> charted) -- no bidule found anywhere in it either, see Next question below; `227/0` riverside_se_grove, NEW September 16 2026 -- reached from `226/0`'s own SE point via a genuine sustained-hold push, correcting that point's earlier "hard wall" verdict (a tap-vs-hold false negative, not a dive-gated door -- see `world_topology.riverside_ne_cove_se_edge_sustained_hold_and_227_discovery`); fully swept the same day (status promoted glimpsed -> charted, see Quest hypothesis below) -- a small closed clearing, no bidule found). Graph and screenshots published in the Koholint Atlas artifact (not yet updated with these rooms or this session's findings). D9 visual-catalog `visual_survey` now covers 6/20 (`front_yard`, `villager_screen` pilot + `crate_room`, `screen3_north` rollout + `well_platform`, `building_screen` rollout, fresh restart of an abandoned attempt, September 10 2026) -- see `DECISIONS.md`'s D9 entry. `146/0` north_corridor_room (still 20 total, was already labeled as an unreached stub) actually ENTERED for the first time September 16 2026, after the checkpoint mixup below cost a 4th anti-patch strike on the same wrong-checkpoint mistake as September 9's 3 -- see "What NOT to redo". First-survey only (D4): 3 of 4 directions open (`probe_all`), not swept. Its own `up` exit led to a new room, `130/0` (single-glance, a structure visible, see `room_labels['130/0']`); `right` led to `147/0` -- a "MAGASIN"-labeled building whose door turned out to be a real, walk-through transition into a 23rd room, `161/14` -- **the first shop interior ever reached in this project** (price-list HUD, counter, standing figure), see Quest hypothesis below. |
-| Dialogues / readable text | 20 confirmed entries in `ram_registry.json`'s `dialogues` (villager duo's shared line, room176's two save-mechanic NPC lines, crate_room's library fully read -- 8 books + 1 wall object, 9/9 tile objects resolved via OAM
-(corrected September 11 2026 from an earlier, buggy "4 books" count -- see "What NOT to redo" below); house2_interior's 2 OAM-verified telephone objects; `riverside_flower_clearing_sign` (225/0) -- a two-page signpost, "Attention aux oursins !" then "Se protéger avec un bouclier !" (2nd page found September 11 2026, needs a long `:a` hold to reveal), NOT a chest/item; `shop_screen_yard_npc` (179/0) -- a friendly yard NPC reciting the SAME save-tip line as room176's pair, first confirmed case of a reused dialogue asset, September 10 2026; `select_map_well_platform_place_name` (160/0) -- the SELECT box's 2-line place name ("Village des Mouettes"), September 12 2026, resolves the "2nd line" question as NOT a separate marker -- all hypothesis/verified_count 1). |
+| Rooms found | 23 labeled in `data/ram_registry.json`'s `room_labels` (9 "charted", 14 "glimpsed"/less -- `224/0` riverside_south_river_room and `225/0` riverside_flower_clearing, south/east of `riverside_south_room`, both further explored (224/0's scroll mechanism and "totem" identity resolved, 225/0's ground-accessible extent mapped plus its NE route now resolved into a real room transition); `209/0` riverside_east_room, found east of `riverside_south_room`'s south band (past the prior x=134,y=115 stop point), fully swept September 10-11 2026 (west/center then, east half via the D13 primitive) -- no bidule found anywhere in it; `179/0` shop_screen, first actually explored September 10 2026 -- turns out to be the shop's EXTERIOR yard, not its interior; see `world_topology.shop_screen_door_approach` and Next question below (SIXTH closed session September 16 2026, still no route to the door; SEVENTH session same day, non-live terrain/OAM read via `Koholint::AutonomousRecovery`, found part of the door band matches confirmed-wall signature and part has a previously uncatalogued static sprite on open-looking ground -- door itself still unreached, see Quest hypothesis below); `226/0` riverside_ne_cove, reached from `225/0`'s previously-abandoned NE route September 10 2026, fully swept September 11 2026 via the D13 primitive (status promoted glimpsed -> charted) -- no bidule found anywhere in it either, see Next question below; `227/0` riverside_se_grove, NEW September 16 2026 -- reached from `226/0`'s own SE point via a genuine sustained-hold push, correcting that point's earlier "hard wall" verdict (a tap-vs-hold false negative, not a dive-gated door -- see `world_topology.riverside_ne_cove_se_edge_sustained_hold_and_227_discovery`); fully swept the same day (status promoted glimpsed -> charted, see Quest hypothesis below) -- a small closed clearing, no bidule found). Graph and screenshots published in the Koholint Atlas artifact (not yet updated with these rooms or this session's findings). D9 visual-catalog `visual_survey` now covers 6/20 (`front_yard`, `villager_screen` pilot + `crate_room`, `screen3_north` rollout + `well_platform`, `building_screen` rollout, fresh restart of an abandoned attempt, September 10 2026) -- see `DECISIONS.md`'s D9 entry. `146/0` north_corridor_room (still 20 total, was already labeled as an unreached stub) actually ENTERED for the first time September 16 2026, after the checkpoint mixup below cost a 4th anti-patch strike on the same wrong-checkpoint mistake as September 9's 3 -- see "What NOT to redo". First-survey only (D4): 3 of 4 directions open (`probe_all`), not swept. Its own `up` exit led to a new room, `130/0` (single-glance, a structure visible, see `room_labels['130/0']`); `right` led to `147/0` -- a "MAGASIN"-labeled building whose door turned out to be a real, walk-through transition into a 23rd room, `161/14` -- **the first shop interior ever reached in this project** (price-list HUD, counter, standing figure), see Quest hypothesis below. |
+| Dialogues / readable text | 21 confirmed entries in `ram_registry.json`'s `dialogues` (villager duo's shared line, room176's two save-mechanic NPC lines, crate_room's library fully read -- 8 books + 1 wall object, 9/9 tile objects resolved via OAM
+(corrected September 11 2026 from an earlier, buggy "4 books" count -- see "What NOT to redo" below); house2_interior's 2 OAM-verified telephone objects; `riverside_flower_clearing_sign` (225/0) -- a two-page signpost, "Attention aux oursins !" then "Se protéger avec un bouclier !" (2nd page found September 11 2026, needs a long `:a` hold to reveal), NOT a chest/item; `shop_screen_yard_npc` (179/0) -- a friendly yard NPC reciting the SAME save-tip line as room176's pair, first confirmed case of a reused dialogue asset, September 10 2026; `select_map_well_platform_place_name` (160/0) -- the SELECT box's 2-line place name ("Village des Mouettes"), September 12 2026, resolves the "2nd line" question as NOT a separate marker; `magasin_interior_shopkeeper_greeting` (161/14) -- a generic "Bienvenue! Apporte ici ce que tu veux acheter.", found September 16 2026, does not name any of the shop's 3 priced items (all hypothesis/verified_count 1). |
 | Terrain / collision | D8 live: reads BG tilemap signatures from VRAM (`lib/terrain.rb`), 93.1%-validated against live-probe oracle. Primary method; live probing kept as fallback. |
 | SELECT map (fog-of-war) | Widest-coverage checkpoint: `lib_explorer_225_fresh_entry.dump` (8 lit cells, superset of `main.dump`'s own 6). 6/8 cells now have a place name read from a checkpoint standing IN that exact cell's room ("Village des Mouettes", "Bibliothèque", "Sud du Village" x2 -- `176/0` and `192/0` share it, "Plage Coco" x2), `select_map_screen`'s SEVENTH + EIGHTH SESSION entries (`192/0` riverside_screen closed EIGHTH SESSION, new working route: nudge x to ~88 from `room176_entry_from_room160.dump`, then plain `:down` taps, no special alignment needed -- corrects the earlier "x=94, 8 calls" figure, which doesn't reproduce). Remaining 2 cells (the chain's earliest 2 rooms) confirmed NOT free-readable from any on-file checkpoint (checked EIGHTH SESSION) -- would need a from-boot replay. Scratchpad images ready for the Atlas (`select_map_full_*.png`), not yet pulled in. **NINTH SESSION, September 11 2026**: owner's game-manual-sourced `!?`/"message"-marker hypothesis tested directly -- REFUTED for the literal claim (no interior cell ever reuses the off-screen icon-legend block's own tile IDs, checked within-checkpoint across 7 checkpoints), but found a genuinely new fact: interior lit cells use 3 visually distinct glyphs, not one uniform "visited" dot -- a new glyph (`0xfd`) covers 4 rooms (`192/0`,`208/0`,`224/0`,`225/0`) at once, keyed to trail ROW not room content (reproduced across both coordinate-anchor families). Doesn't correlate cleanly with which rooms have confirmed dialogue, so likely decorative/distance-based, not a location hint -- see `select_map_screen`'s note for full detail, `hypothesis`/`verified_count: 1`. |
 | Save/continue | Mechanically verified end-to-end: hold A+B+START+SELECT opens the real save menu, "SAUVEGARDER & QUITTER" writes a real `.sav` (MD5-diffed), "REVENIR AU JEU" continues at the room's own door. This is the durable-progress path -- see "Standing conventions" below. |
@@ -154,10 +154,39 @@ Two new NAMED leads surfaced tonight, from crate_room's library turning out to h
   `room_labels['161/14']`, `world_topology.magasin_door_and_shop_interior`. hypothesis/verified_count
   1, single session/method -- not yet re-confirmed independently. UNRESOLVED: whether `147/0` is the
   same physical building as `shop_screen`'s (179/0) yard seen from a different side, or a distinct
-  building -- this route never touched 179/0's own geometry. **Next question**: identify the 3 priced
-  items (visually only, no purchase/dialogue tested yet), test whether the yard (179/0) connects to
-  this interior by any route, and consider whether a purchase is possible (rupee count needed --
-  not yet checked this session). Owner delegated the next pick to the planner (September 16 2026).
+  building -- this route never touched 179/0's own geometry.
+  **Follow-up, ANSWERED September 16 2026 (fresh cold-context session)**: the shopkeeper (counter
+  sprite at (120,96)/(128,96)) IS interactive -- facing it and holding `:a` ~150 frames (not a
+  short tap) triggers a real 2-page dialogue, `dialogues.magasin_interior_shopkeeper_greeting`:
+  "Bienvenue! Apporte ici ce que tu veux acheter." A generic greeting, NOT item-specific -- no
+  submenu/item-selection UI follows it (tested `:a`/directions while open, box just closes).
+  Rupee count read from the HUD: **000** -- Link cannot afford any of the 3 items (200/10/20)
+  regardless of identity, so purchase is untested (blocked by economy, not mechanic). The
+  200-rupee icon's shape (4x crop) does NOT resemble a magnifying glass -- **not confirmed as "la
+  Loupe"**, no in-game text has named any of the 3 items. Whether 179/0's yard connects to this
+  interior is still untested. Full detail: `room_labels['161/14']`'s same-session addendum.
+  **Next question**: where do rupees come from (needed before any shop purchase can be tested at
+  all), and/or does 179/0 connect to 147/0/161/14 by any route.
+- **shop_screen's (179/0) door, SEVENTH session finding, September 16 2026** (fresh cold-context
+  session -- first real use of `Koholint::AutonomousRecovery` on a genuine blocker, per
+  `docs/AUTONOMOUS_RECOVERY.md`/`.claude/skills/autonomous-recovery/SKILL.md`): rather than a 7th
+  walking/push attempt (budget spent, see below), read the never-physically-probed door band
+  (x=80-130,y=90-111) via `Koholint::Terrain.signature_at`/`Navigator.oam_sprites` on the on-file
+  `lib_shop_screen.dump` checkpoint -- zero live movement, run for real through the recovery seam
+  (`ExperimentRunner`, persisted `ResearchTask` id `81da96f2cb8607eb` at
+  `.koholint/research_task.json`). Finding: part of the band (x=80-95,y=96-111) shares the EXACT
+  BG signature as 2 already-confirmed real walls -- likely genuine structural wall, not a cuttable
+  bush. Another part (x=96-111,y=80-95) reads plain open-grass BG signature but has a previously
+  uncatalogued static OAM sprite (tile=94/0x5E) sitting directly on it -- the same
+  "walkable-looking-tile-plus-invisible-sprite" pattern already proven to cause a real block
+  elsewhere in this room (the SW pocket). Hypothesis `h_door_band_sprite_not_uniform_wall`: 1 of 3
+  budgeted experiments used, outcome `supports`, still `open` (needs a 2nd independent experiment
+  before the recovery flow calls it `supported`) -- **not yet promoted to a registry fact beyond
+  hypothesis/verified_count 1**. Full detail: `world_topology.shop_screen_door_approach`'s SEVENTH
+  SESSION note, `visual_catalog.shop_screen_door_band_object`. A future session should read
+  `.koholint/research_task.json` first and run a 2nd, genuinely different experiment (e.g. a
+  minimal live probe of that exact cell/sprite, or a CHR-byte check) before treating this as
+  resolved either way.
 - **Warp holes** -- `book_f` describes teleporting between them ("il y a des trous Warp...").
   Never encountered/tested anywhere in this project. Could shortcut navigation if found.
 
@@ -245,8 +274,15 @@ visible in BG art beyond the north wall is a new, unreached, unchased visual lea
 
 ## In-flight work (for resumability)
 
-None currently open. See "Quest hypothesis" above for the live thread; resolved past work is
-archived at `docs/archive/SESSION_LOG.md`, not repeated here.
+One open `Koholint::AutonomousRecovery::ResearchTask`, id `81da96f2cb8607eb`, persisted at
+`.koholint/research_task.json` (+ handoff manifest alongside it), created September 16 2026:
+goal "Reach shop_screen's (179/0) door and its interior", 1 of 3 budgeted experiments used
+(outcome `supports`), hypothesis `h_door_band_sprite_not_uniform_wall` still `open` (needs a 2nd
+independent supporting/refuting experiment before the flow calls it `supported`). A fresh session
+picking this back up should read the task file first (`docs/AUTONOMOUS_RECOVERY.md`'s discovery
+snippet) rather than starting a new one -- see `world_topology.shop_screen_door_approach`'s
+SEVENTH SESSION note for full detail. See "Quest hypothesis" above for the live narrative thread;
+resolved past work is archived at `docs/archive/SESSION_LOG.md`, not repeated here.
 
 ## Next question
 
@@ -520,3 +556,13 @@ own data model), not something to implement ad hoc.
   considering a sustained-hold recheck, especially near water/scroll terrain -- the gap was NOT
   diving-specific (a no-B control crossed identically), so this isn't only a water-mechanic
   caveat.
+- `CheckpointSupport.nudge_axis!` burns its whole `max_steps` budget without noticing if the
+  target axis is on the far side of a real obstacle (confirmed September 16 2026, `161/14`
+  magasin_interior: nudging x toward the counter's column hit `Navigator.move!(:right): :blocked`
+  8 times in a row, `max_steps` exhausted, landing well short of the intended target with zero
+  useful progress after the first hit) -- same class of gap as D13's own documented one for
+  `avoid_hostiles_and_push!` (`world_topology.shop_screen_door_approach`'s D13 addendum: neither
+  helper detects "the last N calls all hit the same wall" and stops itself). Don't assume
+  `nudge_axis!`'s returned position is close to the requested target just because it returned --
+  print the landed position and compare, and don't re-issue it blindly toward a target that's
+  behind a sprite/furniture object already known (or suspected) to block that direction.
