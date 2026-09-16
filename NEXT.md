@@ -183,10 +183,33 @@ Two new NAMED leads surfaced tonight, from crate_room's library turning out to h
   budgeted experiments used, outcome `supports`, still `open` (needs a 2nd independent experiment
   before the recovery flow calls it `supported`) -- **not yet promoted to a registry fact beyond
   hypothesis/verified_count 1**. Full detail: `world_topology.shop_screen_door_approach`'s SEVENTH
-  SESSION note, `visual_catalog.shop_screen_door_band_object`. A future session should read
-  `.koholint/research_task.json` first and run a 2nd, genuinely different experiment (e.g. a
-  minimal live probe of that exact cell/sprite, or a CHR-byte check) before treating this as
-  resolved either way.
+  SESSION note, `visual_catalog.shop_screen_door_band_object`.
+  **EIGHTH session, ANSWERED (research-hypothesis level only) September 16 2026** (fresh
+  cold-context session, resumed the same `ResearchTask` per its own instruction rather than
+  starting a new one): live reconnaissance (west/south/east, not a formal experiment) found no new
+  route toward the sprite cell -- reconfirms the SEVENTH session's "sealed from every side already
+  reachable" reading, no new gap. The formal 2nd experiment, a CHR-byte crosscheck of the
+  door-band sprite (tile=94/95) against the room's two already-confirmed-blocking bush sprites
+  (tile=92/93, tile=88/89), ran for real through `ExperimentRunner`/`RecoveryCoordinator`: byte-
+  distinct from both (not a mislabeled duplicate), and visually a small sparse tuft/paw-print mark
+  (6/16 pixel rows inked) rather than a full bush silhouette (15/16) -- confirmed by a 6x
+  framebuffer crop (`data/screenshots/shop_screen_door_band_crop_6x_eighth_session.png`). Outcome
+  `supports` -- per the flow's own 2-supporting-experiment threshold, hypothesis
+  `h_door_band_sprite_not_uniform_wall` is now `supported`, `ResearchTask` `status: resolved`.
+  **Scope limit, stated plainly so this isn't overclaimed**: "supported" means only that a genuine,
+  distinct, previously-uncatalogued static object sits in an otherwise-open-reading door-band cell,
+  confirmed by 2 independent non-live methods -- it does NOT mean the object's movement-blocking
+  behavior was live-tested (the cell is still physically unreached) and does NOT mean the door
+  itself is any closer to being reached. **The door is still closed** -- 8 total sessions now, all
+  3 open sides independently reconfirmed sealed at least twice each. Full detail:
+  `world_topology.shop_screen_door_approach`'s EIGHTH SESSION note,
+  `visual_catalog.shop_screen_door_band_object`'s same-session addendum. Given `147/0`'s MAGASIN
+  building already leads to a real shop interior (`161/14`), the balance of evidence now favors
+  reading `179/0`'s own door as unreachable background art from this side, not a live door gated
+  by a missing item -- **recommend the owner confirm this reading before a 9th session repeats the
+  same routing sweep a 3rd+ time** (anti-patch territory); no cutting item exists to test the
+  alternative, and none is expected to change this specific reading since `161/14` already answers
+  "where is the shop's real interior."
 - **Warp holes** -- `book_f` describes teleporting between them ("il y a des trous Warp...").
   Never encountered/tested anywhere in this project. Could shortcut navigation if found.
 
@@ -274,15 +297,12 @@ visible in BG art beyond the north wall is a new, unreached, unchased visual lea
 
 ## In-flight work (for resumability)
 
-One open `Koholint::AutonomousRecovery::ResearchTask`, id `81da96f2cb8607eb`, persisted at
-`.koholint/research_task.json` (+ handoff manifest alongside it), created September 16 2026:
-goal "Reach shop_screen's (179/0) door and its interior", 1 of 3 budgeted experiments used
-(outcome `supports`), hypothesis `h_door_band_sprite_not_uniform_wall` still `open` (needs a 2nd
-independent supporting/refuting experiment before the flow calls it `supported`). A fresh session
-picking this back up should read the task file first (`docs/AUTONOMOUS_RECOVERY.md`'s discovery
-snippet) rather than starting a new one -- see `world_topology.shop_screen_door_approach`'s
-SEVENTH SESSION note for full detail. See "Quest hypothesis" above for the live narrative thread;
-resolved past work is archived at `docs/archive/SESSION_LOG.md`, not repeated here.
+None currently. The `Koholint::AutonomousRecovery::ResearchTask` id `81da96f2cb8607eb` (shop_screen
+door band, `.koholint/research_task.json`) reached `status: resolved` September 16 2026 (EIGHTH
+session, 2nd independent supporting experiment) -- see "Quest hypothesis" above for the current
+state of the underlying game goal (still blocked; a resolved *hypothesis* is not a reached door)
+and `docs/archive/SESSION_LOG.md` for the full session writeup. A future session opening a new
+blocker should create a fresh `ResearchTask` per `docs/AUTONOMOUS_RECOVERY.md`, not reuse this id.
 
 ## Next question
 

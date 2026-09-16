@@ -1351,3 +1351,57 @@ right) is "really" water versus hedge -- both tested identically blocked. Record
 small, previously-flagged loose ends as negatives/refutations rather than advancing the sword
 search. The two still-open NAMED leads from the crate_room library session ("la Loupe",
 Warp holes) remain the most concrete untried threads; see `NEXT.md`'s Quest hypothesis section.
+
+## `ResearchTask 81da96f2cb8607eb` (shop_screen's door band) resolved at the hypothesis level, door
+## itself still closed (September 16 2026, EIGHTH session)
+
+Fresh cold-context session, resumed the SEVENTH session's open `ResearchTask` per
+`docs/AUTONOMOUS_RECOVERY.md`'s own instruction (read the task file first, not a new one) rather
+than defaulting to it without judgment, per the session's own mandate. Two parts.
+
+**(1) Live reconnaissance** (real `Navigator.move!`/`probe_all` from a fresh `lib_shop_screen.dump`
+restore, not a formal ResearchTask experiment -- run only to orient before picking the 2nd formal
+one): south via row6/7 from the west spawn column dead-ends at the already-known SW/bush wall
+(x=60,y=112); a new incidental detail found en route -- the yard NPC (`shop_screen_yard_npc`)
+physically blocks a cell whose BG signature reads open grass, the same pattern as the door band
+and the SW pocket, just with an already-catalogued friendly NPC instead of an uncatalogued object;
+east via the hedge maze re-confirms the already-known NE/hedge wall (x=122,y=32). No new gap --
+reconfirms, doesn't newly establish, the SEVENTH session's "sealed from every side already
+reachable" reading.
+
+**(2) The formal 2nd experiment**, `chr_crosscheck_door_band_sprite_tile94_vs_known_bushes`, run
+for real through `Koholint::AutonomousRecovery::ExperimentRunner`/`RecoveryCoordinator` (frame cost
+0, `durable_fingerprint` = the real `.sav` MD5, unchanged before/after, same as the SEVENTH
+session's own experiment): extracted the door-band sprite's CHR pixel bytes (tile=94/95, 8x16 mode
+confirmed via LCDC) and cross-checked them against the room's two already-catalogued,
+already-physically-confirmed-blocking bush sprites (tile=92/93, tile=88/89 -- the FIFTH/SIXTH
+sessions' sustained-hold-confirmed-immovable SW-pocket bush). Result: byte-distinct from both (not
+a mislabeled duplicate, ruling out a cataloguing/read-artifact explanation), and visually much
+sparser -- 6 of 16 pixel rows inked in the door-band sprite's own 8x16 composite versus 15 of 16
+for the known bush -- a small tuft/paw-print-shaped mark, not a full bush silhouette. Confirmed by
+rendering both a raw pixel decode and a 6x crop of the live framebuffer directly under the door
+(`data/screenshots/shop_screen_door_band_crop_6x_eighth_session.png`), which shows 3 small marks
+scattered on open ground, visually distinct from the room's large round flower-bush clusters.
+
+Outcome recorded `supports` -- the 2nd independent supporting experiment, a genuinely different
+technique (CHR pixel data, not tile-ID signature/OAM position). Per the flow's own software
+threshold (`min_supporting_experiments: 2`), hypothesis `h_door_band_sprite_not_uniform_wall` is
+now `status: supported`, task `status: resolved`.
+
+**Scope limit, stated explicitly to avoid overclaiming**: "supported" means only that a genuine,
+distinct, previously-uncatalogued static object occupies an otherwise-open-reading door-band cell,
+confirmed by 2 independent non-live methods. It does NOT mean the object's actual movement-blocking
+behavior was live-tested (the cell remains physically unreached by any of the 8 total sessions'
+routing attempts, per part (1) above), and it does NOT mean the door itself is any closer to being
+reached -- **the door is still closed**, all 3 open sides independently reconfirmed sealed at least
+twice each.
+
+**Recommendation left for the owner/a future session**: given `147/0`'s MAGASIN building (a
+different building, found the same day as the SIXTH session) already leads to a real, walk-through
+shop interior (`161/14`), the balance of evidence now favors reading `179/0`'s own door as
+unreachable background art from this side (the building's real entrance being `147/0`'s door
+instead) over continuing to search for a live route into `179/0`'s door without a cutting/clearing
+item -- worth confirming before a 9th session repeats the same routing sweep a 3rd+ time (anti-
+patch territory). Full detail (all 8 sessions' worth): `world_topology.shop_screen_door_approach`,
+`visual_catalog.shop_screen_door_band_object`. This closes `NEXT.md`'s "In-flight work" pointer to
+`ResearchTask 81da96f2cb8607eb` -- no ResearchTask is open as of this session.

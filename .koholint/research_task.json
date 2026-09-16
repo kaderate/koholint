@@ -29,9 +29,10 @@
     {
       "id": "h_door_band_sprite_not_uniform_wall",
       "statement": "shop_screen's (179/0) unreached door-approach band (x=80-130,y=90-111) is not a uniform solid wall: reading its BG-tile signature (Terrain.signature_at, no live movement) against 2 already-confirmed real walls (roof-face x=104,y=16; NE-hedge x=122,y=32) and the already-confirmed grass+sprite SW pocket (x=60,y=106) should show at least one door-band cell sharing the grass+sprite signature/pattern rather than the solid-wall signature, with a previously uncatalogued static OAM sprite physically inside it -- mirroring the SW-pocket precedent (D9/D10) where BG terrain alone reads walkable but a static sprite still blocks it.",
-      "status": "open",
+      "status": "supported",
       "evidence": [
-        "{:known_wall_signature=>[244, 246, 245, 247], :known_wall2_signature=>[244, 246, 245, 247], :known_grass_blocked_by_sprite_signature=>[90, 127, 127, 90], :known_open_grass_signature=>[90, 127, 127, 90], :door_band_signatures=>{:row5_col5=>[90, 127, 127, 90], :row5_col6=>[90, 127, 127, 90], :row6_col5=>[244, 246, 245, 247], :row6_col6=>[32, 33, 48, 49]}, :oam_sprites_in_door_band=>[{:y=>88, :x=>102, :tile=>94, :attrs=>65}]}"
+        "{:known_wall_signature=>[244, 246, 245, 247], :known_wall2_signature=>[244, 246, 245, 247], :known_grass_blocked_by_sprite_signature=>[90, 127, 127, 90], :known_open_grass_signature=>[90, 127, 127, 90], :door_band_signatures=>{:row5_col5=>[90, 127, 127, 90], :row5_col6=>[90, 127, 127, 90], :row6_col5=>[244, 246, 245, 247], :row6_col6=>[32, 33, 48, 49]}, :oam_sprites_in_door_band=>[{:y=>88, :x=>102, :tile=>94, :attrs=>65}]}",
+        "{:lcdc=>231, :sprite_size_16=>true, :door_band_sprite_oam=>{:y=>88, :x=>102, :tile=>94, :attrs=>65}, :planter_a_oam=>{:y=>60, :x=>50, :tile=>94, :attrs=>1}, :planter_b_oam=>{:y=>70, :x=>77, :tile=>94, :attrs=>65}, :bush_a_oam=>{:y=>110, :x=>49, :tile=>92, :attrs=>33}, :bush_b_oam=>{:y=>110, :x=>57, :tile=>88, :attrs=>33}, :tile94_chr=>[0, 0, 0, 0, 0, 0, 0, 0, 195, 0, 231, 66, 255, 102, 255, 102], :tile95_chr=>[126, 36, 60, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], :identical_to_known_bush_a=>false, :identical_to_known_bush_b=>false, :nonblank_8px_rows_tile94_composite=>6, :nonblank_8px_rows_known_bush_composite=>15, :note=>\"tile94/95 CHR bytes decode to a real, coherent, renderable sprite (not a read artifact); confirmed byte-distinct from both already-catalogued bush instances (tile=92/93 and tile=88/89); pixel footprint is sparser (6/16 rows with any ink vs 15/16 for the known bush) -- visually a smaller/different decorative element, not simply a duplicate reading of the room's already-known bush. Movement-blocking itself was NOT tested this experiment (no live approach was made -- the cell remains physically unreached, per the SEVENTH SESSION's routing exhaustion); this experiment only independently reconfirms, via a genuinely different technique (CHR pixel data, not tile-ID signature/position), that a real, distinct, previously-uncatalogued static object occupies the cell.\"}"
       ]
     }
   ],
@@ -46,12 +47,23 @@
       "cost": 0,
       "state_fingerprint": "e9db76357b9d74c864f1cbf59116fcc3",
       "created_at": "2026-09-16T14:50:54Z"
+    },
+    {
+      "id": "0324c9c4d2e5e381",
+      "hypothesis_id": "h_door_band_sprite_not_uniform_wall",
+      "checkpoint": "shop_screen",
+      "action": "chr_crosscheck_door_band_sprite_tile94_vs_known_bushes",
+      "observation": "{:lcdc=>231, :sprite_size_16=>true, :door_band_sprite_oam=>{:y=>88, :x=>102, :tile=>94, :attrs=>65}, :planter_a_oam=>{:y=>60, :x=>50, :tile=>94, :attrs=>1}, :planter_b_oam=>{:y=>70, :x=>77, :tile=>94, :attrs=>65}, :bush_a_oam=>{:y=>110, :x=>49, :tile=>92, :attrs=>33}, :bush_b_oam=>{:y=>110, :x=>57, :tile=>88, :attrs=>33}, :tile94_chr=>[0, 0, 0, 0, 0, 0, 0, 0, 195, 0, 231, 66, 255, 102, 255, 102], :tile95_chr=>[126, 36, 60, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], :identical_to_known_bush_a=>false, :identical_to_known_bush_b=>false, :nonblank_8px_rows_tile94_composite=>6, :nonblank_8px_rows_known_bush_composite=>15, :note=>\"tile94/95 CHR bytes decode to a real, coherent, renderable sprite (not a read artifact); confirmed byte-distinct from both already-catalogued bush instances (tile=92/93 and tile=88/89); pixel footprint is sparser (6/16 rows with any ink vs 15/16 for the known bush) -- visually a smaller/different decorative element, not simply a duplicate reading of the room's already-known bush. Movement-blocking itself was NOT tested this experiment (no live approach was made -- the cell remains physically unreached, per the SEVENTH SESSION's routing exhaustion); this experiment only independently reconfirms, via a genuinely different technique (CHR pixel data, not tile-ID signature/position), that a real, distinct, previously-uncatalogued static object occupies the cell.\"}",
+      "outcome": "supports",
+      "cost": 0,
+      "state_fingerprint": "e9db76357b9d74c864f1cbf59116fcc3",
+      "created_at": "2026-09-16T15:25:21Z"
     }
   ],
   "budget": {
     "max_experiments": 3,
     "min_supporting_experiments": 2
   },
-  "status": "open",
+  "status": "resolved",
   "promoted_facts": []
 }
