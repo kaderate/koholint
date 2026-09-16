@@ -34,7 +34,7 @@ grids -- already fulfilled and recorded under D8 in `DECISIONS.md`; no other fil
 
 | Indicator | Value |
 |---|---|
-| Rooms found | 19 labeled in `data/ram_registry.json`'s `room_labels` (8 "charted", 11 "glimpsed"/less -- `224/0` riverside_south_river_room and `225/0` riverside_flower_clearing, south/east of `riverside_south_room`, both further explored (224/0's scroll mechanism and "totem" identity resolved, 225/0's ground-accessible extent mapped plus its NE route now resolved into a real room transition); `209/0` riverside_east_room, found east of `riverside_south_room`'s south band (past the prior x=134,y=115 stop point), fully swept September 10-11 2026 (west/center then, east half via the D13 primitive) -- no bidule found anywhere in it; `179/0` shop_screen, first actually explored September 10 2026 -- turns out to be the shop's EXTERIOR yard, not its interior; see `world_topology.shop_screen_door_approach` and Next question below; `226/0` riverside_ne_cove, reached from `225/0`'s previously-abandoned NE route September 10 2026, fully swept September 11 2026 via the D13 primitive (status promoted glimpsed -> charted) -- no bidule found anywhere in it either, see Next question below). Graph and screenshots published in the Koholint Atlas artifact (not yet updated with these rooms or this session's findings). D9 visual-catalog `visual_survey` now covers 6/19 (`front_yard`, `villager_screen` pilot + `crate_room`, `screen3_north` rollout + `well_platform`, `building_screen` rollout, fresh restart of an abandoned attempt, September 10 2026) -- see `DECISIONS.md`'s D9 entry. |
+| Rooms found | 20 labeled in `data/ram_registry.json`'s `room_labels` (8 "charted", 12 "glimpsed"/less -- `224/0` riverside_south_river_room and `225/0` riverside_flower_clearing, south/east of `riverside_south_room`, both further explored (224/0's scroll mechanism and "totem" identity resolved, 225/0's ground-accessible extent mapped plus its NE route now resolved into a real room transition); `209/0` riverside_east_room, found east of `riverside_south_room`'s south band (past the prior x=134,y=115 stop point), fully swept September 10-11 2026 (west/center then, east half via the D13 primitive) -- no bidule found anywhere in it; `179/0` shop_screen, first actually explored September 10 2026 -- turns out to be the shop's EXTERIOR yard, not its interior; see `world_topology.shop_screen_door_approach` and Next question below (now a SIXTH closed session, September 16 2026, still no route to the door); `226/0` riverside_ne_cove, reached from `225/0`'s previously-abandoned NE route September 10 2026, fully swept September 11 2026 via the D13 primitive (status promoted glimpsed -> charted) -- no bidule found anywhere in it either, see Next question below; `227/0` riverside_se_grove, NEW September 16 2026 -- reached from `226/0`'s own SE point via a genuine sustained-hold push, correcting that point's earlier "hard wall" verdict (a tap-vs-hold false negative, not a dive-gated door -- see `world_topology.riverside_ne_cove_se_edge_sustained_hold_and_227_discovery`); not fully swept). Graph and screenshots published in the Koholint Atlas artifact (not yet updated with these rooms or this session's findings). D9 visual-catalog `visual_survey` now covers 6/20 (`front_yard`, `villager_screen` pilot + `crate_room`, `screen3_north` rollout + `well_platform`, `building_screen` rollout, fresh restart of an abandoned attempt, September 10 2026) -- see `DECISIONS.md`'s D9 entry. |
 | Dialogues / readable text | 20 confirmed entries in `ram_registry.json`'s `dialogues` (villager duo's shared line, room176's two save-mechanic NPC lines, crate_room's library fully read -- 8 books + 1 wall object, 9/9 tile objects resolved via OAM
 (corrected September 11 2026 from an earlier, buggy "4 books" count -- see "What NOT to redo" below); house2_interior's 2 OAM-verified telephone objects; `riverside_flower_clearing_sign` (225/0) -- a two-page signpost, "Attention aux oursins !" then "Se protéger avec un bouclier !" (2nd page found September 11 2026, needs a long `:a` hold to reveal), NOT a chest/item; `shop_screen_yard_npc` (179/0) -- a friendly yard NPC reciting the SAME save-tip line as room176's pair, first confirmed case of a reused dialogue asset, September 10 2026; `select_map_well_platform_place_name` (160/0) -- the SELECT box's 2-line place name ("Village des Mouettes"), September 12 2026, resolves the "2nd line" question as NOT a separate marker -- all hypothesis/verified_count 1). |
 | Terrain / collision | D8 live: reads BG tilemap signatures from VRAM (`lib/terrain.rb`), 93.1%-validated against live-probe oracle. Primary method; live probing kept as fallback. |
@@ -148,6 +148,29 @@ CONFIRMED a hard wall, zero displacement/HP change/visual change either way, at 
 Flippers (`world_topology.riverside_flower_clearing_sw_pocket_dive_test`). None of the three opened
 a new lead -- the sword search's two live named threads remain **"la Loupe"** and **Warp holes**
 (below), plus the still-open outdoor-telephone-booth question above.
+
+**Shop door SIXTH session (closed) + a new room via a sustained-hold correction, September 16
+2026**: `shop_screen`'s door is STILL CLOSED -- a 6th session (3 new routing vectors, none opened
+a gap; 2 fresh 400-frame sustained-hold pushes at the closest reachable points to the door's own
+x=81-130 column, x=104,y=16 and x=122,y=32, both confirmed immovable, zero displacement/damage).
+Exact geometry now pinned down on all 3 open sides: SW/bush wall at x=60,y=106 (already known),
+roof-face wall at x=104-113,y=16-25 (new x-stops, same wall), NE/hedge wall at x=122,y=32 (now
+hit from 2 independent entry vectors, same signature both times). No cutting item, no new lead --
+still consistent with, not newly proof of, the "gated by an item Link doesn't have" hypothesis.
+Full detail: `world_topology.shop_screen_door_approach`'s SIXTH SESSION note. **Separately, the
+226/0 dive test (secondary mandate) found real new ground**: `226/0`'s own SE "cul-de-sac"
+(x=154,y=58), previously read as a genuine 3-way wall under `Navigator.probe_all`'s short taps,
+turned out to be a false negative -- a genuine 400f sustained hold toward `:right` (WITH OR
+WITHOUT `:b`, a control run ruled out diving specifically) crosses into a brand-new room, **227/0
+(`riverside_se_grove`)**. Not the sword/bidule (2 light-survey screenshots showed only more of the
+already-known flower-creature/hazard family and hedge/sand terrain, no item, no connection to "la
+Loupe"/Warp holes/the telephone booth), but a real methodological finding worth generalizing: at
+least one cell in this project had been wrongly marked "blocked" because `move!`'s 2-frame taps
+never held long enough to register a slow-committing transition -- see `room_labels['227/0']` and
+`world_topology.riverside_ne_cove_se_edge_sustained_hold_and_227_discovery`. `227/0` itself is not
+fully swept (budget) -- a future session should finish it before assuming it's a dead end, and
+should consider whether other "hard wall" verdicts elsewhere in this project deserve the same
+sustained-hold recheck rather than trusting the tap-based read alone.
 
 ## In-flight work (for resumability)
 
@@ -392,3 +415,18 @@ own data model), not something to implement ad hoc.
   and `right`, 400 frames each, September 12 2026), not just ordinary movement -- don't re-test
   "maybe diving does something" here without a cutting/swimming item Link doesn't have yet
   (Flippers); see `world_topology.riverside_flower_clearing_sw_pocket_dive_test`.
+- `shop_screen`'s door is closed on all 3 open sides now with a 6th session's worth of evidence,
+  including 2 fresh 400-frame sustained-hold pushes (September 16 2026) at the closest reachable
+  points to the door's own column (x=104,y=16 and x=122,y=32, both confirmed immovable) -- don't
+  re-sweep any of the 3 known walls (x=60,y=106 SW/bush, x=104-113,y=16-25 roof-face, x=122,y=32
+  NE/hedge) again without either a cutting item or a genuinely different method (e.g. a
+  `lib/terrain.rb` signature read of the door's own cell, no live probing); see
+  `world_topology.shop_screen_door_approach`'s SIXTH SESSION note.
+- `Navigator.probe_all`/`move!`'s short 2-frame taps produced at least one confirmed false
+  "blocked" negative (226/0's SE point, x=154,y=58 -- see
+  `world_topology.riverside_ne_cove_se_edge_sustained_hold_and_227_discovery`): a genuine 400f
+  sustained hold crossed cleanly into a new room where taps always read all-3-directions-blocked.
+  Don't trust a tap-based "hard wall" verdict anywhere in this project as final without at least
+  considering a sustained-hold recheck, especially near water/scroll terrain -- the gap was NOT
+  diving-specific (a no-B control crossed identically), so this isn't only a water-mechanic
+  caveat.
