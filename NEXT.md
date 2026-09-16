@@ -165,8 +165,32 @@ Two new NAMED leads surfaced tonight, from crate_room's library turning out to h
   200-rupee icon's shape (4x crop) does NOT resemble a magnifying glass -- **not confirmed as "la
   Loupe"**, no in-game text has named any of the 3 items. Whether 179/0's yard connects to this
   interior is still untested. Full detail: `room_labels['161/14']`'s same-session addendum.
-  **Next question**: where do rupees come from (needed before any shop purchase can be tested at
-  all), and/or does 179/0 connect to 147/0/161/14 by any route.
+  **Follow-up, ANSWERED September 16 2026 (fresh cold-context session, owner-directed)**: checked
+  Link's actual current equipped items first, per the owner's own suggestion, before any live test
+  -- `wram_unmapped.equipped_b_item` already on file: B-slot (0xDB00)=4 (Shield), A-slot
+  (0xDB01)=0 (empty) in every checkpoint ever sampled; `wram_unmapped.inventory` is "not found" --
+  no sword anywhere in the registry. Then ran ONE bounded live test on the "cutting grass gives
+  rupees" lead (owner-confirmed game-manual fact, flagged `terrain_collision` as "NOT YET
+  INVESTIGATED" since September 9 2026): held `:a` for a genuine 150 frames (not a tap) while
+  standing in plain open grass (`front_yard`, 162/0, `lib_front_yard.dump`), full `0xC000-0xDFFF`
+  WRAM diff before/after, against a same-duration zero-input control to strip background-animation
+  noise. RESULT: REFUTED for this location -- the `:a`-hold run and the idle control produced the
+  byte-for-byte identical WRAM diff (same 88 addresses, all ordinary animation/counter noise);
+  position, HP, room, both inventory slots, and the rendered framebuffer (HUD rupee counter still
+  `000`, A-slot bracket still empty) are all unchanged. Holding `:a` in grass currently does
+  NOTHING measurable -- consistent with (not new proof of) Link's empty A-slot being why no rupee
+  source has been found anywhere in this project yet, the same underlying blocker as the sword
+  hypothesis. Does NOT confirm grass-cutting is even this game's real rupee mechanism (still
+  unobserved either way). hypothesis/verified_count 1, single location/direction (front_yard's
+  base grass texture only, not a distinct tuft/bush object). Screenshots:
+  `data/screenshots/front_yard_grass_a_test_before.png`,
+  `data/screenshots/front_yard_hud_crop_4x_a_slot_empty_rupees_000.png`. Full detail:
+  `world_topology.front_yard_grass_a_interaction_test`.
+  **Next question**: rupee-sourcing and la Loupe both now read as blocked on the SAME missing
+  A-slot item (no sword/cutting tool found anywhere in the registry) -- worth searching specifically
+  for where an A-slot item could be obtained (an NPC gift like the shield's, a chest, a dungeon)
+  rather than re-testing grass/bushes again with the current empty inventory. Whether 179/0
+  connects to 147/0/161/14 by any route is also still untested.
 - **shop_screen's (179/0) door, SEVENTH session finding, September 16 2026** (fresh cold-context
   session -- first real use of `Koholint::AutonomousRecovery` on a genuine blocker, per
   `docs/AUTONOMOUS_RECOVERY.md`/`.claude/skills/autonomous-recovery/SKILL.md`): rather than a 7th
@@ -576,6 +600,12 @@ own data model), not something to implement ad hoc.
   considering a sustained-hold recheck, especially near water/scroll terrain -- the gap was NOT
   diving-specific (a no-B control crossed identically), so this isn't only a water-mechanic
   caveat.
+- Don't re-test grass-cutting-for-rupees with Link's current inventory expecting a different
+  result -- a genuine 150-frame `:a` hold in open grass (`front_yard`) produced a WRAM diff
+  byte-for-byte identical to a same-duration zero-input control, September 16 2026 (A-slot is
+  empty, 0xDB01=0). Confirmed nothing measurable happens, not a timing/hold-length artifact; see
+  `world_topology.front_yard_grass_a_interaction_test`. An A-slot item would be a genuinely
+  different, decisive retest -- the empty-handed case doesn't need repeating.
 - `CheckpointSupport.nudge_axis!` burns its whole `max_steps` budget without noticing if the
   target axis is on the far side of a real obstacle (confirmed September 16 2026, `161/14`
   magasin_interior: nudging x toward the counter's column hit `Navigator.move!(:right): :blocked`
