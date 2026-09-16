@@ -68,6 +68,14 @@ are the shipped primitive, not in-flight anymore. Full rationale for each: `DECI
   `data/`, `docs/`) -- always.
 - **Push notifications**: send one whenever the owner's input is needed, on every meaningful
   finding, and on every Atlas update.
+- **Screenshots in owner-facing reports**: the owner can't place a room from a `room_id/map_id`
+  pair or a prose description alone (raised September 16, 2026). Any report to the owner that
+  names a specific room -- a new find, a blocked door, a checkpoint's own vantage point -- must
+  include a rendered PNG of it (`motherboard.ppu.export_framebuffer_png(path)`, same call
+  `lib/validation/checkpoint_*.rb` scripts already use), sent via the file-delivery tool, not just
+  described. Applies to the planner's own reports and to any Explorer subagent's final report
+  back to the planner (the subagent should render and hand back PNG paths for its key
+  checkpoints, not just prose).
 - **Continuous save model**: `/tmp/zelda_checkpoints/main.dump` is the single canonical
   in-progress state, overwritten in place after each session (previous version backed up to
   `/tmp/zelda_checkpoints/backups/main_<timestamp>.dump` first). Never branch from a fixed
