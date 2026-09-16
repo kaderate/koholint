@@ -128,15 +128,22 @@ Two new NAMED leads surfaced tonight, from crate_room's library turning out to h
   y=108 -- both blocked too. **Anti-patch rule triggered**: 3 sub-attempts, no progress on any goal
   indicator, same mechanism (front_yard's east wall). Stopping here per `AGENTS.md`. Full detail:
   `world_topology.front_yard_adjacent_rooms`'s FOLLOW-UP note.
-  **Paradigm to question (owner decision needed)**: front_yard's east edge into `clover_field` is
-  now blocked-confirmed at 3 rows via 2 methods each -- consistent with an item gate (same shape as
-  `shop_screen`'s door), but not proven as one. Candidates for the next session, not yet
-  prioritized: (a) try `clover_field` from a genuinely different edge/room, if one exists, instead
-  of front_yard's east wall again; (b) chase `north_corridor_room` (146/0, glimpsed-only, still
-  unreached) or the still-open outdoor-telephone-booth lead near `villager_screen` instead of
-  clover_field specifically; (c) treat "la Loupe" as gated behind finding the sword first and pivot
-  search effort toward Warp holes or a fresh angle on the sword itself. Owner's call on which to
-  spend the next session's budget on.
+  **Paradigm to question, resolved by owner delegation, September 16 2026**: front_yard's east
+  edge into `clover_field` is blocked-confirmed at 3 rows via 2 methods each -- consistent with an
+  item gate (same shape as `shop_screen`'s door), not proven as one. Owner said "proceed
+  autonomously per your guidelines" rather than picking between the 3 candidates listed here
+  previously -- picked (b)'s `north_corridor_room` half (not the telephone-booth half): it has an
+  already-confirmed route (front_yard's north corridor, column x<=24, `front_yard_adjacent_rooms`
+  note above), so it's pure measurement on an established fact, no new judgment call about item
+  gating or blind search -- the best fit for "autonomy executes, it does not design"
+  (`AGENTS.md`). (a) needs a not-yet-known second edge to even attempt; (c) (Warp holes) has no
+  known location anywhere, blind search. Not a paradigm change, no `DECISIONS.md` entry needed --
+  ordinary next-question selection, same as every other "Next question proposed" pick.
+  **This session's question**: what's inside `north_corridor_room` (146/0), reached via
+  front_yard's confirmed north corridor? First survey only (D4, on-demand not exhaustive): entry
+  visuals, an OAM sprite inventory, and at least one exit direction characterized via `probe_all`.
+  Budget: one Explorer session, single checkpoint chain. Deliverable: `room_labels['146/0']`
+  entry, a checkpoint standing inside it, a screenshot.
 - **Warp holes** -- `book_f` describes teleporting between them ("il y a des trous Warp...").
   Never encountered/tested anywhere in this project. Could shortcut navigation if found.
 
