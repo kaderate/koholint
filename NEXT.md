@@ -34,7 +34,7 @@ grids -- already fulfilled and recorded under D8 in `DECISIONS.md`; no other fil
 
 | Indicator | Value |
 |---|---|
-| Rooms found | 21 labeled in `data/ram_registry.json`'s `room_labels` (9 "charted", 12 "glimpsed"/less -- `224/0` riverside_south_river_room and `225/0` riverside_flower_clearing, south/east of `riverside_south_room`, both further explored (224/0's scroll mechanism and "totem" identity resolved, 225/0's ground-accessible extent mapped plus its NE route now resolved into a real room transition); `209/0` riverside_east_room, found east of `riverside_south_room`'s south band (past the prior x=134,y=115 stop point), fully swept September 10-11 2026 (west/center then, east half via the D13 primitive) -- no bidule found anywhere in it; `179/0` shop_screen, first actually explored September 10 2026 -- turns out to be the shop's EXTERIOR yard, not its interior; see `world_topology.shop_screen_door_approach` and Next question below (now a SIXTH closed session, September 16 2026, still no route to the door); `226/0` riverside_ne_cove, reached from `225/0`'s previously-abandoned NE route September 10 2026, fully swept September 11 2026 via the D13 primitive (status promoted glimpsed -> charted) -- no bidule found anywhere in it either, see Next question below; `227/0` riverside_se_grove, NEW September 16 2026 -- reached from `226/0`'s own SE point via a genuine sustained-hold push, correcting that point's earlier "hard wall" verdict (a tap-vs-hold false negative, not a dive-gated door -- see `world_topology.riverside_ne_cove_se_edge_sustained_hold_and_227_discovery`); fully swept the same day (status promoted glimpsed -> charted, see Quest hypothesis below) -- a small closed clearing, no bidule found). Graph and screenshots published in the Koholint Atlas artifact (not yet updated with these rooms or this session's findings). D9 visual-catalog `visual_survey` now covers 6/20 (`front_yard`, `villager_screen` pilot + `crate_room`, `screen3_north` rollout + `well_platform`, `building_screen` rollout, fresh restart of an abandoned attempt, September 10 2026) -- see `DECISIONS.md`'s D9 entry. `146/0` north_corridor_room (still 20 total, was already labeled as an unreached stub) actually ENTERED for the first time September 16 2026, after the checkpoint mixup below cost a 4th anti-patch strike on the same wrong-checkpoint mistake as September 9's 3 -- see "What NOT to redo". First-survey only (D4): 3 of 4 directions open (`probe_all`), not swept. Its own `up` exit led to a genuinely NEW 21st room, `130/0` (single-glance only, a structure visible, see `room_labels['130/0']`); `right` is inconclusive with an unidentified tan-object sighting, see Quest hypothesis below. |
+| Rooms found | 22 labeled in `data/ram_registry.json`'s `room_labels` (9 "charted", 13 "glimpsed"/less -- `224/0` riverside_south_river_room and `225/0` riverside_flower_clearing, south/east of `riverside_south_room`, both further explored (224/0's scroll mechanism and "totem" identity resolved, 225/0's ground-accessible extent mapped plus its NE route now resolved into a real room transition); `209/0` riverside_east_room, found east of `riverside_south_room`'s south band (past the prior x=134,y=115 stop point), fully swept September 10-11 2026 (west/center then, east half via the D13 primitive) -- no bidule found anywhere in it; `179/0` shop_screen, first actually explored September 10 2026 -- turns out to be the shop's EXTERIOR yard, not its interior; see `world_topology.shop_screen_door_approach` and Next question below (now a SIXTH closed session, September 16 2026, still no route to the door); `226/0` riverside_ne_cove, reached from `225/0`'s previously-abandoned NE route September 10 2026, fully swept September 11 2026 via the D13 primitive (status promoted glimpsed -> charted) -- no bidule found anywhere in it either, see Next question below; `227/0` riverside_se_grove, NEW September 16 2026 -- reached from `226/0`'s own SE point via a genuine sustained-hold push, correcting that point's earlier "hard wall" verdict (a tap-vs-hold false negative, not a dive-gated door -- see `world_topology.riverside_ne_cove_se_edge_sustained_hold_and_227_discovery`); fully swept the same day (status promoted glimpsed -> charted, see Quest hypothesis below) -- a small closed clearing, no bidule found). Graph and screenshots published in the Koholint Atlas artifact (not yet updated with these rooms or this session's findings). D9 visual-catalog `visual_survey` now covers 6/20 (`front_yard`, `villager_screen` pilot + `crate_room`, `screen3_north` rollout + `well_platform`, `building_screen` rollout, fresh restart of an abandoned attempt, September 10 2026) -- see `DECISIONS.md`'s D9 entry. `146/0` north_corridor_room (still 20 total, was already labeled as an unreached stub) actually ENTERED for the first time September 16 2026, after the checkpoint mixup below cost a 4th anti-patch strike on the same wrong-checkpoint mistake as September 9's 3 -- see "What NOT to redo". First-survey only (D4): 3 of 4 directions open (`probe_all`), not swept. Its own `up` exit led to a new room, `130/0` (single-glance, a structure visible, see `room_labels['130/0']`); `right` led to a 22nd room, `147/0` -- a building with "MAGASIN" on its facade, POSSIBLY a new approach to `shop_screen`'s long-unreachable door, see Quest hypothesis below (untested). |
 | Dialogues / readable text | 20 confirmed entries in `ram_registry.json`'s `dialogues` (villager duo's shared line, room176's two save-mechanic NPC lines, crate_room's library fully read -- 8 books + 1 wall object, 9/9 tile objects resolved via OAM
 (corrected September 11 2026 from an earlier, buggy "4 books" count -- see "What NOT to redo" below); house2_interior's 2 OAM-verified telephone objects; `riverside_flower_clearing_sign` (225/0) -- a two-page signpost, "Attention aux oursins !" then "Se protéger avec un bouclier !" (2nd page found September 11 2026, needs a long `:a` hold to reveal), NOT a chest/item; `shop_screen_yard_npc` (179/0) -- a friendly yard NPC reciting the SAME save-tip line as room176's pair, first confirmed case of a reused dialogue asset, September 10 2026; `select_map_well_platform_place_name` (160/0) -- the SELECT box's 2-line place name ("Village des Mouettes"), September 12 2026, resolves the "2nd line" question as NOT a separate marker -- all hypothesis/verified_count 1). |
 | Terrain / collision | D8 live: reads BG tilemap signatures from VRAM (`lib/terrain.rb`), 93.1%-validated against live-probe oracle. Primary method; live probing kept as fallback. |
@@ -140,18 +140,20 @@ Two new NAMED leads surfaced tonight, from crate_room's library turning out to h
   known location anywhere, blind search. Not a paradigm change, no `DECISIONS.md` entry needed --
   ordinary next-question selection, same as every other "Next question proposed" pick.
   **This session's question, ANSWERED September 16 2026**: what's inside `north_corridor_room`
-  (146/0)? Reached (after a checkpoint mixup, see "What NOT to redo"), first survey done: 3/4
-  directions open (`up`/`down`/`right`), no item/dialogue found (not tested, out of first-survey
-  scope). **Follow-up, same session**: `up` leads to a genuinely NEW room, `room_id=130/map_id=0`
-  (single-glance only, see `room_labels['130/0']`); `right` is INCONCLUSIVE (120px of real
-  progress, no wall, no room change within a 15-tap budget) and its end-of-attempt screenshot shows
-  a small tan/brown rectangular object roughly centered on screen -- unidentified, worth a closer
-  look, not yet claimed as the bidule/"la Loupe". Full detail: `room_labels['146/0']` and
-  `world_topology.north_corridor_room_exits`. **Next question, not yet started**: either push
-  `right` further (higher `max_taps` or a re-aimed nudge, to resolve the tan-object sighting) or
-  survey the new `130/0`, or pivot to a different named lead (telephone booth, Warp holes) --
-  owner delegated this choice to the planner (September 16 2026), next session picks per the same
-  reasoning as above.
+  (146/0)? Reached (after a checkpoint mixup, see "What NOT to redo"), first survey done. `up`
+  leads to a genuinely new room, `room_id=130/map_id=0` (single-glance, see `room_labels['130/0']`).
+  `right`'s initial "tan/brown object" sighting was a FALSE ALARM, resolved same session: it's
+  Link's own OAM sprite self-sighted in a screenshot taken without a simultaneous OAM check, not a
+  new object -- pushing further crosses cleanly into ANOTHER new room, `room_id=147/map_id=0`.
+  Full detail: `room_labels['146/0']`, `world_topology.north_corridor_room_exits`.
+  **Potentially significant, not yet confirmed**: `147/0`'s building has "MAGASIN" painted on its
+  facade (in-game rendered text, read directly -- see `room_labels['147/0']`) -- possibly a NEW,
+  untested approach to the same shop whose door has been unreachable for 6 sessions from the
+  `shop_screen` (179/0) yard side (`world_topology.shop_screen_door_approach`). Single-glance only,
+  connection to 179/0 and the door itself both UNTESTED. **Next question**: test whether this
+  approach reaches the shop's door/interior -- highest-value candidate by far, given the existing
+  6-session blocker; survey `130/0`, or pivot to a different named lead, are fallbacks if this
+  doesn't pan out. Owner delegated this choice to the planner (September 16 2026).
 - **Warp holes** -- `book_f` describes teleporting between them ("il y a des trous Warp...").
   Never encountered/tested anywhere in this project. Could shortcut navigation if found.
 
@@ -358,6 +360,11 @@ own data model), not something to implement ad hoc.
 
 ## What NOT to redo
 
+- Don't read an "unidentified object" off a single screenshot without an `oam_sprites` check at
+  that exact position first -- a `north_corridor_room` sighting (September 16 2026) that looked
+  like a new tan/brown object turned out to be Link's own 2-tile OAM sprite (tile 0/2, X-flip),
+  confirmed only once a follow-up pass checked OAM at the same spot. Take the screenshot AND the
+  OAM census from the same state, not a screenshot alone, before flagging a sighting as new.
 - Don't start a `front_yard` (162/0) route from `lib_front_yard.dump` (x=88,y=92) when the
   documented route needs a different row -- `lib_front_yard.dump` sits in a mid-screen band
   (roughly y=56-96) that's blocked going west at x=52 (hut/bush obstacle, `probe_all` confirmed
