@@ -35,8 +35,8 @@ grids -- already fulfilled and recorded under D8 in `DECISIONS.md`; no other fil
 | Indicator | Value |
 |---|---|
 | Rooms found | 24 labeled in `data/ram_registry.json`'s `room_labels` (15 "charted", 8 "glimpsed"/less -- `208/0` riverside_south_room promoted glimpsed -> charted September 16 2026, its own last untested edge (WEST) confirmed a genuine hard wall via 3 independent y-bands, taps AND a 400-frame sustained hold each, no item/chest/NPC found -- see world_topology.riverside_south_room_survey's `west_edge_test` and Quest hypothesis below; `167/16` screen3_north_house_interior, NEW September 16 2026, found via screen3_north's own previously-unswept house door (world_topology.screen3_north_house_door_and_outdoor_telephone_search) while searching for a second outdoor telephone booth -- fully swept the same session (1 NPC dialogue, 1 mobile "dog" object, single door back out, no telephone/item found), status "charted"; `224/0` riverside_south_river_room and `225/0` riverside_flower_clearing, south/east of `riverside_south_room`, both further explored (224/0's scroll mechanism and "totem" identity resolved, 225/0's ground-accessible extent mapped plus its NE route now resolved into a real room transition); `209/0` riverside_east_room, found east of `riverside_south_room`'s south band (past the prior x=134,y=115 stop point), fully swept September 10-11 2026 (west/center then, east half via the D13 primitive) -- no bidule found anywhere in it; `179/0` shop_screen, first actually explored September 10 2026 -- turns out to be the shop's EXTERIOR yard, not its interior; see `world_topology.shop_screen_door_approach` and Next question below (SIXTH closed session September 16 2026, still no route to the door; SEVENTH session same day, non-live terrain/OAM read via `Koholint::AutonomousRecovery`, found part of the door band matches confirmed-wall signature and part has a previously uncatalogued static sprite on open-looking ground -- door itself still unreached, see Quest hypothesis below); `226/0` riverside_ne_cove, reached from `225/0`'s previously-abandoned NE route September 10 2026, fully swept September 11 2026 via the D13 primitive (status promoted glimpsed -> charted) -- no bidule found anywhere in it either, see Next question below; `227/0` riverside_se_grove, NEW September 16 2026 -- reached from `226/0`'s own SE point via a genuine sustained-hold push, correcting that point's earlier "hard wall" verdict (a tap-vs-hold false negative, not a dive-gated door -- see `world_topology.riverside_ne_cove_se_edge_sustained_hold_and_227_discovery`); fully swept the same day (status promoted glimpsed -> charted, see Quest hypothesis below) -- a small closed clearing, no bidule found). Graph and screenshots published in the Koholint Atlas artifact (not yet updated with these rooms or this session's findings). D9 visual-catalog `visual_survey` now covers 6/20 (`front_yard`, `villager_screen` pilot + `crate_room`, `screen3_north` rollout + `well_platform`, `building_screen` rollout, fresh restart of an abandoned attempt, September 10 2026) -- see `DECISIONS.md`'s D9 entry. `146/0` north_corridor_room (still 20 total, was already labeled as an unreached stub) actually ENTERED for the first time September 16 2026, after the checkpoint mixup below cost a 4th anti-patch strike on the same wrong-checkpoint mistake as September 9's 3 -- see "What NOT to redo". First-survey only (D4): 3 of 4 directions open (`probe_all`), not swept. Its own `up` exit led to a new room, `130/0` (single-glance, a structure visible, see `room_labels['130/0']`); `right` led to `147/0` -- a "MAGASIN"-labeled building whose door turned out to be a real, walk-through transition into a 23rd room, `161/14` -- **the first shop interior ever reached in this project** (price-list HUD, counter, standing figure), see Quest hypothesis below. `130/0` FULLY SURVEYED September 16 2026 (follow-up session): a small, fully enclosed dead-end pocket -- a building facade with two dark door/window-shaped openings is visible but confirmed unreachable (2 independent 400-frame sustained-hold rechecks, both hard walls), no item/chest/NPC found, promoted glimpsed -> charted; `146/0`'s own last uncharacterized exit (`down`) live-tested the same session, confirmed the plain return to `front_yard` -- all 4 of its exits now characterized. See Quest hypothesis below. `178/0` overworld_screen2's "landmark" object turned out to BE the telephone booth (Sept 17 2026 correction, own real walk-through door found, leading to a 25th room, `203/16` telephone_booth_interior, glimpsed) -- see Quest hypothesis below. |
-| Dialogues / readable text | 22 confirmed entries in `ram_registry.json`'s `dialogues` (`room167_toutou_greeting`, NEW September 16 2026 -- a generic pet-owner greeting in the newly-found `167/16`, not telephone-related, found while searching for the outdoor telephone booth; villager duo's shared line, room176's two save-mechanic NPC lines, crate_room's library fully read -- 8 books + 1 wall object, 9/9 tile objects resolved via OAM
-(corrected September 11 2026 from an earlier, buggy "4 books" count -- see "What NOT to redo" below); house2_interior's 2 OAM-verified telephone objects; `riverside_flower_clearing_sign` (225/0) -- a two-page signpost, "Attention aux oursins !" then "Se protéger avec un bouclier !" (2nd page found September 11 2026, needs a long `:a` hold to reveal), NOT a chest/item; `shop_screen_yard_npc` (179/0) -- a friendly yard NPC reciting the SAME save-tip line as room176's pair, first confirmed case of a reused dialogue asset, September 10 2026; `select_map_well_platform_place_name` (160/0) -- the SELECT box's 2-line place name ("Village des Mouettes"), September 12 2026, resolves the "2nd line" question as NOT a separate marker; `magasin_interior_shopkeeper_greeting` (161/14) -- a generic "Bienvenue! Apporte ici ce que tu veux acheter.", found September 16 2026, does not name any of the shop's 3 priced items (all hypothesis/verified_count 1). `starting_house_npc_bench`/`starting_house_npc_beds` promoted `hypothesis` -> `verified` (verified_count 2), September 16 2026 -- independently re-triggered live, both cycle to page 1 on a further `:a` press, the bench NPC is named Tarkin/Tarin in dialogue (`near_tarkin.dump`'s own first-meeting text, a new `world_topology.near_tarkin_first_meeting_live_retrigger` entry, not counted in this 22), and the "`[nom vide/non rendu]`" name slot renders as `A`, not blank. |
+| Dialogues / readable text | 25 entries in `ram_registry.json`'s `dialogues` (`room167_toutou_greeting`, NEW September 16 2026 -- a generic pet-owner greeting in the newly-found `167/16`, not telephone-related, found while searching for the outdoor telephone booth; villager duo's shared line, room176's two save-mechanic NPC lines, crate_room's library fully read -- 8 books + 1 wall object, 9/9 tile objects resolved via OAM
+(corrected September 11 2026 from an earlier, buggy "4 books" count -- see "What NOT to redo" below); house2_interior's 2 OAM-verified telephone objects; `riverside_flower_clearing_sign` (225/0) -- a two-page signpost, "Attention aux oursins !" then "Se protéger avec un bouclier !" (2nd page found September 11 2026, needs a long `:a` hold to reveal), NOT a chest/item; `shop_screen_yard_npc` (179/0) -- a friendly yard NPC reciting the SAME save-tip line as room176's pair, first confirmed case of a reused dialogue asset, September 10 2026; `select_map_well_platform_place_name` (160/0) -- the SELECT box's 2-line place name ("Village des Mouettes"), September 12 2026, resolves the "2nd line" question as NOT a separate marker; `magasin_interior_shopkeeper_greeting` (161/14) -- a generic "Bienvenue! Apporte ici ce que tu veux acheter.", found September 16 2026, does not name any of the shop's 3 priced items (all hypothesis/verified_count 1). `starting_house_npc_bench`/`starting_house_npc_beds` promoted `hypothesis` -> `verified` (verified_count 2), September 16 2026 -- independently re-triggered live, both cycle to page 1 on a further `:a` press, the bench NPC is named Tarkin/Tarin in dialogue (`near_tarkin.dump`'s own first-meeting text, a new `world_topology.near_tarkin_first_meeting_live_retrigger` entry, not counted here), and the "`[nom vide/non rendu]`" name slot renders as `A`, not blank. `room203_pepe_phone_call` (203/16), found September 17 2026 earlier the same day -- see Quest hypothesis, now `verified`/`verified_count 2` (independently re-triggered live this session). `riverside_screen_signpost_cave_flagello` (192/0), NEW September 17 2026 -- a two-line signpost naming "Cave Flagello" and "Plage Coco", `verified`/`verified_count 2`; see Quest hypothesis below. |
 | Terrain / collision | D8 live: reads BG tilemap signatures from VRAM (`lib/terrain.rb`), 93.1%-validated against live-probe oracle. Primary method; live probing kept as fallback. |
 | SELECT map (fog-of-war) | Widest-coverage checkpoint: `lib_explorer_225_fresh_entry.dump` (8 lit cells, superset of `main.dump`'s own 6). 6/8 cells now have a place name read from a checkpoint standing IN that exact cell's room ("Village des Mouettes", "Bibliothèque", "Sud du Village" x2 -- `176/0` and `192/0` share it, "Plage Coco" x2), `select_map_screen`'s SEVENTH + EIGHTH SESSION entries (`192/0` riverside_screen closed EIGHTH SESSION, new working route: nudge x to ~88 from `room176_entry_from_room160.dump`, then plain `:down` taps, no special alignment needed -- corrects the earlier "x=94, 8 calls" figure, which doesn't reproduce). Remaining 2 cells (the chain's earliest 2 rooms) confirmed NOT free-readable from any on-file checkpoint (checked EIGHTH SESSION) -- would need a from-boot replay. Scratchpad images ready for the Atlas (`select_map_full_*.png`), not yet pulled in. **NINTH SESSION, September 11 2026**: owner's game-manual-sourced `!?`/"message"-marker hypothesis tested directly -- REFUTED for the literal claim (no interior cell ever reuses the off-screen icon-legend block's own tile IDs, checked within-checkpoint across 7 checkpoints), but found a genuinely new fact: interior lit cells use 3 visually distinct glyphs, not one uniform "visited" dot -- a new glyph (`0xfd`) covers 4 rooms (`192/0`,`208/0`,`224/0`,`225/0`) at once, keyed to trail ROW not room content (reproduced across both coordinate-anchor families). Doesn't correlate cleanly with which rooms have confirmed dialogue, so likely decorative/distance-based, not a location hint -- see `select_map_screen`'s note for full detail, `hypothesis`/`verified_count: 1`. |
 | Save/continue | Mechanically verified end-to-end: hold A+B+START+SELECT opens the real save menu, "SAUVEGARDER & QUITTER" writes a real `.sav` (MD5-diffed), "REVENIR AU JEU" continues at the room's own door. This is the durable-progress path -- see "Standing conventions" below. |
@@ -487,6 +487,57 @@ between a one-time story dialogue and a repeating NPC-flavor line. Full detail:
 `data/screenshots/overworld_screen2_*.png` (7), `near_tarkin_live_retrigger_page0-10.png` (11),
 `starting_house_npc_bench_*.png` (3), `starting_house_npc_beds_*.png` (3).
 
+**Pépé phone call reproducibility + "Cave Flagello" found, ANSWERED September 17 2026 (fresh
+cold-context session, two closely-related falsifiable questions per NEXT.md's own dispatch)**.
+Question 1 (re-call Pépé after a state change): the SAME-checkpoint call IS reproducible
+verbatim -- a fresh script reload of `lib_room203_16_entry.dump`, redoing the documented 3x-up/
+1x-right approach and a full 13-tap page-through, reproduced the exact text (spot-checked pages 0,
+5, 9, 13 against the recorded transcript, byte-for-byte) -- promotes
+`dialogues.room203_pepe_phone_call` to `verified`/`verified_count 2`. The DIFFERENT-checkpoint half
+was attempted, not forced: no on-file checkpoint sits closer to the booth than
+`lib_overworld_screen2_via_villager.dump` with meaningfully different game-progress context (the
+same-day shop/magasin visit's own checkpoints all sit deep inside `161/14`, requiring a fresh
+multi-room route back out). Tried the literal documented route anyway as a first check (front_yard's
+south exit lands in `178/0` at the same absolute in-room coordinates as the villager-entry route, so
+the same tap sequence should transfer) -- it did NOT reproduce the booth crossing: a clean, fresh
+replay of `overworld_screen2_telephone_booth_door`'s own "8 down, 8 right, 6 left, then up with
+corrections" method walked 9 straight `:up` pushes with zero blocked reads, past the booth entirely,
+into the room's own already-known north edge (`front_yard`/`162-0`) instead. This is a genuine
+reproducibility gap in that entry's own tap-count description (now flagged there), not proof the
+booth itself moved -- consistent with this project's own standing lesson that these routes are
+live procedures, not fixed tap counts. Given the friction and per "don't force a route", did NOT
+build a fresh 6-room reverse-navigation script this session. **Answer: SAME-checkpoint call
+reproducible (confirmed); DIFFERENT-context re-call is genuinely OPEN, not answered either way** --
+a future session with more budget could still attempt the shop-to-booth reverse route (147/0 west
+into 146/0, south into front_yard, south into 178/0 at x=88,y=22, then live-recompute the door
+approach rather than replaying fixed taps) if the re-call question is still live-interesting then.
+
+Question 2 (the "decorative object" audit): checked the two candidates NEXT.md named first.
+`shop_screen`'s (179/0) SW-pocket bush cluster had only ever been `:a`-tested with short taps
+(terrain_collision's FIRST DIRECT CONTACT TEST) -- re-tested with a genuine ~130-140f sustained hold
+from 3 approach angles (right/up/down, the pocket's 3 blocked sides): CONFIRMED STILL
+NON-INTERACTIVE, closes the gap with a clean negative, no new lead. `riverside_screen`'s (192/0)
+signpost -- logged since September 8 2026 as "tested negative for :a, not fully exhaustively", no
+exact position/method ever recorded -- was the other candidate. Result: **POSITIVE, a genuine false
+negative**. From `lib_route192_reached.dump`, nudged to x=68,y=40 (probe_all: up/left `:blocked`,
+the sign itself), facing up, a single plain short `Navigator.tap_button(:a)` (no hold needed at
+all, same as the telephone booth) opens a real 2-line message box: "→ Cave Flagello / ♦ Plage Coco".
+Independently reconfirmed the same session via a fully separate script run (fresh reload, approach
+re-derived from scratch) -- byte-identical result, `verified`/`verified_count 2`. A 2nd `:a` or a
+`:b` both just close it, `:down` does nothing while open (tested via snapshot branches) -- a static
+sign, not a selectable warp menu; no room/position/HP change on any branch. "Plage Coco" is already
+well-known (the riverside cluster, exhaustively swept). **"Cave Flagello" is a brand-new name, never
+seen anywhere else in this project** -- not yet located on the map. Full detail:
+`dialogues.riverside_screen_signpost_cave_flagello`, `world_topology.riverside_screen_signpost_audit`,
+`room_labels['192/0']`. Screenshots: `data/screenshots/room192_signpost_cave_flagello_message.png`,
+`room192_signpost_approach_position.png`, `room179_shop_screen_bush_sustained_hold_test.png`.
+**Next question, strongly updated**: after 6+ consecutive sessions finding no A-slot lead via edge
+sweeps or mechanic tests, this audit -- a cheap, different method, exactly as NEXT.md's own
+"different method entirely" option suggested -- found one. **Locating "Cave Flagello" is now the
+single strongest next lead in this project**, ahead of another edge sweep (`riverside_screen`'s own
+EAST edge is still the only untested spatial frontier edge on file) or another decorative-object
+audit pass. Not chased this session (budget/scope -- this was the audit, not the search).
+
 ## In-flight work (for resumability)
 
 None currently. The `Koholint::AutonomousRecovery::ResearchTask` id `81da96f2cb8607eb` (shop_screen
@@ -830,3 +881,28 @@ own data model), not something to implement ad hoc.
   room -- it does NOT reopen on further presses, confirmed via 10 additional sustained holds. The
   "`[nom vide/non rendu]`" name-slot question is CLOSED -- it renders as `A`, not blank; don't
   re-flag it as a rendering bug.
+- `dialogues.room203_pepe_phone_call` is `verified`/`verified_count 2` now (September 17 2026) --
+  don't re-run a basic same-checkpoint reproducibility check again, it's settled. The separate
+  question of whether the call's TEXT changes after a story-flag/state change is still OPEN, not
+  answered -- don't cite this session's work as having refuted or confirmed that, it only found
+  routing friction reaching the booth from a different-context checkpoint, not a content result.
+  `world_topology.overworld_screen2_telephone_booth_door`'s own "8 down, 8 right, 6 left, then
+  up-with-corrections" tap-count description does NOT reliably replay -- a fresh literal replay
+  walked straight past the booth into `front_yard` instead (September 17 2026 follow-up session).
+  Treat that route as a live procedure only (push and check `room_id` after each, correct toward
+  the door when blocked), same caveat this project already applies to every other multi-room route
+  in `front_yard_to_room177`/Plage Coco -- don't assume the fixed tap counts are replayable as
+  written.
+- `shop_screen`'s (179/0) SW-pocket bush cluster (x~60-68,y=106-112) is now confirmed
+  non-interactive under a genuine sustained `:a` hold from 3 approach angles too, not just short
+  taps (September 17 2026) -- don't re-run this test on this object again without a new reason
+  (e.g. a cutting item). This is a DIFFERENT object from `179/0`'s other bush at ~x=49-57,y=110
+  (also already confirmed non-interactive, separately) -- don't conflate the two when reading this
+  room's notes.
+- `riverside_screen`'s (192/0) signpost is CORRECTED as of September 17 2026 -- it is NOT
+  non-interactive. Don't cite the old "tested negative for :a, not fully exhaustively" line as
+  current; a plain short `:a` tap from x=68,y=40 facing up opens a real message naming "Cave
+  Flagello" and "Plage Coco" (`dialogues.riverside_screen_signpost_cave_flagello`,
+  `verified_count 2`). It is a static sign (closes on a 2nd `:a` or `:b`, `:down` does nothing) --
+  don't expect a selectable warp menu from it, that was tested and ruled out. "Cave Flagello" is
+  not yet located -- don't assume it's reachable from this room without checking first.
