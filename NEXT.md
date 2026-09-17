@@ -330,6 +330,7 @@ Two new NAMED leads surfaced tonight, from crate_room's library turning out to h
   same routing sweep a 3rd+ time** (anti-patch territory); no cutting item exists to test the
   alternative, and none is expected to change this specific reading since `161/14` already answers
   "where is the shop's real interior."
+- **Second building in villager_screen, SEARCHED September 17 2026 (Explorer session, owner-directed)**: owner's precise clue indicated a building east of Pépé's house in 177/0, distinct from Pépé's own house, that can be entered. Extensive exploration via east-west walks at Y levels 22, 32, 50, 60+; examined 5+ screenshots from different positions; inspected OAM sprites at checkpoint. Eastern boundary confirmed at x~148 (transitions to room 178/0). RESULT: no second, visually distinct building structure found. Registry description updated with search notation. Building may exist but was not located in this session -- possibility remains that it requires specific sub-tile alignment, interaction at specific location, or is in an unexplored region. Recommend future session continue search or try direct door-entry attempts at eastern region points.
 - **Warp holes** -- `book_f` describes teleporting between them ("il y a des trous Warp...").
   Never encountered/tested anywhere in this project. Could shortcut navigation if found.
 
