@@ -215,3 +215,52 @@ a 19-entry dialogue corpus, re-deriving already-known findings, not yet tested o
 unread clue. Planner did not commit the script or wire it into any live session (D13's "recur a
 few times first" bar isn't met by a single validation run) -- leaving the resolution itself to
 MetaPlanner, per this file's standing rule that Planner may append evidence but not close an entry.
+
+**Addendum, September 17 2026 (planner session, owner-prompted "isn't it time to invent a
+world-puzzle process?")**: the "recur a few times first" bar this project uses before formalizing
+a primitive (the same bar D13's `Navigator` avoidance helper cleared) is now unambiguously met, on
+a SECOND, closely-related failure mode this ESC's original context already flagged but didn't yet
+have evidence for: an interactive object gets misclassified as decorative/non-interactive and
+stays that way indefinitely, because it was only ever tested one way (one hold-length, one
+approach angle) instead of the two-mode test this project's own history should have taught it to
+run. Three independent instances now on file, spanning the whole project's lifetime: (1)
+`crate_room`'s 6 "hard negative" books (September 11 2026) -- tap-tested only, never held ~110f,
+turned out to hold the first specific named-item reference in the project ("la Loupe") and the
+Warp-holes description; (2) `overworld_screen2`'s "landmark" object (September 17 2026, today) --
+catalogued for a week as a decorative bush/creature at low zoom, turned out at 6x crop to be the
+outdoor telephone booth the owner had been pointing at since a much earlier session, with a real
+walk-through door behind it into a whole new room; (3) `riverside_screen`'s signpost (September 17
+2026, same day) -- logged September 8 as "tested negative for `:a`, not fully exhaustively," never
+re-tested until this session's own audit, turned out to open on a single plain tap and name a
+brand-new location ("Cave Flagello") never found by any other means.
+
+All three share the same shape: a real interactive/informative object, sitting in an
+already-"charted" room, invisible to spatial sweeping because sweeping only asks "can I walk
+through this cell", never "have I actually tested this object both ways". This is a distinct
+sub-problem from proposal (2)'s clue-cross-referencing (which is about connecting dialogue TEXT to
+locations) -- this one is about not losing objects to a single under-specified interaction test in
+the first place, upstream of there being any clue text to cross-reference at all. Worth scoping as
+part of this same ESC (both are "the planner/Explorer routes clue-shaped problems like open-ended
+mapping problems, and loses information as a result") rather than a separate entry, since they
+share the same root diagnosis and the owner raised them in the same breath.
+
+Owner's framing, verbatim reason for revisiting now: distinguishing "world puzzles" (this whole
+class -- a large, low-signal-density overworld where the failure mode is misclassification, not
+reasoning) from "dungeon puzzles" (not yet reached by this project -- contained, spatial,
+block/key/item logic within one room) as needing genuinely different tooling, not the same
+Explorer playbook stretched to cover both. Both proposals below are scoped to the world-puzzle
+case only; dungeon-puzzle process is explicitly out of scope until the project reaches one.
+
+Planner's updated proposal, given the bar is now met: (1) `visual_catalog`/`room_labels` entries
+that mark an object decorative/non-interactive should carry an explicit two-part checked field --
+tested with a short tap AND a sustained ~110-150f hold, from at least one approach angle each --
+not just a free-text claim; an entry missing either half is not yet a valid negative and should
+read as untested, not decorative. (2) Promote proposal (2)'s validated cross-reference script
+(mechanism (b) from the addendum above) out of the scratchpad into a real, committed tool -- it has
+now independently reproduced two owner-known connections from data already on file with no
+prompting (Plage Coco on September 12, and it would trivially have flagged "Cave Flagello" as an
+ungrounded named term the moment the signpost was read today, had it been run). Both are Builder-
+shaped work now, not further Explorer validation -- the validation bar for each is cleared.
+Dispatched via `create_session` per `AGENTS.md`'s MetaPlanner trigger rule (event-based, planner-
+initiated, no owner confirmation required since MP2's first-observed-run condition was already
+satisfied by prior MetaPlanner sessions MP1-MP8).
