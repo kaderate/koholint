@@ -271,3 +271,119 @@ place anyway despite this rule being written (the same failure mode `MP4` alread
 up), prose isn't sufficient for this either -- the fix needs a mechanical check (e.g. a lint that
 flags any line containing "RESOLVED" still present in `NEXT.md`, or a pre-commit hook), not a
 restated rule.
+
+## MP9: two explicit thread-status terms -- "closed" vs. "paused (gate: ...)" -- so a status summary can't conflate them
+
+**Date**: September 17, 2026. Resolves `METAPLANNER_ESCALATIONS.md#ESC7`.
+
+**Context**: D12 (RAM writes to gameplay state are case-by-case, asked every time -- not a standing
+tool) was ratified after the owner answered an `AskUserQuestion` about the Plage Coco health
+blocker. The planner then folded that into a status report by grouping "Plage Coco (en pause, D12)"
+under a "high-confidence leads are now exhausted" summary, alongside genuinely closed threads
+(`shop_screen`'s door, the bush-contact test). The owner caught this immediately -- Plage Coco was
+never eliminated, D12 explicitly left a live path open (ask per specific instance), and the planner
+never actually made that specific ask before writing the summary. Nothing in `AGENTS.md` or the
+reporting convention distinguished, in writing, a thread that's genuinely closed from one that's
+paused behind a standing gate the planner hasn't yet exercised for this instance -- both rendered
+identically ("en pause"/lumped into "épuisé") with no textual distinction.
+
+**Options considered**:
+1. Leave it to planner discipline / re-reading `DECISIONS.md` before each summary. Rejected: this is
+   exactly what already failed -- the gate (D12) was known and cited correctly elsewhere in the same
+   session, the failure was purely in how the status summary worded it, not in missing information.
+2. A mechanical status enum enforced by tooling (e.g. a structured `NEXT.md` field, lint-checked).
+   Rejected: over-engineering a wording problem into a schema/tooling problem before prose has even
+   been tried once, and building such tooling is Builder-shaped work outside a short MetaPlanner
+   session's mandate and context (no game/domain access here to design it well).
+3. **Chosen**: add a "Thread status: closed vs. paused-behind-gate" subsection to `AGENTS.md`,
+   defining exactly two terms for any non-active thread in a status summary -- `Closed` (anti-patch
+   budget spent or every identified avenue tried and failed) and `Paused (gate: <decision>)` (blocked
+   behind a standing gated decision not yet exercised for this instance) -- and stating the rule that
+   a thread moves from paused to closed only once the gate-specific ask was actually made and
+   declined, never by association with other threads nearby being exhausted. Placed right before the
+   existing "End-of-session report" section since it governs the same kind of status communication.
+
+**Invalidation condition**: if a future status summary still conflates the two despite the explicit
+terms being written down (the same failure mode `MP4`/`MP8` already saw one level down, for
+`NEXT.md` content instead of report wording), prose distinction isn't sufficient -- the fix needs a
+mechanical check (e.g. a lint requiring every non-active thread mentioned in a session report to be
+tagged with one of the two literal terms) instead of restating the rule.
+
+## MP10: a tested-both-ways bar for decorative/non-interactive claims, and a spec-first route (not a MetaPlanner build) for promoting the validated clue cross-reference script
+
+**Date**: September 17, 2026. Resolves `METAPLANNER_ESCALATIONS.md#ESC8`.
+
+**Context**: `ESC8` opened September 10, 2026 over dialogue clues not being cross-referenced against
+newly-found spatial facts, with a four-part planner proposal (a `quest_clues` registry section, a
+standing cross-reference step, spatial-vs-clue-directed Explorer mandates, a Reviewer checklist
+item) offered as a starting point, not a final answer. A September 12 addendum validated one narrow
+piece of that cheaply: a throwaway ~60-line Ruby prototype's mechanism (b) -- cross-referencing
+dialogue text, case-insensitive, against the SELECT map's own known place-name vocabulary -- 
+independently reproduced the `starting_house` -> "Plage Coco" link the owner had pointed out three
+times, using only data already on file. A sibling mechanism (a) (capitalization-based term
+extraction) was shown blind to that exact case, since the clue ("va sur *la plage*") is a lowercase
+French common noun the game never capitalizes. The same addendum also surfaced a grounding bug:
+checking a term against *any* field containing it (including open-discussion notes) falsely marks
+debated-but-unresolved terms like "Loupe" as grounded; grounding must check only fields recording an
+actual placed/observed fact (`room_labels`, `select_map_screen.note`).
+
+A September 17 addendum reported the project's own "recur a few times first" bar (the same bar D13's
+`Navigator` avoidance helper cleared, after the same tactic was independently re-derived across 4
+sessions) now met for a second, related failure mode: an interactive object misclassified as
+decorative because it was tested only one way. Three independent, dated instances: `crate_room`'s 6
+"hard negative" books (tap-tested only, actually held the game's first named-item reference),
+`overworld_screen2`'s "landmark" (catalogued decorative for a week, actually a telephone booth with
+a real door), `riverside_screen`'s signpost (logged "not fully exhaustively" tested, actually opened
+on a single plain tap and named a new location, "Cave Flagello"). The addendum scoped two concrete,
+Builder-shaped asks -- a two-part tested field, and promoting the validated cross-reference script
+out of scratchpad -- explicitly distinguishing this "world puzzle" misclassification problem from
+proposal (2)'s clue-cross-referencing, and explicitly deferring "dungeon puzzle" process (not yet
+reached by the project) as out of scope.
+
+**Options considered**:
+1. Adopt the full `quest_clues` registry (the original proposal 1) now. Rejected: that's a new
+   `data/ram_registry.json` schema section -- game-data territory outside this mandate (`AGENTS.md`'s
+   "never `data/ram_registry.json`" line) -- and the addendum's own recurrence bar was demonstrated
+   met only for the two narrower September 17 asks, not for the full registry redesign across the
+   whole quest-clue space (one prototype run against a 19-entry corpus, re-deriving already-known
+   findings, per the September 12 addendum's own "not yet evidence" caveat). Left undecided at this
+   scope; a planner/`DECISIONS.md`-scoped call if the evidence bar is met later.
+2. Have this MetaPlanner session write the promoted cross-reference script into `lib/` directly, and/
+   or edit the two-part `tested` field directly into existing `room_labels`/`visual_catalog` entries.
+   Rejected: both are Builder-shaped implementation work over game data and game tooling, requiring
+   ROM/emulator context this session explicitly doesn't have (a process-only MetaPlanner session, no
+   gameplay work) -- exactly `MP1`'s mandate boundary. Mirrors why `MP5` assigned the provenance audit
+   to the existing Reviewer role instead of building an audit script itself.
+3. Adopt only the two-part `tested` field convention now and leave the script-promotion ask
+   unrouted, pending further Explorer validation. Rejected: the addendum was explicit that both asks
+   already cleared the validation bar ("Builder-shaped work now, not further Explorer validation");
+   leaving a second, already-validated finding sitting unrouted would just recreate the exact
+   evidence-drift problem `ESC8` itself was opened over.
+4. **Chosen**, two-part:
+   (a) Add a registry-entry convention to `AGENTS.md`, same form and location as the existing
+   `verified_count` rule: a `room_labels`/`visual_catalog` entry may only claim
+   `decorative`/`non-interactive` once it carries a two-part `tested` field -- a short tap AND a
+   sustained ~110-150f hold, each from at least one approach angle -- and an entry missing either
+   half reads as `untested`, not decorative. Folded into the existing Reviewer cold-review checklist
+   alongside the `verified_count` audit, same cadence `MP5` already established (no new cadence
+   invented). The Reviewer role-table row updated to name both audits explicitly.
+   (b) Add a general "Promoting validated Explorer prototypes" process rule to `AGENTS.md`: a
+   scratchpad spike that clears the same recurrence bar as the anti-patch rule/D13 (validated more
+   than once, independently) is Builder-shaped work to route with a fixed spec, not something
+   MetaPlanner builds or the proposing session keeps generalizing. Applied here as the worked
+   example: direct a Builder session to promote mechanism (b) alone (never mechanism (a), documented
+   blind to the target case) from the September 12 prototype into a committed `lib/` tool, scoped
+   exactly as validated -- cross-reference dialogue text against `select_map_screen.note`'s place-name
+   vocabulary, run once per new dialogue/place-name fact captured, grounding checked only against
+   `room_labels`/`select_map_screen.note`, never open-discussion prose (`world_topology.*.note`) per
+   the documented "Loupe" false-positive.
+   The original proposal 1 (full `quest_clues` registry) and its remaining pieces (spatial-vs-clue-
+   directed Explorer mandates) are not adopted at this scope -- left as a planner/domain call if the
+   evidence bar is met later, per option 1 above.
+
+**Invalidation condition**: if a `room_labels`/`visual_catalog` entry still claims
+decorative/non-interactive without the two-part field despite this rule and the Reviewer checklist
+item, or if the Builder-shaped script promotion doesn't happen within a reasonable number of
+sessions after being routed this concretely, prose/routing isn't sufficient -- the fix needs a
+mechanical guard (e.g. a lint rejecting a decorative claim missing either tested sub-field) or a
+stronger directive prioritizing the next Builder session on it, instead of restating the rule.

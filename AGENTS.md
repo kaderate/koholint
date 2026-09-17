@@ -26,6 +26,19 @@ order, `NEXT.md` before any action.
   unconditional checklist item, reported alongside its compliance judgment -- riding the same
   every-N-commits/mornings cadence `PLAN.md` already runs cold reviews on (see
   `METAPLANNER.md#MP5`).
+- **A `room_labels`/`visual_catalog` entry may only claim `decorative`/`non-interactive` once it
+  carries a two-part `tested` field: a short tap AND a sustained ~110-150f hold, each from at least
+  one approach angle.** An entry missing either half is `untested`, not decorative — say so
+  explicitly rather than defaulting to decorative because the tap alone found nothing. Found
+  violated in the field three times independently (September 11 and 17, 2026): `crate_room`'s 6
+  "hard negative" books (tap-tested only, actually held the first named-item reference in the
+  project), `overworld_screen2`'s "landmark" (catalogued decorative for a week, actually the
+  telephone booth with a real door behind it), `riverside_screen`'s signpost (logged "not fully
+  exhaustively" tested, actually opened on a single plain tap and named a new location). Audited on
+  the same cadence and by the same mechanism as the `verified_count` bar above: every cold Reviewer
+  session scans `room_labels`/`visual_catalog` for a decorative/non-interactive claim missing either
+  tested sub-field, as a standing, unconditional checklist item alongside the provenance audit (see
+  `METAPLANNER.md#MP10`).
 - **Pre-trained knowledge**: the game's memory map (community disassembly) is a source of
   hypotheses to verify, consistent with the provenance model. *Game* knowledge (where the sword is,
   who an NPC is) is forbidden: it is observed, never assumed.
@@ -55,7 +68,7 @@ one small fix left".
 |---|---|---|
 | Explorer | throwaway spikes, measurements, memory diffs, scripts in the scratchpad | commit to `lib/`, decide |
 | Builder | implements a decision already made, with specs, in its worktree | change paradigm, "take the opportunity" to fix something else |
-| Reviewer | reads cold, judges against `docs/CONCEPT.md` and `DECISIONS.md`, audits `ram_registry.json` provenance (`verified_count` bar) | read the narrative log before judging, fix things itself |
+| Reviewer | reads cold, judges against `docs/CONCEPT.md` and `DECISIONS.md`, audits `ram_registry.json` provenance (`verified_count` bar) and decorative/non-interactive claims (two-part `tested` bar) | read the narrative log before judging, fix things itself |
 
 You never judge your own build. A review is triggered by the owner every N commits or every morning after a night of autonomy, by a fresh session with no history.
 
@@ -103,6 +116,21 @@ A catalog size, a skip rate, a number of resolved cells are means metrics. A com
 ### Anti-patch rule
 
 **Three successive patches on the same mechanism with no progress on a goal indicator means mandatory stop.** You write a "paradigm to question" note in `NEXT.md` with the question the owner must decide, and you stop. The fourth fix isn't "almost there", it's the sign the problem is elsewhere.
+
+### Promoting validated Explorer prototypes
+
+A throwaway Explorer-role spike (scratchpad script, not committed) that independently reproduces
+the same finding, or clears the same kind of problem, more than once should not sit in scratchpad
+indefinitely and is not MetaPlanner's to implement — it's Builder-shaped work to route, with a spec
+already fixed by what the prototype validated. Same recurrence bar as the anti-patch rule and D13's
+own "a few times first" threshold: one validation run is evidence, not proof; a second independent
+one (a different corpus, a different session) clears it for promotion. Concretely: pin the exact
+mechanism that was validated (not a superset of what was tried — a sibling mechanism that was tried
+and shown blind to the target case stays unpromoted), state what data it may read from (facts
+recorded as actually observed, e.g. `room_labels`, `select_map_screen.note`) versus what it must
+not (open-discussion prose, e.g. `world_topology.*.note`, which reads as resolved just by being
+discussed), and dispatch a Builder session against that spec rather than generalizing further in
+the proposing session itself. See `METAPLANNER.md#MP10` for a worked example.
 
 ### Autonomy executes, it does not design
 
@@ -211,6 +239,26 @@ Cascades the planner -> worker split one level up. The planner (whoever is drivi
 - **Memory**: `METAPLANNER.md` is MetaPlanner's own decision log, one entry per workflow change -- same shape as `DECISIONS.md`'s entries (context, options, choice, invalidation condition), but for the workflow instead of the game. Written only by MetaPlanner sessions.
 - **Handoff**: `METAPLANNER_ESCALATIONS.md` is the shared queue between the two roles, separate from `METAPLANNER.md` so the access boundary is a file, not a section inside one. The planner may only *append* an entry with status `open` (context, symptom, why it's process and not domain) -- never edit or resolve one itself. MetaPlanner drains the queue: marks an entry `resolved` with a pointer to the `METAPLANNER.md` entry that addressed it, and prunes old resolved entries periodically (archive or trim) so the queue doesn't drift into the same one-page violation `NEXT.md` already hit once.
 - Same rule as everywhere else in this project: a change with no entry in `METAPLANNER.md` and no resolved line in `METAPLANNER_ESCALATIONS.md` didn't happen, as far as the next cold session is concerned.
+
+### Thread status: closed vs. paused-behind-gate
+
+A status summary (chat, `NEXT.md`, or the end-of-session report below) must not group a thread
+that is genuinely closed together with one that is merely blocked behind a standing case-by-case
+decision the planner hasn't yet exercised for this specific instance — even though both currently
+look identical from the outside ("no progress this session"). Use exactly one of two terms for any
+non-active thread, never a shared bucket word ("exhausted", "en pause") that can mean either:
+
+- **Closed**: the anti-patch budget is spent, or every avenue actually identified has been tried
+  and failed — nothing left to ask anyone.
+- **Paused (gate: `<decision>`)**: progress requires invoking a standing gated decision (e.g. D12's
+  "ask the owner every time" rule) and that specific ask hasn't been made yet for this instance. A
+  thread only moves from this state to closed once the gate-specific ask was actually made and
+  declined or failed — never by re-labeling it as exhausted because other threads nearby are.
+
+Found violated once already (September 10, 2026): a status report folded "Plage Coco (paused,
+D12)" under a "high-confidence leads are now exhausted" heading, alongside genuinely closed threads
+— the owner had never actually been asked the D12-gated question for that instance, so it was never
+exhausted, just unpaused-able without an ask nobody had made yet (see `METAPLANNER.md#MP9`).
 
 ### End-of-session report
 

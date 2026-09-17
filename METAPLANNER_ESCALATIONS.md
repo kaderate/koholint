@@ -125,7 +125,7 @@ the house2_interior section itself as the one-time worked example.
 
 ## ESC7: planner status summaries conflate "closed/exhausted" with "paused pending a specific ask", drifting the owner's read of live state
 
-**Status**: open
+**Status**: resolved
 **Opened**: September 10, 2026, by planner session
 **Context**: D12 (RAM writes to gameplay state are case-by-case, asked every time -- not a
 standing tool) was ratified after the owner answered an `AskUserQuestion` about the Plage Coco
@@ -141,11 +141,13 @@ this instance -- both ended up rendered identically ("en pause"/lumped into "ép
 artifact and the chat summary, with no visual or textual distinction.
 **Why process, not domain**: about how the planner represents thread status to the owner (report
 structure/wording discipline), not a game fact or a navigation finding.
-**Resolution** (MetaPlanner fills in): -> pending.
+**Resolution**: -> `METAPLANNER.md#MP9`, added a "Thread status: closed vs. paused-behind-gate"
+subsection to `AGENTS.md` defining two explicit, non-conflatable terms for any non-active thread in
+a status summary.
 
 ## ESC8: no standing process for narrative-clue cross-referencing, so a "puzzle" gets misread as unfinished "mapping"
 
-**Status**: open
+**Status**: resolved
 **Opened**: September 10, 2026, by planner session (owner-prompted introspection)
 **Context**: several sessions spent real budget doing spatial/navigational exploration (sweeping
 `riverside_ne_cove`/`riverside_south_river_room` for an item) after multiple dialogue clues
@@ -264,3 +266,14 @@ shaped work now, not further Explorer validation -- the validation bar for each 
 Dispatched via `create_session` per `AGENTS.md`'s MetaPlanner trigger rule (event-based, planner-
 initiated, no owner confirmation required since MP2's first-observed-run condition was already
 satisfied by prior MetaPlanner sessions MP1-MP8).
+
+**Resolution**: -> `METAPLANNER.md#MP10`. Two-part: (a) a two-part `tested` field (tap + sustained
+hold, each from at least one angle) required in `AGENTS.md` before any `room_labels`/
+`visual_catalog` entry may claim decorative/non-interactive, audited on the existing Reviewer
+cold-review cadence alongside the `verified_count` bar; (b) a general "Promoting validated Explorer
+prototypes" rule added to `AGENTS.md`, applied here to route (not build) promotion of the validated
+mechanism (b) cross-reference script into a committed `lib/` tool as Builder-shaped work, with the
+spec fixed by what was actually validated. The original `quest_clues` registry proposal and the
+remaining spatial-vs-clue-directed Explorer-mandate piece are left unadopted at this scope --
+game-schema territory outside this mandate, and not yet evidenced to the same bar; a planner/
+`DECISIONS.md`-scoped call if that changes.
