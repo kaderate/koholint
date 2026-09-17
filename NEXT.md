@@ -455,9 +455,15 @@ literally fixed "throughout" as the REFUTED verdict claimed -- every on-file che
 settle at SCY=128, but a temporary SCY=0 poke on an unsaved loaded copy revealed a second,
 tile-identical structure in the tilemap's rows 0-15, never shown by the normal camera (not the
 booth itself, a separate methodological find -- see `world_topology.overworld_screen2_telephone_booth_door`).
-Interacting with the phone object inside `203/16` was NOT successful this session despite several
-approach angles and hold lengths up to 200 frames -- open for a future session. Full detail:
-`world_topology.overworld_screen2_telephone_booth_door`, `room_labels['178/0']`, `room_labels['203/16']`.
+**SOLVED, same day, follow-up pass**: the phone answers to a plain SHORT `:a` TAP, not a sustained
+hold -- the inversion of this project's usual truncation lesson; a 200-frame hold at the exact same
+spot produced nothing, a single `Navigator.tap_button(:a)` worked immediately. Full call transcribed
+(`dialogues.room203_pepe_phone_call`): Pépé le Ramollo answers, says he knows the whole island and to
+call him if lost -- a real, working hint mechanic, but THIS call is a generic intro line, not a
+specific pointer to la Loupe or the A-slot item. Worth calling again after a story-flag-changing event
+(a new room/item found) to see if the line changes, per `room176`'s own precedent for state-gated
+dialogue. Full detail: `world_topology.overworld_screen2_telephone_booth_door`, `room_labels['178/0']`,
+`room_labels['203/16']`, `dialogues.room203_pepe_phone_call`.
 Question 2 (re-verify `starting_house_npc_bench`/`_beds`) -- BOTH promoted `hypothesis` ->
 `verified`, `verified_count` 2, via genuinely independent fresh-session live re-triggers (sustained
 ~130f `:a` holds, one screenshot per page, not the prior sessions' shorter/single-checked runs).
