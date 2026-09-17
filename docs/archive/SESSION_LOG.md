@@ -1405,3 +1405,128 @@ item -- worth confirming before a 9th session repeats the same routing sweep a 3
 patch territory). Full detail (all 8 sessions' worth): `world_topology.shop_screen_door_approach`,
 `visual_catalog.shop_screen_door_band_object`. This closes `NEXT.md`'s "In-flight work" pointer to
 `ResearchTask 81da96f2cb8607eb` -- no ResearchTask is open as of this session.
+**CORRECTED September 17 2026**: 147/0 and 179/0 are NOT the same building -- see
+`world_topology.clover_field_second_route_and_shop_connection`; they are 2 distinct areas with
+`163/0` (clover_field) bridging them.
+
+## `NEXT.md`'s pre-Plage-Coco "Next question" section, archived verbatim September 17 2026
+
+Superseded reference material (Session 4/PLAN.md-era topology and dialogue notes, September 8-10
+2026), kept in `NEXT.md` for a long time past its own "kept here only for topology/dialogue
+reference, not as an active question" framing -- moved here in full per `AGENTS.md`'s "archive on
+resolution" rule (this was already resolved/superseded, just never actually archived) during a
+September 17 2026 session's own housekeeping pass, one page over budget. Every fact in it remains
+true and is still reachable from `data/ram_registry.json`'s `room_labels`/`world_topology`/
+`dialogues` entries it cites; nothing here is new information as of the archival.
+
+Session 4 (PLAN.md) is fully complete -- see the State section above. NOT currently paused (that
+framing is stale from an earlier session); see "Quest hypothesis" above for the live thread, which
+now also covers September 12 2026's three bundled closures (SELECT-box 2nd line, shop bush
+sustained-hold push, 225/0 dive test) -- not repeated here. Most
+of the detail below predates tonight's Plage Coco/crate_room/manual work (archived at
+`docs/archive/SESSION_LOG.md`) and is kept here only for topology/dialogue reference, not as an
+active question. SELECT-map fog-of-war, crate_room's
+library (9/9 objects), and `house2_interior`'s 2 telephone objects are all resolved -- see "What
+NOT to redo" and `dialogues.*` for detail, not repeated here. `riverside_south_room` (208/0)'s two
+entrance figures are mobile/wandering; 4 interaction attempts found no dialogue but never confirmed
+genuine adjacency at the press -- INCONCLUSIVE, not negative (see
+`world_topology.riverside_south_room_survey`). Its south exit into `224/0`
+(riverside_south_river_room) and onward into `225/0` (riverside_flower_clearing) is now
+`verified`/`verified_count: 2` (2 independent Explorer sessions, September 10 2026) -- reliable as
+a procedure ("keep tapping `:right`, check room_id after each"), NOT at a fixed tap count (see
+`world_topology.riverside_south_room_south_exit`). `225/0`'s previously glimpsed-only "chest-like
+object" is RESOLVED, same day: it's a signpost ("Attention aux oursins !" -- a hazard warning, not
+an item; see `dialogues.riverside_flower_clearing_sign`), no HUD/inventory change. `224/0`'s scroll
+mechanism and "totem" identity are FULLY RESOLVED (time-based scripted scroll, totem = a mobile
+contact-damage enemy sprite) -- archived to `docs/archive/SESSION_LOG.md`, full detail still in
+`room_labels['224/0']`. `225/0` was explored past the signpost, same session: it does NOT scroll (fixed single
+screen, confirmed), and its ground-accessible area is small and enclosed -- hedges north/west, a
+water strip south/east that was never actually entered (swim-gated hypothesis, Link has no Flippers
+yet, unconfirmed) -- `Navigator.probe_all` dead-ends at `down: blocked, right: blocked` in the SW
+pocket. No new room transition found in 225/0. One route (hugging the top row east past the sign
+toward the NE bush cluster) produced only unexplained diagonal slides, never reaching that area --
+open gap for a future session. Full detail in `room_labels['224/0']`/`['225/0']`. `208/0`'s south
+band east extent (from the original x=134,y=115 stop point) is now RESOLVED, same day: a real room
+transition at x=149,y=115 into a new room, `209/0` riverside_east_room, single-glance only -- see
+`world_topology.riverside_south_room_east_exit` and `room_labels['209/0']`, not chased deeper.
+`shop_screen` (179/0) actually explored for the first time, same day: it's the shop's EXTERIOR
+YARD, not the interior a prior session's Atlas note assumed -- a "MAGASIN" building facade ringed
+by static flower-bush obstacles plus a hedge maze east side. The door itself was never reached
+despite 8+ distinct routing attempts covering all 3 open sides (north over the roof, west and east
+at ground level) -- every one hit a wall before the door's own column; see
+`world_topology.shop_screen_door_approach` for the full attempt log and an open hypothesis (an
+off-tile-grid trigger column, same shape as `house2_interior`'s door -- see D11 paragraph below).
+Found and interaction-tested in the yard: a friendly NPC (tile=0x70/0x72) reciting the EXACT SAME
+save-tip line as `room176_pair_a`/`room176_pair_b` -- first confirmed case in this registry of a
+dialogue line reused verbatim across rooms (`dialogues.shop_screen_yard_npc`) -- and a decorative
+plant/bush object, confirmed non-interactive. No shopkeeper, no buy/sell mechanic, no HUD/inventory
+change -- because the interior was never reached, not because a shop mechanic was ruled out.
+
+**`225/0`'s NE route RESOLVED, September 10 2026 (independent Explorer session)**: the "unexplained
+diagonal slides" were never a real wall -- they were two stacked hazards along the route (an
+invisible mobile hostile creature delivering contact knockback mid-tap, same pattern as `224/0`'s
+totem and D11, plus ordinary blocking terrain: a sea-urchin OAM cluster and a flower-cluster BG
+obstacle). Tactic tested per the owner's suggestion: holding B (the equipped shield) continuously
+via `mmu.joypad.key_state` (not `Navigator.tap_button`, which releases every button between taps)
+while pushing the route. Result: mixed but net positive -- one full clean run took zero damage
+where the same route unshielded had cost 3 hearts, but a later shield-held attempt through the same
+general area still lost a full heart with no OAM sprite visible adjacent in the snapshot, so the
+shield mitigates the creature's knockback without eliminating all damage in the room. Working
+strategy (not a fixed tap count, same caveat as every other route in this room cluster): from
+`lib_explorer_225_fresh_entry.dump`, go down to y~42 before pushing east (avoids one hazard band),
+back up to y~26 to continue east to x~76 where a flower cluster is a real wall, then -- the key
+correction -- drop further south than instinct suggests, to y~41 (below the flower, above the
+sea-urchin row), to clear it and continue east to x~124 (base of a second, NE-corner palm tree),
+then south along the tree's east flank to y~65-68 and east again, which crosses room_id/map_id
+from 225/0 into a brand-new room, **226/0 (`riverside_ne_cove`)**, at x=17,y=67, no damage on the
+crossing itself. `226/0` itself: two palm trees, a differently-oriented hedge corner, more
+sea-urchins, the same green amphibious sprite glimpsed in 225/0, and two more instances of the
+tile=0x60/0x62 hostile-family creature (visually matching 224/0's "totem"). `probe_all` from the
+entry point reads up/left/right all open, down blocked -- genuinely more room to explore, not a
+dead end, but not pursued further this session (budget). The "bidule" item was NOT found in either
+room this session. Full route, checkpoint chain, and every attempt (including the 2 that failed
+and dead-ended back at x=76,y=26) are in `room_labels['225/0']`'s NE-route addendum and
+`room_labels['226/0']`; the transition itself is also in
+`world_topology.riverside_flower_clearing_ne_exit`. `224/0`'s own secondary sweep (also flagged as
+open in its entry) was NOT attempted this session -- the NE route took far more sub-attempts than
+budgeted, leaving no time for it; still open for a future session.
+
+**D11 hazard-classification pass, September 10 2026 (Explorer session)**: `front_yard`'s creature
+(D9's byte-identical CHR match to `villager_screen`'s confirmed-friendly NPC) got a 4th navigation
+attempt using the adaptive live-OAM-tracking method D11 authorized -- still INCONCLUSIVE, not
+refuted: 2 sub-attempts stayed in `front_yard` (avoiding the known door-column trap) but both got
+wedged at a real obstacle, x=88,y=82-84 (a building-side wall, now independently reconfirmed by 2
+sessions/2 different chase heuristics -- see `visual_catalog.villager_wandering_creature`'s
+`interaction_tested['162/0']`). No `:a` was pressed; the creature's own interactivity is still
+unknown. Separately, `hazard_status` was added across `visual_catalog` per D11:
+`riverside_south_pale_creature` (tile=0x6c, never tested before) got 2 contact-test approaches --
+both produced a knockback-shaped position jump on Link, but the creature wasn't confirmed on-screen
+at the exact jump instant, so it's "unknown, suggestive of hostile" not a clean classification.
+`riverside_east_room` (209/0)'s two sprites (tile=0x62 and 0x68/0x6a) turned out, via a 4-sample
+idle animation log, to cycle through the SAME tile set (0x60/0x62/0x64/0x66/0x68/0x6a) as the
+already-confirmed-hostile `riverside_south_tan_creature` and `riverside_south_river_room_sprite`
+(224/0's totem) -- classified `hostile` mainly on that family match, plus one observed wrong-axis
+13px jump while a family-tile creature was in close range. See `visual_catalog.riverside_east_room_creatures`,
+`.riverside_south_pale_creature`, and `.villager_wandering_creature` for full detail. The
+off-tile-grid-alignment hypothesis first confirmed for house2's door now has a SECOND candidate
+case (`shop_screen`'s own unreached door, see above) -- still not a proven general rule, but worth
+trying on any future "walled-off door" before assuming it's a genuine dead end. Also deferred, not
+urgent: formalizing a navigation spec/format (raised by an external review, judged sound but not
+blocking).
+
+**Real architecture question, owner-raised September 9 2026, not yet designed**: the current
+walkability model (D8's `Terrain::RoomClassifier`, `walkable`/`blocked` per tile signature) is a
+static snapshot that conflates several genuinely different things -- see
+`terrain_collision.background_tilemap_predicts_walkability`'s three newest caveats: (1) the bottom
+HUD row reads as a normal 'blocked' cell despite not being world terrain at all, (2) the same
+visual object (e.g. a tree) can carry different signatures per room, by design, but nothing
+currently states this explicitly for a reader reasoning about the data, (3) at least one class of
+terrain (bushes) is CONDITIONALLY blocked -- passable once cut, presumably with an item Link
+doesn't have yet -- and the model has no way to represent "blocked now, for a reason that could
+change" versus "permanently blocked." Owner's framing: how do we build a world-model
+representation that's good enough to act on now but can evolve as more is learned, and --
+explicitly -- how much of getting this right is on-session judgment (mine, this conversation) vs.
+something that belongs in the durable, cold-readable parts of this project (schemas, `AGENTS.md`
+process rules, `DECISIONS.md`) so it doesn't depend on any one session remembering it. Needs a
+real design pass, not a quick patch -- likely a Builder-role decision once scoped (changes D8's
+own data model), not something to implement ad hoc.

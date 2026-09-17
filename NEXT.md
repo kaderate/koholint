@@ -34,7 +34,7 @@ grids -- already fulfilled and recorded under D8 in `DECISIONS.md`; no other fil
 
 | Indicator | Value |
 |---|---|
-| Rooms found | 27 labeled in `data/ram_registry.json`'s `room_labels` (16 "charted", 11 "glimpsed"/less). `193/0` riverside_east_meadow, found September 17 2026 via `riverside_screen`'s (192/0) own EAST edge (a plain tap-through transition, not a wall), then FULLY SURVEYED a follow-up session the same day: its south edge is a real wall except at one column that loops back into already-charted `209/0`, and its own east edge (`x=155`, previously tap-false-negative) leads via a sustained hold into 2 MORE new rooms, `194/0` riverside_narrows (glimpsed) and `195/0` riverside_lake_cove (glimpsed, contains this cluster's real water/lake feature -- the earlier "lake in 193/0's south" VRAM-dump read is now believed to have been a HUD-row misread, see Quest hypothesis below) -- status promoted glimpsed -> charted for `193/0`; no chest/sign/NPC/item found in any of the 3 rooms, "Cave Flagello" still not located, see Quest hypothesis below. -- `208/0` riverside_south_room promoted glimpsed -> charted September 16 2026, its own last untested edge (WEST) confirmed a genuine hard wall via 3 independent y-bands, taps AND a 400-frame sustained hold each, no item/chest/NPC found -- see world_topology.riverside_south_room_survey's `west_edge_test` and Quest hypothesis below; `167/16` screen3_north_house_interior, NEW September 16 2026, found via screen3_north's own previously-unswept house door (world_topology.screen3_north_house_door_and_outdoor_telephone_search) while searching for a second outdoor telephone booth -- fully swept the same session (1 NPC dialogue, 1 mobile "dog" object, single door back out, no telephone/item found), status "charted"; `224/0` riverside_south_river_room and `225/0` riverside_flower_clearing, south/east of `riverside_south_room`, both further explored (224/0's scroll mechanism and "totem" identity resolved, 225/0's ground-accessible extent mapped plus its NE route now resolved into a real room transition); `209/0` riverside_east_room, found east of `riverside_south_room`'s south band (past the prior x=134,y=115 stop point), fully swept September 10-11 2026 (west/center then, east half via the D13 primitive) -- no bidule found anywhere in it; `179/0` shop_screen, first actually explored September 10 2026 -- turns out to be the shop's EXTERIOR yard, not its interior; see `world_topology.shop_screen_door_approach` and Next question below (SIXTH closed session September 16 2026, still no route to the door; SEVENTH session same day, non-live terrain/OAM read via `Koholint::AutonomousRecovery`, found part of the door band matches confirmed-wall signature and part has a previously uncatalogued static sprite on open-looking ground -- door itself still unreached, see Quest hypothesis below); `226/0` riverside_ne_cove, reached from `225/0`'s previously-abandoned NE route September 10 2026, fully swept September 11 2026 via the D13 primitive (status promoted glimpsed -> charted) -- no bidule found anywhere in it either, see Next question below; `227/0` riverside_se_grove, NEW September 16 2026 -- reached from `226/0`'s own SE point via a genuine sustained-hold push, correcting that point's earlier "hard wall" verdict (a tap-vs-hold false negative, not a dive-gated door -- see `world_topology.riverside_ne_cove_se_edge_sustained_hold_and_227_discovery`); fully swept the same day (status promoted glimpsed -> charted, see Quest hypothesis below) -- a small closed clearing, no bidule found). Graph and screenshots published in the Koholint Atlas artifact (not yet updated with these rooms or this session's findings). D9 visual-catalog `visual_survey` now covers 6/20 (`front_yard`, `villager_screen` pilot + `crate_room`, `screen3_north` rollout + `well_platform`, `building_screen` rollout, fresh restart of an abandoned attempt, September 10 2026) -- see `DECISIONS.md`'s D9 entry. `146/0` north_corridor_room (still 20 total, was already labeled as an unreached stub) actually ENTERED for the first time September 16 2026, after the checkpoint mixup below cost a 4th anti-patch strike on the same wrong-checkpoint mistake as September 9's 3 -- see "What NOT to redo". First-survey only (D4): 3 of 4 directions open (`probe_all`), not swept. Its own `up` exit led to a new room, `130/0` (single-glance, a structure visible, see `room_labels['130/0']`); `right` led to `147/0` -- a "MAGASIN"-labeled building whose door turned out to be a real, walk-through transition into a 23rd room, `161/14` -- **the first shop interior ever reached in this project** (price-list HUD, counter, standing figure), see Quest hypothesis below. `130/0` FULLY SURVEYED September 16 2026 (follow-up session): a small, fully enclosed dead-end pocket -- a building facade with two dark door/window-shaped openings is visible but confirmed unreachable (2 independent 400-frame sustained-hold rechecks, both hard walls), no item/chest/NPC found, promoted glimpsed -> charted; `146/0`'s own last uncharacterized exit (`down`) live-tested the same session, confirmed the plain return to `front_yard` -- all 4 of its exits now characterized. See Quest hypothesis below. `178/0` overworld_screen2's "landmark" object turned out to BE the telephone booth (Sept 17 2026 correction, own real walk-through door found, leading to a 25th room, `203/16` telephone_booth_interior, glimpsed) -- see Quest hypothesis below. |
+| Rooms found | 27 labeled in `data/ram_registry.json`'s `room_labels` (17 "charted", 10 "glimpsed"/less). `163/0` clover_field promoted glimpsed -> charted September 17 2026 -- a SECOND route in was found (147/0's own south exit, never probed before), not the already-anti-patch-closed front_yard east approach; full survey found its south edge bridges into shop_screen (179/0) via 2 corridors flanking a central impassable clover-clump obstacle, resolving whether 147/0 and 179/0's yard are the same building (they are not; clover_field sits between them) -- no item/chest/NPC found. See Quest hypothesis below and `world_topology.clover_field_second_route_and_shop_connection`. `193/0` riverside_east_meadow, found September 17 2026 via `riverside_screen`'s (192/0) own EAST edge (a plain tap-through transition, not a wall), then FULLY SURVEYED a follow-up session the same day: its south edge is a real wall except at one column that loops back into already-charted `209/0`, and its own east edge (`x=155`, previously tap-false-negative) leads via a sustained hold into 2 MORE new rooms, `194/0` riverside_narrows (glimpsed) and `195/0` riverside_lake_cove (glimpsed, contains this cluster's real water/lake feature -- the earlier "lake in 193/0's south" VRAM-dump read is now believed to have been a HUD-row misread, see Quest hypothesis below) -- status promoted glimpsed -> charted for `193/0`; no chest/sign/NPC/item found in any of the 3 rooms, "Cave Flagello" still not located, see Quest hypothesis below. -- `208/0` riverside_south_room promoted glimpsed -> charted September 16 2026, its own last untested edge (WEST) confirmed a genuine hard wall via 3 independent y-bands, taps AND a 400-frame sustained hold each, no item/chest/NPC found -- see world_topology.riverside_south_room_survey's `west_edge_test` and Quest hypothesis below; `167/16` screen3_north_house_interior, NEW September 16 2026, found via screen3_north's own previously-unswept house door (world_topology.screen3_north_house_door_and_outdoor_telephone_search) while searching for a second outdoor telephone booth -- fully swept the same session (1 NPC dialogue, 1 mobile "dog" object, single door back out, no telephone/item found), status "charted"; `224/0` riverside_south_river_room and `225/0` riverside_flower_clearing, south/east of `riverside_south_room`, both further explored (224/0's scroll mechanism and "totem" identity resolved, 225/0's ground-accessible extent mapped plus its NE route now resolved into a real room transition); `209/0` riverside_east_room, found east of `riverside_south_room`'s south band (past the prior x=134,y=115 stop point), fully swept September 10-11 2026 (west/center then, east half via the D13 primitive) -- no bidule found anywhere in it; `179/0` shop_screen, first actually explored September 10 2026 -- turns out to be the shop's EXTERIOR yard, not its interior; see `world_topology.shop_screen_door_approach` and Next question below (SIXTH closed session September 16 2026, still no route to the door; SEVENTH session same day, non-live terrain/OAM read via `Koholint::AutonomousRecovery`, found part of the door band matches confirmed-wall signature and part has a previously uncatalogued static sprite on open-looking ground -- door itself still unreached, see Quest hypothesis below); `226/0` riverside_ne_cove, reached from `225/0`'s previously-abandoned NE route September 10 2026, fully swept September 11 2026 via the D13 primitive (status promoted glimpsed -> charted) -- no bidule found anywhere in it either, see Next question below; `227/0` riverside_se_grove, NEW September 16 2026 -- reached from `226/0`'s own SE point via a genuine sustained-hold push, correcting that point's earlier "hard wall" verdict (a tap-vs-hold false negative, not a dive-gated door -- see `world_topology.riverside_ne_cove_se_edge_sustained_hold_and_227_discovery`); fully swept the same day (status promoted glimpsed -> charted, see Quest hypothesis below) -- a small closed clearing, no bidule found). Graph and screenshots published in the Koholint Atlas artifact (not yet updated with these rooms or this session's findings). D9 visual-catalog `visual_survey` now covers 6/20 (`front_yard`, `villager_screen` pilot + `crate_room`, `screen3_north` rollout + `well_platform`, `building_screen` rollout, fresh restart of an abandoned attempt, September 10 2026) -- see `DECISIONS.md`'s D9 entry. `146/0` north_corridor_room (still 20 total, was already labeled as an unreached stub) actually ENTERED for the first time September 16 2026, after the checkpoint mixup below cost a 4th anti-patch strike on the same wrong-checkpoint mistake as September 9's 3 -- see "What NOT to redo". First-survey only (D4): 3 of 4 directions open (`probe_all`), not swept. Its own `up` exit led to a new room, `130/0` (single-glance, a structure visible, see `room_labels['130/0']`); `right` led to `147/0` -- a "MAGASIN"-labeled building whose door turned out to be a real, walk-through transition into a 23rd room, `161/14` -- **the first shop interior ever reached in this project** (price-list HUD, counter, standing figure), see Quest hypothesis below. `130/0` FULLY SURVEYED September 16 2026 (follow-up session): a small, fully enclosed dead-end pocket -- a building facade with two dark door/window-shaped openings is visible but confirmed unreachable (2 independent 400-frame sustained-hold rechecks, both hard walls), no item/chest/NPC found, promoted glimpsed -> charted; `146/0`'s own last uncharacterized exit (`down`) live-tested the same session, confirmed the plain return to `front_yard` -- all 4 of its exits now characterized. See Quest hypothesis below. `178/0` overworld_screen2's "landmark" object turned out to BE the telephone booth (Sept 17 2026 correction, own real walk-through door found, leading to a 25th room, `203/16` telephone_booth_interior, glimpsed) -- see Quest hypothesis below. |
 | Dialogues / readable text | 25 entries in `ram_registry.json`'s `dialogues` (`room167_toutou_greeting`, NEW September 16 2026 -- a generic pet-owner greeting in the newly-found `167/16`, not telephone-related, found while searching for the outdoor telephone booth; villager duo's shared line, room176's two save-mechanic NPC lines, crate_room's library fully read -- 8 books + 1 wall object, 9/9 tile objects resolved via OAM
 (corrected September 11 2026 from an earlier, buggy "4 books" count -- see "What NOT to redo" below); house2_interior's 2 OAM-verified telephone objects; `riverside_flower_clearing_sign` (225/0) -- a two-page signpost, "Attention aux oursins !" then "Se protéger avec un bouclier !" (2nd page found September 11 2026, needs a long `:a` hold to reveal), NOT a chest/item; `shop_screen_yard_npc` (179/0) -- a friendly yard NPC reciting the SAME save-tip line as room176's pair, first confirmed case of a reused dialogue asset, September 10 2026; `select_map_well_platform_place_name` (160/0) -- the SELECT box's 2-line place name ("Village des Mouettes"), September 12 2026, resolves the "2nd line" question as NOT a separate marker; `magasin_interior_shopkeeper_greeting` (161/14) -- a generic "Bienvenue! Apporte ici ce que tu veux acheter.", found September 16 2026, does not name any of the shop's 3 priced items (all hypothesis/verified_count 1). `starting_house_npc_bench`/`starting_house_npc_beds` promoted `hypothesis` -> `verified` (verified_count 2), September 16 2026 -- independently re-triggered live, both cycle to page 1 on a further `:a` press, the bench NPC is named Tarkin/Tarin in dialogue (`near_tarkin.dump`'s own first-meeting text, a new `world_topology.near_tarkin_first_meeting_live_retrigger` entry, not counted here), and the "`[nom vide/non rendu]`" name slot renders as `A`, not blank. `room203_pepe_phone_call` (203/16), found September 17 2026 earlier the same day -- see Quest hypothesis, now `verified`/`verified_count 2` (independently re-triggered live this session). `riverside_screen_signpost_cave_flagello` (192/0), NEW September 17 2026 -- a two-line signpost naming "Cave Flagello" and "Plage Coco", `verified`/`verified_count 2`; see Quest hypothesis below. |
 | Terrain / collision | D8 live: reads BG tilemap signatures from VRAM (`lib/terrain.rb`), 93.1%-validated against live-probe oracle. Primary method; live probing kept as fallback. |
@@ -640,6 +640,56 @@ strong enough that a future session should treat "Link cannot enter deep water" 
 assumption rather than a per-location open question, without a Flippers-equivalent item ever being
 found first.
 
+**`163/0` (clover_field) second route found, fully surveyed, "Cave Flagello" STILL NOT located,
+September 17 2026 (fresh cold-context session, owner-directed -- this was the project's one
+genuinely open frontier: `163/0` had only ever been glimpsed via front_yard's own east approach,
+which was independently blocked-confirmed at 3 rows/2 methods and anti-patch-closed; the room
+itself had never actually been entered)**. Used `world_topology.world_map_reconstruction`'s
+tentative coordinate grid as a hypothesis generator, not ground truth: `north_corridor_room`
+(146/0, at (0,-1)) has an own `right` exit into `147/0` (~(1,-1)); the grid tentatively placed
+`clover_field` at (1,0) -- directly SOUTH of `147/0`. Cross-checked against a fact already on file
+but never acted on: `room_labels['147/0']`'s own entry-point `probe_all` read `down: :ok`, but no
+session had ever actually followed it (every prior 147/0 session went straight for the door north
+into `161/14`). Live-verified: from `147/0`'s own entry checkpoint (x=85,y=121),
+`cross_until_room_change!(:down)` crosses in 2 calls, zero HP cost, into `163/0` at x=85,y=23 --
+reproduced identically on a fresh reload. **This is the second route the day's mandate asked
+for -- confirmed, not the refused front_yard approach.** Full survey (live movement AND a non-live
+`Terrain.signature_at` grid dump, D8's own non-invasive method, used to explain a puzzling result):
+the room is a light-green grass frame around a solid, impassable 6x5 clover-clump block (confirmed
+non-interactive under a 150-frame `:a` hold) -- a straight push south from the entry column dead-
+ends at the clump's own north face (y=32), which is why the room initially looked sealed; 2 open
+corridors flank the clump (columns 0-1 and 8) and, pushed to their far end (8 clean move! calls
+each, zero HP cost), BOTH lead directly into `shop_screen` (179/0) -- **a previously unknown
+adjacency**, resolving `room_labels['147/0']`'s own long-open question of whether 147/0 and 179/0's
+yard are the same building (they are not; clover_field bridges 2 distinct areas, matching the
+coordinate grid's (1,-1)/(1,0)/(1,1) column exactly, now confirmed by live traversal). East is a
+genuine hard hedge wall (sustained-hold-confirmed); west (row 1) is a real transition back into
+`front_yard`, at a different, previously-untested row than the one already refused. No chest, sign,
+NPC, or item found anywhere in the room -- not Cave Flagello, not the A-slot item/sword. Status
+promoted glimpsed -> charted. **Side finding worth a future session's attention, not chased here**:
+the shop_screen crossing at x=138,y=16 sits outside every x-stop that room's own 8-session door
+search ever sampled (topped out at x=122, see `world_topology.shop_screen_door_approach`) -- a
+genuinely new, never-tried entry vector into a mechanism this project has otherwise closed under
+anti-patch. Deliberately NOT turned into a fresh door-search attempt this session (that specific
+mechanism needs explicit owner sign-off before a 9th session reopens it, per its own notes) -- flag
+it, don't chase it, next time the sword/A-slot search revisits shop_screen. Full detail:
+`world_topology.clover_field_second_route_and_shop_connection`, `room_labels['163/0']`,
+`room_labels['147/0']`'s same-day addendum, `room_labels['179/0']`'s same-day addendum. Screenshots:
+`data/screenshots/room147_0_before_south_push.png`, `room163_0_second_route_entry_from_147.png`,
+`room163_0_entry_settled.png`, `room163_0_east_edge_hedge_wall.png`,
+`room163_0_north_row_clover_wall.png`, `room163_0_south_corridor_into_shop_screen.png`,
+`room179_0_new_entry_from_163_north.png`. **Next question**: the project's one identified genuinely
+open frontier edge is now closed. No A-slot item/sword/"la Loupe"/Cave Flagello lead survives
+anywhere currently mapped -- every named cluster (Plage Coco, the shop-door neighborhood via 3
+separate approach families now, the telephone-booth neighborhood, `north_corridor_room`'s own
+neighborhood, and the whole `192/0`-`195/0` riverside-east chain) is exhausted. A future session
+needs either a genuinely new area (nothing charted currently borders unexplored territory the way
+`163/0` did this morning -- would need a fresh long-range search, not another edge re-sweep) or a
+mechanic/story trigger not yet tried (re-calling Pépé from a different game-state context, per the
+still-open half of September 17's earlier Pépé-reproducibility question; or revisiting whether any
+already-catalogued dialogue holds a missed clue, per NEXT.md's own "different method entirely"
+precedent that found the Cave Flagello signpost in the first place).
+
 ## In-flight work (for resumability)
 
 None currently. The `Koholint::AutonomousRecovery::ResearchTask` id `81da96f2cb8607eb` (shop_screen
@@ -651,117 +701,12 @@ blocker should create a fresh `ResearchTask` per `docs/AUTONOMOUS_RECOVERY.md`, 
 
 ## Next question
 
-Session 4 (PLAN.md) is fully complete -- see the State section above. NOT currently paused (that
-framing is stale from an earlier session); see "Quest hypothesis" above for the live thread, which
-now also covers September 12 2026's three bundled closures (SELECT-box 2nd line, shop bush
-sustained-hold push, 225/0 dive test) -- not repeated here. Most
-of the detail below predates tonight's Plage Coco/crate_room/manual work (archived at
-`docs/archive/SESSION_LOG.md`) and is kept here only for topology/dialogue reference, not as an
-active question. SELECT-map fog-of-war, crate_room's
-library (9/9 objects), and `house2_interior`'s 2 telephone objects are all resolved -- see "What
-NOT to redo" and `dialogues.*` for detail, not repeated here. `riverside_south_room` (208/0)'s two
-entrance figures are mobile/wandering; 4 interaction attempts found no dialogue but never confirmed
-genuine adjacency at the press -- INCONCLUSIVE, not negative (see
-`world_topology.riverside_south_room_survey`). Its south exit into `224/0`
-(riverside_south_river_room) and onward into `225/0` (riverside_flower_clearing) is now
-`verified`/`verified_count: 2` (2 independent Explorer sessions, September 10 2026) -- reliable as
-a procedure ("keep tapping `:right`, check room_id after each"), NOT at a fixed tap count (see
-`world_topology.riverside_south_room_south_exit`). `225/0`'s previously glimpsed-only "chest-like
-object" is RESOLVED, same day: it's a signpost ("Attention aux oursins !" -- a hazard warning, not
-an item; see `dialogues.riverside_flower_clearing_sign`), no HUD/inventory change. `224/0`'s scroll
-mechanism and "totem" identity are FULLY RESOLVED (time-based scripted scroll, totem = a mobile
-contact-damage enemy sprite) -- archived to `docs/archive/SESSION_LOG.md`, full detail still in
-`room_labels['224/0']`. `225/0` was explored past the signpost, same session: it does NOT scroll (fixed single
-screen, confirmed), and its ground-accessible area is small and enclosed -- hedges north/west, a
-water strip south/east that was never actually entered (swim-gated hypothesis, Link has no Flippers
-yet, unconfirmed) -- `Navigator.probe_all` dead-ends at `down: blocked, right: blocked` in the SW
-pocket. No new room transition found in 225/0. One route (hugging the top row east past the sign
-toward the NE bush cluster) produced only unexplained diagonal slides, never reaching that area --
-open gap for a future session. Full detail in `room_labels['224/0']`/`['225/0']`. `208/0`'s south
-band east extent (from the original x=134,y=115 stop point) is now RESOLVED, same day: a real room
-transition at x=149,y=115 into a new room, `209/0` riverside_east_room, single-glance only -- see
-`world_topology.riverside_south_room_east_exit` and `room_labels['209/0']`, not chased deeper.
-`shop_screen` (179/0) actually explored for the first time, same day: it's the shop's EXTERIOR
-YARD, not the interior a prior session's Atlas note assumed -- a "MAGASIN" building facade ringed
-by static flower-bush obstacles plus a hedge maze east side. The door itself was never reached
-despite 8+ distinct routing attempts covering all 3 open sides (north over the roof, west and east
-at ground level) -- every one hit a wall before the door's own column; see
-`world_topology.shop_screen_door_approach` for the full attempt log and an open hypothesis (an
-off-tile-grid trigger column, same shape as `house2_interior`'s door -- see D11 paragraph below).
-Found and interaction-tested in the yard: a friendly NPC (tile=0x70/0x72) reciting the EXACT SAME
-save-tip line as `room176_pair_a`/`room176_pair_b` -- first confirmed case in this registry of a
-dialogue line reused verbatim across rooms (`dialogues.shop_screen_yard_npc`) -- and a decorative
-plant/bush object, confirmed non-interactive. No shopkeeper, no buy/sell mechanic, no HUD/inventory
-change -- because the interior was never reached, not because a shop mechanic was ruled out.
-
-**`225/0`'s NE route RESOLVED, September 10 2026 (independent Explorer session)**: the "unexplained
-diagonal slides" were never a real wall -- they were two stacked hazards along the route (an
-invisible mobile hostile creature delivering contact knockback mid-tap, same pattern as `224/0`'s
-totem and D11, plus ordinary blocking terrain: a sea-urchin OAM cluster and a flower-cluster BG
-obstacle). Tactic tested per the owner's suggestion: holding B (the equipped shield) continuously
-via `mmu.joypad.key_state` (not `Navigator.tap_button`, which releases every button between taps)
-while pushing the route. Result: mixed but net positive -- one full clean run took zero damage
-where the same route unshielded had cost 3 hearts, but a later shield-held attempt through the same
-general area still lost a full heart with no OAM sprite visible adjacent in the snapshot, so the
-shield mitigates the creature's knockback without eliminating all damage in the room. Working
-strategy (not a fixed tap count, same caveat as every other route in this room cluster): from
-`lib_explorer_225_fresh_entry.dump`, go down to y~42 before pushing east (avoids one hazard band),
-back up to y~26 to continue east to x~76 where a flower cluster is a real wall, then -- the key
-correction -- drop further south than instinct suggests, to y~41 (below the flower, above the
-sea-urchin row), to clear it and continue east to x~124 (base of a second, NE-corner palm tree),
-then south along the tree's east flank to y~65-68 and east again, which crosses room_id/map_id
-from 225/0 into a brand-new room, **226/0 (`riverside_ne_cove`)**, at x=17,y=67, no damage on the
-crossing itself. `226/0` itself: two palm trees, a differently-oriented hedge corner, more
-sea-urchins, the same green amphibious sprite glimpsed in 225/0, and two more instances of the
-tile=0x60/0x62 hostile-family creature (visually matching 224/0's "totem"). `probe_all` from the
-entry point reads up/left/right all open, down blocked -- genuinely more room to explore, not a
-dead end, but not pursued further this session (budget). The "bidule" item was NOT found in either
-room this session. Full route, checkpoint chain, and every attempt (including the 2 that failed
-and dead-ended back at x=76,y=26) are in `room_labels['225/0']`'s NE-route addendum and
-`room_labels['226/0']`; the transition itself is also in
-`world_topology.riverside_flower_clearing_ne_exit`. `224/0`'s own secondary sweep (also flagged as
-open in its entry) was NOT attempted this session -- the NE route took far more sub-attempts than
-budgeted, leaving no time for it; still open for a future session.
-
-**D11 hazard-classification pass, September 10 2026 (Explorer session)**: `front_yard`'s creature
-(D9's byte-identical CHR match to `villager_screen`'s confirmed-friendly NPC) got a 4th navigation
-attempt using the adaptive live-OAM-tracking method D11 authorized -- still INCONCLUSIVE, not
-refuted: 2 sub-attempts stayed in `front_yard` (avoiding the known door-column trap) but both got
-wedged at a real obstacle, x=88,y=82-84 (a building-side wall, now independently reconfirmed by 2
-sessions/2 different chase heuristics -- see `visual_catalog.villager_wandering_creature`'s
-`interaction_tested['162/0']`). No `:a` was pressed; the creature's own interactivity is still
-unknown. Separately, `hazard_status` was added across `visual_catalog` per D11:
-`riverside_south_pale_creature` (tile=0x6c, never tested before) got 2 contact-test approaches --
-both produced a knockback-shaped position jump on Link, but the creature wasn't confirmed on-screen
-at the exact jump instant, so it's "unknown, suggestive of hostile" not a clean classification.
-`riverside_east_room` (209/0)'s two sprites (tile=0x62 and 0x68/0x6a) turned out, via a 4-sample
-idle animation log, to cycle through the SAME tile set (0x60/0x62/0x64/0x66/0x68/0x6a) as the
-already-confirmed-hostile `riverside_south_tan_creature` and `riverside_south_river_room_sprite`
-(224/0's totem) -- classified `hostile` mainly on that family match, plus one observed wrong-axis
-13px jump while a family-tile creature was in close range. See `visual_catalog.riverside_east_room_creatures`,
-`.riverside_south_pale_creature`, and `.villager_wandering_creature` for full detail. The
-off-tile-grid-alignment hypothesis first confirmed for house2's door now has a SECOND candidate
-case (`shop_screen`'s own unreached door, see above) -- still not a proven general rule, but worth
-trying on any future "walled-off door" before assuming it's a genuine dead end. Also deferred, not
-urgent: formalizing a navigation spec/format (raised by an external review, judged sound but not
-blocking).
-
-**Real architecture question, owner-raised September 9 2026, not yet designed**: the current
-walkability model (D8's `Terrain::RoomClassifier`, `walkable`/`blocked` per tile signature) is a
-static snapshot that conflates several genuinely different things -- see
-`terrain_collision.background_tilemap_predicts_walkability`'s three newest caveats: (1) the bottom
-HUD row reads as a normal 'blocked' cell despite not being world terrain at all, (2) the same
-visual object (e.g. a tree) can carry different signatures per room, by design, but nothing
-currently states this explicitly for a reader reasoning about the data, (3) at least one class of
-terrain (bushes) is CONDITIONALLY blocked -- passable once cut, presumably with an item Link
-doesn't have yet -- and the model has no way to represent "blocked now, for a reason that could
-change" versus "permanently blocked." Owner's framing: how do we build a world-model
-representation that's good enough to act on now but can evolve as more is learned, and --
-explicitly -- how much of getting this right is on-session judgment (mine, this conversation) vs.
-something that belongs in the durable, cold-readable parts of this project (schemas, `AGENTS.md`
-process rules, `DECISIONS.md`) so it doesn't depend on any one session remembering it. Needs a
-real design pass, not a quick patch -- likely a Builder-role decision once scoped (changes D8's
-own data model), not something to implement ad hoc.
+Session 4 (PLAN.md) is fully complete -- see the State section above. See "Quest hypothesis" above
+for the live thread. The September 8-10 2026 topology/dialogue reference notes formerly here (early
+Plage Coco routing, D11's hazard-classification pass, the open walkability-model architecture
+question) were archived verbatim to `docs/archive/SESSION_LOG.md` September 17 2026 (already
+resolved/superseded, `NEXT.md` one page over budget) -- every fact they contain is still reachable
+from `data/ram_registry.json`'s `room_labels`/`world_topology`/`dialogues` entries, cited there.
 
 ## What NOT to redo
 
@@ -890,10 +835,11 @@ own data model), not something to implement ad hoc.
   text. `225/0` does not scroll (single fixed screen) and its SW
   ground pocket dead-ends at a hedge/water boundary (`probe_all` blocked both down and right
   there) -- don't re-walk that pocket expecting a new exit. The NE route past the sign is NO
-  LONGER an open gap -- it's resolved into a real transition into `226/0`, see "Next question" for
-  the working strategy (hold the shield, and specifically drop to y~41, not y~26/34, to clear the
-  flower-cluster wall around x=76) before attempting a straight re-push at the old y=26 band, which
-  is a confirmed hard wall there. `lib_explorer_225_route7.dump` is a real but LOW-HEALTH (1 heart)
+  LONGER an open gap -- it's resolved into a real transition into `226/0`, see
+  `world_topology.riverside_flower_clearing_ne_exit` (full write-up archived to
+  `docs/archive/SESSION_LOG.md` September 17 2026) for the working strategy (hold the shield, and
+  specifically drop to y~41, not y~26/34, to clear the flower-cluster wall around x=76) before
+  attempting a straight re-push at the old y=26 band, which is a confirmed hard wall there. `lib_explorer_225_route7.dump` is a real but LOW-HEALTH (1 heart)
   checkpoint -- resume from `lib_explorer_225_fresh_entry.dump` (full health) instead unless
   deliberately continuing from the dead end. The exact per-leg tap counts on the NE route are not
   reproducible at a fixed count (same caveat as every other route in this room cluster) -- treat
@@ -1038,3 +984,15 @@ own data model), not something to implement ad hoc.
   primitive in a room like this one. "Cave Flagello" is still not found anywhere in this 4-room
   chain (`192/0`/`193/0`/`194/0`/`195/0`) -- don't re-sweep any of their now-characterized edges
   again without a new reason; the search needs a different area entirely.
+- `163/0` (clover_field) is fully charted now (September 17 2026) -- all 4 edges characterized,
+  don't re-run `probe_all`/edge characterization on it again. Its route in is `147/0`'s own `down`
+  exit (2 `cross_until_room_change!` calls from x=85,y=121), NOT `front_yard`'s east approach --
+  that approach is separately, independently anti-patch-closed (`world_topology.front_yard_adjacent_rooms`)
+  and still should not be retried a 4th time. The clover-clump block filling the room's center
+  (tile-cell rows 2-6, cols 2-7) is confirmed non-interactive and confirmed impassable -- don't
+  re-test it expecting a cutting mechanic without an actual cutting item in hand. Its south edge's
+  2 corridors both lead into `shop_screen` (179/0), not new unexplored ground -- see
+  `world_topology.clover_field_second_route_and_shop_connection`. The specific new shop_screen entry
+  point this revealed (x=138,y=16) is a genuinely untried door-search vector, but don't turn it into
+  an 8th+ door-search session without owner sign-off first -- that mechanism is separately
+  anti-patch-closed (`world_topology.shop_screen_door_approach`).
