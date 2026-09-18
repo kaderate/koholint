@@ -706,6 +706,16 @@ session could not ask the owner for a scoped HP-write exception mid-task. No che
 found anywhere actually reached. Status left `glimpsed` (not promoted). Full detail:
 `room_labels['240/0']`, `visual_catalog.room240_round_green_object`. A future session with an
 owner-approved D12 exception is the natural next step to close this room out.
+**`240/0` right-exit retry, September 18 2026 (Explorer subagent, second session same day)**: owner
+declined the D12 HP-write exception above and asked for D13's actual `avoid_hostiles_and_push!`
+primitive first (the prior 3 attempts were plain `move!` taps, never the primitive). 3 distinct
+sub-attempts (default radius, `radius:32`, down-then-right route) all converged on the IDENTICAL
+stopping point/HP floor (24/24 -> 8/24, still ~31px short of the tile=0x50 object) -- the primitive
+is no better than raw taps here, ruling out both a tuning and a routing fix. Right exit reclassified
+as a genuine hostile-density chokepoint (not a technique gap); status promoted `glimpsed` ->
+`charted` since all 3 exits now have a clean, convergent account. Object interactivity still
+UNTESTED. No A-slot item/sword found here either. Full detail: `room_labels['240/0']`'s RIGHT EXIT
+RETRY note.
 
 ## In-flight work (for resumability)
 
