@@ -45,7 +45,19 @@
       "evidence": []
     }
   ],
-  "experiments": [],
+  "experiments": [
+    {
+      "id": "25078c01e4c1ae75",
+      "hypothesis_id": "h_oursin_shield_contact_block",
+      "checkpoint": "e240_confirmed",
+      "action": "shielded_contact_tile50_object",
+      "observation": "Checkpoint e240_confirmed (24/24 HP, x=20 y=36, room 240/0, shield equipped B-slot=4), 2 runs.\nRun 1 (avoid_hostiles_and_move! bias toward :right): the hazard-avoidance dot-product picked\n:up at step 3 (nearby 0x60-family wanderer), which -- per Navigator.move!'s own documented\nboundary-rebase caveat -- silently crossed room_id 240/0->224/0 while still reporting :blocked;\n9 further steps wandered in 224/0 (wrong room) burning HP 24->16 with the tile=0x50 object never\nin OAM range. Discarded as a script artifact, not evidence either way.\nRun 2 (plain Navigator.move_holding!(motherboard,:right,:b,min_hp:8) per step, room_id checked\nevery step to catch a repeat of run 1's silent room-exit): reproduced the established chokepoint\nexactly -- stopped at (44,12), HP 24->8, still in 240/0, after 4 productive steps. OAM census\ntaken immediately BEFORE each damaging step cleanly attributes every HP loss to the wandering\nhazard family, never to a tile=0x50 object: step2 (-1 HP, 24->23) nearest 0x60-wanderer at\n28.2px (tile=0x50 present but at 43.9px, farther); step3 (-12 HP, 23->11) an under-tracked\ntile=0x6c 'unknown hazard' sprite (Navigator::UNKNOWN_HAZARD_TILE_IDS, NOT in my wanderer query\nuntil I checked it by hand) sat 5.7px from Link's pre-step position, no tile=0x50 object was even\non-screen at that moment (nearest_static: null); step4 (-3 HP, 11->8, the safety floor) a\ntile=0x60 wanderer sat 2.8px away (essentially adjacent) while the nearest tile=0x50 object was\n31.6px away -- matching, almost to the pixel, room_labels['240/0']'s already-recorded ~31px\nclosest-approach figure from the prior D13-primitive session. The static tile=0x50 object was\nNEVER within Navigator::HAZARD_PROXIMITY_PX (16px) contact range in either run; closest live\nreading was 31.6px, always with HP already at or crossing the 8-floor by the time the object\nentered plausible range. Deliberate contact (walking INTO the object, facing it, shield held) was\ntherefore never attempted -- the HP floor was reached first, 3 productive right-pushes in, a 4th\ntechnique-independent convergence on the exact same (44,12)/8-24 signature already seen 3 times\n(raw taps, avoid_hostiles_and_push! r16, r32, down-then-right). Control comparison (not re-run,\nfrom data/ram_registry.json's already-established Sept 16 2026 combat-contact test, 208/0): a\nsingle stationary-approached 0x60-family wanderer took a full shield block (zero damage, 12-14\ncollision-seeking steps at 8.1px) in that room's less-dense setting; this run's denser,\nmulti-hazard 240/0 pocket (0x60 AND 0x6c both active near the chokepoint) showed only partial\nmitigation -- real, non-zero damage on 3 of 4 productive steps despite the shield being held\ncontinuously throughout (verified via Navigator.shield_equipped? and holding :b every internal\ntap), consistent with this project's own established 'shield only partially mitigates in dense\nmulti-hazard scenarios, not a guaranteed full block' reading. GIFs:\ndata/recordings/2026-09-18_240_0_oursin_shield_test.gif (run 1, room-exit artifact),\ndata/recordings/2026-09-18_240_0_oursin_shield_test_v2.gif (run 2, the recorded attempt).",
+      "outcome": "inconclusive",
+      "cost": 2440,
+      "state_fingerprint": null,
+      "created_at": "2026-09-18T13:33:52Z"
+    }
+  ],
   "budget": {
     "max_experiments": 3,
     "min_supporting_experiments": 2

@@ -9,6 +9,6 @@
     "DECISIONS.md"
   ],
   "context_policy": "fresh",
-  "remaining_experiments": 3,
+  "remaining_experiments": 2,
   "next_step": "choose_one_bounded_experiment"
 }
