@@ -280,7 +280,7 @@ game-schema territory outside this mandate, and not yet evidenced to the same ba
 
 ## ESC9: creature/hazard facts are scattered per-room with no canonical cross-reference, so the same identification work repeats and code hazard-tracking silently drifts out of sync with what's already catalogued
 
-**Status**: open
+**Status**: resolved
 **Opened**: September 18 2026, by planner session
 **Context**: owner asked, mid-session, how to make the process itself notice it needs something
 like an enemy bestiary. Four concrete instances on file, same root shape, clearing this project's
@@ -317,4 +317,11 @@ of MetaPlanner's mandate to write directly. What's in scope here is process-leve
 canonical cross-reference structure and a checklist/audit habit exist at all, the same shape as
 ESC8/MP10's two-part `tested` field convention and Reviewer-audit cadence -- a coordination gap,
 not a claim about what any specific creature actually does.
-**Resolution** (MetaPlanner fills in): -> METAPLANNER.md#MP<n>, one-line summary.
+**Resolution**: -> `METAPLANNER.md#MP11`. Two-part: (a) a "cross-reference before classify"
+convention added to `AGENTS.md` -- check for an already-recorded match before logging a new
+hazard/creature entry, use the canonical `HAZARD_TILE_IDS` union rather than a narrower set --
+audited on the existing Reviewer cold-review cadence alongside the `verified_count` and `tested`-
+field bars; (b) a precisely-scoped Builder task routed (not built here) for a derived, read-only
+hazard/creature cross-reference index/tool over facts already on file. A full new
+`data/ram_registry.json` bestiary schema is left unadopted at this scope -- game-schema territory
+outside this mandate, a planner/`DECISIONS.md`-scoped call if evidenced further.

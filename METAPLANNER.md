@@ -387,3 +387,77 @@ item, or if the Builder-shaped script promotion doesn't happen within a reasonab
 sessions after being routed this concretely, prose/routing isn't sufficient -- the fix needs a
 mechanical guard (e.g. a lint rejecting a decorative claim missing either tested sub-field) or a
 stronger directive prioritizing the next Builder session on it, instead of restating the rule.
+
+## MP11: a cross-reference-before-classify convention for hazard/creature facts, and a spec-first route (not a MetaPlanner build) for a derived hazard/creature index tool
+
+**Date**: September 18, 2026. Resolves `METAPLANNER_ESCALATIONS.md#ESC9`.
+
+**Context**: `ESC9` opened September 18, 2026 over creature/hazard facts being scattered per-room
+with no canonical cross-reference, so the same identification work repeats and code hazard-tracking
+silently drifts out of sync with what's already catalogued. Four concrete, evidenced instances,
+same root shape, clearing this project's own "recur a few times first" bar (the one `ESC8`/`MP10`
+already used): (1) a live `240/0` hazard-avoidance experiment filtered on `Navigator::HOSTILE_TILE_IDS`
+alone and took a real -12 HP hit from `tile=0x6c`, already a known member of the separate
+`Navigator::UNKNOWN_HAZARD_TILE_IDS` set, before the gap was caught and fixed mid-session; (2) a
+signpost's explicit, falsifiable claim ("a shield counters oursins") sat unqueried for 8 days with
+nothing surfacing it as an open claim to test; (3) at least 4 separate `visual_catalog` entries
+across different rooms independently carry "hazard status unknown, not tested" with no shared place
+recording that once; (4) a CHR-byte-confirmed identity match (friendly creature at `177/0` = same
+sprite at `162/0`) is on file but didn't propagate, so the second sighting stayed queued as a fresh
+unknown many sessions later. The escalation itself is explicit that the actual facts about any given
+creature are `DECISIONS.md`/`data/ram_registry.json`-scope, out of MetaPlanner's mandate, while
+whether a canonical cross-reference structure and audit habit exist at all is process-level, same
+split `ESC8`/`MP10` already drew between claim content and claim-tracking structure.
+
+**Options considered**:
+1. Adopt a full canonical creature/hazard registry schema now (e.g. a new `bestiary` section in
+   `data/ram_registry.json`). Rejected: a new game-data schema is domain territory outside this
+   mandate (`AGENTS.md`'s "never `data/ram_registry.json`" line), same reasoning `MP10` already used
+   to reject adopting the full `quest_clues` registry at MetaPlanner's own scope -- left undecided
+   here, a planner/`DECISIONS.md`-scoped call if evidence for that specific shape accumulates.
+2. Have this MetaPlanner session build the cross-reference index/tool itself. Rejected: Builder-shaped
+   implementation work requiring ROM/registry content context this session doesn't have -- exactly
+   `MP1`'s mandate boundary, and the same reasoning `MP10`'s option 2 already used to reject building
+   the promoted script itself instead of routing it.
+3. Adopt only the convention/Reviewer-audit half now, leave the index/tool routing for a later
+   MetaPlanner pass pending further validation. Rejected: unlike `MP10`'s full `quest_clues`
+   registry (evidenced by one prototype run against one corpus), `ESC9`'s four instances already
+   independently clear this project's own recurrence bar for the narrower, already-scoped ask (a
+   derived index over facts already on file, not a new schema) -- leaving it unrouted would
+   recreate the exact drift this escalation was opened over.
+4. **Chosen**, two-part:
+   (a) Add a "cross-reference before classify" convention to `AGENTS.md`, same form and location as
+   the existing `verified_count`/`tested`-field rules: before logging a new hazard/creature
+   classification entry, check whether the same tile ID, CHR pattern, or cross-room identity is
+   already recorded elsewhere; before writing or using a hazard-tile filter, reference the canonical
+   union (`Navigator::HAZARD_TILE_IDS`), never a narrower set picked without checking for a broader
+   one. Folded into the existing Reviewer cold-review checklist alongside the `verified_count` and
+   `tested`-field audits, same cadence `MP5`/`MP10` already established (no new cadence invented).
+   The Reviewer role-table row updated to name all three audits.
+   (b) Route (not build) a precisely-scoped Builder task, per `AGENTS.md`'s "Promoting validated
+   Explorer prototypes" precedent of routing rather than MetaPlanner building: a derived, read-only
+   index/tool (e.g. `lib/hazard_index.rb`) generated from `data/ram_registry.json`'s
+   `visual_catalog`/`room_labels`/`world_topology` entries and `lib/navigator.rb`'s
+   `HOSTILE_TILE_IDS`/`UNKNOWN_HAZARD_TILE_IDS`/`HAZARD_TILE_IDS` constants -- given a tile ID, CHR
+   signature, or room+object key, it reports every registry location that already records something
+   about it, so a session about to log a new hazard/creature entry can query first instead of
+   quietly duplicating one. It also scans `dialogues.*.note` for an already-flagged specific
+   falsifiable behavioral claim about a creature/hazard and surfaces it if no other entry's status
+   reflects that claim being tested yet. Grounding rule, same as `MP10`'s mechanism (b): match only
+   against fields recording an actual placed/observed fact (`room_labels`, `visual_catalog`,
+   `world_topology`'s tile/CHR fields), never open-discussion `note` prose, to avoid the exact
+   false-grounding bug `MP10`'s own addendum already found once ("Loupe"). Explicitly out of scope
+   for this routed task: designing a new `data/ram_registry.json` schema section -- that's option 1
+   above, left undecided. This MetaPlanner session does not call `create_session` to dispatch the
+   Builder work itself, matching `MP10`'s own precedent (its routed promotion, commit `af62929`, was
+   made by a later Builder session, not from within the MetaPlanner session that wrote the spec) --
+   the spec above is fixed here for whichever Builder session picks it up next.
+
+**Invalidation condition**: if any of the four evidenced instances' shape recurs despite the
+cross-reference convention and Reviewer checklist item being written (a new duplicated hazard entry,
+or a hazard filter still referencing a narrower tile-ID set without justification), or if the routed
+Builder task doesn't get picked up within a reasonable number of sessions after being scoped this
+concretely, prose/routing isn't sufficient -- the fix needs a mechanical guard (e.g. a lint rejecting
+a hazard-status entry or tile-ID filter that doesn't cite a cross-reference check) or a stronger
+directive prioritizing the next Builder session on it, instead of restating the rule -- the same
+fallback `MP10` already named for its own routed piece.

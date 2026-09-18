@@ -39,6 +39,31 @@ order, `NEXT.md` before any action.
   session scans `room_labels`/`visual_catalog` for a decorative/non-interactive claim missing either
   tested sub-field, as a standing, unconditional checklist item alongside the provenance audit (see
   `METAPLANNER.md#MP10`).
+- **Before creating a new hazard/creature classification entry, or before writing/using a
+  hazard-tile filter, cross-reference what's already recorded.** A `visual_catalog`/`room_labels`
+  entry logging a hazard status (`unknown`, `not tested`) for a tile ID, CHR pattern, or sprite
+  must first check whether that same tile ID, CHR pattern, or cross-room sprite match is already
+  classified elsewhere in the registry -- a fresh entry that duplicates one already on file, under
+  a different room or tile ID, is a drift, not a new finding. Likewise, a hazard-checking script or
+  helper must reference the canonical union of hazard-tile-ID constants
+  (`Navigator::HAZARD_TILE_IDS`), never a narrower set (`HOSTILE_TILE_IDS` alone) picked without
+  checking whether a broader one exists. Found violated in the field, four instances (September
+  2026, surfaced together September 18): a `240/0` hazard-avoidance experiment filtered on
+  `HOSTILE_TILE_IDS` alone and took a real, attributable -12 HP hit from `tile=0x6c` -- already a
+  known member of the separate `UNKNOWN_HAZARD_TILE_IDS` set -- before the gap was noticed and
+  corrected mid-session; a signpost's explicit, falsifiable claim that a shield counters "oursins"
+  sat unqueried for 8 days with nothing surfacing it as an open claim to test, until the owner
+  happened to mention it; at least 4 separate `visual_catalog` entries across different rooms
+  independently carry "hazard status unknown, not tested" with no shared place recording that fact
+  once; and a CHR-byte-confirmed identity match between a friendly creature at `177/0` and the same
+  sprite at `162/0` didn't propagate, so the second sighting stayed queued as a fresh unknown many
+  sessions later. Audited on the same cadence and by the same mechanism as the `verified_count` and
+  `tested`-field bars above: every cold Reviewer session scans for (a) a hazard-checking script or
+  helper referencing a hazard-tile-ID set narrower than `HAZARD_TILE_IDS` without justifying the
+  narrowing, and (b) a `visual_catalog`/`room_labels` entry recording a hazard or identity status
+  that duplicates one already recorded elsewhere in the registry under a different tile ID, room,
+  or CHR pattern -- as a standing, unconditional checklist item alongside the other two (see
+  `METAPLANNER.md#MP11`).
 - **Pre-trained knowledge**: the game's memory map (community disassembly) is a source of
   hypotheses to verify, consistent with the provenance model. *Game* knowledge (where the sword is,
   who an NPC is) is forbidden: it is observed, never assumed.
@@ -68,7 +93,7 @@ one small fix left".
 |---|---|---|
 | Explorer | throwaway spikes, measurements, memory diffs, scripts in the scratchpad | commit to `lib/`, decide |
 | Builder | implements a decision already made, with specs, in its worktree | change paradigm, "take the opportunity" to fix something else |
-| Reviewer | reads cold, judges against `docs/CONCEPT.md` and `DECISIONS.md`, audits `ram_registry.json` provenance (`verified_count` bar) and decorative/non-interactive claims (two-part `tested` bar) | read the narrative log before judging, fix things itself |
+| Reviewer | reads cold, judges against `docs/CONCEPT.md` and `DECISIONS.md`, audits `ram_registry.json` provenance (`verified_count` bar), decorative/non-interactive claims (two-part `tested` bar), and hazard/creature cross-referencing (no un-unioned tile-ID filter, no duplicated hazard entry) | read the narrative log before judging, fix things itself |
 
 You never judge your own build. A review is triggered by the owner every N commits or every morning after a night of autonomy, by a fresh session with no history.
 
