@@ -93,6 +93,9 @@ are the shipped primitive, not in-flight anymore. Full rationale for each: `DECI
   separation per `AGENTS.md`) with a self-contained prompt (context, tools, lessons learned,
   budget, exact report format). Never use `run_in_background`/Monitor inside an Explorer's own
   script -- run everything foreground/synchronous, it has gotten subagents stuck twice.
+- **Clue cross-referencing**: `lib/clue_cross_reference.rb` (`ruby lib/clue_cross_reference.rb`)
+  cross-references `dialogues.*.text` against `select_map_screen.note`/`room_labels` place names;
+  run it once per new dialogue or place-name fact captured (see `METAPLANNER.md#MP10`).
 
 ## Quest hypothesis (current best guess + blocker)
 
