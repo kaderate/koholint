@@ -1,14 +1,14 @@
 {
-  "research_task_id": "81da96f2cb8607eb",
-  "mode": "resume",
-  "original_goal": "Reach shop_screen's (179/0) door and its interior",
-  "checkpoint": "shop_screen",
+  "research_task_id": "8cc5729712d902a5",
+  "mode": "research",
+  "original_goal": "Reach past riverside_hedge_meadow (240/0) right-exit hostile chokepoint to survey its unexplored east/south ground, identify the tile=0x50 objects, and find the A-slot item (sword) if it is there",
+  "checkpoint": "e240_confirmed",
   "required_reads": [
     "AGENTS.md",
     "NEXT.md",
     "DECISIONS.md"
   ],
   "context_policy": "fresh",
-  "remaining_experiments": 1,
-  "next_step": "resume_original_goal"
+  "remaining_experiments": 3,
+  "next_step": "choose_one_bounded_experiment"
 }

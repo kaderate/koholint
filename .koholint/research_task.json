@@ -1,69 +1,49 @@
 {
-  "id": "81da96f2cb8607eb",
-  "goal": "Reach shop_screen's (179/0) door and its interior",
+  "id": "8cc5729712d902a5",
+  "goal": "Reach past riverside_hedge_meadow (240/0) right-exit hostile chokepoint to survey its unexplored east/south ground, identify the tile=0x50 objects, and find the A-slot item (sword) if it is there",
   "blocker": {
     "status": "blocked",
-    "goal": "Reach shop_screen's (179/0) door and its interior",
-    "location": "shop_screen (179/0), door-approach band x=80-130,y=90-111",
-    "checkpoint": "shop_screen",
+    "goal": "Reach past riverside_hedge_meadow (240/0) right-exit hostile chokepoint to survey its unexplored east/south ground, identify the tile=0x50 objects, and find the A-slot item (sword) if it is there",
+    "location": "240/0, right exit chokepoint, on-screen stop position (44,12)",
+    "checkpoint": "e240_confirmed",
     "attempts": 6,
-    "blocker_type": "wall",
+    "blocker_type": "hostile_density_chokepoint",
     "observations": [
-      "6 sessions, 8+ push/sustained-hold routing attempts, all 3 open sides confirmed walled",
-      "anti-patch rule invoked in the 2nd, 3rd, and 6th sessions -- push-based method exhausted",
-      "registry's own SIXTH SESSION note names the exact next method: read the door cell's own lib/terrain.rb signature without live probing"
+      "3 methodologically distinct approaches (raw Navigator.move! taps; Navigator.avoid_hostiles_and_push! default radius=16; avoid_hostiles_and_push! radius=32; avoid_hostiles_and_push! via a down-then-right alternate route) all converge on the EXACT same on-screen stop position (44,12) and the exact same HP floor (8/24 from a 24/24 start) -- technique-independent convergence, not a controller-skill gap.",
+      "2 OAM-confirmed tile=0x50 object pairs sit just past the chokepoint (screen x=70,y=30 and further east) -- static, non-mobile, 4-frame idle animation, never yet reached for a face+:a interaction test.",
+      "Room genuinely SCROLLS past this point (SCY shift observed, single tap moved y from 36 to 12) -- the chokepoint sits right around the scroll boundary, a plausible reason a fixed-radius avoidance primitive underperforms here specifically."
     ],
     "failed_actions": [
-      "push",
-      "sustained_hold_push",
-      "off_grid_tap_sweep",
-      "hedge_maze_route",
-      "npc_east_route"
+      "raw_tap_push_right",
+      "avoid_hostiles_and_push_default_radius_16",
+      "avoid_hostiles_and_push_radius_32",
+      "avoid_hostiles_and_push_down_then_right_route"
     ],
     "known_constraints": [
-      "D12: no RAM writes to bypass a real obstacle",
-      "no cutting item confirmed owned yet"
+      "D12: no RAM writes to bypass the obstacle (0xDB5A must never be written)",
+      "no weapon/A-slot item confirmed owned yet",
+      "owner explicitly declined a D12 HP-write exception for this specific blocker and asked for a genuinely different approach instead"
     ]
   },
   "hypotheses": [
     {
-      "id": "h_door_band_sprite_not_uniform_wall",
-      "statement": "shop_screen's (179/0) unreached door-approach band (x=80-130,y=90-111) is not a uniform solid wall: reading its BG-tile signature (Terrain.signature_at, no live movement) against 2 already-confirmed real walls (roof-face x=104,y=16; NE-hedge x=122,y=32) and the already-confirmed grass+sprite SW pocket (x=60,y=106) should show at least one door-band cell sharing the grass+sprite signature/pattern rather than the solid-wall signature, with a previously uncatalogued static OAM sprite physically inside it -- mirroring the SW-pocket precedent (D9/D10) where BG terrain alone reads walkable but a static sprite still blocks it.",
-      "status": "supported",
-      "evidence": [
-        "{:known_wall_signature=>[244, 246, 245, 247], :known_wall2_signature=>[244, 246, 245, 247], :known_grass_blocked_by_sprite_signature=>[90, 127, 127, 90], :known_open_grass_signature=>[90, 127, 127, 90], :door_band_signatures=>{:row5_col5=>[90, 127, 127, 90], :row5_col6=>[90, 127, 127, 90], :row6_col5=>[244, 246, 245, 247], :row6_col6=>[32, 33, 48, 49]}, :oam_sprites_in_door_band=>[{:y=>88, :x=>102, :tile=>94, :attrs=>65}]}",
-        "{:lcdc=>231, :sprite_size_16=>true, :door_band_sprite_oam=>{:y=>88, :x=>102, :tile=>94, :attrs=>65}, :planter_a_oam=>{:y=>60, :x=>50, :tile=>94, :attrs=>1}, :planter_b_oam=>{:y=>70, :x=>77, :tile=>94, :attrs=>65}, :bush_a_oam=>{:y=>110, :x=>49, :tile=>92, :attrs=>33}, :bush_b_oam=>{:y=>110, :x=>57, :tile=>88, :attrs=>33}, :tile94_chr=>[0, 0, 0, 0, 0, 0, 0, 0, 195, 0, 231, 66, 255, 102, 255, 102], :tile95_chr=>[126, 36, 60, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], :identical_to_known_bush_a=>false, :identical_to_known_bush_b=>false, :nonblank_8px_rows_tile94_composite=>6, :nonblank_8px_rows_known_bush_composite=>15, :note=>\"tile94/95 CHR bytes decode to a real, coherent, renderable sprite (not a read artifact); confirmed byte-distinct from both already-catalogued bush instances (tile=92/93 and tile=88/89); pixel footprint is sparser (6/16 rows with any ink vs 15/16 for the known bush) -- visually a smaller/different decorative element, not simply a duplicate reading of the room's already-known bush. Movement-blocking itself was NOT tested this experiment (no live approach was made -- the cell remains physically unreached, per the SEVENTH SESSION's routing exhaustion); this experiment only independently reconfirms, via a genuinely different technique (CHR pixel data, not tile-ID signature/position), that a real, distinct, previously-uncatalogued static object occupies the cell.\"}"
-      ]
-    }
-  ],
-  "experiments": [
-    {
-      "id": "6a30f8783f0de942",
-      "hypothesis_id": "h_door_band_sprite_not_uniform_wall",
-      "checkpoint": "shop_screen",
-      "action": "read_bg_signatures_and_oam_census_shop_screen_door_band",
-      "observation": "{:known_wall_signature=>[244, 246, 245, 247], :known_wall2_signature=>[244, 246, 245, 247], :known_grass_blocked_by_sprite_signature=>[90, 127, 127, 90], :known_open_grass_signature=>[90, 127, 127, 90], :door_band_signatures=>{:row5_col5=>[90, 127, 127, 90], :row5_col6=>[90, 127, 127, 90], :row6_col5=>[244, 246, 245, 247], :row6_col6=>[32, 33, 48, 49]}, :oam_sprites_in_door_band=>[{:y=>88, :x=>102, :tile=>94, :attrs=>65}]}",
-      "outcome": "supports",
-      "cost": 0,
-      "state_fingerprint": "e9db76357b9d74c864f1cbf59116fcc3",
-      "created_at": "2026-09-16T14:50:54Z"
+      "id": "h_opportunistic_gap_dash",
+      "statement": "The chokepoint is passable without any HP-floor regression below the already-established 8/24 by reading hostile OAM positions live each step and only advancing right when no hostile is within contact range (an opportunistic gap-dash), because the hostiles wander/patrol (documented elsewhere in this project) rather than permanently occupying the chokepoint -- a fixed-radius avoidance primitive (tested at radius 16 and 32) cannot exploit a moving gap the way a live polling loop can.",
+      "status": "open",
+      "evidence": []
     },
     {
-      "id": "0324c9c4d2e5e381",
-      "hypothesis_id": "h_door_band_sprite_not_uniform_wall",
-      "checkpoint": "shop_screen",
-      "action": "chr_crosscheck_door_band_sprite_tile94_vs_known_bushes",
-      "observation": "{:lcdc=>231, :sprite_size_16=>true, :door_band_sprite_oam=>{:y=>88, :x=>102, :tile=>94, :attrs=>65}, :planter_a_oam=>{:y=>60, :x=>50, :tile=>94, :attrs=>1}, :planter_b_oam=>{:y=>70, :x=>77, :tile=>94, :attrs=>65}, :bush_a_oam=>{:y=>110, :x=>49, :tile=>92, :attrs=>33}, :bush_b_oam=>{:y=>110, :x=>57, :tile=>88, :attrs=>33}, :tile94_chr=>[0, 0, 0, 0, 0, 0, 0, 0, 195, 0, 231, 66, 255, 102, 255, 102], :tile95_chr=>[126, 36, 60, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], :identical_to_known_bush_a=>false, :identical_to_known_bush_b=>false, :nonblank_8px_rows_tile94_composite=>6, :nonblank_8px_rows_known_bush_composite=>15, :note=>\"tile94/95 CHR bytes decode to a real, coherent, renderable sprite (not a read artifact); confirmed byte-distinct from both already-catalogued bush instances (tile=92/93 and tile=88/89); pixel footprint is sparser (6/16 rows with any ink vs 15/16 for the known bush) -- visually a smaller/different decorative element, not simply a duplicate reading of the room's already-known bush. Movement-blocking itself was NOT tested this experiment (no live approach was made -- the cell remains physically unreached, per the SEVENTH SESSION's routing exhaustion); this experiment only independently reconfirms, via a genuinely different technique (CHR pixel data, not tile-ID signature/position), that a real, distinct, previously-uncatalogued static object occupies the cell.\"}",
-      "outcome": "supports",
-      "cost": 0,
-      "state_fingerprint": "e9db76357b9d74c864f1cbf59116fcc3",
-      "created_at": "2026-09-16T15:25:21Z"
+      "id": "h_structural_gate_no_gap",
+      "statement": "The chokepoint is a genuine structural gate: hostile patrol paths permanently overlap this exact screen position with no exploitable timing gap, so even an opportunistic gap-dash will still take unavoidable contact converging on the same (44,12)/8-24-HP signature already seen 3 times -- passing legitimately requires an item not yet found (a weapon or equivalent), not a better technique.",
+      "status": "open",
+      "evidence": []
     }
   ],
+  "experiments": [],
   "budget": {
     "max_experiments": 3,
     "min_supporting_experiments": 2
   },
-  "status": "resolved",
+  "status": "open",
   "promoted_facts": []
 }
