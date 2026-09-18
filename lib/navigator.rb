@@ -73,13 +73,14 @@ module Koholint
     # under COMMIT_THRESHOLD even though a real transition just happened -- move! returns :blocked
     # while room_id/map_id have actually changed. Check room identity after every call near a
     # screen edge; never infer "nothing happened" from :blocked alone.
-    def self.move!(motherboard, direction)
+    def self.move!(motherboard, direction, recorder: nil)
       axis = AXIS.fetch(direction)
       sign = SIGN.fetch(direction)
       start = position(motherboard.mmu)[axis]
 
       MAX_TAPS.times do
         tap(motherboard, direction)
+        recorder&.snapshot!
         delta = (position(motherboard.mmu)[axis] - start) * sign
         return :ok if delta >= COMMIT_THRESHOLD
       end
@@ -241,7 +242,7 @@ module Koholint
     # (hp_before/hp_after/damage) rather than assuming the biased direction was ever really safe.
     # Pass `min_hp` to bail out of the internal tap loop early (see #move_holding!) instead of only
     # finding out about a dangerous step after it already happened.
-    def self.avoid_hostiles_and_move!(motherboard, target_direction, radius: HAZARD_PROXIMITY_PX, min_hp: nil)
+    def self.avoid_hostiles_and_move!(motherboard, target_direction, radius: HAZARD_PROXIMITY_PX, min_hp: nil, recorder: nil)
       mmu = motherboard.mmu
       link_pos = position(mmu)
       hazards = nearby_hazards(motherboard, from: link_pos, radius:)
@@ -249,6 +250,7 @@ module Koholint
       shield = shield_equipped?(mmu)
       hp_before = mmu.read(LINK_HP_ADDRESS)
       result = move_holding!(motherboard, chosen, shield ? :b : [], min_hp:)
+      recorder&.snapshot!
       hp_after = motherboard.mmu.read(LINK_HP_ADDRESS)
       { direction: chosen, target_direction:, result:, hazards_seen: hazards.size,
         shield_held: shield, hp_before:, hp_after:, damage: hp_before - hp_after }
@@ -258,12 +260,12 @@ module Koholint
     # to/through `min_hp` -- callers decide whether/how to top HP back up between pushes (D12's
     # scoped Plage Coco permission); this only refuses to walk into a KO by itself. Returns one
     # result hash per step actually taken (see #avoid_hostiles_and_move!).
-    def self.avoid_hostiles_and_push!(motherboard, target_direction, max_steps:, min_hp: 8, radius: HAZARD_PROXIMITY_PX)
+    def self.avoid_hostiles_and_push!(motherboard, target_direction, max_steps:, min_hp: 8, radius: HAZARD_PROXIMITY_PX, recorder: nil)
       results = []
       max_steps.times do
         break if motherboard.mmu.read(LINK_HP_ADDRESS) <= min_hp
 
-        step = avoid_hostiles_and_move!(motherboard, target_direction, radius:, min_hp:)
+        step = avoid_hostiles_and_move!(motherboard, target_direction, radius:, min_hp:, recorder:)
         results << step
         break if step[:hp_after] <= min_hp
       end
