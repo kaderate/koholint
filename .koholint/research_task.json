@@ -37,6 +37,12 @@
       "statement": "The chokepoint is a genuine structural gate: hostile patrol paths permanently overlap this exact screen position with no exploitable timing gap, so even an opportunistic gap-dash will still take unavoidable contact converging on the same (44,12)/8-24-HP signature already seen 3 times -- passing legitimately requires an item not yet found (a weapon or equivalent), not a better technique.",
       "status": "open",
       "evidence": []
+    },
+    {
+      "id": "h_oursin_shield_contact_block",
+      "statement": "The 240/0 chokepoint damage is not purely from the wandering tile=0x6a/0x68 hostile: the 2 static tile=0x50 round objects near it (never contact-tested, closest approach only 25-30px) may be a variant of the oursin/sea-urchin hazard family already documented at riverside_flower_clearing (225/0, tile=0x5C/0x5E) -- a STATIC contact-damage hazard, not an active attacker. The signpost there explicitly says a shield protects against oursins specifically (dialogues.riverside_flower_clearing_sign, page 2: \"Se proteger avec un bouclier!\"), a claim never actually tested in-game (registry note: shield was only ever measured as partial knockback-mitigation against the WANDERING 0x60-family, never as a full block against a static oursin-type object). If true, deliberately walking into contact with a tile=0x50 object while shield-equipped (B held, facing it) should show ZERO HP cost on that specific contact, unlike contact with the wandering 0x6a/0x68 creature, which the D13 primitive already showed still costs HP even while shielded.",
+      "status": "open",
+      "evidence": []
     }
   ],
   "experiments": [],
