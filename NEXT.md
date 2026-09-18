@@ -693,6 +693,19 @@ mechanic/story trigger not yet tried (re-calling Pépé from a different game-st
 still-open half of September 17's earlier Pépé-reproducibility question; or revisiting whether any
 already-catalogued dialogue holds a missed clue, per NEXT.md's own "different method entirely"
 precedent that found the Cave Flagello signpost in the first place).
+**`240/0` (riverside_hedge_meadow) survey, September 18 2026 (Explorer subagent)**: the one genuinely
+fresh lead on file (found as a side effect of the diagonal-hold test, adjacent to `224/0`) was
+surveyed. `up`/`down` exits both resolved (up = return door to already-charted `224/0`; down = a
+real hard wall dead-ending into a small pocket). The room's one previously-uncatalogued object
+(tile=0x50, a round green blob) is now IDENTIFIED as static/non-mobile, non-hostile -- but its
+actual `:a` interaction test was never reached: `right`, the room's one open thread (and the only
+one leading toward both unidentified objects and unexplored ground), is blocked by an unusually
+dense/aggressive hostile cluster -- 3 independent approach attempts all stalled at HP risk (down to
+4/24 at worst) before Link ever got within contact range. PAUSED (gate: D12), not closed -- this
+session could not ask the owner for a scoped HP-write exception mid-task. No chest/sign/NPC/item
+found anywhere actually reached. Status left `glimpsed` (not promoted). Full detail:
+`room_labels['240/0']`, `visual_catalog.room240_round_green_object`. A future session with an
+owner-approved D12 exception is the natural next step to close this room out.
 
 ## In-flight work (for resumability)
 
