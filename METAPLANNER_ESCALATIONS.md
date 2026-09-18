@@ -277,3 +277,44 @@ spec fixed by what was actually validated. The original `quest_clues` registry p
 remaining spatial-vs-clue-directed Explorer-mandate piece are left unadopted at this scope --
 game-schema territory outside this mandate, and not yet evidenced to the same bar; a planner/
 `DECISIONS.md`-scoped call if that changes.
+
+## ESC9: creature/hazard facts are scattered per-room with no canonical cross-reference, so the same identification work repeats and code hazard-tracking silently drifts out of sync with what's already catalogued
+
+**Status**: open
+**Opened**: September 18 2026, by planner session
+**Context**: owner asked, mid-session, how to make the process itself notice it needs something
+like an enemy bestiary. Four concrete instances on file, same root shape, clearing this project's
+own "recur a few times first" bar (the one ESC8/MP10 already used):
+(1) **A real instrumentation gap found by accident today**: a live experiment against `240/0`'s
+hostile-density chokepoint (`.koholint/research_task.json`, hypothesis
+`h_oursin_shield_contact_block`) initially filtered nearby hazards using only
+`Navigator::HOSTILE_TILE_IDS`, missing `tile=0x6c`, which is in the separate
+`Navigator::UNKNOWN_HAZARD_TILE_IDS` set -- that tile did real, attributable damage (-12 HP in one
+step) before the gap was noticed and corrected mid-session. The two tile-ID sets exist in code but
+nothing forces a script to check both, because there is no single place answering "what hazards are
+known near this tile family, and am I tracking all of them".
+(2) **An actionable, testable claim sat unqueried for 8 days**: `dialogues.riverside_flower_clearing_sign`
+(found September 10 2026) explicitly states a shield protects against "oursins" (sea urchins,
+`tile=0x5C/0x5E`) -- a specific, falsifiable claim about a specific creature family -- but nothing
+in this project surfaces "here is an untested behavioral claim about creature X" as a thing to
+check off; it was only investigated September 18 because the owner happened to say "Oursins..." as
+a hint. A canonical per-creature index with an `open_questions`/`untested_claims` field would have
+surfaced this on its own the day the signpost was read.
+(3) **Hazard status is recorded per-room, inconsistently, with no propagation**: `visual_catalog`
+currently has at least 4 separate "hazard status unknown, not tested" entries for visually distinct
+objects across different rooms (`room240_round_green_object` tile=0x50; `riverside_south_pale_creature`
+tile=108/109; `shop_screen_door_band_object`; `building_screen_flutter_object`), each discovered and
+left open independently, with no shared place a future session would check first to see "has
+anything like this tile/CHR pattern already been classified elsewhere."
+(4) **A known cross-room identity link exists but its status didn't propagate**: `villager_wandering_creature`
+was CHR-byte-matched as the identical sprite across `177/0` (confirmed friendly, has dialogue) and
+`162/0` (still untested many sessions later) -- the match itself is on file, but nothing in the
+process re-surfaces "this is probably the same, already-known-friendly creature" when the second
+instance is encountered, so it stays queued as a fresh unknown.
+**Why process, not domain**: the actual facts about any given creature (is it hostile, what tile
+IDs, what counters it) are `DECISIONS.md`/`data/ram_registry.json`-scope game-domain content, out
+of MetaPlanner's mandate to write directly. What's in scope here is process-level: whether a
+canonical cross-reference structure and a checklist/audit habit exist at all, the same shape as
+ESC8/MP10's two-part `tested` field convention and Reviewer-audit cadence -- a coordination gap,
+not a claim about what any specific creature actually does.
+**Resolution** (MetaPlanner fills in): -> METAPLANNER.md#MP<n>, one-line summary.
