@@ -307,3 +307,76 @@ four foundation sessions that grew until the loop was never reached.
 whose score has moved at least once with no human touching the controls. If that is not true,
 the architecture is wrong rather than merely behind — which is the check that was missing when
 the same verdict was written twice, two weeks apart.
+
+---
+
+## 5. What is built in advance, and what the agent builds
+
+The PokéAgent Challenge (arXiv 2603.15563) is the sharpest available evidence on where this
+boundary belongs, and it puts it much further toward "built in advance" than intuition suggests.
+Its headline result is that without a harness, frontier models achieve *"effectively 0% task
+completion"*, which it calls *"not a marginal optimization but a prerequisite"*. Its provided
+baseline is already substantial — perception, memory with *"automatic context compaction to
+manage the thousands of reasoning steps"*, a central orchestrator holding a route plan, and
+tools for A\* pathfinding, button inputs and knowledge retrieval, plus sub-agents for battle
+strategy, self-reflection, puzzles and objective verification. Both winning teams then moved
+*further* in that direction, replacing runtime LLM decisions with policies trained offline.
+
+One asymmetry works strongly in our favour. That benchmark deliberately withholds state: it
+exposes party composition, levels, status and HP, while *"puzzle states, dynamic obstacles,
+items, and movesets are not exposed"*, so its agents must recover them from pixels — and its
+first listed open challenge is VLM-SLAM grounding for localization and objective detection. We
+own the emulator. Localization is four RAM addresses. **That entire problem class is bought, not
+solved**, and no effort goes into VLM perception.
+
+### Bucket A — built in advance, by us
+
+| | |
+|---|---|
+| Emulator session, frame-accurate stepping, snapshot/restore, input log, determinism test | L0 |
+| The RAM map: finding the addresses for inventory, progress flags and dialogue state | L1 |
+| The score: the milestone list and its RAM predicates | L2 |
+| The action vocabulary and each action's input sequence | L3 |
+| Tree, node store, worker pool, budget accounting | L4 |
+| Planner scaffolding: prompt structure, state compaction, call budget, maneuver declaration | L5 |
+| World-model **schema** and its validator | L6 |
+| A\* routing as an algorithm | L6 |
+| Persistence, run directory, dashboard | L7 |
+
+The RAM map is deliberately in this bucket, and it is the one debatable entry. An agent
+discovering its own addresses at runtime is foundation work wearing the costume of play — the
+exact R1 trap. Finding addresses is *engineering* discovery, which is ours; discovering the
+island is *game* discovery, which is the agent's. The benchmark makes the same split: its 15
+milestones are standardized and defined by the environment, not discovered by competitors.
+
+### Bucket B — built by the agent, and persisted
+
+| | |
+|---|---|
+| The room graph: nodes and typed exits. A\* is ours; the graph it runs on is the agent's | |
+| Entities, hazards and their behaviour, per room | |
+| The hypothesis ledger: claims, provenance, verification status, refutations | |
+| **Maneuver solutions** — the winning input sequence for a hard crossing, stored as a reusable edge | |
+| The decomposition of "finish the game" into subgoals, and the route plan | |
+
+Maneuver solutions are the most valuable of these and the least obvious. Once `240/0` is solved,
+the sequence that solves it is a permanent asset replayable at zero search cost. It is the same
+thing the winning team obtained by distilling a policy, held as a replayable input sequence
+instead of network weights — which is available to us precisely because we chose determinism and
+rollback.
+
+### Bucket C — never persisted
+
+The LLM's reasoning traces, and narrative session logs. Outcomes and evidence are recorded;
+deliberation is not. This is the bucket the old project had no name for, which is how ~65 400
+words of English ended up inside `data/ram_registry.json`.
+
+### The reconciliation with "the loop is commit 1"
+
+"Build a lot in advance" reads dangerously close to the foundation-first failure that produced
+four sessions of groundwork and no agent. The distinction is precise and it is the whole point
+of §4's build order: **the harness is built in advance, but thin and end-to-end first, never
+deep and layer-by-layer.** All of bucket A exists from day one at low quality, with the loop
+running through it, and is then improved under a running loop. The failure mode was never
+building infrastructure; it was perfecting one layer before the next existed, until the top
+layer was never reached.
