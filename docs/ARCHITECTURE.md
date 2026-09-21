@@ -380,3 +380,101 @@ deep and layer-by-layer.** All of bucket A exists from day one at low quality, w
 running through it, and is then improved under a running loop. The failure mode was never
 building infrastructure; it was perfecting one layer before the next existed, until the top
 layer was never reached.
+
+---
+
+## 6. Framework versus run, borrowed from pathfinder
+
+`github.com/vd1/pathfinder` is a multi-stage pipeline that pairs academic papers and drives
+peer agents to write publishable notes. The domain is unrelated; its *organisation* is worth
+taking almost wholesale, and it sharpens three things this document had left vague.
+
+### The pattern
+
+A reusable **framework** (the `pathfinder/` package: CLI, orchestration, scoring) is separated
+from a **campaign directory** holding one concrete execution — its config, its state files, its
+ledgers, its artifacts. Every command takes `--root DIR` to say which campaign it operates on.
+`experiments/3peers/` is a second campaign that reruns the same pairs with three peers instead
+of two, sharing the source corpus by symlink.
+
+Nothing in koholint is implicitly global under this pattern, and that alone would have prevented
+R9: `/tmp/zelda_checkpoints/main.dump` was a global, unaddressed, unversioned singleton because
+no command ever had to name which run it belonged to.
+
+### The koholint run directory
+
+```
+runs/main/
+  run.json            # config: models, budgets, knowledge policy, workers, action set
+  inputs.log          # the durable unit: inputs from boot
+  nodes.jsonl         # the macro graph, append-only
+  world/              # the typed world model (rooms, entities, facts, hypotheses)
+  maneuvers/<id>/
+    declaration.json  # from, succeeds?, candidates, budget
+    attempts.jsonl    # append-only evidence
+    solution.log      # the winning input sequence, if any
+    status.json       # open | solved | exhausted
+    lock
+  receipts.jsonl      # one line per model call, failures included
+  events.jsonl        # goals set, maneuvers declared, abandonments
+  score.jsonl
+  screenshots/
+  cache/snapshots/    # derived, gitignored, re-derivable by replay
+  stop.json           # present = halt
+  index.html
+```
+
+`koholint run --root runs/main`, and likewise `reconcile`, `serve`, `export`.
+
+### The three things this fixes
+
+**1. Receipts and a budget guard replace a documented budget.** Pathfinder writes one receipt
+line per *attempted* model call, failures included, carrying model, seconds, outcome, tokens,
+cache reads and cost. Before admitting a call, a guard checks that known cost plus an estimate
+for each in-flight call stays under `budget_usd`, and **if it does not, the guard writes the stop
+marker itself**. That is C4 made mechanical. This document said the LLM budget would be "declared,
+measured and enforced in code" without saying how; this is how, and it is the same principle as
+C7 — a rule a script can check is checked by a script, never by a paragraph.
+
+**2. `reconcile` replaces the cold-start read, and it is the best idea in the repository.**
+Pathfinder's `stop` writes `stop.json`; a later call resumes each thread at its recorded stage,
+and `reconcile [pair]` computes the safe next action and applies it with `--apply`. So a process
+with no memory of what came before does not *read* its way back into the work — it **asks the
+state what to do next**.
+
+That is a strictly better answer to R10 than the ≤ 2 000-word `START_HERE.md` in C6. The word
+budget stays, as a cap on human-facing orientation, but the mechanism becomes a command. The old
+project's context-rotation protocol made a ~27 300-word re-read a *recurring* cost precisely
+because durable memory was a document written for a reader rather than a state queryable by a
+program.
+
+**3. `experiments/` makes decision B's ablation free.** `docs/OBJECTIVES.md` §3 promises that the
+discovery question gets settled later by turning knowledge off and measuring how far the same
+agent gets. Under this pattern that experiment is `experiments/no-knowledge/` with a different
+`run.json` — same framework, same code, one config key — rather than a branch or a rewrite. The
+same holds for comparing planner models, worker counts and action sets. An experiment that costs
+a directory gets run; one that costs a refactor does not.
+
+### What already agreed
+
+Several details confirm choices made above rather than changing them, which is mild evidence the
+shape is right: append-only ledgers with a digest of their source, so a frozen cut can detect
+that the appendable file moved under it (our snapshot cache is already keyed by the input-log
+hash); bounded loops with named verdicts and caps in config, not in prose (`DRAFT` / `REVISE` /
+`ITERATE` / `PAUSE` against our `:solved` / `:exhausted`); a live monitor served from the run
+directory; per-thread `lock` files, which we need too once N workers write to one node store; and
+an open-ended mode that keeps expanding and re-ranking above a score threshold with IDs stable
+across passes — structurally our frontier expansion.
+
+### What not to take
+
+**The role taxonomy.** Pathfinder runs two peer agents, a consolidator and a verifier, because
+its output is a document produced by deliberation and independent viewpoints genuinely improve
+it. Our output is a path through a state space, checked by a score function. Importing peers,
+consolidators and verifiers would re-create exactly the role structure the retrospective told us
+to delete (R4, Q12) — admiring a repository and copying its org chart along with its mechanics.
+
+**The linear pipeline.** `fetch → sources → scan → select → research → paper → export` is a
+pipeline because that domain is one. Ours is a loop over a tree, and forcing it into stages would
+reintroduce the phase-ordered plan whose four foundation sessions never reached the loop (R1).
+Take `--root`, the run directory, receipts, the stop marker and `reconcile`. Leave the stages.
