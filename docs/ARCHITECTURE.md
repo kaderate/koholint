@@ -1,11 +1,12 @@
 # Koholint — architecture
 
-Written September 21, 2026, from `docs/RETROSPECTIVE.md` and the objectives and constraints
-settled with the owner in `docs/OBJECTIVES.md`. Those three decisions are assumed here:
+An autonomous agent that plays *The Legend of Zelda: Link's Awakening DX* through gemboy, a
+Game Boy emulator written in Ruby. Objectives and constraints are in `docs/OBJECTIVES.md`; this
+document assumes its three decisions:
 
-- **Objective**: finish Link's Awakening DX. The agent decomposes; the score is global.
-- **Knowledge**: the manual is the only document in context; the model's own priors are allowed
-  but tagged; nothing becomes a fact without in-game verification.
+- **Objective**: finish the game. The agent decomposes it; the score is global.
+- **Knowledge**: the manual is the only document in the agent's context; the model's own priors
+  are allowed but tagged; nothing becomes a fact without in-game verification.
 - **Rollback**: a gameplay mechanic, not a debugging tool.
 
 ---
@@ -13,23 +14,23 @@ settled with the owner in `docs/OBJECTIVES.md`. Those three decisions are assume
 ## 1. The central idea
 
 **The agent is a search over a tree of emulator states, guided by an LLM.** Not a player
-pressing buttons in one continuous life.
+pressing buttons through one continuous life.
 
-That reframing is the architecture, and it follows directly from the decisions. The emulator is
-deterministic and snapshots cost ~0.05–0.08 s, so a state is a value that can be kept, copied,
-returned to and searched from. Nodes are states, edges are action sequences, the score orders
-the nodes. The LLM decides what to try and reads what happened; code does the searching, the
-scoring and the bookkeeping.
+The emulator is deterministic and a snapshot costs ~0.05–0.08 s, so an emulator state is a value
+that can be kept, copied, returned to and searched from. Nodes are states, edges are action
+sequences, and the score orders the nodes. The LLM decides what to try and reads what happened;
+code does the searching, the scoring and the bookkeeping.
 
-Everything the retrospective flagged falls out of this:
+Three properties follow immediately, and they are why the design is shaped this way:
 
-| Root cause | How the tree answers it |
-|---|---|
-| R1 — no loop | The loop *is* tree expansion. It is small, and it is the first commit. |
-| R8 — grinding on a wall | A wall is a subtree that buys no score. Budget spent → back up and branch. Abandonment is a graph operation, not a judgement call. |
-| R9 — progress in `/tmp` | The path from root to the best node *is* the input log. Progress is a committed file. |
-| R7 — throughput | Expansion is embarrassingly parallel across emulator processes. |
-| R5 — drifting indicators | The score orders the tree. A metric that does not order nodes is not an indicator. |
+- **A wall becomes a search with a budget.** A passage the agent cannot cross is a subtree that
+  buys no score. When its budget is spent, the runner backs up and branches. Deciding that a
+  subgoal is unreachable is a graph operation, not a judgement call, so it needs no human.
+- **Durable progress is a path, not a save file.** The route from the root to the best node is
+  exactly the sequence of inputs that produces it — a few kilobytes of text that reproduce any
+  state on any machine.
+- **Expansion is parallel.** Independent branches explore in separate processes with separate
+  emulators, which is the only way to buy throughput (`docs/OBJECTIVES.md` C1).
 
 ### Two levels, or it explodes
 
@@ -37,39 +38,86 @@ A naive search over all action sequences is combinatorially hopeless. The tree h
 and keeping them separate is what makes it tractable.
 
 **The macro graph** — nodes are *states worth keeping*: a milestone reached, a new room entered,
-a subgoal completed. Edges are whole maneuvers. This graph is small (hundreds of nodes for a
-full playthrough) and it is where the LLM plans.
+a subgoal completed. Edges are whole maneuvers. This graph stays small, on the order of hundreds
+of nodes for a full playthrough, and it is where the LLM plans.
 
-**A maneuver** — a bounded, code-driven search inside one edge. It is declared as:
+**A maneuver** — a bounded, code-driven search inside a single edge:
 
 ```
 Maneuver
-  from:      snapshot
-  succeeds?: (observation) -> bool     # e.g. x > 100 && hp >= 16
+  from:       snapshot
+  succeeds?:  (observation) -> bool     # e.g. x > 100 && hp >= 16
   candidates: generator of action sequences   # timing, row, approach angle, order
-  budget:    frames, or attempts
+  budget:     frames, or attempts
 ```
 
-Code runs it, in parallel, and returns either a winning input sequence or `:exhausted`. The LLM
-never sees the individual attempts — only the verdict and a summary of the evidence.
+Code runs it, in parallel, and returns a winning input sequence or `:exhausted`. The LLM never
+sees individual attempts — only the verdict and a summary of the evidence.
 
-Room `240/0` is the worked example. Under one continuous life it is a wall: six attempts, five
-techniques, the same 8/24 HP floor. As a maneuver it is `from:` the snapshot at the room's
-entrance, `succeeds?:` crossed the right edge with HP ≥ 16, `candidates:` variations over
-approach row, timing and shield state, `budget:` 200 attempts. That is a few seconds per attempt,
-so roughly twenty minutes on one emulator or three on eight. It either yields an input sequence
-or it returns exhausted — and exhaustion is a *fact the planner can act on*, which is precisely
-what the old system never had.
+A hostile room an unarmed Link cannot walk straight through is the worked example. Played as one
+life it is a wall. As a maneuver it is: start from the snapshot at the room's entrance, succeed
+on reaching the far exit above an HP floor, vary the approach row, the timing and the shield
+state, and stop after 200 attempts. That is a few seconds per attempt, so roughly twenty minutes
+on one emulator or three on eight. It yields a crossing, or it returns exhausted — and
+exhaustion is a fact the planner can act on.
 
 ---
 
-## 2. Layers
+## 2. Invariants: what is fixed, and what the agent chooses
 
-Eight, bottom up. Each one is testable without the one above it.
+The loop's *structure* is fixed in code. What the agent supplies is the *content* of a few
+decisions inside it. This is the boundary that keeps autonomy from becoming drift, and every
+line of it is enforced mechanically rather than asked for in a prompt.
+
+### Fixed — the agent cannot change these
+
+| Invariant | Enforced by |
+|---|---|
+| The cycle is observe → score → plan → declare → execute → record → repeat | the runner; the planner cannot add, skip or reorder a step |
+| The LLM never sends an input to the emulator | the planner's only return type is a `Maneuver` |
+| Every emulator action happens inside a declared maneuver carrying a success predicate and a budget | the maneuver runner refuses an undeclared action |
+| Budgets are counted down and terminated by the runner | frame and attempt counters, not the planner's judgement |
+| The score is computed from RAM by code | `Score` is a pure function; nothing on the planner's path can write it |
+| Kept states are monotone in score | the node store refuses a replacement that scores lower |
+| A flat score over N expansions forces re-planning | a counter in the runner |
+| Model calls are receipted, and a guard halts the run when the budget is exceeded | the guard runs before each call and writes the stop marker itself |
+| Nothing enters the world model without passing the schema | the validator, in CI and at write time |
+
+### Free — the agent's only degrees of freedom
+
+- Which subgoal to pursue next, and whether to abandon it before its budget is spent.
+- A maneuver's success predicate and candidate generator.
+- The budget it requests, within the cap its configuration sets.
+- Which hypotheses to form, and which to test first.
+
+### The drift that remains, and why it is bounded
+
+Two failure modes survive this, and neither is worth pretending away.
+
+**The agent pursues a wrong subgoal.** It can spend a night of emulation on a branch that leads
+nowhere. Three things bound the damage: the cost is capped, because every maneuver carries a
+budget and the run carries a spend guard; it is visible, because `score.jsonl`, `events.jsonl`
+and the dashboard show a flat score against accumulating attempts; and it is recoverable,
+because the tree still holds every good node and the search resumes from one of them. Wasted
+time is the worst case. Lost ground is not possible, which is what score monotonicity buys.
+
+**The agent declares a weak success predicate.** A maneuver can "succeed" at reaching a position
+that turns out not to be progress. The arbiter is the score, not the predicate: a maneuver that
+succeeds without moving the score is recorded as exactly that, and a run of them is what the
+flat-score trigger detects.
+
+Both are bounded, observable and recoverable. Neither is silent, and neither needs a human to
+notice it.
+
+---
+
+## 3. Layers
+
+Eight, bottom up. Each is testable without the one above it.
 
 ### L0 — Emulator session
 
-A thin wrapper over gemboy's `Motherboard`. It owns the one invariant everything else rests on:
+A thin wrapper over gemboy's `Motherboard`, owning the invariant everything else rests on:
 **the same ROM plus the same input log produces the same state.**
 
 ```
@@ -84,36 +132,39 @@ Emulator
 ```
 
 Two notes on gemboy. `run_cycles` advances in chunks of 20 instructions and overshoots by up to
-one chunk, so it is deterministic but not frame-exact — L0 must align on the PPU's frame
-boundary itself. And `dump(with_rom: false)` gives a ROM-free snapshot, which matters for what
-may be cached on disk.
+one chunk, so it is deterministic but not frame-exact — L0 aligns on the PPU's frame boundary
+itself. And `dump(with_rom: false)` yields a ROM-free snapshot, which decides what may be cached
+on disk.
 
-**First test to write, before anything else**: boot, run a fixed input log twice in two fresh
-processes, assert identical RAM. If determinism from boot does not hold, the whole design
-changes, and it is cheap to find out.
+**The first test to write, before anything else**: boot, replay a fixed input log in two fresh
+processes, assert identical RAM. Determinism from boot is an assumption, not yet a fact, and
+rollback, the input log as the durable unit and the snapshot cache all rest on it.
 
 ### L1 — Observation
 
-One struct, built from RAM in a single cheap pass. No prose, no derived narrative.
+One struct, built from RAM in a single cheap pass.
 
 ```
 Observation
   x, y, room, map, direction     # 0xFF98, 0xFF99, 0xFFF6, 0xFFF7, 0xFF9E
   hp, max_hp                     # 0xDB5A
   a_slot, b_slot                 # 0xDB00 (hypothesis: 4 = shield)
-  inventory_flags                # TO FIND
-  progress_flags                 # TO FIND
-  in_dialogue                    # TO FIND (currently inferred by probing movement)
+  inventory_flags                # to find
+  progress_flags                 # to find
+  in_dialogue                    # to find
   tilemap_digest
 ```
 
-Screenshots are produced on demand, upscaled 4–6×, and are for the owner and the rare vision
-call — never for the loop's own decisions.
+Screenshots are produced on demand, upscaled 4–6×, for the owner and the rare vision call —
+never for the loop's own decisions.
 
-The unknown addresses are **task zero**, using the method that already worked: diff the whole
-`0x0000–0xFFFF` space across a controlled action, cross-check against the community
-disassembly. The ~15 KB of already-clean addresses in the old `data/ram_registry.json` migrate
-as they are.
+The unknown addresses are task zero. The method: diff the whole `0x0000–0xFFFF` space across a
+controlled action, then cross-check against the community disassembly. Scanning WRAM alone is
+not enough; the known position and direction addresses live in HRAM.
+
+Dialogue text is decoded by 8×8 pixel bitmap, never by tile ID: the renderer reuses a fixed
+scratch tile range (`0xD0–0xDF`, `0xE0–0xEF`) and rewrites its pixels per textbox, so tile IDs
+carry no information.
 
 ### L2 — Score
 
@@ -123,22 +174,21 @@ Score.milestones(observation) -> Set<Symbol>
 Score.percent(observation)    -> Float
 ```
 
-A pure function of RAM. Runs on any snapshot in milliseconds. The milestone list is declared —
-sword, shield, Tail Cave entered, Roc's Feather, Moldorm defeated, Full Moon Cello, and on
-through the eight instruments to the egg — and it is itself knowledge under decision B: sourced
-from the manual and model priors, tagged as such, each entry verified in-game the first time it
-is observed.
+A pure function of RAM, running on any snapshot in milliseconds. The milestone list is declared
+— sword, shield, first dungeon entered, Roc's Feather, first boss defeated, Full Moon Cello, on
+through the eight instruments to the egg. The list is itself knowledge under the
+manual-plus-tagged-priors rule: sourced, labelled, and each entry verified in-game the first
+time it is observed.
 
-Four properties, and they are the whole point of R5:
+Four properties:
 
 1. It is **the only indicator**. Rooms charted, dialogues transcribed, terrain coverage and
-   verified-fact counts are diagnostics. They may be logged. They may never sit in a table next
-   to the score as peers.
+   verified-fact counts are diagnostics. They may be logged; they never sit beside the score as
+   peers. A number that does not order nodes in the tree is not an indicator.
 2. Every run prints it without being asked.
-3. It is **monotone over kept states**: a node is never replaced by one that scores lower. This
-   is what makes rollback coherent — it is the rule that says which state to keep.
-4. A flat score over N expansions **triggers re-planning in code**. Fourteen of twenty sessions
-   reported "game indicator unchanged" and nothing noticed; this is the mechanism that notices.
+3. It is **monotone over kept states** — the rule that decides which state to keep, and what
+   makes rollback coherent.
+4. A flat score over N expansions **triggers re-planning in code**.
 
 ### L3 — Action space
 
@@ -148,26 +198,28 @@ An action is an object, not a method on a navigator.
 Action
   name
   applicable?(observation) -> bool
-  inputs               -> [(buttons, frames), ...]
-  effect(before, after) -> :ok | :no_effect | :unexpected
+  inputs                   -> [(buttons, frames), ...]
+  effect(before, after)    -> :ok | :no_effect | :unexpected
   frame_cost
 ```
 
 Initial vocabulary: `Tap(dir)`, `Hold(dir, frames)`, `Attack`, `Push(dir)`, `Dive`,
 `UseItem(slot)`, `Equip(item, slot)`, `OpenMenu`, `AdvanceDialogue`.
 
-`Push` and `Dive` are in the first vocabulary deliberately: the manual describes both, the old
-project never attempted either, and it recorded statue-shaped objects and water edges as
-impassable walls while doing so.
+`Push` and `Dive` are in the first vocabulary because the manual describes both and each turns a
+class of apparent wall — statues, water edges — into a passage.
 
-**Growth rule**: a new mechanic is a new file implementing this interface. It never edits a
-navigator. That is the answer to R6, where the action space accreted from whatever the next
-script happened to need.
+**Growth rule**: a new mechanic is a new file implementing this interface, never an edit to a
+navigator.
 
 **Recording rule**: an attempt records the `Action` instance and the observation delta, never a
-boolean. "I tried X and it did not work" is meaningless without tap-versus-hold, the approach
-row and the angle — at least four "confirmed hard walls" in the old project were tap-timing
-false negatives.
+boolean. A directional tap commits ~14 px over ~24–28 frames or bounces; a sustained hold of
+110–400 frames is a *different action* with a different outcome, as are the approach row and the
+angle. A negative result that does not record how it was obtained is not a result.
+
+One trap worth encoding: crossing a room boundary rebases the position, so an axis delta can
+read as blocked while a real transition happened. Never infer "nothing happened" from a zero
+delta alone.
 
 ### L4 — The search
 
@@ -181,39 +233,35 @@ Node
 ```
 
 A pool of N worker processes, each owning one emulator, pulls `(node, maneuver)` jobs from a
-queue. This is where C1 is absorbed: one instance yields ~25–30 minutes of game time per real
-hour, so parallelism is not an optimisation to add later — the job queue exists in the first
-version even when N is 1.
+queue. One instance yields ~25–30 minutes of game time per real hour, so the job queue exists
+from the first version even while N is 1.
 
-Snapshots are a **cache**, keyed by the input-log hash, evictable at any time and re-derivable
-by replaying the log. That is what keeps disk bounded on a search that keeps thousands of states.
+Snapshots are a **cache** keyed by the input-log hash, evictable at any time and re-derivable by
+replay. That is what keeps disk bounded across a search holding thousands of states.
 
 ### L5 — The planner
 
-This is the only place an LLM is called, and it never presses a button.
-
-It does four things:
+The only place an LLM is called, and it never presses a button. It does four things:
 
 1. **Decompose** the objective into the current subgoal, from the world model and the score.
-2. **Declare a maneuver**: the success predicate, the candidate generator, the budget.
-3. **Interpret** a result — and on `:exhausted`, decide between *the approach was wrong*, *the
-   subgoal was wrong*, or *the budget was too small*. This is the mechanism R8 never had.
+2. **Declare a maneuver**: success predicate, candidate generator, budget.
+3. **Interpret** a result, and on `:exhausted` choose between *the approach was wrong*, *the
+   subgoal was wrong* and *the budget was too small*.
 4. **Form hypotheses** about the world, each tagged with its provenance.
 
-Budget: **LLM calls per emulated game minute**, declared, measured and enforced in code. The
-state a call receives is compact — the current observation, the score, the subgoal, a summary of
-the last few maneuver results, and the queried slice of the world model. Never a narrative, and
-never a file read from end to end.
+Budget: **LLM calls per emulated game minute**, declared in configuration, receipted per call
+and enforced by a guard (§5). The state a call receives is compact — the current observation,
+the score, the subgoal, a summary of recent maneuver results, and the queried slice of the world
+model. Never a narrative, and never a file read end to end.
 
-This is `docs/CONCEPT.md`'s three-tier design, which was scheduled as sessions 5 to 7 and never
-started. It is still right. The PokéAgent Challenge reaches the same shape independently —
-an orchestrator holding the route plan, dispatching specialised sub-agents — and reports that
-without such a harness, frontier models achieve *"effectively 0% task completion"*, which it
-calls *"not a marginal optimization but a prerequisite"*.
+The PokéAgent Challenge (arXiv 2603.15563) converges on the same shape from a different
+direction — an orchestrator holding a route plan and dispatching specialised sub-agents — and
+reports that without such a harness, frontier models reach *"effectively 0% task completion"*,
+which it calls *"not a marginal optimization but a prerequisite"*.
 
 ### L6 — World model
 
-A typed store with a validator in CI. Not a document.
+A typed store with a validator, not a document.
 
 ```
 rooms       id, map, exits[]         # exit: direction, action used, destination, verified_count
@@ -224,9 +272,9 @@ milestones  the score's definition
 ```
 
 `source` is an enum: `manual`, `model_prior`, `in_game_observation`. `status` is an enum:
-`open`, `verified`, `refuted`. This is decision B made mechanical — the model's priors are a
-legitimate, *labelled* source, and at the end of a run you can measure what fraction of the
-world model came from priors versus observation. That is a result, not a compliance problem.
+`open`, `verified`, `refuted`. This makes the knowledge policy mechanical — a prior is a
+legitimate, labelled source, and the share of the world model that came from priors rather than
+observation is a measurable quantity at the end of a run.
 
 Queries it must answer **in code**, not in tokens:
 
@@ -235,173 +283,97 @@ Queries it must answer **in code**, not in tokens:
 - contradiction — two facts about the same cell that disagree
 - lookup — what is known about this room, entity or address
 
-Enforcement, answering R3 and C7: provenance, `verified_count ≥ 2` before `verified`, and the
-`status` enum are checked by a validator that fails the build. The old project wrote that rule
-three times in prose and shipped 63 violations of it. Free prose lives in one `notes` field,
-capped in length, that no code reads.
-
-The old registry's room facts, 25 dialogues and 20-entry visual catalog are migrated into this
-schema — roughly 65 000 words of prose becoming typed rows. The facts are an asset; their
-container was the problem.
+Provenance, `verified_count >= 2` before `verified`, and both enums are checked by a validator
+that fails the build. Free prose lives in one `notes` field, capped in length, that no code
+reads.
 
 ### L7 — Persistence and observability
 
-**Durable progress is the input log from boot.** A few kilobytes of text, no ROM in it, no
-format fragility, and it reproduces any state exactly on any machine. Snapshots are a local
-cache. The `.sav` remains a coarse anchor for convenience.
+**Durable progress is the input log from boot**: a few kilobytes of text, no ROM inside it, no
+format fragility, reproducing any state exactly on any machine. Snapshots are a local cache. The
+game's own `.sav`, via gemboy's `BatteryRam.save/load`, remains a coarse anchor.
 
-Acceptance test: a fresh container, plus the owner's ROM, replays the committed log and reaches
-the same state and the same score. (The ROM cannot be committed, so this test runs locally
-rather than in CI; CI runs the schema validators, the unit tests and everything else that does
-not need the ROM.)
+Acceptance test: a fresh container plus the owner's ROM replays the committed log and reaches
+the same state and score. The ROM cannot be committed, so this test runs locally; CI runs the
+schema validators, the unit tests and everything else that does not need it.
 
-**Observability is an output of the loop, not a reporting convention.** Every run writes to one
-directory: `score.jsonl`, `events.jsonl` (goals set, maneuvers declared, exhaustions,
-abandonments), a screenshot at every milestone and every goal change, and a single `index.html`
-regenerated in place with the current score, the current goal, the latest screenshot and the
-score curve. If the loop runs, the dashboard exists. Kader reads pictures, not `room_id/map_id`
-pairs.
+**Observability is an output of the loop, not a reporting convention.** Every run writes
+`score.jsonl`, `events.jsonl` (goals set, maneuvers declared, exhaustions, abandonments), a
+screenshot at every milestone and goal change, and an `index.html` regenerated in place carrying
+the current score, the current goal, the latest screenshot and the score curve. If the loop
+runs, the dashboard exists. The owner reads pictures, not `room_id/map_id` pairs.
 
 ---
 
-## 3. What survives of the process
+## 4. What is built in advance, and what the agent builds
 
-**Survives**: the score, a decision log of one line per decision with its invalidation
-condition, and CI.
+The PokéAgent Challenge is the sharpest available evidence on where this boundary belongs, and
+it puts it further toward "built in advance" than intuition suggests. Its provided baseline
+already contains perception, memory with *"automatic context compaction to manage the thousands
+of reasoning steps"*, a central orchestrator holding a route plan, and tools for A\* pathfinding,
+button inputs and knowledge retrieval. Both winning teams then moved further in that direction,
+replacing runtime LLM decisions with policies trained offline.
 
-**Does not**: the three roles, the escalation queue, MetaPlanner, `PROCESS_EVIDENCE.md`, and
-`AGENTS.md`'s 3 700 words. They are replaced by a schema and tests. Process work was tractable
-when game work was not, and a system with an escalation path cheaper than the real work will
-spend itself there.
-
-**Cold start**: one `START_HERE.md`, at most 2 000 words, enforced by a test that fails the
-build. Everything else is *queried* from the world model, not read. The old path cost ~27 300
-words before the first action, paid again on every context rotation.
-
----
-
-## 4. Build order
-
-The order is the design. Getting it wrong is how R1 happened.
-
-**Commit 1 — the walking skeleton.** L0 + a minimal L1 (position and HP) + a trivial L2 (rooms
-visited) + two actions + a single-worker search with a random policy + the run directory. It
-plays badly. It plays *autonomously*, end to end, from boot. Everything after this is
-improvement, never foundation.
-
-Then, in order, each step keeping the loop running:
-
-2. Determinism test and the input log as the durable unit (L0, L7).
-3. The real score from RAM — find the inventory and progress flags (L1, L2).
-4. The world model with its validator in CI, and the migration of the old facts (L6).
-5. The LLM planner, replacing the random policy (L5).
-6. The action space beyond movement: attack, push, dive, items (L3).
-7. Parallel workers (L4).
-
-**The standing rule, and it is the important one: nothing is merged that is not reachable from
-the loop.** If no code path the loop executes calls it, it does not merge. That single rule
-would have stopped three of the old project's seven files, which were wired to nothing, and the
-four foundation sessions that grew until the loop was never reached.
-
-**Acceptance criterion for the architecture itself**: by the end of week one, a loop is running
-whose score has moved at least once with no human touching the controls. If that is not true,
-the architecture is wrong rather than merely behind — which is the check that was missing when
-the same verdict was written twice, two weeks apart.
-
----
-
-## 5. What is built in advance, and what the agent builds
-
-The PokéAgent Challenge (arXiv 2603.15563) is the sharpest available evidence on where this
-boundary belongs, and it puts it much further toward "built in advance" than intuition suggests.
-Its headline result is that without a harness, frontier models achieve *"effectively 0% task
-completion"*, which it calls *"not a marginal optimization but a prerequisite"*. Its provided
-baseline is already substantial — perception, memory with *"automatic context compaction to
-manage the thousands of reasoning steps"*, a central orchestrator holding a route plan, and
-tools for A\* pathfinding, button inputs and knowledge retrieval, plus sub-agents for battle
-strategy, self-reflection, puzzles and objective verification. Both winning teams then moved
-*further* in that direction, replacing runtime LLM decisions with policies trained offline.
-
-One asymmetry works strongly in our favour. That benchmark deliberately withholds state: it
+One asymmetry works strongly in our favour. That benchmark deliberately withholds state — it
 exposes party composition, levels, status and HP, while *"puzzle states, dynamic obstacles,
-items, and movesets are not exposed"*, so its agents must recover them from pixels — and its
-first listed open challenge is VLM-SLAM grounding for localization and objective detection. We
-own the emulator. Localization is four RAM addresses. **That entire problem class is bought, not
-solved**, and no effort goes into VLM perception.
+items, and movesets are not exposed"* — so its agents must recover them from pixels, and its
+first listed open challenge is VLM-SLAM grounding for localization. We own the emulator.
+Localization is four RAM addresses. **That entire problem class is bought rather than solved**,
+and no effort goes into visual perception.
 
 ### Bucket A — built in advance, by us
 
-| | |
-|---|---|
-| Emulator session, frame-accurate stepping, snapshot/restore, input log, determinism test | L0 |
-| The RAM map: finding the addresses for inventory, progress flags and dialogue state | L1 |
-| The score: the milestone list and its RAM predicates | L2 |
-| The action vocabulary and each action's input sequence | L3 |
-| Tree, node store, worker pool, budget accounting | L4 |
-| Planner scaffolding: prompt structure, state compaction, call budget, maneuver declaration | L5 |
-| World-model **schema** and its validator | L6 |
-| A\* routing as an algorithm | L6 |
-| Persistence, run directory, dashboard | L7 |
+Emulator session, frame-accurate stepping, snapshot/restore, input log, determinism test (L0).
+The RAM map (L1). The score and its milestone predicates (L2). The action vocabulary and each
+action's input sequence (L3). Tree, node store, worker pool, budget accounting (L4). Planner
+scaffolding: prompt structure, state compaction, call budget, maneuver declaration format (L5).
+The world-model **schema** and its validator, and A\* as an algorithm (L6). Persistence, run
+directory, dashboard (L7).
 
-The RAM map is deliberately in this bucket, and it is the one debatable entry. An agent
-discovering its own addresses at runtime is foundation work wearing the costume of play — the
-exact R1 trap. Finding addresses is *engineering* discovery, which is ours; discovering the
-island is *game* discovery, which is the agent's. The benchmark makes the same split: its 15
-milestones are standardized and defined by the environment, not discovered by competitors.
+The RAM map is the one debatable entry, and it belongs here. Finding addresses is *engineering*
+discovery and it is ours; discovering the island is *game* discovery and it is the agent's. An
+agent hunting its own addresses at runtime is foundation work wearing the costume of play. The
+benchmark makes the same split: its fifteen milestones are standardised and defined by the
+environment, not discovered by competitors.
 
 ### Bucket B — built by the agent, and persisted
 
-| | |
-|---|---|
-| The room graph: nodes and typed exits. A\* is ours; the graph it runs on is the agent's | |
-| Entities, hazards and their behaviour, per room | |
-| The hypothesis ledger: claims, provenance, verification status, refutations | |
-| **Maneuver solutions** — the winning input sequence for a hard crossing, stored as a reusable edge | |
-| The decomposition of "finish the game" into subgoals, and the route plan | |
+The room graph, nodes and typed exits — A\* is ours, the graph it runs on is the agent's.
+Entities, hazards and their behaviour per room. The hypothesis ledger with provenance,
+verification status and refutations. **Maneuver solutions** — the winning input sequence for a
+hard crossing, stored as a reusable edge. And the decomposition of "finish the game" into
+subgoals, which is the route plan.
 
-Maneuver solutions are the most valuable of these and the least obvious. Once `240/0` is solved,
-the sequence that solves it is a permanent asset replayable at zero search cost. It is the same
-thing the winning team obtained by distilling a policy, held as a replayable input sequence
-instead of network weights — which is available to us precisely because we chose determinism and
+Maneuver solutions are the most valuable of these and the least obvious. Once a crossing is
+solved, the sequence that solves it is a permanent asset replayable at zero search cost. It is
+what the winning team obtained by distilling a policy, held as a replayable input sequence
+instead of network weights — available to us precisely because we chose determinism and
 rollback.
 
 ### Bucket C — never persisted
 
 The LLM's reasoning traces, and narrative session logs. Outcomes and evidence are recorded;
-deliberation is not. This is the bucket the old project had no name for, which is how ~65 400
-words of English ended up inside `data/ram_registry.json`.
+deliberation is not. A store that accepts free text will fill with free text.
 
 ### The reconciliation with "the loop is commit 1"
 
-"Build a lot in advance" reads dangerously close to the foundation-first failure that produced
-four sessions of groundwork and no agent. The distinction is precise and it is the whole point
-of §4's build order: **the harness is built in advance, but thin and end-to-end first, never
-deep and layer-by-layer.** All of bucket A exists from day one at low quality, with the loop
-running through it, and is then improved under a running loop. The failure mode was never
-building infrastructure; it was perfecting one layer before the next existed, until the top
-layer was never reached.
+"Build a lot in advance" reads close to building a foundation that never reaches a loop. The
+distinction is precise: **the harness is built in advance, but thin and end-to-end first, never
+deep and layer-by-layer.** All of bucket A exists from day one at low quality with the loop
+running through it, and improves under a running loop. Perfecting one layer before the next
+exists is how the top layer never arrives.
 
 ---
 
-## 6. Framework versus run, borrowed from pathfinder
+## 5. Framework and run
 
-`github.com/vd1/pathfinder` is a multi-stage pipeline that pairs academic papers and drives
-peer agents to write publishable notes. The domain is unrelated; its *organisation* is worth
-taking almost wholesale, and it sharpens three things this document had left vague.
+The organisation is borrowed from `github.com/vd1/pathfinder`, a pipeline that pairs academic
+papers and drives peer agents to write publishable notes. The domain is unrelated; the
+separation it uses transfers whole.
 
-### The pattern
-
-A reusable **framework** (the `pathfinder/` package: CLI, orchestration, scoring) is separated
-from a **campaign directory** holding one concrete execution — its config, its state files, its
-ledgers, its artifacts. Every command takes `--root DIR` to say which campaign it operates on.
-`experiments/3peers/` is a second campaign that reruns the same pairs with three peers instead
-of two, sharing the source corpus by symlink.
-
-Nothing in koholint is implicitly global under this pattern, and that alone would have prevented
-R9: `/tmp/zelda_checkpoints/main.dump` was a global, unaddressed, unversioned singleton because
-no command ever had to name which run it belonged to.
-
-### The koholint run directory
+A reusable **framework** — the library: orchestration, scoring, search, CLI — is separated from a
+**run directory** holding one concrete execution: its config, its state, its ledgers, its
+artifacts. Every command takes `--root DIR`. Nothing is implicitly global.
 
 ```
 runs/main/
@@ -426,55 +398,52 @@ runs/main/
 
 `koholint run --root runs/main`, and likewise `reconcile`, `serve`, `export`.
 
-### The three things this fixes
+**Receipts and a spend guard.** One receipt line per *attempted* model call, failures included,
+carrying model, seconds, outcome, tokens, cache reads and cost. Before admitting a call, a guard
+checks that known cost plus an estimate for each in-flight call stays under the configured
+budget, and if it does not, **the guard writes the stop marker itself**. A budget enforced by a
+guard is a budget; a budget written in a document is a hope.
 
-**1. Receipts and a budget guard replace a documented budget.** Pathfinder writes one receipt
-line per *attempted* model call, failures included, carrying model, seconds, outcome, tokens,
-cache reads and cost. Before admitting a call, a guard checks that known cost plus an estimate
-for each in-flight call stays under `budget_usd`, and **if it does not, the guard writes the stop
-marker itself**. That is C4 made mechanical. This document said the LLM budget would be "declared,
-measured and enforced in code" without saying how; this is how, and it is the same principle as
-C7 — a rule a script can check is checked by a script, never by a paragraph.
+**`reconcile` instead of a cold-start read.** `stop` writes `stop.json`; a later call resumes
+each thread at its recorded stage, and `reconcile` computes the safe next action and applies it
+with `--apply`. A process with no memory of what came before does not *read* its way back into
+the work — it asks the state what to do next. Durable memory is a queryable state, not a
+document written for a reader. The human-facing orientation file stays capped at 2 000 words,
+enforced by a test, because it serves a different purpose.
 
-**2. `reconcile` replaces the cold-start read, and it is the best idea in the repository.**
-Pathfinder's `stop` writes `stop.json`; a later call resumes each thread at its recorded stage,
-and `reconcile [pair]` computes the safe next action and applies it with `--apply`. So a process
-with no memory of what came before does not *read* its way back into the work — it **asks the
-state what to do next**.
+**`experiments/` for variants.** `experiments/no-knowledge/` is the same framework and the same
+code with one configuration key changed, which is how the knowledge ablation in
+`docs/OBJECTIVES.md` §3 gets run — likewise for comparing planner models, worker counts and
+action sets. An experiment that costs a directory gets run; one that costs a refactor does not.
 
-That is a strictly better answer to R10 than the ≤ 2 000-word `START_HERE.md` in C6. The word
-budget stays, as a cap on human-facing orientation, but the mechanism becomes a command. The old
-project's context-rotation protocol made a ~27 300-word re-read a *recurring* cost precisely
-because durable memory was a document written for a reader rather than a state queryable by a
-program.
+Two things are deliberately *not* borrowed. Pathfinder runs two peer agents, a consolidator and
+a verifier, because its output is a document produced by deliberation where independent
+viewpoints genuinely improve it; our output is a path through a state space checked by a score
+function, and a role taxonomy would buy nothing. And its stages form a linear pipeline because
+its domain is one; ours is a loop over a tree, and forcing it into phases is how a plan spends
+itself on groundwork.
 
-**3. `experiments/` makes decision B's ablation free.** `docs/OBJECTIVES.md` §3 promises that the
-discovery question gets settled later by turning knowledge off and measuring how far the same
-agent gets. Under this pattern that experiment is `experiments/no-knowledge/` with a different
-`run.json` — same framework, same code, one config key — rather than a branch or a rewrite. The
-same holds for comparing planner models, worker counts and action sets. An experiment that costs
-a directory gets run; one that costs a refactor does not.
+---
 
-### What already agreed
+## 6. Build order
 
-Several details confirm choices made above rather than changing them, which is mild evidence the
-shape is right: append-only ledgers with a digest of their source, so a frozen cut can detect
-that the appendable file moved under it (our snapshot cache is already keyed by the input-log
-hash); bounded loops with named verdicts and caps in config, not in prose (`DRAFT` / `REVISE` /
-`ITERATE` / `PAUSE` against our `:solved` / `:exhausted`); a live monitor served from the run
-directory; per-thread `lock` files, which we need too once N workers write to one node store; and
-an open-ended mode that keeps expanding and re-ranking above a score threshold with IDs stable
-across passes — structurally our frontier expansion.
+**Commit 1 — the walking skeleton.** L0, a minimal L1 (position and HP), a trivial L2 (rooms
+visited), two actions, a single-worker search with a random policy, and the run directory. It
+plays badly. It plays *autonomously*, end to end, from boot. Everything after is improvement,
+never foundation.
 
-### What not to take
+Then, each step keeping the loop running:
 
-**The role taxonomy.** Pathfinder runs two peer agents, a consolidator and a verifier, because
-its output is a document produced by deliberation and independent viewpoints genuinely improve
-it. Our output is a path through a state space, checked by a score function. Importing peers,
-consolidators and verifiers would re-create exactly the role structure the retrospective told us
-to delete (R4, Q12) — admiring a repository and copying its org chart along with its mechanics.
+2. Determinism test and the input log as the durable unit (L0, L7).
+3. The real score from RAM — find the inventory and progress flags (L1, L2).
+4. The world model with its validator in CI (L6).
+5. The LLM planner, replacing the random policy (L5).
+6. The action space beyond movement: attack, push, dive, items (L3).
+7. Parallel workers (L4).
 
-**The linear pipeline.** `fetch → sources → scan → select → research → paper → export` is a
-pipeline because that domain is one. Ours is a loop over a tree, and forcing it into stages would
-reintroduce the phase-ordered plan whose four foundation sessions never reached the loop (R1).
-Take `--root`, the run directory, receipts, the stop marker and `reconcile`. Leave the stages.
+**The standing rule: nothing is merged that is not reachable from the loop.** If no code path
+the loop executes calls it, it does not merge.
+
+**Acceptance criterion for the architecture itself**: by the end of week one, a loop is running
+whose score has moved at least once with no human touching the controls. If that is not true,
+the architecture is wrong rather than merely behind.
