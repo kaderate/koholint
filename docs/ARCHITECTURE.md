@@ -254,10 +254,6 @@ and enforced by a guard (§5). The state a call receives is compact — the curr
 the score, the subgoal, a summary of recent maneuver results, and the queried slice of the world
 model. Never a narrative, and never a file read end to end.
 
-The PokéAgent Challenge (arXiv 2603.15563) converges on the same shape from a different
-direction — an orchestrator holding a route plan and dispatching specialised sub-agents — and
-reports that without such a harness, frontier models reach *"effectively 0% task completion"*,
-which it calls *"not a marginal optimization but a prerequisite"*.
 
 ### L6 — World model
 
@@ -307,19 +303,16 @@ runs, the dashboard exists. The owner reads pictures, not `room_id/map_id` pairs
 
 ## 4. What is built in advance, and what the agent builds
 
-The PokéAgent Challenge is the sharpest available evidence on where this boundary belongs, and
-it puts it further toward "built in advance" than intuition suggests. Its provided baseline
-already contains perception, memory with *"automatic context compaction to manage the thousands
-of reasoning steps"*, a central orchestrator holding a route plan, and tools for A\* pathfinding,
-button inputs and knowledge retrieval. Both winning teams then moved further in that direction,
-replacing runtime LLM decisions with policies trained offline.
+The boundary sits further toward "built in advance" than intuition suggests, for a simple
+reason: an agent that has to build its own instrumentation spends its budget on instrumentation
+rather than on the game. Perception, scoring and the means to act are infrastructure, and
+infrastructure assembled at runtime is assembled badly, slowly, and again on the next run.
 
-One asymmetry works strongly in our favour. That benchmark deliberately withholds state — it
-exposes party composition, levels, status and HP, while *"puzzle states, dynamic obstacles,
-items, and movesets are not exposed"* — so its agents must recover them from pixels, and its
-first listed open challenge is VLM-SLAM grounding for localization. We own the emulator.
-Localization is four RAM addresses. **That entire problem class is bought rather than solved**,
-and no effort goes into visual perception.
+One asymmetry decides much of the rest. We own the emulator, so the game's own state is readable
+directly — position is four RAM addresses, not a localization problem to be recovered from
+pixels. An agent working against a black-box environment would have to infer all of it visually.
+**That entire problem class is bought rather than solved**, and no effort goes into visual
+perception.
 
 ### Bucket A — built in advance, by us
 
@@ -332,9 +325,7 @@ directory, dashboard (L7).
 
 The RAM map is the one debatable entry, and it belongs here. Finding addresses is *engineering*
 discovery and it is ours; discovering the island is *game* discovery and it is the agent's. An
-agent hunting its own addresses at runtime is foundation work wearing the costume of play. The
-benchmark makes the same split: its fifteen milestones are standardised and defined by the
-environment, not discovered by competitors.
+agent hunting its own addresses at runtime is foundation work wearing the costume of play.
 
 ### Bucket B — built by the agent, and persisted
 
@@ -345,10 +336,9 @@ hard crossing, stored as a reusable edge. And the decomposition of "finish the g
 subgoals, which is the route plan.
 
 Maneuver solutions are the most valuable of these and the least obvious. Once a crossing is
-solved, the sequence that solves it is a permanent asset replayable at zero search cost. It is
-what the winning team obtained by distilling a policy, held as a replayable input sequence
-instead of network weights — available to us precisely because we chose determinism and
-rollback.
+solved, the sequence that solves it is a permanent asset replayable at zero search cost: the
+search is paid once and the result is reusable for the rest of the run. Determinism and rollback
+are what make a solved crossing storable at all.
 
 ### Bucket C — never persisted
 
@@ -367,13 +357,10 @@ exists is how the top layer never arrives.
 
 ## 5. Framework and run
 
-The organisation is borrowed from `github.com/vd1/pathfinder`, a pipeline that pairs academic
-papers and drives peer agents to write publishable notes. The domain is unrelated; the
-separation it uses transfers whole.
-
 A reusable **framework** — the library: orchestration, scoring, search, CLI — is separated from a
 **run directory** holding one concrete execution: its config, its state, its ledgers, its
-artifacts. Every command takes `--root DIR`. Nothing is implicitly global.
+artifacts. Every command takes `--root DIR`. Nothing is implicitly global. (The pattern is
+borrowed from `github.com/vd1/pathfinder`.)
 
 ```
 runs/main/
@@ -416,12 +403,12 @@ code with one configuration key changed, which is how the knowledge ablation in
 `docs/OBJECTIVES.md` §3 gets run — likewise for comparing planner models, worker counts and
 action sets. An experiment that costs a directory gets run; one that costs a refactor does not.
 
-Two things are deliberately *not* borrowed. Pathfinder runs two peer agents, a consolidator and
-a verifier, because its output is a document produced by deliberation where independent
-viewpoints genuinely improve it; our output is a path through a state space checked by a score
-function, and a role taxonomy would buy nothing. And its stages form a linear pipeline because
-its domain is one; ours is a loop over a tree, and forcing it into phases is how a plan spends
-itself on groundwork.
+Two things this design deliberately does not have. **No role taxonomy** — no peers, reviewers or
+consolidators. A system whose output is a document produced by deliberation gains from
+independent viewpoints; ours is a path through a state space, checked by a score function, and
+roles would buy nothing but coordination. **No linear pipeline** — a run is a loop over a tree,
+not a sequence of stages, and forcing it into phases is how a plan spends itself on groundwork
+before ever reaching the loop.
 
 ---
 

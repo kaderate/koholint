@@ -82,9 +82,6 @@ loop with knowledge, reach the milestones, then turn knowledge off and measure h
 agent gets. Under the run-directory design that experiment costs one configuration key
 (`docs/ARCHITECTURE.md` §5).
 
-Supporting evidence: the PokéAgent Challenge (arXiv 2603.15563), a five-institution benchmark on
-Pokémon Emerald, does not ban game knowledge either. It states that *"Pokémon knowledge appears
-in pretraining corpora"* and works with that rather than against it.
 
 ---
 
@@ -106,10 +103,6 @@ progress" becomes the best node of a tree rather than a save file, which is what
 log necessary rather than merely tidy. And the score's monotonicity becomes structural, since it
 is the rule that decides which state to keep.
 
-Noted for the record: the PokéAgent Challenge runs the opposite way — real time, no save states,
-*"the game world continues while the agent reasons"*. Its strongest result nonetheless comes
-from RL distillation over thousands of replayed episodes, so the retrying is present there too,
-moved into training rather than into play.
 
 ---
 
