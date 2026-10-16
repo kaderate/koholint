@@ -116,6 +116,16 @@ class EngineTest < Minitest::Test
     end
   end
 
+  def test_journal_on_disk_has_exactly_the_frames_played_after_one_macro
+    skip_without_rom!
+    with_run do |_dir, run|
+      eng = Koholint::Engine.new(run: run, policy: Koholint::Policies::WalkAndTalk.new, budget: Koholint::Budget.new)
+      eng.send(:iterate)
+      assert_operator eng.instance_variable_get(:@emulator).frame, :>, 0
+      assert_equal eng.instance_variable_get(:@emulator).frame, Koholint::InputLog.load(File.join(run.dir, 'inputs.log')).frames
+    end
+  end
+
   def test_sigint_on_unlimited_cli_run_takes_the_stop_path
     skip_without_rom!
     Dir.mktmpdir do |dir|

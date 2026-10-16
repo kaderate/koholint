@@ -73,6 +73,7 @@ module Koholint
         done += 1
         after_frame
       end
+      @run.inputs.flush
       done
     end
 
