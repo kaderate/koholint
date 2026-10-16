@@ -1,0 +1,9 @@
+[
+  {"name": "link_x", "addr": "0xFF98", "source": "v1_ram_registry", "confidence": "verified", "verified_count": 8},
+  {"name": "link_y", "addr": "0xFF99", "source": "v1_ram_registry", "confidence": "verified", "verified_count": 8},
+  {"name": "link_direction", "addr": "0xFF9E", "source": "v1_ram_registry", "confidence": "verified", "verified_count": 3},
+  {"name": "room_id", "addr": "0xFFF6", "source": "v1_ram_registry", "confidence": "verified", "verified_count": 9},
+  {"name": "map_id", "addr": "0xFFF7", "source": "v1_ram_registry", "confidence": "verified", "verified_count": 8},
+  {"name": "hp", "addr": "0xDB5A", "source": "v1_ram_registry", "confidence": "verified", "verified_count": 2},
+  {"name": "max_hearts", "addr": "0xDB5B", "source": "v1_ram_registry", "confidence": "hypothesis", "verified_count": 1}
+]

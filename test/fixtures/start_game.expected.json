@@ -1,0 +1,11 @@
+{
+  "frame": 6201,
+  "room_id": 163,
+  "map_id": 16,
+  "x": 80,
+  "y": 96,
+  "direction": 3,
+  "hp": 24,
+  "max_hp": 24,
+  "state_hash": "f6d9f1085536c4b8a7c10b1f80ede0a5715e5e42043eb322cbfee51a5dac2dea"
+}

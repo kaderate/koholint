@@ -9,3 +9,10 @@ roms/
 .DS_Store
 /vendor/
 /coverage/
+.superpowers/
+/runs/*/keyframes/
+/runs/*/video/
+/manual/*.txt
+/Notice Zelda.pdf
+/runs/*/run.lock
+.env
