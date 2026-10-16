@@ -10,8 +10,9 @@ module Koholint
       READ_TIMEOUT = 5
 
       attr_reader :listener
+      attr_writer :follower, :feed
 
-      def initialize(follower:, feed:, port: 0, host: '127.0.0.1', read_timeout: READ_TIMEOUT)
+      def initialize(follower: nil, feed: nil, port: 0, host: '127.0.0.1', read_timeout: READ_TIMEOUT)
         @follower = follower
         @feed = feed
         @port = port
@@ -22,13 +23,18 @@ module Koholint
         @lock = Mutex.new
       end
 
-      def start
+      def bind
         @page = File.binread(PAGE_PATH)
-        @listener = TCPServer.new(@host, @port)
-        @acceptor = Thread.new { accept_loop }
+        @listener ||= TCPServer.new(@host, @port)
         @listener.local_address.ip_port
       rescue Errno::EADDRINUSE
         raise Error, "port #{@port} is already in use; choose another port with --port"
+      end
+
+      def start
+        port = bind
+        @acceptor = Thread.new { accept_loop }
+        port
       end
 
       def stop
