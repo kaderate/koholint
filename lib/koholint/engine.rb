@@ -72,6 +72,7 @@ module Koholint
     end
 
     def checkpoint_keyframe
+      @run.inputs.flush
       path = @keyframes.save(@emulator)
       @run.trace.emit(:keyframe, frame: @emulator.frame, path: File.basename(path))
     end

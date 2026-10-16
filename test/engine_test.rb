@@ -105,4 +105,31 @@ class EngineTest < Minitest::Test
       assert_equal 0x42, File.binread(file).getbyte(3)
     end
   end
+
+  def test_journal_on_disk_covers_the_last_keyframe_without_a_clean_stop
+    skip_without_rom!
+    with_run do |_dir, run|
+      eng = Koholint::Engine.new(run: run, policy: Koholint::Policies::WalkAndTalk.new,
+                                 budget: Koholint::Budget.new, keyframe_every: 120)
+      eng.send(:iterate) while eng.instance_variable_get(:@emulator).frame < 300
+      assert_operator Koholint::InputLog.load(File.join(run.dir, 'inputs.log')).frames, :>=, 240
+    end
+  end
+
+  def test_sigint_on_unlimited_cli_run_takes_the_stop_path
+    skip_without_rom!
+    Dir.mktmpdir do |dir|
+      bin = File.expand_path('../bin/koholint', __dir__)
+      pid = Process.spawn(bin, 'run', '--root', dir, %i[out err] => File::NULL)
+      trace = nil
+      deadline = Time.now + 90
+      sleep 0.5 until Time.now > deadline || (trace = Dir.glob(File.join(dir, '*', 'trace.jsonl')).first) && File.size(trace) > 2000
+      Process.kill('INT', pid)
+      _, status = Process.wait2(pid)
+      assert status.success?
+      stops = Koholint::Trace.read(trace).select { |e| e['type'] == 'stop' }
+      assert_equal ['stopped'], stops.map { |e| e['reason'] }
+      assert_equal 'stopped', JSON.parse(File.read(File.join(File.dirname(trace), 'manifest.json')))['status']
+    end
+  end
 end
