@@ -20,7 +20,7 @@ module Koholint
       buttons = input_at(frame)
       frames = 1
       frames += 1 while frames < MAX_MACRO_FRAMES && input_at(frame + frames) == buttons
-      { buttons: buttons, frames: frames }
+      { buttons:, frames: }
     end
 
     def title_input(frame)
