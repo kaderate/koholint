@@ -100,10 +100,11 @@ runs/<id>/
 - **Snapshot size**: v1's `Motherboard#dump` is ~2.7 MB because it embeds the ROM. A keyframe must
   serialize machine state *without* the ROM (target tens of KB, unmeasured). Keyframes never
   contain the ROM.
-- **Replay cost**: the v1 figure (~1.15 s per 30-frame tap, ~0.4x real time) was measured in Claude
-  Remote agent environments (owner, 2026-10-16); local is expected to be much faster. First task of
-  the build: measure headless frames/second of the bare loop **locally**, then size the keyframe
-  interval (candidate: every 30–60 game seconds) and the realistic run length.
+- **Replay cost**: measured locally (Task 2, `bin/measure_speed`, 2026-10-16, Apple silicon, Ruby 4.0.1):
+  **26 fps without YJIT (0.44x real time, matching the v1 remote figure) and 96 fps with `--yjit`
+  (1.6x real time).** The engine and tests must run with YJIT. At 96 fps, 5 game-minutes replay in
+  ~3 min and 10 game-hours in ~6 h; keyframe interval stays a candidate of 30–60 game seconds
+  (~20–40 s of replay worst case).
 - **Sleep and interruption tolerance**: runs must survive the machine sleeping or the process being
   suspended. Game time is frames, so suspension never affects determinism. Wall-clock budgets count
   active time only (monotonic, gaps over a threshold excluded); agent calls have timeouts and

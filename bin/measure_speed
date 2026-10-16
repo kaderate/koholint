@@ -1,0 +1,11 @@
+#!/usr/bin/env ruby
+$LOAD_PATH.unshift(File.expand_path('../lib', __dir__))
+require 'koholint'
+require 'koholint/emulator'
+
+frames = (ARGV[0] || 3600).to_i
+emulator = Koholint::Emulator.boot
+started = Process.clock_gettime(Process::CLOCK_MONOTONIC)
+frames.times { emulator.step }
+elapsed = Process.clock_gettime(Process::CLOCK_MONOTONIC) - started
+puts format('%d frames in %.2fs = %.1f fps (%.2fx real time)', frames, elapsed, frames / elapsed, frames / elapsed / 59.7275)
