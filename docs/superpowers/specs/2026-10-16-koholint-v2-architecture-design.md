@@ -97,9 +97,9 @@ runs/<id>/
 - **Durable progress = canonical `.sav` + `inputs.log` from boot + ROM hash.** Any machine with
   the ROM can reproduce the exact state from the repo alone. Keyframes are a local cache of the
   replay, regenerable, gitignored.
-- **Snapshot size**: v1's `Motherboard#dump` is ~2.7 MB because it embeds the ROM. A keyframe must
-  serialize machine state *without* the ROM (target tens of KB, unmeasured). Keyframes never
-  contain the ROM.
+- **Snapshot size** (measured, Task 6): emu-gb's `dump(with_rom: false)` is ~366 KB raw and ~12 KB
+  zlib-compressed after 600 frames. Keyframes never contain the ROM; at one per 45 game seconds,
+  10 game-hours is ~10 MB. v1's 2.7 MB dumps were that plus the embedded ROM.
 - **Replay cost**: measured locally (Task 2, `bin/measure_speed`, 2026-10-16, Apple silicon, Ruby 4.0.1):
   **26 fps without YJIT (0.44x real time, matching the v1 remote figure) and 96 fps with `--yjit`
   (1.6x real time).** The engine and tests must run with YJIT. At 96 fps, 5 game-minutes replay in

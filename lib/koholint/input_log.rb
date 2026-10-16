@@ -35,6 +35,8 @@ module Koholint
     end
 
     def each_frame
+      return to_enum(:each_frame) unless block_given?
+
       @runs.each do |mask, count|
         buttons = BUTTONS.each_index.select { |i| mask[i] == 1 }.map { |i| BUTTONS[i] }
         count.times { yield buttons }

@@ -60,6 +60,21 @@ module Koholint
       write_manifest
     end
 
+    def fork(at_frame:, flow_version:, rom_path: Koholint.rom_path)
+      child = self.class.create(root: File.dirname(dir), flow_version: flow_version, budget: manifest['budget'],
+                                parent: { 'id' => id, 'frame' => at_frame }, seed: manifest['seed'], rom_path: rom_path)
+      journal = InputLog.new(File.join(child.dir, 'inputs.log'))
+      inputs.each_frame.first(at_frame).each { |buttons| journal.append(buttons) }
+      journal.flush
+      Trace.read(File.join(dir, 'trace.jsonl')).select { |event| event['frame'] <= at_frame }.each do |event|
+        File.open(File.join(child.dir, 'trace.jsonl'), 'a') { |file| file.puts(JSON.generate(event)) }
+      end
+      Dir.glob(File.join(dir, 'keyframes', 'kf-*.zlib')).each do |path|
+        FileUtils.cp(path, File.join(child.dir, 'keyframes')) if File.basename(path)[/\d+/].to_i <= at_frame
+      end
+      self.class.open(child.dir, flow_version: flow_version, rom_path: rom_path)
+    end
+
     def write_manifest
       tmp = File.join(dir, 'manifest.json.tmp')
       File.write(tmp, JSON.pretty_generate(@manifest))
