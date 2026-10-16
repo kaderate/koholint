@@ -21,6 +21,7 @@ module Koholint
         @expected = {}
         @captured = {}
         @trace_offset = 0
+        @bad_keyframes = []
         open_journal
         refresh_trace
         start(from)
@@ -71,7 +72,9 @@ module Koholint
       def open_journal
         raise Error, "no run at #{@dir}" unless File.file?(File.join(@dir, 'manifest.json'))
 
-        JSON.parse(File.read(File.join(@dir, 'manifest.json')))
+        manifest = JSON.parse(File.read(File.join(@dir, 'manifest.json')))
+        raise Error, "manifest at #{@dir} is not an object" unless manifest.is_a?(Hash)
+
         raise Error, "no input journal at #{@dir}" unless File.file?(@journal_path)
 
         @version = File.binread(@journal_path, 1)&.getbyte(0)
@@ -112,15 +115,24 @@ module Koholint
       end
 
       def restore_keyframe_at_or_before(target)
-        best = keyframe_frames.select { |f| f <= target }.max
-        return unless best && best > @frame
+        candidates = keyframe_frames.select { |f| f <= target && f > @frame && !@bad_keyframes.include?(f) }.sort.reverse
+        candidates.each do |best|
+          emulator = load_keyframe(best) or next
+          @emulator = emulator
+          @frame = @emulator.frame
+          @entry = 0
+          @used = 0
+          advance_cursor(@frame)
+          capture
+          return
+        end
+      end
 
-        @emulator = Keyframes.load(File.join(@keyframes_dir, format('kf-%09d.zlib', best)))
-        @frame = @emulator.frame
-        @entry = 0
-        @used = 0
-        advance_cursor(@frame)
-        capture
+      def load_keyframe(frame)
+        Keyframes.load(File.join(@keyframes_dir, format('kf-%09d.zlib', frame)))
+      rescue StandardError
+        @bad_keyframes << frame
+        nil
       end
 
       def keyframe_frames

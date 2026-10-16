@@ -213,4 +213,48 @@ class FollowerTest < Minitest::Test
       refute_includes error.message, "\n"
     end
   end
+
+  def keyframe_files(run) = Dir.glob(File.join(run.dir, 'keyframes', 'kf-*.zlib')).sort
+
+  def test_corrupt_newest_keyframe_falls_back_to_an_older_one_at_start
+    with_recorded_run do |run|
+      files = keyframe_files(run)
+      assert_operator files.size, :>=, 2
+      File.binwrite(files.last, 'not a keyframe')
+      follower = Koholint::Viewer::Follower.new(run.dir)
+      assert_equal files[-2][/kf-(\d+)/, 1].to_i, follower.frame
+    end
+  end
+
+  def test_all_keyframes_corrupt_boots_from_frame_zero
+    with_recorded_run do |run|
+      keyframe_files(run).each { |file| File.binwrite(file, '') }
+      follower = Koholint::Viewer::Follower.new(run.dir)
+      assert_equal 0, follower.frame
+      assert_operator follower.step_available(max_frames: 5), :>, 0
+    end
+  end
+
+  def test_corrupt_keyframe_does_not_kill_a_lag_jump
+    with_recorded_run do |run|
+      File.binwrite(journal(run), [0, 4000].pack('CV'), mode: 'ab')
+      keyframe_files(run).each { |file| File.binwrite(file, 'garbage') }
+      follower = Koholint::Viewer::Follower.new(run.dir, from: :start, max_lag_frames: 1800)
+      assert_equal 10, follower.step_available(max_frames: 10)
+      assert_equal 10, follower.frame
+      assert_equal 10, follower.step_available(max_frames: 10)
+      assert_equal 20, follower.frame
+    end
+  end
+
+  def test_non_object_manifest_is_a_one_line_error
+    %w[[] null "x" 5].each do |content|
+      Dir.mktmpdir do |dir|
+        File.write(File.join(dir, 'manifest.json'), content)
+        File.binwrite(File.join(dir, 'inputs.log'), [2].pack('C'))
+        error = assert_raises(Koholint::Error) { Koholint::Viewer::Follower.new(dir) }
+        refute_includes error.message, "\n"
+      end
+    end
+  end
 end
