@@ -14,6 +14,7 @@ module Koholint
 
     def self.resume(run_path, policy:, budget:, flow_version: Koholint::FLOW_VERSION, **options)
       run = Run.open(run_path, flow_version: flow_version)
+      run.lock!
       run.truncate_trace!(run.inputs.frames)
       new(run: run, policy: policy, budget: budget, emulator: Replay.to(run, run.inputs.frames), **options)
     end
@@ -32,6 +33,7 @@ module Koholint
     def request_stop = @budget.stop!
 
     def run
+      @run.lock!
       @run.status = 'running'
       @budget.tick
       begin
@@ -41,6 +43,8 @@ module Koholint
         raise
       end
       stop(@budget.exhausted)
+    ensure
+      @run.unlock!
     end
 
     private

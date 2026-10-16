@@ -85,6 +85,22 @@ module Koholint
       self.class.open(child.dir, flow_version: flow_version, rom_path: rom_path)
     end
 
+    def lock!
+      return if @lock_file
+
+      file = File.open(File.join(dir, 'run.lock'), File::CREAT | File::RDWR)
+      unless file.flock(File::LOCK_EX | File::LOCK_NB)
+        file.close
+        raise Error, "run #{id} is already in use by another process"
+      end
+      @lock_file = file
+    end
+
+    def unlock!
+      @lock_file&.close
+      @lock_file = nil
+    end
+
     def truncate_trace!(frames)
       path = File.join(dir, 'trace.jsonl')
       kept = Trace.read(path).reject do |event|

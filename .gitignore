@@ -14,3 +14,4 @@ roms/
 /runs/*/video/
 /manual/*.txt
 /Notice Zelda.pdf
+/runs/*/run.lock

@@ -1,6 +1,7 @@
 require 'digest'
 require 'fileutils'
 require 'tmpdir'
+require 'koholint'
 
 module Koholint
   class Emulator
