@@ -22,7 +22,10 @@ module Koholint
       end
 
       def read_manifest(run_dir)
-        JSON.parse(File.read(File.join(run_dir, 'manifest.json')))
+        manifest = JSON.parse(File.read(File.join(run_dir, 'manifest.json')))
+        raise Error, "manifest of run #{File.basename(run_dir)} is not an object" unless manifest.is_a?(Hash)
+
+        manifest
       rescue SystemCallError, JSON::ParserError
         raise Error, "cannot read manifest of run #{File.basename(run_dir)}"
       end

@@ -72,4 +72,14 @@ class FeedTest < Minitest::Test
       assert_raises(Koholint::Error) { Koholint::Viewer::Feed.for(dir, FOLLOWER) }
     end
   end
+
+  def test_non_object_manifest_is_a_one_line_error
+    ['[]', 'null', '"x"', '5'].each do |content|
+      with_dir(manifest: nil) do |dir, _|
+        File.write(File.join(dir, 'manifest.json'), content)
+        error = assert_raises(Koholint::Error) { Koholint::Viewer::Feed.for(dir, FOLLOWER) }
+        refute_includes error.message, "\n"
+      end
+    end
+  end
 end
