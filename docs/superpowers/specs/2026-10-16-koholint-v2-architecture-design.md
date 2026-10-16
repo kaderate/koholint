@@ -89,7 +89,7 @@ runs/<id>/
 ```
 
 - Only the engine writes `trace.jsonl` and `save/`.
-- **Progress** = the last in-game save (a `save{source: game}` trace event, detected by the engine when cartridge RAM changes) + the trace. Saves and keyframes are events on the same timeline, so any of them is a fork point. Savestates/keyframes are disposable accelerators.
+- **Progress** = the last in-game save (a `save{source: game}` trace event, detected by the engine when cartridge RAM content changes; the game also formats its save RAM at boot, which shows up as an early event around frame 60 and must be ignored when judging progress) + the trace. Saves and keyframes are events on the same timeline, so any of them is a fork point. Savestates/keyframes are disposable accelerators.
 - **Resume**: last keyframe + input replay, or `.sav` if missing; same `flow_version` required.
 - **Fork**: new run with `parent` link from any point of the trace (nearest keyframe + replay up
   to the point). Required to test a modified flow on the same critical moment. Nothing is
