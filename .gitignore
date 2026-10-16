@@ -10,3 +10,7 @@ roms/
 /vendor/
 /coverage/
 .superpowers/
+/runs/*/keyframes/
+/runs/*/video/
+/manual/*.txt
+/Notice Zelda.pdf
