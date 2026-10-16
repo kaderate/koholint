@@ -6,6 +6,9 @@ require 'koholint/png'
 
 module Koholint
   class Emulator
+    SCREEN_WIDTH = 160
+    SCREEN_HEIGHT = 144
+    RGB_UNPACK = ('a3x' * (SCREEN_WIDTH * SCREEN_HEIGHT)).freeze
     BUTTONS = %i[up down left right a b start select].freeze
 
     @roms = {}
@@ -83,10 +86,10 @@ module Koholint
     def dump = Marshal.dump(frame: @frame, motherboard: @driver.motherboard.dump(with_rom: false))
 
     def frame_rgb
-      @driver.motherboard.ppu.framebuffer.pixels_frame.flat_map { |c| [c & 0xFF, (c >> 8) & 0xFF, (c >> 16) & 0xFF] }.pack('C*')
+      @driver.motherboard.ppu.framebuffer.pixels_frame.pack('V*').unpack(RGB_UNPACK).join
     end
 
-    def frame_png = Png.encode(rgb: frame_rgb, width: 160, height: 144)
+    def frame_png = Png.encode(rgb: frame_rgb, width: SCREEN_WIDTH, height: SCREEN_HEIGHT)
 
     def framebuffer_png(path) = @driver.framebuffer_png(path)
   end

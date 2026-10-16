@@ -1,4 +1,5 @@
 require_relative 'test_helper'
+require 'stringio'
 require 'zlib'
 require 'koholint/png'
 
@@ -25,5 +26,9 @@ class PngTest < Minitest::Test
     expected = ([0] + rgb.bytes.first(6) + [0] + rgb.bytes.last(6)).pack('C*')
     assert_equal expected, Zlib::Inflate.inflate(list[1][1])
     assert_empty list[2][1]
+  end
+
+  def test_encode_rejects_a_buffer_of_the_wrong_size
+    assert_raises(ArgumentError) { Koholint::Png.encode(rgb: 'x'.b * 11, width: 2, height: 2) }
   end
 end

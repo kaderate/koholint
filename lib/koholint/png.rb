@@ -5,6 +5,8 @@ module Koholint
     SIGNATURE = "\x89PNG\r\n\x1a\n".b
 
     def self.encode(rgb:, width:, height:)
+      raise ArgumentError, "rgb has #{rgb.bytesize} bytes, expected #{width * height * 3}" unless rgb.bytesize == width * height * 3
+
       stride = width * 3
       raw = String.new(encoding: Encoding::BINARY)
       height.times { |row| raw << 0 << rgb.byteslice(row * stride, stride) }

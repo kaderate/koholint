@@ -1,4 +1,5 @@
 require_relative 'test_helper'
+require 'tmpdir'
 require 'zlib'
 require 'koholint/emulator'
 require 'koholint/boot_script'
@@ -67,8 +68,9 @@ class EmulatorTest < Minitest::Test
       raw = Zlib::Inflate.inflate(idat)
       stride = 160 * 3
       rows = (0...144).map { |row| raw.byteslice((row * (stride + 1)) + 1, stride) }
-      assert_operator emulator.frame_rgb.bytes.uniq.size, :>, 2
-      assert_equal rows.join, emulator.frame_rgb
+      rgb = emulator.frame_rgb
+      assert(rgb.bytes.each_slice(3).any? { |r, _g, b| r != b })
+      assert_equal rows.join, rgb
     end
   end
 end
