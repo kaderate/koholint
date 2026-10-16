@@ -2,6 +2,7 @@ require 'digest'
 require 'fileutils'
 require 'tmpdir'
 require 'koholint'
+require 'koholint/png'
 
 module Koholint
   class Emulator
@@ -80,6 +81,12 @@ module Koholint
     end
 
     def dump = Marshal.dump(frame: @frame, motherboard: @driver.motherboard.dump(with_rom: false))
+
+    def frame_rgb
+      @driver.motherboard.ppu.framebuffer.pixels_frame.flat_map { |c| [c & 0xFF, (c >> 8) & 0xFF, (c >> 16) & 0xFF] }.pack('C*')
+    end
+
+    def frame_png = Png.encode(rgb: frame_rgb, width: 160, height: 144)
 
     def framebuffer_png(path) = @driver.framebuffer_png(path)
   end
