@@ -89,35 +89,52 @@ class ServerTest < Minitest::Test
     end
   end
 
-  class OverlapProbe
-    attr_reader :max
-
-    def initialize
-      @inside = 0
-      @max = 0
-      @guard = Mutex.new
-    end
-
-    def track
-      @guard.synchronize { @inside += 1; @max = [@max, @inside].max }
-      sleep 0.03
-      yield
-    ensure
-      @guard.synchronize { @inside -= 1 }
+  def test_slow_feed_does_not_block_frame_png
+    entered = Queue.new
+    release = Queue.new
+    feed = -> { entered << true; release.pop; STATE }
+    with_server(feed:) do |_, port|
+      slow = Thread.new { get(port, '/state.json').code }
+      entered.pop
+      started = Process.clock_gettime(Process::CLOCK_MONOTONIC)
+      assert_equal '200', get(port, '/frame.png').code
+      assert_operator Process.clock_gettime(Process::CLOCK_MONOTONIC) - started, :<, 1
+      release << true
+      assert_equal '200', slow.value
     end
   end
 
-  def test_follower_and_feed_calls_never_overlap
-    probe = OverlapProbe.new
-    follower = Object.new
-    follower.define_singleton_method(:frame_png) { probe.track { PNG_SIGNATURE } }
-    with_server(follower:, feed: -> { probe.track { STATE } }) do |_, port|
+  def test_simultaneous_requests_all_succeed
+    with_server do |_, port|
       codes = %w[/frame.png /state.json /frame.png /state.json /frame.png /state.json].map do |path|
         Thread.new { get(port, path).code }
       end.map(&:value)
       assert_equal ['200'] * 6, codes
-      assert_equal 1, probe.max
     end
+  end
+
+  def test_stop_returns_promptly_with_a_silent_connection
+    server = Koholint::Viewer::Server.new(follower: StubFollower.new, feed: -> { STATE })
+    port = server.start
+    silent = TCPSocket.new('127.0.0.1', port)
+    sleep 0.1
+    threads = server.instance_variable_get(:@connections).dup
+    refute_empty threads
+    started = Process.clock_gettime(Process::CLOCK_MONOTONIC)
+    server.stop
+    assert_operator Process.clock_gettime(Process::CLOCK_MONOTONIC) - started, :<, 1
+    assert threads.none?(&:alive?)
+    silent.close
+  end
+
+  def test_idle_connection_is_dropped_after_the_read_timeout
+    server = Koholint::Viewer::Server.new(follower: StubFollower.new, feed: -> { STATE }, read_timeout: 0.2)
+    port = server.start
+    silent = TCPSocket.new('127.0.0.1', port)
+    assert_nil silent.read(1)
+    silent.close
+  ensure
+    server&.stop
   end
 
   def test_binds_loopback_only
