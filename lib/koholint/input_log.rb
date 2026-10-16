@@ -41,8 +41,12 @@ module Koholint
     def flush
       if @rewrite
         tmp = "#{@path}.tmp"
-        File.binwrite(tmp, [FORMAT_VERSION].pack('C') + pack(@runs))
+        File.open(tmp, 'wb') do |file|
+          file.write([FORMAT_VERSION].pack('C') + pack(@runs))
+          file.fsync
+        end
         File.rename(tmp, @path)
+        sync_directory
         @disk_entries = @runs.size
         @rewrite = false
       elsif @pending.any?
@@ -75,6 +79,12 @@ module Koholint
       else
         runs << [mask, 1]
       end
+    end
+
+    def sync_directory
+      File.open(File.dirname(@path)) { |dir| dir.fsync }
+    rescue SystemCallError, IOError
+      nil
     end
 
     def pack(runs) = runs.map { |mask, count| [mask, count].pack('CV') }.join

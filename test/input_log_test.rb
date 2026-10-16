@@ -111,4 +111,35 @@ class InputLogTest < Minitest::Test
       assert_equal 10, Koholint::InputLog.load(path).frames
     end
   end
+
+  module CallRecorder
+    EVENTS = []
+
+    def fsync
+      EVENTS << [:fsync, path]
+      super
+    end
+  end
+
+  module RenameRecorder
+    def rename(from, to)
+      CallRecorder::EVENTS << [:rename, from]
+      super
+    end
+  end
+
+  def test_rewrite_fsyncs_the_tmp_file_before_renaming_it
+    with_path do |path|
+      packed = [[1 << BUTTONS.index(:a), 7], [0, 2]].map { |m, c| [m, c].pack('CV') }.join
+      File.binwrite(path, [1].pack('C') + Zlib::Deflate.deflate(packed))
+      log = Koholint::InputLog.load(path)
+      CallRecorder::EVENTS.clear
+      File.prepend(CallRecorder)
+      File.singleton_class.prepend(RenameRecorder)
+      log.flush
+      tmp = "#{path}.tmp"
+      assert_operator CallRecorder::EVENTS.index([:fsync, tmp]), :<, CallRecorder::EVENTS.index([:rename, tmp])
+      assert_equal 9, Koholint::InputLog.load(path).frames
+    end
+  end
 end
