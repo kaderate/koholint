@@ -3,6 +3,7 @@ require 'optparse'
 require 'koholint'
 require 'koholint/budget'
 require 'koholint/engine'
+require 'koholint/policies/start_game'
 require 'koholint/policies/walk_and_talk'
 require 'koholint/replay'
 require 'koholint/run'
@@ -42,10 +43,10 @@ module Koholint
       case command
       when 'run'
         run = Run.create(root: options.fetch(:root, 'runs'), flow_version: flow, budget: limits)
-        play(Engine.new(run: run, policy: Policies::WalkAndTalk.new, budget: Budget.new(**limits)), run, out)
+        play(Engine.new(run: run, policy: default_policy, budget: Budget.new(**limits)), run, out)
       when 'resume'
         run = Run.open(run_dir(args), flow_version: flow)
-        engine = Engine.resume(run.dir, policy: Policies::WalkAndTalk.new, budget: Budget.new(**limits), flow_version: flow)
+        engine = Engine.resume(run.dir, policy: default_policy, budget: Budget.new(**limits), flow_version: flow)
         play(engine, run, out)
       when 'fork'
         at_frame = options.fetch(:at_frame) { raise OptionParser::MissingArgument, '--at-frame' }
@@ -62,6 +63,8 @@ module Koholint
     end
 
     def run_dir(args) = args.first || raise(OptionParser::MissingArgument, 'run_dir')
+
+    def default_policy = Policies::StartGame.new(Policies::WalkAndTalk.new)
 
     def play(engine, run, out)
       previous = %w[INT TERM].to_h { |sig| [sig, Signal.trap(sig) { engine.request_stop }] }

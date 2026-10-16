@@ -52,9 +52,10 @@ module Koholint
     def iterate
       state = Perception.read(@emulator)
       @run.trace.emit(:perception, frame: state.frame, state: state.to_h, state_hash: @emulator.state_hash)
-      result = @policy.decide(@point, state, {})
-      choice = @point.validate(result[:choice])
-      @run.trace.emit(:decision, frame: state.frame, point: @point.name.to_s, input: state.to_h, options: @point.options,
+      point = @policy.respond_to?(:point_for) ? @policy.point_for(state) : @point
+      result = @policy.decide(point, state, {})
+      choice = point.validate(result[:choice])
+      @run.trace.emit(:decision, frame: state.frame, point: point.name.to_s, input: state.to_h, options: point.options || [],
                                  choice: choice, justification: result[:justification], confidence: result[:confidence],
                                  agent: result[:agent], latency_ms: 0, cost_usd: 0.0, fallback: result[:fallback] || false)
       frames = press(choice)
