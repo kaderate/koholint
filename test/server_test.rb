@@ -85,6 +85,38 @@ class ServerTest < Minitest::Test
       other = Koholint::Viewer::Server.new(follower: StubFollower.new, feed: -> { STATE }, port:)
       error = assert_raises(Koholint::Error) { other.start }
       refute_includes error.message, "\n"
+      assert_match(/choose another port with --port\z/, error.message)
+    end
+  end
+
+  class OverlapProbe
+    attr_reader :max
+
+    def initialize
+      @inside = 0
+      @max = 0
+      @guard = Mutex.new
+    end
+
+    def track
+      @guard.synchronize { @inside += 1; @max = [@max, @inside].max }
+      sleep 0.03
+      yield
+    ensure
+      @guard.synchronize { @inside -= 1 }
+    end
+  end
+
+  def test_follower_and_feed_calls_never_overlap
+    probe = OverlapProbe.new
+    follower = Object.new
+    follower.define_singleton_method(:frame_png) { probe.track { PNG_SIGNATURE } }
+    with_server(follower:, feed: -> { probe.track { STATE } }) do |_, port|
+      codes = %w[/frame.png /state.json /frame.png /state.json /frame.png /state.json].map do |path|
+        Thread.new { get(port, path).code }
+      end.map(&:value)
+      assert_equal ['200'] * 6, codes
+      assert_equal 1, probe.max
     end
   end
 

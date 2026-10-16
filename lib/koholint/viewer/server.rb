@@ -17,6 +17,7 @@ module Koholint
         @host = host
         @connections = []
         @lock = Mutex.new
+        @source_lock = Mutex.new
       end
 
       def start
@@ -25,7 +26,7 @@ module Koholint
         @acceptor = Thread.new { accept_loop }
         @listener.local_address.ip_port
       rescue Errno::EADDRINUSE
-        raise Error, "port #{@port} is already in use"
+        raise Error, "port #{@port} is already in use; choose another port with --port"
       end
 
       def stop
@@ -71,8 +72,8 @@ module Koholint
 
         case path
         when '/' then ['200 OK', 'text/html; charset=utf-8', @page, {}]
-        when '/frame.png' then ['200 OK', 'image/png', @follower.frame_png, NO_STORE]
-        when '/state.json' then ['200 OK', 'application/json', JSON.generate(@feed.call), NO_STORE]
+        when '/frame.png' then ['200 OK', 'image/png', @source_lock.synchronize { @follower.frame_png }, NO_STORE]
+        when '/state.json' then ['200 OK', 'application/json', @source_lock.synchronize { JSON.generate(@feed.call) }, NO_STORE]
         else ['404 Not Found', 'text/plain', "not found\n", {}]
         end
       rescue StandardError => e
