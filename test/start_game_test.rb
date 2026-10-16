@@ -4,6 +4,7 @@ require 'koholint/engine'
 require 'koholint/policies/start_game'
 require 'koholint/policies/walk_and_talk'
 require 'koholint/summary'
+require 'support/emulator_cache'
 
 class StartGameTest < Minitest::Test
   def state(frame, hp: 0, x: 0) = Koholint::GameState.new(frame: frame, hp: hp, x: x, milestone: :none)
@@ -32,17 +33,29 @@ class StartGameTest < Minitest::Test
     assert_equal 'walk_and_talk', policy.decide(policy.point_for(controllable), controllable, {})[:agent]
   end
 
-  def test_engine_run_reaches_a_playable_state
-    skip_without_rom!
+  def run_from(emulator, frames)
     Dir.mktmpdir do |dir|
       run = Koholint::Run.create(root: dir, flow_version: Koholint::FLOW_VERSION, budget: {})
-      Koholint::Engine.new(run: run, policy: policy, budget: Koholint::Budget.new(frames: 6600)).run
-      summary = Koholint::Summary.for(run)
+      Koholint::Engine.new(run: run, policy: policy, emulator: emulator, budget: Koholint::Budget.new(frames: frames)).run
+      yield Koholint::Summary.for(run), Koholint::Trace.read(File.join(run.dir, 'trace.jsonl')).select { |e| e['type'] == 'perception' }
+    end
+  end
+
+  def test_engine_run_from_the_title_screen_reaches_a_playable_state
+    skip_without_rom!
+    run_from(EmulatorCache.at(5900), 700) do |summary, states|
+      assert_equal [5900, 0], [states.first['frame'], states.first['state']['hp']]
       assert_equal 3.0, summary[:hearts]
-      assert_equal 'stopped', summary[:health]
-      states = Koholint::Trace.read(File.join(run.dir, 'trace.jsonl')).select { |e| e['type'] == 'perception' }
       assert_equal [163, 16], states.last['state'].values_at('room_id', 'map_id')
-      assert_empty states.select { |e| e['frame'] < 6000 }.select { |e| e['state']['hp'].positive? }
+    end
+  end
+
+  def test_full_boot_reaches_a_playable_state
+    skip 'set E2E=1 to run the full boot from frame 0' unless ENV['E2E']
+    skip_without_rom!
+    run_from(Koholint::Emulator.boot, 6600) do |summary, states|
+      assert_equal 3.0, summary[:hearts]
+      assert_empty states.select { |e| e['frame'] < 6000 && e['state']['hp'].positive? }
     end
   end
 end

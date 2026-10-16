@@ -9,4 +9,5 @@ A deterministic engine that plays Link's Awakening DX headless through emu-gb an
 - v1 (agent session driving the game): git tag `v1-archive`, analysis in `docs/RETROSPECTIVE.md`
 
 Needs Ruby 4.0.1, an emu-gb checkout and the ROM. Copy `.env.example` to `.env` (gitignored) and set
-`EMU_GB_HOME` and `KOHOLINT_ROM`; real environment variables take precedence. Tests: `rake test`.
+`EMU_GB_HOME` and `KOHOLINT_ROM`; real environment variables take precedence. Tests: `rake test` (one process per file, in parallel, ~40 s; the first run builds a local emulator
+state cache in `tmp/`), `rake test:e2e` to also play the full boot from frame 0.
