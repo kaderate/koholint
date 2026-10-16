@@ -15,3 +15,4 @@ roms/
 /manual/*.txt
 /Notice Zelda.pdf
 /runs/*/run.lock
+.env

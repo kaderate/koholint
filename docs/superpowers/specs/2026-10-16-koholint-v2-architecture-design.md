@@ -14,7 +14,7 @@ v2 inverts the dependency: **a deterministic engine owns the game loop and calls
 decision points**. The agent cannot leave its role because it only has decision contracts. A run
 is a self-contained, versioned, observable unit stored in the repo.
 
-Reference lessons from Jev×Tetris (`../terraindejeu/jev/tetris`): runner + pluggable strategies,
+Reference lessons from the Jev×Tetris project: runner + pluggable strategies,
 a deterministic baseline that beat the LLM strategies (so keep one as yardstick), per-call
 latency/cost logging, seeds. Its weak spots to avoid: unstructured `runs/`, no strategy version
 attached to a run, hand-built reports, video capture changing RNG timing.

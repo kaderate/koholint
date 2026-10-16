@@ -6,7 +6,7 @@
 
 **Architecture:** `Engine` owns the loop (perceive → decide → execute → record → budget check) over an `Emulator` adapter; every event goes through a schema-validated `Trace`; progress is reproducible from `inputs.log` + ROM hash, with keyframes as a local cache. Agents, world model, skills, live view and navigation are later plans; this plan only builds the vertical slice they plug into.
 
-**Tech Stack:** Ruby 4.0.1 (as Jev/Tetris), minitest, emu-gb (`Driver`) at `$EMU_GB_HOME` (default `~/Code/emu-gb`), zlib, JSON/JSONL.
+**Tech Stack:** Ruby 4.0.1 (as Jev/Tetris), minitest, emu-gb (`Driver`) at `EMU_GB_HOME`, zlib, JSON/JSONL.
 
 **Spec:** `docs/superpowers/specs/2026-10-16-koholint-v2-architecture-design.md`
 
@@ -14,7 +14,7 @@
 
 - Time unit is the frame; no `sleep`, no wall-clock in game logic (wall clock only inside `Budget`).
 - Everything in the repo is English; comments almost none (one-line hidden *why* only); commits are one imperative line, no body.
-- The ROM is never committed. Path from `$KOHOLINT_ROM`, default `~/Code/emu-gb/roms/zelda_dx_rev1.gbc`. Tests needing it skip when absent.
+- The ROM is never committed. Path from `KOHOLINT_ROM`, set in the environment or a gitignored `.env` (see `.env.example`); no machine-specific path in code or docs. Tests needing it skip when absent.
 - Keyframes, videos, `manual/` text are gitignored. Committable per run: `manifest.json`, `trace.jsonl`, `inputs.log`, `save/`, `world.json`, `suggestions.md`.
 - Only the engine writes `trace.jsonl` and `save/`. A run resumes only with the same `flow_version` and ROM hash.
 - DMG mode (D3). Replay must be bit-exact.
@@ -177,4 +177,4 @@
 - Deliberately deferred to later plans (each depends on this foundation): world model schema + validators, skill registry, Jev/Claude contract clients (`claude -p` isolation), step/objective lifecycle and loop detection, milestone ladder detection (shield, sword), live web view (A + C), navigation/combat spike, manual digest.
 - Real saves and keyframes are trace events (`save`, `keyframe`): "how far are we" = the last `save{source: 'game'}` event; the journal gives exact position.
 - Known spec deviation to confirm in Task 6: keyframes may embed the ROM if emu-gb's dump cannot strip it (local, gitignored only).
-- Open dependency: the repo README says `gemboy`; the local checkout is `~/Code/emu-gb` (the Tetris project uses the same). Task 1 documents `$EMU_GB_HOME`.
+- Open dependency: the repo README says `gemboy`; the emu-gb checkout is configured through `EMU_GB_HOME`. Task 1 documents it.
