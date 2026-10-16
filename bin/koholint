@@ -1,0 +1,5 @@
+#!/usr/bin/env -S ruby --yjit
+$LOAD_PATH.unshift(File.expand_path('../lib', __dir__))
+require 'koholint/cli'
+
+exit Koholint::CLI.run(ARGV)
