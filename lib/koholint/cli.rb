@@ -6,13 +6,15 @@ require 'koholint/engine'
 require 'koholint/policies/start_game'
 require 'koholint/policies/walk_and_talk'
 require 'koholint/replay'
+require 'koholint/pacer'
 require 'koholint/run'
 require 'koholint/summary'
+require 'koholint/viewer'
 
 module Koholint
   module CLI
-    USAGE = 'usage: koholint run|resume <run_dir>|fork <run_dir> --at-frame N|verify <run_dir>|summary <run_dir> ' \
-            '[--frames N --minutes N --dollars X --root DIR]'.freeze
+    USAGE = 'usage: koholint run|resume <run_dir>|fork <run_dir> --at-frame N|verify <run_dir>|summary <run_dir>|watch <run_dir> ' \
+            '[--frames N --minutes N --dollars X --root DIR --realtime --port N --from live|start --speed X]'.freeze
 
     module_function
 
@@ -26,6 +28,10 @@ module Koholint
         o.on('--flow-version V') { |v| options[:flow_version] = v }
         o.on('--root DIR') { |v| options[:root] = v }
         o.on('--at-frame N', Integer) { |v| options[:at_frame] = v }
+        o.on('--realtime') { options[:realtime] = true }
+        o.on('--port N', Integer) { |v| options[:port] = v }
+        o.on('--from MODE', %w[live start]) { |v| options[:from] = v.to_sym }
+        o.on('--speed X', Float) { |v| options[:speed] = v.positive? ? v : raise(OptionParser::InvalidArgument, v.to_s) }
       end
       args = parser.parse(rest)
       dispatch(command, args, options, out)
@@ -43,16 +49,18 @@ module Koholint
       case command
       when 'run'
         run = Run.create(root: options.fetch(:root, 'runs'), flow_version: flow, budget: limits)
-        play(Engine.new(run: run, policy: default_policy, budget: Budget.new(**limits)), run, out)
+        play(Engine.new(run: run, policy: default_policy, budget: Budget.new(**limits), **pacing(options)), run, out)
       when 'resume'
         run = Run.open(run_dir(args), flow_version: flow)
-        engine = Engine.resume(run.dir, policy: default_policy, budget: Budget.new(**limits), flow_version: flow)
+        engine = Engine.resume(run.dir, policy: default_policy, budget: Budget.new(**limits), flow_version: flow, **pacing(options))
         play(engine, run, out)
       when 'fork'
         at_frame = options.fetch(:at_frame) { raise OptionParser::MissingArgument, '--at-frame' }
         child = Run.open(run_dir(args), flow_version: flow).fork(at_frame: at_frame, flow_version: flow)
         out.puts "run #{child.dir}"
         0
+      when 'watch'
+        Viewer.watch(run_dir(args), **options.slice(:port, :from, :speed), out: out)
       when 'verify' then verify(Run.open(run_dir(args), flow_version: flow), out)
       when 'summary'
         out.puts JSON.pretty_generate(Summary.for(Run.open(run_dir(args), flow_version: flow)))
@@ -61,6 +69,8 @@ module Koholint
         raise OptionParser::InvalidOption, command.to_s
       end
     end
+
+    def pacing(options) = options[:realtime] ? { pacer: Pacer.new } : {}
 
     def run_dir(args) = args.first || raise(OptionParser::MissingArgument, 'run_dir')
 
