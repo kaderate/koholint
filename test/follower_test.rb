@@ -33,6 +33,7 @@ class FollowerTest < Minitest::Test
       assert_equal 0, follower.lag
       assert_equal Koholint::Replay.to(run, 600).state_hash, follower.state_hash
       assert_equal :in_sync, follower.sync
+      assert_operator follower.compared_frames, :>, 1
       assert_operator follower.frame_png.bytesize, :>, 100
     end
   end
@@ -86,9 +87,10 @@ class FollowerTest < Minitest::Test
   def test_tampered_perception_hash_is_diverged
     with_recorded_run do |run|
       path = File.join(run.dir, 'trace.jsonl')
+      first_stepped = Koholint::Trace.read(path).select { |e| e['type'] == 'perception' && e['frame'].positive? }.first['frame']
       lines = File.readlines(path).map do |line|
         event = JSON.parse(line)
-        event['state_hash'] = 'tampered' if event['type'] == 'perception' && event['frame'] == 0
+        event['state_hash'] = 'tampered' if event['type'] == 'perception' && event['frame'] == first_stepped
         JSON.generate(event)
       end
       File.write(path, "#{lines.join("\n")}\n")
@@ -107,6 +109,99 @@ class FollowerTest < Minitest::Test
       follower.step_available(max_frames: 1)
       assert_operator follower.frame, :>=, last_keyframe
       assert_operator follower.lag, :<, 4600
+    end
+  end
+
+  def perception(run, frame, hash)
+    Koholint::Trace.new(File.join(run.dir, 'trace.jsonl')).emit(:perception, frame:, state: {}, state_hash: hash)
+  end
+
+  def test_late_perception_at_the_current_frame_is_compared
+    with_recorded_run do |run|
+      follower = Koholint::Viewer::Follower.new(run.dir, from: :start)
+      drain(follower)
+      compared = follower.compared_frames
+      perception(run, 600, follower.state_hash)
+      follower.step_available
+      assert_equal compared + 1, follower.compared_frames
+      assert_equal :in_sync, follower.sync
+    end
+  end
+
+  def test_late_wrong_perception_at_the_current_frame_is_diverged
+    with_recorded_run do |run|
+      follower = Koholint::Viewer::Follower.new(run.dir, from: :start)
+      drain(follower)
+      perception(run, 600, 'wrong')
+      follower.step_available
+      assert_equal :diverged, follower.sync
+    end
+  end
+
+  def test_lag_jump_compares_the_landing_frame
+    with_recorded_run do |run|
+      File.binwrite(journal(run), [0, 4000].pack('CV'), mode: 'ab')
+      landing = Dir.children(File.join(run.dir, 'keyframes')).map { |name| name[/\d+/].to_i }.max
+      perception(run, landing, 'wrong')
+      follower = Koholint::Viewer::Follower.new(run.dir, from: :start)
+      follower.step_available(max_frames: 1)
+      assert_equal :diverged, follower.sync
+    end
+  end
+
+  def test_trace_is_read_incrementally_and_partial_lines_wait
+    with_recorded_run do |run|
+      follower = Koholint::Viewer::Follower.new(run.dir, from: :start)
+      path = File.join(run.dir, 'trace.jsonl')
+      assert_equal File.size(path), follower.instance_variable_get(:@trace_offset)
+      line = "#{JSON.generate({ v: 1, type: 'perception', frame: 0, state: {}, state_hash: 'late' })}\n"
+      File.binwrite(path, line[0, 20], mode: 'ab')
+      follower.step_available(max_frames: 0)
+      assert_equal File.size(path) - 20, follower.instance_variable_get(:@trace_offset)
+      File.binwrite(path, line[20..], mode: 'ab')
+      follower.step_available(max_frames: 0)
+      assert_equal File.size(path), follower.instance_variable_get(:@trace_offset)
+      assert_equal :diverged, follower.sync
+    end
+  end
+
+  def test_concurrent_readers_do_not_corrupt_the_follower
+    with_recorded_run do |run|
+      follower = Koholint::Viewer::Follower.new(run.dir, from: :start)
+      drain(follower)
+      errors = Queue.new
+      readers = Array.new(3) do
+        Thread.new do
+          10.times do
+            20.times do
+              follower.lag
+              follower.journal_frames
+            end
+            follower.frame_png
+            Thread.pass
+          end
+        rescue StandardError => e
+          errors << e
+        end
+      end
+      writer = Thread.new do
+        [0, 2, 0, 16].each do |mask|
+          File.binwrite(journal(run), [mask, 50].pack('CV'), mode: 'ab')
+          Thread.pass
+        end
+      end
+      stepper = Thread.new do
+        follower.step_available(max_frames: 25) while follower.frame < 800 || writer.alive?
+      rescue StandardError => e
+        errors << e
+      end
+      stepper.join
+      writer.join
+      readers.each(&:join)
+      assert_predicate errors, :empty?
+      assert_equal 800, follower.frame
+      reopened = Koholint::Run.open(run.dir, flow_version: Koholint::FLOW_VERSION)
+      assert_equal Koholint::Replay.to(reopened, 800).state_hash, follower.state_hash
     end
   end
 

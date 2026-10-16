@@ -1,4 +1,5 @@
 require 'json'
+require 'monitor'
 require 'koholint'
 require 'koholint/emulator'
 require 'koholint/input_log'
@@ -8,9 +9,8 @@ require 'koholint/trace'
 module Koholint
   module Viewer
     class Follower
-      attr_reader :frame
-
       def initialize(run_dir, from: :live, max_lag_frames: 1800)
+        @lock = Monitor.new
         @dir = run_dir
         @max_lag = max_lag_frames
         @journal_path = File.join(run_dir, 'inputs.log')
@@ -20,43 +20,53 @@ module Koholint
         @total = 0
         @expected = {}
         @captured = {}
-        @trace_size = -1
+        @trace_offset = 0
         open_journal
         refresh_trace
         start(from)
       end
 
-      def journal_frames
-        refresh_journal
-        @total
-      end
+      def frame = synchronize { @frame }
 
-      def lag = journal_frames - @frame
+      def journal_frames = synchronize { refresh_journal && @total }
 
-      def frame_png = @emulator.frame_png
+      def lag = synchronize { journal_frames - @frame }
 
-      def state_hash = @emulator.state_hash
+      def frame_png = synchronize { @emulator.frame_png }
+
+      def state_hash = synchronize { @emulator.state_hash }
+
+      def compared_frames = synchronize { @captured.size }
 
       def step_available(max_frames: 60)
-        refresh_trace
-        jump_if_lagging
-        count = [max_frames, lag].min
-        count.times do
-          @emulator.step(buttons_at_cursor)
-          advance_cursor(1)
-          @frame = @emulator.frame
+        synchronize do
+          refresh_trace
+          jump_if_lagging
           capture
+          count = [max_frames, lag].min
+          count.times do
+            @emulator.step(buttons_at_cursor)
+            advance_cursor(1)
+            @frame = @emulator.frame
+            capture
+          end
+          [count, 0].max
         end
-        [count, 0].max
       end
 
       def sync
-        return :unknown if @captured.empty?
+        synchronize do
+          refresh_trace
+          capture
+          next :unknown if @captured.empty?
 
-        @captured.all? { |frame, hash| @expected[frame] == hash } ? :in_sync : :diverged
+          @captured.all? { |frame, hash| @expected[frame] == hash } ? :in_sync : :diverged
+        end
       end
 
       private
+
+      def synchronize(&) = @lock.synchronize(&)
 
       def open_journal
         raise Error, "no run at #{@dir}" unless File.file?(File.join(@dir, 'manifest.json'))
@@ -78,11 +88,12 @@ module Koholint
       end
 
       def refresh_journal
-        return unless @version == InputLog::FORMAT_VERSION
+        return true unless @version == InputLog::FORMAT_VERSION
 
         fresh, @offset = InputLog.read_from(@journal_path, @offset)
         @entries.concat(fresh)
         @total += fresh.sum(&:last)
+        true
       end
 
       def load_legacy
@@ -109,6 +120,7 @@ module Koholint
         @entry = 0
         @used = 0
         advance_cursor(@frame)
+        capture
       end
 
       def keyframe_frames
@@ -140,16 +152,28 @@ module Koholint
 
       def refresh_trace
         size = File.exist?(@trace_path) ? File.size(@trace_path) : 0
-        return if size == @trace_size
-
-        @trace_size = size
-        Trace.read(@trace_path).each do |event|
-          @expected[event['frame']] = event['state_hash'] if event['type'] == 'perception' && event['state_hash']
+        if size < @trace_offset
+          @trace_offset = 0
+          @expected.clear
         end
+        return if size == @trace_offset
+
+        chunk = File.open(@trace_path, 'rb') { |file| file.seek(@trace_offset) && file.read } || ''
+        complete = chunk[0..(chunk.rindex("\n") || -1)]
+        complete = '' unless complete.end_with?("\n")
+        @trace_offset += complete.bytesize
+        complete.each_line { |line| record(line) }
+      end
+
+      def record(line)
+        event = JSON.parse(line)
+        @expected[event['frame']] = event['state_hash'] if event['type'] == 'perception' && event['state_hash']
+      rescue JSON::ParserError
+        nil
       end
 
       def capture
-        @captured[@frame] = @emulator.state_hash if @expected.key?(@frame)
+        @captured[@frame] = @emulator.state_hash if @expected.key?(@frame) && !@captured.key?(@frame)
       end
     end
   end
