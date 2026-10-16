@@ -31,7 +31,9 @@ module Koholint
 
     def flush
       packed = @runs.map { |mask, count| [mask, count].pack('CV') }.join
-      File.binwrite(@path, [FORMAT_VERSION].pack('C') + Zlib::Deflate.deflate(packed))
+      tmp = "#{@path}.tmp"
+      File.binwrite(tmp, [FORMAT_VERSION].pack('C') + Zlib::Deflate.deflate(packed))
+      File.rename(tmp, @path)
     end
 
     def each_frame
@@ -49,7 +51,12 @@ module Koholint
       data = File.binread(@path)
       raise Error, "unsupported input log version #{data.getbyte(0).inspect}" unless data.getbyte(0) == FORMAT_VERSION
 
-      Zlib::Inflate.inflate(data.byteslice(1..)).scan(/.{5}/m) do |entry|
+      raw = begin
+        Zlib::Inflate.inflate(data.byteslice(1..))
+      rescue Zlib::Error
+        raise Error, "input log #{@path} is corrupt"
+      end
+      raw.scan(/.{5}/m) do |entry|
         mask, count = entry.unpack('CV')
         @runs << [mask, count]
         @frames += count

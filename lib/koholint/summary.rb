@@ -26,7 +26,7 @@ module Koholint
 
     def health(events, state, frames)
       return 'stopped' if events.last && events.last['type'] == 'stop'
-      return 'dead' if state && state['hp'].zero?
+      return 'dead' if state && state['max_hp'].positive? && state['hp'].zero?
 
       last_progress = events.select { |e| %w[notable objective].include?(e['type']) }.map { |e| e['frame'] }.max || 0
       frames - last_progress >= STALL_FRAMES ? 'stalled' : 'progressing'

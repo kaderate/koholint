@@ -28,9 +28,11 @@ module Koholint
       end
       emulator = Emulator.boot
       frames = run.inputs.each_frame
-      expected.map do |event|
+      expected.filter_map do |event|
         emulator.step(frames.next) while emulator.frame < event['frame']
         [event['frame'], emulator.state_hash == event['state_hash']]
+      rescue StopIteration
+        nil
       end
     end
   end

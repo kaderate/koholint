@@ -14,6 +14,7 @@ module Koholint
 
     def self.resume(run_path, policy:, budget:, flow_version: Koholint::FLOW_VERSION, **options)
       run = Run.open(run_path, flow_version: flow_version)
+      run.truncate_trace!(run.inputs.frames)
       new(run: run, policy: policy, budget: budget, emulator: Replay.to(run, run.inputs.frames), **options)
     end
 
@@ -33,7 +34,12 @@ module Koholint
     def run
       @run.status = 'running'
       @budget.tick
-      iterate until @budget.exhausted
+      begin
+        iterate until @budget.exhausted
+      rescue StandardError
+        stop(:error)
+        raise
+      end
       stop(@budget.exhausted)
     end
 
@@ -73,6 +79,9 @@ module Koholint
 
     def checkpoint_keyframe
       @run.inputs.flush
+      return if @last_keyframe == @emulator.frame
+
+      @last_keyframe = @emulator.frame
       path = @keyframes.save(@emulator)
       @run.trace.emit(:keyframe, frame: @emulator.frame, path: File.basename(path))
     end
@@ -92,11 +101,11 @@ module Koholint
 
     def stop(reason)
       @run.inputs.flush
-      @run.trace.emit(:budget_stop, frame: @emulator.frame, kind: reason.to_s) unless reason == :stopped
+      @run.trace.emit(:budget_stop, frame: @emulator.frame, kind: reason.to_s) unless %i[stopped error].include?(reason)
       emit_save('stop')
       checkpoint_keyframe
       @run.trace.emit(:stop, frame: @emulator.frame, reason: reason.to_s)
-      @run.status = 'stopped'
+      @run.status = reason == :error ? 'crashed' : 'stopped'
       reason
     end
   end

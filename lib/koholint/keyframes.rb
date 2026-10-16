@@ -11,7 +11,8 @@ module Koholint
 
     def save(emulator)
       path = File.join(@dir, format('kf-%09d.zlib', emulator.frame))
-      File.binwrite(path, Zlib::Deflate.deflate(emulator.dump))
+      File.binwrite("#{path}.tmp", Zlib::Deflate.deflate(emulator.dump))
+      File.rename("#{path}.tmp", path)
       path
     end
 

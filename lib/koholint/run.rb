@@ -27,7 +27,11 @@ module Koholint
     end
 
     def self.open(dir, flow_version:, rom_path: Koholint.rom_path)
-      manifest = JSON.parse(File.read(File.join(dir, 'manifest.json')))
+      manifest = begin
+        JSON.parse(File.read(File.join(dir, 'manifest.json')))
+      rescue Errno::ENOENT, JSON::ParserError
+        raise Error, "no run at #{dir}"
+      end
       if manifest['flow_version'] != flow_version
         raise VersionMismatch, "run #{File.basename(dir)} is flow #{manifest['flow_version']}, not #{flow_version}"
       end
@@ -61,13 +65,19 @@ module Koholint
     end
 
     def fork(at_frame:, flow_version:, rom_path: Koholint.rom_path)
+      raise Error, "cannot fork at frame #{at_frame}: run has #{inputs.frames} frames" unless (0..inputs.frames).cover?(at_frame)
+
       child = self.class.create(root: File.dirname(dir), flow_version: flow_version, budget: manifest['budget'],
                                 parent: { 'id' => id, 'frame' => at_frame }, seed: manifest['seed'], rom_path: rom_path)
       journal = InputLog.new(File.join(child.dir, 'inputs.log'))
       inputs.each_frame.first(at_frame).each { |buttons| journal.append(buttons) }
       journal.flush
-      Trace.read(File.join(dir, 'trace.jsonl')).select { |event| event['frame'] <= at_frame }.each do |event|
-        File.open(File.join(child.dir, 'trace.jsonl'), 'a') { |file| file.puts(JSON.generate(event)) }
+      events = Trace.read(File.join(dir, 'trace.jsonl')).select do |event|
+        event['frame'] < at_frame && !%w[stop budget_stop].include?(event['type'])
+      end
+      rewrite_trace(File.join(child.dir, 'trace.jsonl'), events)
+      events.select { |event| event['type'] == 'save' }.each do |event|
+        FileUtils.cp(File.join(dir, 'save', event['path']), File.join(child.dir, 'save'))
       end
       Dir.glob(File.join(dir, 'keyframes', 'kf-*.zlib')).each do |path|
         FileUtils.cp(path, File.join(child.dir, 'keyframes')) if File.basename(path)[/\d+/].to_i <= at_frame
@@ -75,10 +85,26 @@ module Koholint
       self.class.open(child.dir, flow_version: flow_version, rom_path: rom_path)
     end
 
+    def truncate_trace!(frames)
+      path = File.join(dir, 'trace.jsonl')
+      kept = Trace.read(path).reject do |event|
+        event['frame'] > frames || (%w[perception decision].include?(event['type']) && event['frame'] >= frames)
+      end
+      rewrite_trace(path, kept)
+    end
+
     def write_manifest
       tmp = File.join(dir, 'manifest.json.tmp')
       File.write(tmp, JSON.pretty_generate(@manifest))
       File.rename(tmp, File.join(dir, 'manifest.json'))
+    end
+
+    private
+
+    def rewrite_trace(path, events)
+      tmp = "#{path}.tmp"
+      File.write(tmp, events.map { |event| "#{JSON.generate(event)}\n" }.join)
+      File.rename(tmp, path)
     end
   end
 end
