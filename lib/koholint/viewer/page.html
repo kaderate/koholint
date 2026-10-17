@@ -1,0 +1,147 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Koholint live</title>
+<style>
+  body { margin: 0; background: #111; color: #ddd; font: 13px/1.4 monospace; }
+  #bar { display: flex; flex-wrap: wrap; gap: 6px 18px; padding: 8px 12px; background: #222; }
+  #bar b { color: #8f8; font-weight: normal; }
+  #bar b.health-unknown { color: #aaa; }
+  #banner, #lost { display: none; padding: 8px 12px; font-weight: bold; color: #fff; }
+  #banner { background: #b00; }
+  #lost { background: #a60; }
+  #main { display: flex; gap: 12px; padding: 12px; align-items: flex-start; }
+  #frame { width: 480px; height: 432px; image-rendering: pixelated; background: #000; flex: none; }
+  #events { flex: 1; height: 432px; overflow-y: auto; background: #181818; padding: 6px; margin: 0; white-space: pre-wrap; }
+</style>
+</head>
+<body>
+<div id="bar"></div>
+<div id="banner">Replay diverged: the follower no longer matches the run.</div>
+<div id="lost">Connection lost, retrying...</div>
+<div id="main">
+  <img id="frame" alt="game frame">
+  <pre id="events"></pre>
+</div>
+<script>
+(function () {
+  // pure:begin
+  function formatChoice(choice) {
+    if (choice === null || choice === undefined) return '';
+    if (typeof choice !== 'object') return String(choice);
+    if (Array.isArray(choice.buttons)) {
+      var pressed = choice.buttons.length ? choice.buttons.join('+') : 'idle';
+      return choice.frames === undefined ? pressed : pressed + ' ' + choice.frames + 'f';
+    }
+    return JSON.stringify(choice);
+  }
+
+  function formatEvent(e) {
+    var what = e.choice !== undefined ? formatChoice(e.choice) : e.skill;
+    return [e.frame, e.type, e.agent, what, e.params ? JSON.stringify(e.params) : '', e.confidence]
+      .filter(function (part) { return part !== undefined && part !== null && part !== ''; }).join(' ');
+  }
+
+  function formatHearts(s) {
+    var hearts = s.status.hearts, max = s.status.max_hearts;
+    if (hearts === null || hearts === undefined || !max) return '-';
+    return hearts + '/' + max;
+  }
+  // pure:end
+
+  var fields = [
+    ['run', function (s) { return s.status.run_id; }],
+    ['flow', function (s) { return s.status.flow_version; }],
+    ['health', function (s) { return s.status.health; }],
+    ['hearts', formatHearts],
+    ['frame', function (s) { return s.replay.frame; }],
+    ['lag', function (s) { return s.replay.lag; }],
+    ['sync', function (s) { return s.replay.sync; }],
+    ['budget', function (s) { return s.status.budget; }],
+    ['manifest', function (s) { return s.status.manifest_status; }]
+  ];
+  var bar = document.getElementById('bar');
+  var banner = document.getElementById('banner');
+  var lost = document.getElementById('lost');
+  var events = document.getElementById('events');
+  var img = document.getElementById('frame');
+  var counter = 0, frameBusy = false, stateBusy = false, frameOk = true, stateOk = true, lastError = null;
+
+  function text(value) {
+    if (value === null || value === undefined) return '-';
+    return typeof value === 'object' ? JSON.stringify(value) : String(value);
+  }
+
+  function renderBar(state) {
+    bar.textContent = '';
+    fields.forEach(function (field) {
+      var item = document.createElement('span');
+      var value = document.createElement('b');
+      try { value.textContent = text(field[1](state)); } catch (e) { value.textContent = '-'; }
+      if (field[0] === 'health') value.className = 'health-' + value.textContent;
+      item.append(field[0] + ' ', value);
+      bar.appendChild(item);
+    });
+    banner.style.display = (state.replay && state.replay.sync === 'diverged') ? 'block' : 'none';
+  }
+
+  var lastEvents = null;
+
+  function renderEvents(list) {
+    var rendered = list.map(formatEvent).join('\n');
+    if (rendered === lastEvents) return;
+    lastEvents = rendered;
+    var pinned = events.scrollTop + events.clientHeight >= events.scrollHeight - 4;
+    var top = events.scrollTop;
+    events.textContent = rendered;
+    events.scrollTop = pinned ? events.scrollHeight : top;
+  }
+
+  function checked(r) {
+    if (r.ok) return r;
+    return r.json().catch(function () { return {}; }).then(function (body) { throw new Error(body.error || r.status); });
+  }
+
+  function updateLost() {
+    lost.style.display = (frameOk && stateOk) ? 'none' : 'block';
+    lost.textContent = lastError ? 'Server error: ' + lastError : 'Connection lost, retrying...';
+  }
+
+  function failed(e) { lastError = (e instanceof TypeError) ? null : e.message; }
+
+  function pollFrame() {
+    if (frameBusy) return;
+    frameBusy = true;
+    counter += 1;
+    fetch('/frame.png?t=' + counter, { cache: 'no-store' })
+      .then(checked).then(function (r) { return r.blob(); })
+      .then(function (blob) {
+        var old = img.src;
+        img.src = URL.createObjectURL(blob);
+        if (old.indexOf('blob:') === 0) URL.revokeObjectURL(old);
+        frameOk = true;
+        lastError = null;
+      })
+      .catch(function (e) { frameOk = false; failed(e); })
+      .then(function () { frameBusy = false; updateLost(); });
+  }
+
+  function pollState() {
+    if (stateBusy) return;
+    stateBusy = true;
+    fetch('/state.json', { cache: 'no-store' })
+      .then(checked).then(function (r) { return r.json(); })
+      .then(function (state) { renderBar(state); renderEvents(state.events || []); stateOk = true; lastError = null; })
+      .catch(function (e) { stateOk = false; failed(e); })
+      .then(function () { stateBusy = false; updateLost(); });
+  }
+
+  setInterval(pollFrame, 100);
+  setInterval(pollState, 500);
+  pollFrame();
+  pollState();
+})();
+</script>
+</body>
+</html>

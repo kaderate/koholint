@@ -16,3 +16,4 @@ roms/
 /Notice Zelda.pdf
 /runs/*/run.lock
 .env
+Gemfile.lock

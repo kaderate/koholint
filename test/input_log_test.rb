@@ -1,5 +1,6 @@
 require_relative 'test_helper'
 require 'tmpdir'
+require 'zlib'
 require 'koholint/input_log'
 
 class InputLogTest < Minitest::Test
@@ -49,6 +50,96 @@ class InputLogTest < Minitest::Test
       2.times { second.append([]) }
       second.flush
       assert_equal 5, Koholint::InputLog.load(path).frames
+    end
+  end
+
+  def test_flush_then_read_without_closing
+    with_path do |path|
+      log = Koholint::InputLog.new(path)
+      4.times { log.append([:a]) }
+      log.flush
+      assert_equal 4, Koholint::InputLog.load(path).frames
+      2.times { log.append([:a]) }
+      log.flush
+      assert_equal 6, Koholint::InputLog.load(path).frames
+      assert_equal 1 + 2 * 5, File.size(path)
+    end
+  end
+
+  def test_partial_trailing_entry_is_ignored
+    with_path do |path|
+      log = Koholint::InputLog.new(path)
+      3.times { log.append([:b]) }
+      log.flush
+      File.binwrite(path, "\x01\x02\x03", mode: 'ab')
+      assert_equal 3, Koholint::InputLog.load(path).frames
+      entries, offset = Koholint::InputLog.read_from(path, 1)
+      assert_equal [[1 << BUTTONS.index(:b), 3]], entries
+      assert_equal 6, offset
+      resumed = Koholint::InputLog.new(path)
+      resumed.append([:b])
+      resumed.flush
+      assert_equal 4, Koholint::InputLog.load(path).frames
+    end
+  end
+
+  def test_read_from_returns_only_new_entries
+    with_path do |path|
+      log = Koholint::InputLog.new(path)
+      2.times { log.append([:a]) }
+      log.flush
+      _, offset = Koholint::InputLog.read_from(path, 1)
+      3.times { log.append([]) }
+      log.append([:a])
+      log.flush
+      entries, next_offset = Koholint::InputLog.read_from(path, offset)
+      assert_equal [[0, 3], [1 << BUTTONS.index(:a), 1]], entries
+      assert_equal File.size(path), next_offset
+      assert_equal [[], next_offset], Koholint::InputLog.read_from(path, next_offset)
+    end
+  end
+
+  def test_version_1_files_still_load
+    with_path do |path|
+      packed = [[1 << BUTTONS.index(:a), 7], [0, 2]].map { |m, c| [m, c].pack('CV') }.join
+      File.binwrite(path, [1].pack('C') + Zlib::Deflate.deflate(packed))
+      log = Koholint::InputLog.load(path)
+      assert_equal 9, log.frames
+      log.append([])
+      log.flush
+      assert_equal 2, File.binread(path).getbyte(0)
+      assert_equal 10, Koholint::InputLog.load(path).frames
+    end
+  end
+
+  module CallRecorder
+    EVENTS = []
+
+    def fsync
+      EVENTS << [:fsync, path]
+      super
+    end
+  end
+
+  module RenameRecorder
+    def rename(from, to)
+      CallRecorder::EVENTS << [:rename, from]
+      super
+    end
+  end
+
+  def test_rewrite_fsyncs_the_tmp_file_before_renaming_it
+    with_path do |path|
+      packed = [[1 << BUTTONS.index(:a), 7], [0, 2]].map { |m, c| [m, c].pack('CV') }.join
+      File.binwrite(path, [1].pack('C') + Zlib::Deflate.deflate(packed))
+      log = Koholint::InputLog.load(path)
+      CallRecorder::EVENTS.clear
+      File.prepend(CallRecorder)
+      File.singleton_class.prepend(RenameRecorder)
+      log.flush
+      tmp = "#{path}.tmp"
+      assert_operator CallRecorder::EVENTS.index([:fsync, tmp]), :<, CallRecorder::EVENTS.index([:rename, tmp])
+      assert_equal 9, Koholint::InputLog.load(path).frames
     end
   end
 end
