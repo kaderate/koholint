@@ -29,7 +29,7 @@ module Koholint
       @pacer = pacer
       @emulator = emulator || Emulator.boot
       @keyframes = Keyframes.new(File.join(run.dir, 'keyframes'))
-      @builder = Vision::GridBuilder.new(trace: run.trace) if grid
+      @builder = Vision::GridBuilder.new(trace: run.trace, beliefs: known_beliefs(run)) if grid
       @ram_hash = Digest::SHA256.hexdigest(@emulator.cartridge_ram)
     end
 
@@ -51,6 +51,8 @@ module Koholint
     end
 
     private
+
+    def known_beliefs(run) = Vision::Beliefs.from_events(Trace.read(File.join(run.dir, 'trace.jsonl')))
 
     def iterate
       state = Perception.read(@emulator)

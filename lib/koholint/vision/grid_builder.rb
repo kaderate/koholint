@@ -16,6 +16,7 @@ module Koholint
       STEPS = { up: [-1, 0], down: [1, 0], left: [0, -1], right: [0, 1] }.freeze
       # A stop only says the neighbour blocks when Link's center is within 4 px of its center line.
       ALIGNMENT_TOLERANCE = 4
+      OVERLAY_STUCK_FRAMES = 600
 
       def self.link_sprite?(sprite, state)
         (sprite[:y] - state.y).abs <= LINK_SPRITE_TOLERANCE &&
@@ -41,6 +42,8 @@ module Koholint
         @emitted = nil
         @statics = {}
         @statics_place = nil
+        @ahead = []
+        @overlay = nil
       end
 
       def observe(emulator, state)
@@ -49,8 +52,10 @@ module Koholint
         if snapshot.overlay
           @previous = nil
           @last = nil
+          note_overlay(state.frame, place)
           return nil
         end
+        @overlay = nil
 
         settled = @previous && @previous[:place] == place
         others = snapshot.sprites.reject { |sprite| self.class.link_sprite?(sprite, state) }
@@ -74,6 +79,14 @@ module Koholint
       end
 
       private
+
+      def note_overlay(frame, place)
+        @overlay = { place:, since: frame, emitted: false } unless @overlay && @overlay[:place] == place
+        return if @overlay[:emitted] || frame - @overlay[:since] <= OVERLAY_STUCK_FRAMES
+
+        @overlay[:emitted] = true
+        @trace.emit(:notable, frame:, kind: 'grid_overlay_stuck', detail: place)
+      end
 
       # Static identity is the position; after an overlay the last statics stand until two observations are consecutive again.
       def track(place, current)
@@ -137,7 +150,7 @@ module Koholint
         return true unless probes.values.any? { |probe| moved?(probe) }
 
         unknown.each do |direction, (row, col)|
-          result = walk_result(probes.fetch(direction), state, cell, direction)
+          result = walk_result(probes.fetch(direction), direction)
           if %i[yes no].include?(result)
             record(grid.static_sprite(row, col) || grid.appearance(row, col), direction, result, state.frame)
           else
@@ -149,11 +162,13 @@ module Koholint
 
       def moved?(probe) = probe[:room_changed] || probe[:to] != probe[:from]
 
-      def walk_result(probe, state, cell, direction)
+      def walk_result(probe, direction)
         return if probe[:room_changed] || probe[:hp_delta].negative?
 
+        start = probe.fetch(:from)
+        cell = self.class.link_cell(start[:x], start[:y]) or return
         after = self.class.link_cell(probe[:to][:x], probe[:to][:y]) or return
-        return aligned?(state, cell, direction) && !sprite_ahead?(state, direction) ? :no : :misaligned if after == cell
+        return aligned?(start, cell, direction) && !sprite_ahead?(start, direction) ? :no : :misaligned if after == cell
 
         drow, dcol = STEPS.fetch(direction)
         delta = [after[0] - cell[0], after[1] - cell[1]]
@@ -164,15 +179,15 @@ module Koholint
       def sprite_boxes(sprites, height) = sprites.map { |s| [s[:x] - 8, s[:y] - 16, 8, height] }
 
       # Only the strip Link would newly cover counts: the NPC next to the start already overlaps his own box.
-      def sprite_ahead?(state, direction)
+      def sprite_ahead?(start, direction)
         drow, dcol = STEPS.fetch(direction)
-        left = state.x - 8 + (dcol * 16)
-        top = state.y - 16 + (drow * 16)
+        left = start[:x] - 8 + (dcol * 16)
+        top = start[:y] - 16 + (drow * 16)
         @ahead.any? { |x, y, w, h| x < left + 16 && left < x + w && y < top + 16 && top < y + h }
       end
 
-      def aligned?(state, cell, direction)
-        offset = STEPS.fetch(direction)[0].zero? ? (state.y - 8) - ((cell[0] * 16) + 8) : state.x - ((cell[1] * 16) + 8)
+      def aligned?(start, cell, direction)
+        offset = STEPS.fetch(direction)[0].zero? ? (start[:y] - 8) - ((cell[0] * 16) + 8) : start[:x] - ((cell[1] * 16) + 8)
         offset.abs <= ALIGNMENT_TOLERANCE
       end
 
