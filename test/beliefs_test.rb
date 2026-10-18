@@ -144,4 +144,34 @@ class BeliefsTest < Minitest::Test
     assert_equal :no, beliefs.query(appearance: 'a1', action: :walk, direction: nil, context: Caps.new)
     assert_equal :down, beliefs.evidence_for('a1', :walk).first[:direction]
   end
+
+  def test_recorded_evidence_is_frozen_and_the_list_is_a_copy
+    record(result: :yes)
+    entry = @beliefs.evidence_for('a1', :walk).first
+    assert_predicate entry, :frozen?
+    assert_raises(FrozenError) { entry[:result] = :no }
+    @beliefs.evidence_for('a1', :walk).clear
+    assert_equal 1, @beliefs.evidence_for('a1', :walk).size
+  end
+
+  def test_record_rejects_malformed_input
+    base = { appearance: 'a1', action: :walk, direction: nil, result: :yes, method: 'hold', context: Caps.new, frame: 1, source: 't' }
+    [{ action: nil }, { action: 'walk' }, { frame: nil }, { frame: '3' }, { direction: :north }, { direction: 'up' }].each do |bad|
+      error = assert_raises(ArgumentError, bad.inspect) { @beliefs.record(**base, **bad) }
+      refute_includes error.message, "\n"
+    end
+    @beliefs.record(**base, direction: :up)
+  end
+
+  def test_from_events_rejects_malformed_affordances_in_one_line
+    good = { 'type' => 'affordance', 'appearance' => 'a1', 'action' => 'walk', 'direction' => 'up', 'result' => 'yes', 'frame' => 1 }
+    [good.except('action'), good.except('result'), good.merge('direction' => 'north'), good.merge('frame' => nil)].each do |bad|
+      error = assert_raises(ArgumentError) { Beliefs.from_events([bad]) }
+      refute_includes error.message, "\n"
+    end
+  end
+
+  def test_query_requires_capabilities_context
+    assert_raises(ArgumentError) { @beliefs.query(appearance: 'a1', action: :walk, context: ['swim']) }
+  end
 end

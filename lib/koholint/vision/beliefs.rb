@@ -4,12 +4,16 @@ module Koholint
   module Vision
     class Beliefs
       RESULTS = %i[yes no].freeze
+      DIRECTIONS = %i[up down left right].freeze
 
       def self.from_events(events)
         new.tap do |beliefs|
           events.each do |event|
             next unless event['type'] == 'affordance'
 
+            %w[action result].each do |key|
+              raise ArgumentError, "affordance event at frame #{event['frame'].inspect} lacks #{key}" unless event[key]
+            end
             beliefs.record(
               appearance: event['appearance'],
               action: event['action'].to_sym,
@@ -30,14 +34,21 @@ module Koholint
 
       def record(appearance:, action:, direction:, result:, method:, context:, frame:, source:)
         raise ArgumentError, "result must be :yes or :no, got #{result.inspect}" unless RESULTS.include?(result)
+        raise ArgumentError, "action must be a Symbol, got #{action.inspect}" unless action.is_a?(Symbol)
+        raise ArgumentError, "frame must be an Integer, got #{frame.inspect}" unless frame.is_a?(Integer)
+        unless direction.nil? || DIRECTIONS.include?(direction)
+          raise ArgumentError, "direction must be one of #{DIRECTIONS.join('/')} or nil, got #{direction.inspect}"
+        end
 
-        @evidence[[appearance, action]] << { appearance:, action:, direction:, result:, method:, context:, frame:, source: }
+        @evidence[[appearance, action]] << { appearance:, action:, direction:, result:, method:, context:, frame:, source: }.freeze
         nil
       end
 
       def evidence_for(appearance, action) = @evidence.fetch([appearance, action], []).dup
 
       def query(appearance:, action:, context:, direction: nil)
+        raise ArgumentError, "context must be a Capabilities, got #{context.inspect}" unless context.is_a?(Capabilities)
+
         all = @evidence.fetch([appearance, action], [])
         return :unknown if all.empty?
 
