@@ -5,8 +5,8 @@ Only what is left to do. When something lands, delete it here (git is the histor
 **Goal:** an agent plays Link's Awakening DX through the engine. First milestones: shield, then sword.
 
 ## Next, in order
-1. **Generic actions and the first agent loop** — action registry (move, press, interact, advance dialogue) with typed results; minimal world view; Jev/Claude decision contracts (`claude -p` isolated, no tools, schema-validated output, deterministic fallback); objective/step lifecycle with a stall limit; loop detection. End criterion: the agent exits the starting house, measured in frames, calls and cost.
-2. **Perception gaps** — inventory/items and Link's capabilities (find addresses by tracing), milestone detection (shield, sword), "dialogue open" state (`dialog_state` 0xC19F is a candidate signal, also for control) and dialogue text decoding, `notable` events (so the feed's health stops being `unknown`).
+1. **Generic actions and the first agent loop** — plan `docs/superpowers/plans/2026-10-18-first-agent-loop.md` (Claude only, dialogue read as an image, Sonnet with a 1 dollar cap, objective chosen by the agent). End criterion: the agent exits the starting house, measured in frames, calls and cost. Jev wiring comes after it.
+2. **Perception gaps** — inventory/items and Link's capabilities (find addresses by tracing), milestone detection (shield, sword), deterministic dialogue text decoding (the first loop reads dialogue as an image), `notable` events (so the feed's health stops being `unknown`).
 3. **Dialogue to leads** — texts and leads (claims extracted by the agent, with status open/tested/refuted and evidence); Claude interprets NPC and sign dialogue.
 4. **Interactions beyond walking** — push, dive/swim, item use; capabilities feed the beliefs of the vision plan.
 5. **Combat** — open question: micro-decisions; settle by spike (Jev macros vs deterministic vs hybrid) after the first agent loop.

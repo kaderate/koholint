@@ -1,0 +1,133 @@
+# Koholint First Agent Loop Implementation Plan
+
+> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+
+**Goal:** An agent (Claude through `claude -p`) plays the starting house of Link's Awakening DX through the engine: it picks its own objective, chooses generic actions from a typed registry, reads dialogue from an image, and is measured (frames, calls, cost) on leaving the starting house.
+
+**Architecture:** The engine stays the loop owner. Perception gets the missing "can the player act" signals; a skill registry turns agent choices into frame-by-frame inputs with typed results; an `Objectives` object (pure code) owns objective lifecycle, predicates, stall limits and loop detection; a `ClaudeCli` client calls `claude -p` stateless and isolated; `Policies::Agent` assembles the context (grid, memory, attempts, manual digest) and validates the answers; every failure degrades to a deterministic `wait` and is traced. Replays never call the agent: the journal records the inputs.
+
+**Tech Stack:** Ruby 4.0.1, minitest, `claude -p` 2.1.x (flags used: `--output-format json`, `--json-schema`, `--tools ""`, `--no-session-persistence`, `--setting-sources ""`, `--system-prompt`, `--model`, `--max-budget-usd`), stdlib only.
+
+**Spec:** `docs/superpowers/specs/2026-10-16-koholint-v2-architecture-design.md` (Decision points, Step definition, Agent context contract); earlier plans: `docs/superpowers/plans/2026-10-18-vision-and-grid.md`.
+
+## Owner decisions for this plan (2026-10-18)
+
+- Agents: **Claude only** first (tactical and strategic both through `claude -p`); the decision contract stays routable so Jev can take the tactical points later without touching the loop.
+- Dialogue: the agent reads the **dialogue box as an image** (cropped, upscaled), and its transcription is written to the trace.
+- Model and budget: **Sonnet, one dollar cap per run** (configurable, stops the run cleanly).
+- First objective: **chosen by the agent** from the manual digest and the game state; the plan's success measure (leaving the starting house place) is computed by code, never by the agent's claim.
+
+## Facts established (from the previous plans and live checks; re-verify, do not trust blindly)
+
+- Boot: the state-based `Policies::StartGame` reaches gameplay (game_mode 0x0B) at frame ~230. Link is moved by the game until ~f258 (cutscene), a dialogue box opens near f778 (`dialog_state` RAM 0xC19F non-zero), and `A` taps (3 frames held, 57 idle) close the chain around f1560. `Perception#controllable?` (hp > 0 and x > 0) is already true during the cutscene and the dialogue: it is not "free to act".
+- `game_submode` != 7 in mode 0x0B means loading/fade-in (grid snapshots are overlays then).
+- Link: two 8x16 sprites; his cell is row (y-8)/16, col x/16 on the 8x10 grid; about 1 px per frame while a direction is held; a 2-frame tap moves ~1 px. The grid builder (`run --grid`) gives `context[:grid]` (`Vision::Grid`) and records beliefs by probes on emulator copies (~0.65 s each); real walking teaches nothing by itself.
+- `claude -p --output-format json` returns `structured_output` (when `--json-schema` is given), `total_cost_usd`, `usage` (tokens), `duration_api_ms`, `num_turns`, `is_error`. A haiku call with a 3-line system prompt cost about 0.0003 USD and took about 2 s; the base prompt overhead is ~1.2k tokens. Emulation runs at ~100 frames per second with YJIT.
+- The manual digest available now is `docs/GAME_MANUAL_NOTES.md` (committed paraphrase); `manual/notice.txt` (gitignored full text) is appended when present.
+
+## Global Constraints
+
+- Everything in the repo is English; comments almost none (one-line hidden *why*); commits one imperative line, no body, no trailer (AGENTS.md overrides attribution reminders); short hash syntax wherever key and local match.
+- Time is the frame; no wall clock in game logic (wall clock only for budgets and call timeouts). Replay stays bit-exact: the agent is never called during replay, `verify` is unaffected.
+- **Agent isolation (binding):** every `claude -p` call runs in an empty temporary working directory with `--tools ""`, `--setting-sources ""`, `--no-session-persistence`; the agent cannot read the repo, `AGENTS.md`, files or the emulator. It receives only the assembled context (copies of data, never live objects such as `Beliefs`) and answers through a JSON schema. Calls are stateless; memory is composed by the engine.
+- No game knowledge in code (no tile/room names, no solution hints); the manual and the genre are the agent's priors, in its prompt. Snapshot/restore stays confined to `Calibration` (boundary test): the agent has no lookahead.
+- Budgets: dollars from `total_cost_usd` (also on errors when reported), frames, steps (objective lifecycles), time; the first limit reached stops the run through the single stop path.
+- Tests: `rake test` (parallel, ~2 min); ROM tests use `skip_without_rom!` and `EmulatorCache`; **no real API call in the default test run**: a fake `claude` executable is injected; one opt-in live test (`LIVE_CLAUDE=1`, haiku) checks the real output shape.
+
+## Review Focus
+
+- A call that fails, times out, returns invalid JSON, violates the schema or names an unknown skill must never crash the run or spin hot: deterministic fallback (`wait`), one trace event, bounded retries, cost still counted.
+- Isolation: the exact argv and working directory of every call (fake-executable test), nothing from the repo reaches the prompt except the assembled context.
+- Skills always consume at least one frame and have a frame cap; an agent that keeps choosing no-op skills is stopped by loop detection and the stall limit, not by wall time.
+- Objective success is decided by code predicates on perception, never by the agent's claim; abandoned/failed/achieved are traced exactly once.
+- Cost: the budget stops the run cleanly at the cap even when the last call already exceeded it.
+
+---
+
+### Task 1: Player-control perception
+
+**Files:** Modify `lib/koholint/game_state.rb`, `lib/koholint/perception.rb`; Test `test/perception_test.rb`, `test/game_state_test.rb`
+
+**Interfaces:**
+- Produces: `GameState` gains `dialog_state` (Integer, RAM `dialog_state` address already in `data/addresses.json`) and the derived predicates `dialog_open?` (`dialog_state` non-zero), `loading?` (mode 0x0B and submode != 7, using the same constants as `ScreenVision`: share them, do not duplicate), `phase -> :boot | :loading | :dialogue | :playing` (`:boot` while `game_mode` != 0x0B, `:loading`, `:dialogue`, else `:playing`). `controllable?` keeps its meaning (the boot policy hands over on it).
+- [ ] **Step 1: Tests.** Fake-state tests of each predicate and `phase`; ROM test on `EmulatorCache.at(700)` (`:playing` or `:boot` per the real values: report them), a state inside the dialogue chain (step ~120 frames after f778 with idle inputs) is `:dialogue`, `EmulatorCache.interactive` is `:playing` and `dialog_open?` false.
+- [ ] **Step 2-4:** FAIL -> implement -> PASS. **Step 5: Commit** `Perceive dialogue and loading phases`
+
+### Task 2: Skill registry and executions
+
+**Files:** Create `lib/koholint/skills/registry.rb`, `lib/koholint/skills/execution.rb`, `lib/koholint/skills/walk.rb`, `press.rb`, `advance_dialogue.rb`, `wait.rb`; Modify `lib/koholint/engine.rb`; Test `test/skills_test.rb`, `test/engine_test.rb`
+
+**Interfaces:**
+- Produces: `Skills::Registry.default -> Registry` with `#names`, `#fetch(name)`, `#schema -> Hash` (JSON-schema fragment describing every skill and its params, used by the contracts); each skill responds to `#start(state, params) -> Execution` and `#params_schema`. `Execution#next_input(state) -> Array<Symbol> | nil` (buttons to hold for the next frame; nil = finished) and `#result(state) -> Hash` with keys `skill, params, frames, from: {room, map, x, y, row, col}, to: {…}, moved_cells, room_changed, hp_delta, dialog_before, dialog_after, stopped_by` (`stopped_by` ∈ `done|blocked|frame_cap|dialogue|room_change|damage`). Skills: `walk(direction, cells)` (1-5 cells, holds the direction until Link's cell has changed `cells` times or he stops moving for 8 frames or 90 frames per cell elapsed, stops early on dialogue opening, room change or damage), `press(button, frames)` (button in a, b, start, select; 1-60 frames; then 10 idle frames), `advance_dialogue` (A for 3 frames then 27 idle, at most 90 frames, stops when `dialog_state` changes or closes), `wait(frames)` (1-120). Every skill consumes at least one frame; hard cap 400 frames per execution.
+- Engine: a decision `choice` with `:skill` and `:params` runs through the registry (a choice with `:buttons`/`:frames` keeps working as today): the engine steps frame by frame, appending to the journal as before, checks the budget every frame, emits the existing `decision` event and an `action` event whose `result` is the `Execution#result`. Journal flushing stays per execution.
+- [ ] **Step 1: Tests.** Unit tests per skill against a scripted fake state stream; ROM tests from `EmulatorCache.interactive`: `walk(:up, 1)` moves Link one cell (record from/to), `walk(:right, 1)` reports `blocked` (the starting-house wall), `wait(30)` consumes 30 frames, `press(:a, 3)` journals 3+10 frames; a ROM test from `EmulatorCache.at(700)`: `advance_dialogue` in the dialogue chain eventually returns `dialog_after` false or progresses `dialog_state`; unknown skill / out-of-range params raise `ArgumentError` from the registry (the policy layer converts them to fallback); engine equality: the same choices give identical journals and state hashes on two runs.
+- [ ] **Step 2-4:** FAIL -> implement -> PASS. **Step 5: Commit** `Add the skill registry and skill executions`
+
+### Task 3: Objectives (lifecycle, predicates, stall, loop detection)
+
+**Files:** Create `lib/koholint/objectives.rb`; Test `test/objectives_test.rb`
+
+**Interfaces:**
+- Produces: `Objectives.new(trace:, stall_frames: 1800, loop_window: 12)`; `#current -> Hash | nil` (`{id:, title:, predicate:, started_frame:, attempts: []}`); `#start(frame:, title:, predicate:) -> id` emits `objective{id, status: 'started', predicate}`; `#record_attempt(skill:, params:, result_summary:)`; `#update(state, frame:) -> :achieved | :abandoned | :failed | nil` evaluated by code: predicates `{kind: 'leave_place', place: [room, map]}` (achieved when a non-loading state has another place), `{kind: 'reach_place', place:}`, `{kind: 'reach_cell', place:, row:, col:}`, `{kind: 'dialogue_closed'}` (a dialogue was open since the objective started and is now closed); `abandon(frame:, reason:)`; stall: no change of (place, Link cell, dialog_state, hp) for `stall_frames` -> `abandoned` with reason `stall`; loop detection: the same (place, cell, dialog_state, skill, params) repeated `loop_window` times with no state change -> `abandoned` with reason `loop`; Link dying (hp 0 after having positive hp) -> `failed`. Each terminal outcome emits exactly one `objective` event (`status` achieved/abandoned/failed) and clears `current`; `#attempts_for_prompt -> Array<String>` (last 10 compact lines) and `#history -> Array` (finished objectives with outcome) for the agent context.
+- [ ] **Step 1: Tests.** Pure tests with hand-built `GameState`s: each predicate, exactly-once terminal events, stall and loop thresholds, failed on death, attempts bounded to 10, `dialogue_closed` needs open-then-closed, a loading state never satisfies `leave_place`.
+- [ ] **Step 2-4:** FAIL -> implement -> PASS. **Step 5: Commit** `Add objectives with code-checked predicates, stall and loop detection`
+
+### Task 4: ClaudeCli client
+
+**Files:** Create `lib/koholint/agents/claude_cli.rb`; Test `test/claude_cli_test.rb`, `test/fixtures/fake_claude` (executable script)
+
+**Interfaces:**
+- Produces: `Agents::ClaudeCli.new(model: 'sonnet', command: 'claude', timeout: 90, max_call_usd: 0.25, retries: 1)`; `#call(system:, prompt:, schema:, image: nil) -> Agents::Reply` where `Reply = Struct(:output, :cost_usd, :latency_ms, :tokens, :error)` (`output` = parsed `structured_output` Hash or nil; `error` nil or a short String). The call runs `command -p --model M --tools "" --no-session-persistence --setting-sources "" --output-format json --json-schema SCHEMA --system-prompt SYS --max-budget-usd N` in a fresh empty temporary directory (removed afterwards) with the prompt on stdin or as the last argument; with an `image` (PNG bytes) it uses `--input-format stream-json` with a base64 image content block (see Task 7 spike; if the CLI cannot take images this way the reply carries `error: 'image_unsupported'`). Timeouts kill the child process group; JSON parse failures, `is_error`, a missing `structured_output` or a schema-invalid output give `output: nil` and an `error`; cost is read from `total_cost_usd` whenever present (also on errors); `retries` applies only to timeouts and transport errors, not to schema violations.
+- [ ] **Step 1: Tests with `test/fixtures/fake_claude`** (a script that records its argv, cwd and stdin to a file named by an env var and prints a canned JSON chosen by another env var): argv contains exactly the isolation flags above and `--model`; cwd is empty and differs from the repo; success returns output, cost, latency, tokens; invalid JSON, `is_error: true`, missing `structured_output`, nonzero exit and timeout (script sleeps) each give an `error` and never raise; the temp dir is removed; the process is killed on timeout; cost counted on an error reply. **Opt-in live test** (`LIVE_CLAUDE=1`, model haiku): one real call with a tiny schema returns an output and a positive cost (skipped otherwise).
+- [ ] **Step 2-4:** FAIL -> implement -> PASS. **Step 5: Commit** `Add an isolated claude -p client with a fake-executable test harness`
+
+### Task 5: Agent context and contracts
+
+**Files:** Create `lib/koholint/agent_context.rb`, `lib/koholint/agents/contracts.rb`; Test `test/agent_context_test.rb`, `test/contracts_test.rb`
+
+**Interfaces:**
+- Consumes: Tasks 1-3, `Skills::Registry`, `Vision::Grid`. Produces: `AgentContext.build(state:, grid:, objective:, history:, attempts:, manual:, last_results:, max_chars: 6000) -> String` rendering: phase, place, Link cell and pixel position, hearts, an 8x10 ASCII grid (one symbol per cell: `.` passable, `#` blocked, `?` unknown, `!` stale, `~` one-way, `o` static object, `@` Link, rows and columns numbered) with a legend, a per-direction neighbour table (belief and last skill result towards it), the current objective with its predicate and attempts, finished objectives, the last 6 skill results, and the manual digest; cut to `max_chars` by dropping the oldest history first (never the grid, the objective or the legend). `Agents::Contracts.act(registry) -> {system:, schema:}` (choose one skill + params, `justification` String, `confidence` 0-1) and `Agents::Contracts.objective -> {system:, schema:}` (a title, a predicate from the four kinds above with its fields, `justification`); `Contracts.validate_act(output, registry) -> Hash | nil` (known skill, params in range) and `validate_objective(output)`; system prompts state the role (a player who knows the manual and the genre, no walkthrough), the output rules and that unknown cells are not walls.
+- [ ] **Step 1: Tests.** A hand-built state/grid renders the exact ASCII lines and legend (snapshot of the string); the char cap drops history but never the grid/objective; contracts' schemas are valid JSON Schema objects naming every registry skill; validators accept good outputs and reject unknown skills, out-of-range params, a predicate missing fields; no live object leaks (the context is a String; a test asserts `AgentContext.build` does not call methods that mutate the grid or beliefs by passing frozen copies).
+- [ ] **Step 2-4:** FAIL -> implement -> PASS. **Step 5: Commit** `Assemble the agent context and the decision contracts`
+
+### Task 6: Agent policy, engine integration, CLI
+
+**Files:** Create `lib/koholint/policies/agent.rb`; Modify `lib/koholint/engine.rb`, `lib/koholint/cli.rb`, `lib/koholint/budget.rb`; Test `test/agent_policy_test.rb`, `test/cli_test.rb`
+
+**Interfaces:**
+- Consumes: Tasks 2-5. Produces: `Policies::Agent.new(client:, registry:, objectives:, manual:, clock:)`; `#point_for(state)` returns a `DecisionPoint.macro(:boot)` while the phase is `:boot`/`:loading` is handled by the existing `StartGame` wrapper (keep `StartGame(Agent)` composition: the boot policy runs until gameplay, the agent takes over once `phase` is `:playing` or `:dialogue`); with no current objective the point is `:objective`, else `:act`. `#decide` builds the context, calls the client, validates, and returns `{choice:, justification:, confidence:, agent: 'claude', latency_ms:, cost_usd:}`; invalid output, an `error` reply or an exception falls back to `{choice: {skill: 'wait', params: {frames: 30}}, fallback: true}` with the error as the justification (trace `decision` fields already carry `latency_ms`/`cost_usd`/`fallback`); the objective answer starts the objective through `Objectives#start`; after each execution the engine records the attempt and calls `Objectives#update` (terminal outcomes emit through it); the engine adds `cost_usd` of each decision to the `Budget`. `Budget` gains `max_dollars` enforcement already present (`dollars:`): ensure the run stops cleanly when the cap is exceeded by the last call. CLI: `run --agent [--model M] [--max-dollars X]` (defaults sonnet, 1.0; implies `--grid`), accepted by `resume`; a missing `claude` executable is a one-line error. Wall-clock timeouts are the client's; the loop never sleeps.
+- [ ] **Step 1: Tests.** With a scripted fake client: first decision is an objective, then acts; invalid output -> fallback `wait` and a traced error; client errors never raise; cost accumulates and stops the run at the cap (cap smaller than one reply); an achieved predicate emits one `objective` event and the next iteration asks for a new objective; loop detection after repeated no-op choices abandons the objective; `--agent` plumbing in the CLI test with the fake executable via `--claude-command`; engine equality is not applicable (the agent decides) but a recorded run replays bit-exact through `Replay.verify`.
+- [ ] **Step 2-4:** FAIL -> implement -> PASS. **Step 5: Commit** `Add the agent policy and wire it into the engine and CLI`
+
+### Task 7: Dialogue image and transcription
+
+**Files:** Create `lib/koholint/vision/dialogue_shot.rb`; Modify `lib/koholint/policies/agent.rb`, `lib/koholint/trace.rb`, `lib/koholint/agents/claude_cli.rb`; Test `test/dialogue_shot_test.rb`, `test/agent_policy_test.rb`
+
+**Interfaces:**
+- Produces: spike first: determine, with one real haiku call (opt-in), whether `claude -p --input-format stream-json` accepts a base64 PNG content block and answers with `--json-schema`; record the working invocation in the report; if impossible, report it and stop this task (the agent then only knows a dialogue is open). `Vision::DialogueShot.crop(emulator) -> String` (PNG bytes): the dialogue box region (screen rows covering grid rows 5-7: find the exact pixel box empirically from a frame with `dialog_state` non-zero), upscaled x4 with the existing `Png`; `Trace` gains `dialogue{place, text, source, page}` (`source: 'agent'`); when `phase == :dialogue` the agent policy sends the crop with the act prompt and the `act` schema gains an optional `transcription` String; a non-empty transcription is emitted as a `dialogue` event (page = number of `advance_dialogue` results since the dialogue opened).
+- [ ] **Step 1: Tests.** `crop` on the real dialogue state (from `EmulatorCache.at(700)` plus idle until `dialog_open?`) returns a PNG with the expected dimensions and non-uniform pixels (pixel-compare against a crop of the driver PNG); fake-client test that an image is passed only in `:dialogue`; a transcription becomes a `dialogue` event, an empty one does not; `Trace` accepts the new type and rejects a missing field.
+- [ ] **Step 2-4:** FAIL -> implement -> PASS. **Step 5: Commit** `Read dialogue boxes as images and record the transcription`
+
+### Task 8: Live view of agent decisions
+
+**Files:** Modify `lib/koholint/viewer/page.html`, `lib/koholint/viewer/feed.rb`; Test `test/page_test.rb`, `test/feed_test.rb`
+
+**Interfaces:**
+- Produces: the event list shows agent decisions readably (`f1234 · claude decides walk up 2` with the justification as a hover title and a `fallback` marker), `action` results (`walked 1 cell, stopped: blocked`), `objective` events (`objective: leave_place … started/achieved/abandoned (stall)`) and `dialogue` transcriptions; the status bar shows the current objective, the run's dollars spent and the number of agent calls (from the trace); the JSON toggle keeps the raw events. Pure formatting functions stay in the `// pure:begin` block and are tested through node.
+- [ ] **Step 1: Tests** for each new format (node) and for the feed fields (objective, calls, dollars) on a hand-built trace. **Step 2-4:** FAIL -> implement -> PASS. **Step 5: Commit** `Show agent decisions, objectives and dialogue in the live view`
+
+### Task 9: First live run and measurement
+
+**Files:** Modify `ROADMAP.md`, `README.md`; Create `docs/runs/2026-10-first-agent-run.md` (measurements only)
+
+- [ ] **Step 1 (manual, report it):** run `bin/koholint run --agent --realtime --max-dollars 1 --root <tmp>` with `watch` open; let it run until the objective is achieved, the budget is reached, or the stall limit stops it. Record: frames played, agent calls, dollars, objectives with outcomes, whether it left the starting house place, how it handled the intro dialogue chain, the worst-looking decisions with their justifications, and every point where the context or the skills were insufficient.
+- [ ] **Step 2:** write the measurements (a table plus a short "what was missing" list) into `docs/runs/2026-10-first-agent-run.md`; update `ROADMAP.md`: remove what landed, add what the run showed missing (do not invent). **Step 3: Commit** `Record the first agent run and update the roadmap`
+
+---
+
+## Execution notes
+Order: Task 1, then Tasks 2 / 3 / 4 in parallel (disjoint files), then Task 5 (needs 2), then Task 6 (needs 2-5), then Tasks 7 and 8, then Task 9 by the controller with the owner watching. Tasks 4 and 7 touch the client: run them sequentially.
+
+## Self-review against the discussion
+- Agent plays, code decides success: Objectives predicates and the exit-the-house measure are code. Skills are generic (walk, press, advance_dialogue, wait): no route, no game fact. Isolation and no-lookahead are enforced by argv/cwd tests and the existing calibration boundary test. Claude-only, image dialogue, Sonnet with a 1 dollar cap, self-chosen first objective: as decided.
+- Not in this plan: Jev wiring, deterministic dialogue text decoding, leads extracted from dialogues, item/inventory perception and milestones (shield, sword), push/swim/combat skills, objective hierarchies; they stay in `ROADMAP.md`.
