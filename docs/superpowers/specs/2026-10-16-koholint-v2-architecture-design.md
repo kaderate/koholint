@@ -83,7 +83,7 @@ runs/<id>/
   trace.jsonl     append-only typed events; the single source of truth
   save/           canonical game .sav = real progress
   keyframes/      local cache of savestates every 30–60 game seconds, tied to a trace line (gitignored)
-  inputs.log      compressed per-frame button journal
+  inputs.log      append-only run-length button journal (format v2: uncompressed 5-byte entries, fsynced per macro; v1 zlib files still readable)
   world.json      run knowledge
   suggestions.md  flow gaps noticed by the run (only file the loop writes about the flow)
 ```

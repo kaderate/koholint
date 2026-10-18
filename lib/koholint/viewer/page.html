@@ -1,0 +1,200 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Koholint live</title>
+<style>
+  body { margin: 0; background: #111; color: #ddd; font: 13px/1.4 monospace; }
+  #bar { display: flex; flex-wrap: wrap; gap: 6px 18px; padding: 8px 12px; background: #222; }
+  #bar b { color: #8f8; font-weight: normal; }
+  #bar b.health-unknown { color: #aaa; }
+  #banner, #lost { display: none; padding: 8px 12px; font-weight: bold; color: #fff; }
+  #banner { background: #b00; }
+  #lost { background: #a60; }
+  #main { display: flex; gap: 12px; padding: 12px; align-items: flex-start; }
+  #frame { width: 480px; height: 432px; image-rendering: pixelated; background: #000; flex: none; }
+  #side { flex: 1; display: flex; flex-direction: column; }
+  #sidebar { display: flex; justify-content: space-between; align-items: center; padding: 4px 6px; background: #222; }
+  #mode { background: #333; color: #ddd; border: 1px solid #555; font: inherit; padding: 2px 10px; cursor: pointer; }
+  #events { height: 400px; overflow-y: auto; background: #181818; padding: 6px; margin: 0; white-space: pre-wrap; }
+  #events .action { color: #999; }
+  #events .decision { color: #dfe; }
+</style>
+</head>
+<body>
+<div id="bar"></div>
+<div id="banner">Replay diverged: the follower no longer matches the run.</div>
+<div id="lost">Connection lost, retrying...</div>
+<div id="main">
+  <img id="frame" alt="game frame">
+  <div id="side">
+    <div id="sidebar"><span>events</span><button id="mode" type="button"></button></div>
+    <div id="events"></div>
+  </div>
+</div>
+<script>
+(function () {
+  // pure:begin
+  function formatChoice(choice) {
+    if (choice === null || choice === undefined) return '';
+    if (typeof choice !== 'object') return String(choice);
+    if (Array.isArray(choice.buttons)) {
+      var pressed = choice.buttons.length ? choice.buttons.join('+') : 'idle';
+      return choice.frames === undefined ? pressed : pressed + ' ' + choice.frames + 'f';
+    }
+    return JSON.stringify(choice);
+  }
+
+  function formatEventPretty(e) {
+    var head = 'f' + e.frame + ' · ';
+    if (e.type === 'decision') {
+      var line = head + e.agent + ' decides ' + formatChoice(e.choice);
+      if (typeof e.confidence === 'number' && e.confidence < 1) line += ' (' + Math.round(e.confidence * 100) + '%)';
+      return line;
+    }
+    if (e.type === 'action') return head + e.skill + ' ' + formatChoice(e.params);
+    return head + e.type;
+  }
+
+  function formatEventJson(e) { return JSON.stringify(e); }
+
+  function normalizeMode(mode) { return mode === 'json' ? 'json' : 'pretty'; }
+
+  function nextMode(mode) { return normalizeMode(mode) === 'json' ? 'pretty' : 'json'; }
+
+  function formatHearts(s) {
+    var hearts = s.status.hearts, max = s.status.max_hearts;
+    if (hearts === null || hearts === undefined || !max) return '-';
+    return hearts + '/' + max;
+  }
+  // pure:end
+
+  var fields = [
+    ['run', function (s) { return s.status.run_id; }],
+    ['flow', function (s) { return s.status.flow_version; }],
+    ['health', function (s) { return s.status.health; }],
+    ['hearts', formatHearts],
+    ['frame', function (s) { return s.replay.frame; }],
+    ['lag', function (s) { return s.replay.lag; }],
+    ['sync', function (s) { return s.replay.sync; }],
+    ['budget', function (s) { return s.status.budget; }],
+    ['manifest', function (s) { return s.status.manifest_status; }]
+  ];
+  var bar = document.getElementById('bar');
+  var banner = document.getElementById('banner');
+  var lost = document.getElementById('lost');
+  var events = document.getElementById('events');
+  var img = document.getElementById('frame');
+  var modeButton = document.getElementById('mode');
+  var counter = 0, frameBusy = false, stateBusy = false, frameOk = true, stateOk = true;
+  var frameError = null, stateError = null;
+  var mode = normalizeMode(storedMode());
+  var lastList = [];
+
+  function storedMode() {
+    try { return window.localStorage.getItem('koholint.events.mode'); } catch (e) { return null; }
+  }
+
+  function storeMode(value) {
+    try { window.localStorage.setItem('koholint.events.mode', value); } catch (e) { /* private mode */ }
+  }
+
+  function text(value) {
+    if (value === null || value === undefined) return '-';
+    return typeof value === 'object' ? JSON.stringify(value) : String(value);
+  }
+
+  function renderBar(state) {
+    bar.textContent = '';
+    fields.forEach(function (field) {
+      var item = document.createElement('span');
+      var value = document.createElement('b');
+      try { value.textContent = text(field[1](state)); } catch (e) { value.textContent = '-'; }
+      if (field[0] === 'health') value.className = 'health-' + value.textContent;
+      item.append(field[0] + ' ', value);
+      bar.appendChild(item);
+    });
+    banner.style.display = (state.replay && state.replay.sync === 'diverged') ? 'block' : 'none';
+  }
+
+  var lastEvents = null;
+
+  function renderEvents(list) {
+    lastList = list;
+    var format = mode === 'json' ? formatEventJson : formatEventPretty;
+    var lines = list.map(format);
+    var rendered = mode + '\n' + lines.join('\n');
+    if (rendered === lastEvents) return;
+    lastEvents = rendered;
+    var pinned = events.scrollTop + events.clientHeight >= events.scrollHeight - 4;
+    var top = events.scrollTop;
+    events.textContent = '';
+    list.forEach(function (event, index) {
+      var row = document.createElement('div');
+      row.className = event.type;
+      row.textContent = lines[index];
+      events.appendChild(row);
+    });
+    events.scrollTop = pinned ? events.scrollHeight : top;
+  }
+
+  function renderModeButton() {
+    modeButton.textContent = mode === 'json' ? 'Format: JSON' : 'Format: readable';
+  }
+
+  modeButton.addEventListener('click', function () {
+    mode = nextMode(mode);
+    storeMode(mode);
+    renderModeButton();
+    renderEvents(lastList);
+  });
+  renderModeButton();
+
+  function checked(r) {
+    if (r.ok) return r;
+    return r.json().catch(function () { return {}; }).then(function (body) { throw new Error(body.error || r.status); });
+  }
+
+  function updateLost() {
+    lost.style.display = (frameOk && stateOk) ? 'none' : 'block';
+    var error = stateError || frameError;
+    lost.textContent = error ? 'Server error: ' + error : 'Connection lost, retrying...';
+  }
+
+  function messageOf(e) { return (e instanceof TypeError) ? null : e.message; }
+
+  function pollFrame() {
+    if (frameBusy) return;
+    frameBusy = true;
+    counter += 1;
+    fetch('/frame.png?t=' + counter, { cache: 'no-store' })
+      .then(checked).then(function (r) { return r.blob(); })
+      .then(function (blob) {
+        var old = img.src;
+        img.src = URL.createObjectURL(blob);
+        if (old.indexOf('blob:') === 0) URL.revokeObjectURL(old);
+        frameOk = true;
+        frameError = null;
+      })
+      .catch(function (e) { frameOk = false; frameError = messageOf(e); })
+      .then(function () { frameBusy = false; updateLost(); });
+  }
+
+  function pollState() {
+    if (stateBusy) return;
+    stateBusy = true;
+    fetch('/state.json', { cache: 'no-store' })
+      .then(checked).then(function (r) { return r.json(); })
+      .then(function (state) { renderBar(state); renderEvents(state.events || []); stateOk = true; stateError = null; })
+      .catch(function (e) { stateOk = false; stateError = messageOf(e); })
+      .then(function () { stateBusy = false; updateLost(); });
+  }
+
+  setInterval(pollFrame, 100);
+  setInterval(pollState, 500);
+  pollFrame();
+  pollState();
+})();
+</script>
+</body>
+</html>

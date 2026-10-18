@@ -19,12 +19,13 @@ module Koholint
       new(run: run, policy: policy, budget: budget, emulator: Replay.to(run, run.inputs.frames), **options)
     end
 
-    def initialize(run:, policy:, budget:, keyframe_every: 1800, point: DecisionPoint.move, emulator: nil)
+    def initialize(run:, policy:, budget:, keyframe_every: 1800, point: DecisionPoint.move, emulator: nil, pacer: nil)
       @run = run
       @policy = policy
       @budget = budget
       @keyframe_every = keyframe_every
       @point = point
+      @pacer = pacer
       @emulator = emulator || Emulator.boot
       @keyframes = Keyframes.new(File.join(run.dir, 'keyframes'))
       @ram_hash = Digest::SHA256.hexdigest(@emulator.cartridge_ram)
@@ -73,6 +74,8 @@ module Koholint
         done += 1
         after_frame
       end
+      @run.inputs.flush
+      @pacer&.pace(done)
       done
     end
 

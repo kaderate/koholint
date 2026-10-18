@@ -8,8 +8,9 @@ module Koholint
 
     module_function
 
-    def for(run)
-      events = Trace.read(File.join(run.dir, 'trace.jsonl'))
+    def for(run) = from_events(Trace.read(File.join(run.dir, 'trace.jsonl')))
+
+    def from_events(events)
       frames = events.map { |e| e['frame'] }.max || 0
       state = events.reverse_each.find { |e| e['type'] == 'perception' }&.fetch('state')
       {

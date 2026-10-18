@@ -3,6 +3,8 @@ require 'stringio'
 require 'tmpdir'
 require 'json'
 require 'koholint/cli'
+require 'net/http'
+require 'timeout'
 
 class CliTest < Minitest::Test
   def cli(*argv)
@@ -52,5 +54,65 @@ class CliTest < Minitest::Test
     code, _out, err = cli('bogus')
     assert_equal 2, code
     assert_match(/usage/i, err)
+  end
+
+  def test_watch_missing_run_dir_prints_one_line_error
+    code, out, err = cli('watch', '/nonexistent/run')
+    assert_equal 1, code
+    assert_equal '', out
+    assert_equal 1, err.lines.size
+  end
+
+  def test_watch_accepts_a_host_option
+    code, _out, err = cli('watch', '/nonexistent/run', '--host', '0.0.0.0')
+    assert_equal 1, code
+    assert_match(/no run at/, err)
+  end
+
+  def test_watch_rejects_bad_options
+    assert_equal 2, cli('watch', 'x', '--from', 'sideways')[0]
+    assert_equal 2, cli('watch', 'x', '--speed', '0')[0]
+    assert_equal 2, cli('watch', 'x', '--port', 'abc')[0]
+  end
+
+  def test_realtime_run_takes_wall_time
+    skip_without_rom!
+    Dir.mktmpdir do |dir|
+      started = Process.clock_gettime(Process::CLOCK_MONOTONIC)
+      assert_equal 0, cli('run', '--frames', '120', '--realtime', '--root', dir)[0]
+      assert_operator Process.clock_gettime(Process::CLOCK_MONOTONIC) - started, :>=, 1.5
+    end
+  end
+
+  def test_watch_serves_a_finished_run_and_stops_on_sigint
+    skip_without_rom!
+    Dir.mktmpdir do |dir|
+      run_dir = cli('run', '--frames', '300', '--root', dir)[1][/^run (.+)$/, 1]
+      reader, writer = IO.pipe
+      pid = Process.spawn(File.expand_path('../bin/koholint', __dir__), 'watch', run_dir, out: writer, err: File::NULL)
+      writer.close
+      begin
+        assert reader.wait_readable(60), 'no output from watch'
+        port = reader.gets[%r{^watching http://127\.0\.0\.1:(\d+)$}, 1]
+        refute_nil port
+        state = JSON.parse(http(port, '/state.json'))
+        assert_equal 'stopped', state.dig('status', 'health')
+        assert_equal "\x89PNG".b, http(port, '/frame.png')[0, 4].b
+        Process.kill('INT', pid)
+        _, status = Timeout.timeout(15) { Process.wait2(pid) }
+        assert_equal 0, status.exitstatus
+        pid = nil
+      ensure
+        if pid
+          Process.kill('KILL', pid)
+          Process.wait(pid)
+        end
+        reader.close
+      end
+    end
+  end
+
+  def http(port, path)
+    Net::HTTP.start('127.0.0.1', port.to_i, open_timeout: 10, read_timeout: 20) { |h| h.get(path).body }
   end
 end

@@ -11,3 +11,10 @@ A deterministic engine that plays Link's Awakening DX headless through emu-gb an
 Needs Ruby 4.0.1, an emu-gb checkout and the ROM. Copy `.env.example` to `.env` (gitignored) and set
 `EMU_GB_HOME` and `KOHOLINT_ROM`; real environment variables take precedence. Tests: `rake test` (one process per file, in parallel, ~40 s; the first run builds a local emulator
 state cache in `tmp/`), `rake test:e2e` to also play the full boot from frame 0.
+
+Live view: `bin/koholint watch runs/<id> [--port N] [--host H] [--from live|start] [--speed X]` prints
+`watching http://127.0.0.1:PORT` and serves the run as video, status and feed from a read-only replay (works on a
+finished run or one being written; Ctrl-C to stop). `run`/`resume --realtime` paces the engine at about 60 fps of
+wall time so the viewer can keep up; pacing never changes the journal or the game state.
+The viewer listens on 127.0.0.1 only; `--host 0.0.0.0` opens it to other devices on the same network (read-only,
+no authentication: use it on a network you trust).
