@@ -7,23 +7,29 @@ module Koholint
   module Viewer
     FPS = 60
     SLICE = 0.02
+    WILDCARD_HOSTS = %w[0.0.0.0 ::].freeze
 
     module_function
 
-    def watch(run_dir, port: 0, from: :live, speed: 1.0, out: $stdout, err: $stderr, clock: Process.method(:clock_gettime))
+    def watch(run_dir, port: 0, host: '127.0.0.1', from: :live, speed: 1.0, out: $stdout, err: $stderr, clock: Process.method(:clock_gettime))
       stopping = false
       previous = %w[INT TERM].to_h { |sig| [sig, Signal.trap(sig) { stopping = true }] }
-      server = Server.new(port:)
+      server = Server.new(port:, host:)
       server.bind
       follower = Follower.new(run_dir, from: from)
       server.follower = follower
       server.feed = -> { Feed.for(run_dir, follower) }
-      out.puts "watching http://127.0.0.1:#{server.start}"
+      out.puts announce(host, server.start)
       out.flush
       pump(follower, speed, -> { stopping }, clock, err:)
     ensure
       server&.stop
       previous&.each { |sig, handler| Signal.trap(sig, handler) }
+    end
+
+    def announce(host, port)
+      line = "watching http://#{host}:#{port}"
+      WILDCARD_HOSTS.include?(host) ? "#{line} (all network interfaces: reachable from other devices on this network)" : line
     end
 
     def pump(follower, speed, stop, clock, err: $stderr)

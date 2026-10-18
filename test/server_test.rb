@@ -167,4 +167,12 @@ class ServerTest < Minitest::Test
     refute_includes page, 'innerHTML'
     refute_match %r{https?://}, page
   end
+
+  def test_a_wildcard_host_binds_every_interface
+    server = Koholint::Viewer::Server.new(follower: nil, feed: -> { {} }, host: '0.0.0.0')
+    server.start
+    assert_equal '0.0.0.0', server.listener.local_address.ip_address
+  ensure
+    server&.stop
+  end
 end

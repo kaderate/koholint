@@ -14,7 +14,7 @@ require 'koholint/viewer'
 module Koholint
   module CLI
     USAGE = 'usage: koholint run|resume <run_dir>|fork <run_dir> --at-frame N|verify <run_dir>|summary <run_dir>|watch <run_dir> ' \
-            '[--frames N --minutes N --dollars X --root DIR --realtime --port N --from live|start --speed X]'.freeze
+            '[--frames N --minutes N --dollars X --root DIR --realtime --port N --host H --from live|start --speed X]'.freeze
 
     module_function
 
@@ -30,6 +30,7 @@ module Koholint
         o.on('--at-frame N', Integer) { |v| options[:at_frame] = v }
         o.on('--realtime') { options[:realtime] = true }
         o.on('--port N', Integer) { |v| options[:port] = v }
+        o.on('--host H') { |v| options[:host] = v }
         o.on('--from MODE', %w[live start]) { |v| options[:from] = v.to_sym }
         o.on('--speed X', Float) { |v| options[:speed] = v.positive? ? v : raise(OptionParser::InvalidArgument, v.to_s) }
       end
@@ -60,7 +61,7 @@ module Koholint
         out.puts "run #{child.dir}"
         0
       when 'watch'
-        Viewer.watch(run_dir(args), **options.slice(:port, :from, :speed), out: out)
+        Viewer.watch(run_dir(args), **options.slice(:port, :host, :from, :speed), out: out)
       when 'verify' then verify(Run.open(run_dir(args), flow_version: flow), out)
       when 'summary'
         out.puts JSON.pretty_generate(Summary.for(Run.open(run_dir(args), flow_version: flow)))

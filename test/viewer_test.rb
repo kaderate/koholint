@@ -24,4 +24,15 @@ class ViewerTest < Minitest::Test
     assert_equal 1, status
     assert_equal "koholint: replay broke\n", err.string
   end
+
+  def test_announce_names_the_loopback_address_by_default
+    assert_equal 'watching http://127.0.0.1:8123', Koholint::Viewer.announce('127.0.0.1', 8123)
+  end
+
+  def test_announce_warns_when_listening_on_all_interfaces
+    line = Koholint::Viewer.announce('0.0.0.0', 8123)
+    assert_equal 1, line.lines.size
+    assert_match(%r{\Awatching http://0\.0\.0\.0:8123 }, line)
+    assert_match(/all network interfaces/, line)
+  end
 end
