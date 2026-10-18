@@ -55,4 +55,16 @@ class EmulatorCacheTest < Minitest::Test
       assert_equal state.frame, Koholint::Perception.read(EmulatorCache.playable).frame
     end
   end
+
+  def test_interactive_state_is_free_and_cached
+    skip_without_rom!
+    with_cache_dir do
+      emulator = EmulatorCache.interactive
+      before = Koholint::Perception.read(emulator)
+      copy = Koholint::Emulator.restore(emulator.dump)
+      40.times { copy.step([:down]) }
+      assert_operator Koholint::Perception.read(copy).y, :>, before.y
+      assert_equal before.frame, Koholint::Perception.read(EmulatorCache.interactive).frame
+    end
+  end
 end

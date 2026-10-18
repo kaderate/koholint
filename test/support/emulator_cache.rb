@@ -8,6 +8,12 @@ require 'koholint/perception'
 
 module EmulatorCache
   BOOT_FRAME_LIMIT = 3000
+  INTERACTIVE_FRAME_LIMIT = 3000
+  TALK_PRESS_FRAMES = 3
+  TALK_IDLE_FRAMES = 57
+  FREE_PROBE_FRAMES = 40
+  EXIT_HOLD_FRAMES = 40
+  EXIT_SETTLE_FRAMES = 30
 
   class << self
     attr_writer :dir
@@ -18,7 +24,35 @@ module EmulatorCache
 
     def playable(expect_hash: nil) = fetch('playable', expect_hash) { build(nil) }
 
+    def interactive(expect_hash: nil) = fetch('interactive', expect_hash) { build_interactive }
+
     private
+
+    def build_interactive
+      emulator = playable
+      start = emulator.frame
+      until moves?(emulator, :right)
+        raise Koholint::Error, 'dialogue chain never released Link' if emulator.frame - start > INTERACTIVE_FRAME_LIMIT
+
+        TALK_PRESS_FRAMES.times { emulator.step([:a]) }
+        TALK_IDLE_FRAMES.times { emulator.step }
+      end
+      EXIT_HOLD_FRAMES.times { emulator.step([:right]) }
+      EXIT_SETTLE_FRAMES.times { emulator.step }
+      raise Koholint::Error, 'Link still locked after leaving the bed' unless moves?(emulator, :down)
+
+      emulator
+    end
+
+    def moves?(emulator, direction)
+      moved = Koholint::Emulator.restore(emulator.dump)
+      control = Koholint::Emulator.restore(emulator.dump)
+      FREE_PROBE_FRAMES.times do
+        moved.step([direction])
+        control.step
+      end
+      Koholint::Perception.read(moved).to_h.values_at(:x, :y) != Koholint::Perception.read(control).to_h.values_at(:x, :y)
+    end
 
     def fetch(name, expect_hash)
       cached = load(name)

@@ -4,12 +4,10 @@ require 'koholint/calibration/walk_probe'
 
 class WalkProbeTest < Minitest::Test
   DIRECTIONS = %i[up down left right].freeze
-  SETTLE_FRAMES = 60
 
   def setup
     skip_without_rom!
-    @emulator = EmulatorCache.playable
-    SETTLE_FRAMES.times { @emulator.step }
+    @emulator = EmulatorCache.interactive
   end
 
   def probe(direction, method: :tap, frames: nil)
@@ -19,6 +17,19 @@ class WalkProbeTest < Minitest::Test
   def test_rejects_unknown_direction_and_method
     assert_raises(ArgumentError) { Koholint::Calibration::WalkProbe.run(Object.new, direction: :north, method: :tap) }
     assert_raises(ArgumentError) { Koholint::Calibration::WalkProbe.run(Object.new, direction: :up, method: :run) }
+  end
+
+  def test_cutscene_state_is_inconclusive_for_every_direction
+    cutscene = EmulatorCache.playable
+    DIRECTIONS.each do |direction|
+      result = Koholint::Calibration::WalkProbe.run(cutscene, direction:, method: :tap)
+      assert result[:inconclusive], direction.to_s
+      refute result[:moved], direction.to_s
+    end
+  end
+
+  def test_free_link_is_never_inconclusive
+    DIRECTIONS.each { |direction| %i[tap hold].each { |method| refute probe(direction, method:)[:inconclusive] } }
   end
 
   def test_probe_leaves_the_emulator_untouched
@@ -33,7 +44,6 @@ class WalkProbeTest < Minitest::Test
 
   def test_starting_position_has_both_open_and_blocked_directions
     results = DIRECTIONS.to_h { |direction| [direction, probe(direction)] }
-    skip "Link never moves from the cached playable state: #{results.inspect}" if results.values.none? { |r| r[:moved] }
     assert results.values.any? { |r| r[:moved] }, results.inspect
     assert results.values.any? { |r| !r[:moved] }, results.inspect
   end
@@ -52,7 +62,7 @@ class WalkProbeTest < Minitest::Test
 
   def test_result_shape
     result = probe(:up)
-    assert_equal %i[frames from hp_delta moved room_changed to], result.keys.sort
+    assert_equal %i[frames from hp_delta inconclusive moved room_changed to], result.keys.sort
     assert_equal 30, result[:frames]
     assert_equal 130, probe(:up, method: :hold)[:frames]
   end
