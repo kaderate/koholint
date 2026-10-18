@@ -14,7 +14,7 @@ require 'koholint/viewer'
 module Koholint
   module CLI
     USAGE = 'usage: koholint run|resume <run_dir>|fork <run_dir> --at-frame N|verify <run_dir>|summary <run_dir>|watch <run_dir> ' \
-            '[--frames N --minutes N --dollars X --root DIR --realtime --port N --host H --from live|start --speed X]'.freeze
+            '[--frames N --minutes N --dollars X --root DIR --realtime --grid --port N --host H --from live|start --speed X]'.freeze
 
     module_function
 
@@ -29,6 +29,7 @@ module Koholint
         o.on('--root DIR') { |v| options[:root] = v }
         o.on('--at-frame N', Integer) { |v| options[:at_frame] = v }
         o.on('--realtime') { options[:realtime] = true }
+        o.on('--grid') { options[:grid] = true }
         o.on('--port N', Integer) { |v| options[:port] = v }
         o.on('--host H') { |v| options[:host] = v }
         o.on('--from MODE', %w[live start]) { |v| options[:from] = v.to_sym }
@@ -50,10 +51,10 @@ module Koholint
       case command
       when 'run'
         run = Run.create(root: options.fetch(:root, 'runs'), flow_version: flow, budget: limits)
-        play(Engine.new(run: run, policy: default_policy, budget: Budget.new(**limits), **pacing(options)), run, out)
+        play(Engine.new(run: run, policy: default_policy, budget: Budget.new(**limits), **engine_options(options)), run, out)
       when 'resume'
         run = Run.open(run_dir(args), flow_version: flow)
-        engine = Engine.resume(run.dir, policy: default_policy, budget: Budget.new(**limits), flow_version: flow, **pacing(options))
+        engine = Engine.resume(run.dir, policy: default_policy, budget: Budget.new(**limits), flow_version: flow, **engine_options(options))
         play(engine, run, out)
       when 'fork'
         at_frame = options.fetch(:at_frame) { raise OptionParser::MissingArgument, '--at-frame' }
@@ -71,7 +72,7 @@ module Koholint
       end
     end
 
-    def pacing(options) = options[:realtime] ? { pacer: Pacer.new } : {}
+    def engine_options(options) = options.slice(:grid).merge(options[:realtime] ? { pacer: Pacer.new } : {})
 
     def run_dir(args) = args.first || raise(OptionParser::MissingArgument, 'run_dir')
 
