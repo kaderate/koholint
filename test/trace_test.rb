@@ -21,6 +21,31 @@ class TraceTest < Minitest::Test
     end
   end
 
+  VISION_FIELDS = {
+    screen: { place: [1, 2], terrain_hash: 'h', objects_hash: 'o', grid: [], static_sprites: [] },
+    screen_changed: { place: [1, 2], cells: [] },
+    affordance: { appearance: 'a1', action: 'walk', direction: nil, result: 'no', method: 'probe', context: [], source: 'x' },
+    grid_contradiction: { place: [1, 2], row: 0, col: 0, direction: 'up', believed: 'yes', observed: 'no' }
+  }.freeze
+
+  def test_vision_events_reject_each_missing_field
+    with_path do |path|
+      VISION_FIELDS.each do |type, fields|
+        fields.each_key do |key|
+          error = assert_raises(Koholint::Trace::InvalidEvent) { Koholint::Trace.new(path).emit(type, frame: 1, **fields.except(key)) }
+          assert_match(/#{key}/, error.message)
+        end
+      end
+    end
+  end
+
+  def test_vision_events_accept_complete_fields_with_nil_direction
+    with_path do |path|
+      VISION_FIELDS.each { |type, fields| assert_equal type.to_s, Koholint::Trace.new(path).emit(type, frame: 1, **fields)['type'] }
+      assert_nil Koholint::Trace.new(path).emit(:affordance, frame: 2, **VISION_FIELDS[:affordance])['direction']
+    end
+  end
+
   def test_emit_writes_versioned_line_and_returns_it
     with_path do |path|
       event = Koholint::Trace.new(path).emit(:stop, frame: 3, reason: 'frames')
