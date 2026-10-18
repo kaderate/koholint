@@ -13,7 +13,6 @@ module Koholint
       RunDir = Struct.new(:dir)
       FIELDS = { 'decision' => %w[frame type agent choice confidence], 'action' => %w[frame type skill params] }.freeze
 
-      PROGRESS = %w[notable objective].freeze
       CACHE = {}
       CACHE_LOCK = Mutex.new
       GRID_CACHE = {}
@@ -27,7 +26,7 @@ module Koholint
         manifest = read_manifest(run_dir)
         trace = trace_events(run_dir)
         summary = Summary.from_events(trace)
-        summary[:health] = 'unknown' if trace.none? { |e| PROGRESS.include?(e['type']) } && %w[progressing stalled].include?(summary[:health])
+        summary[:health] = 'unknown' if trace.none? { |e| Summary.progress?(e) } && %w[progressing stalled].include?(summary[:health])
         {
           status: summary.merge(run_id: File.basename(run_dir), flow_version: manifest['flow_version'],
                                 manifest_status: manifest['status'], budget: manifest['budget']),
@@ -69,17 +68,23 @@ module Koholint
         end
       end
 
+      def sound_screen?(event)
+        rows = event['grid']
+        sprites = event.fetch('static_sprites', [])
+        rows.size == Vision::Grid::ROWS && rows.all? { |row| row.is_a?(Array) && row.size == Vision::Grid::COLS } &&
+          sprites.is_a?(Array) && sprites.all? { |s| s.is_a?(Hash) && s['x'].is_a?(Integer) && s['y'].is_a?(Integer) }
+      end
+
       def usable_affordance?(event)
-        event['action'].is_a?(String) && %w[yes no].include?(event['result']) &&
+        event['action'].is_a?(String) && event.fetch('context', []).is_a?(Array) && %w[yes no].include?(event['result']) &&
           [nil, *DIRECTIONS.map(&:to_s)].include?(event['direction'])
       end
 
-      def same_trace?(ref, trace) = ref.weakref_alive? && ref.__getobj__.equal?(trace)
+      def same_trace?(ref, trace) = (ref.__getobj__.equal?(trace) rescue false)
 
       def grid_events(trace)
         usable = trace.select { |e| e.is_a?(Hash) && GRID_TYPES.include?(e['type']) && e['frame'].is_a?(Integer) }
-        { screens: usable.select { |e| e['type'] == 'screen' && e['place'].is_a?(Array) && e['grid'].is_a?(Array) &&
-                                                  e['grid'].size == Vision::Grid::ROWS },
+        { screens: usable.select { |e| e['type'] == 'screen' && e['place'].is_a?(Array) && e['grid'].is_a?(Array) && sound_screen?(e) },
           affordances: usable.select { |e| e['type'] == 'affordance' && usable_affordance?(e) },
           perceptions: usable.select { |e| e['type'] == 'perception' } }
       end

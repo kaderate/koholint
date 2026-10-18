@@ -71,6 +71,16 @@ class FeedTest < Minitest::Test
     end
   end
 
+  def test_a_diagnostic_notable_keeps_health_unknown
+    with_dir do |dir, trace|
+      trace.emit(:notable, frame: 10, kind: 'grid_overlay_stuck', detail: [1, 2])
+      trace.emit(:perception, frame: 4000, state: STATE, state_hash: 'h')
+      status = Koholint::Viewer::Feed.for(dir, FOLLOWER)[:status]
+      assert_equal 'unknown', status[:health]
+      assert_nil status[:last_notable]
+    end
+  end
+
   def test_stopped_and_dead_are_kept
     with_dir do |dir, trace|
       trace.emit(:perception, frame: 1, state: { 'hp' => 0, 'max_hp' => 24, 'milestone' => 'none' }, state_hash: 'h')
@@ -263,6 +273,12 @@ class FeedTest < Minitest::Test
            { 'type' => 'affordance', 'frame' => nil, 'appearance' => 'a1' },
            { 'type' => 'affordance', 'frame' => 5, 'appearance' => 'a1', 'action' => 'walk', 'direction' => 'north', 'result' => 'yes' },
            { 'type' => 'affordance', 'frame' => 'z', 'action' => 'walk', 'result' => 'yes' }]
+    bad += [{ 'type' => 'affordance', 'frame' => 6, 'appearance' => 'a1', 'action' => 'walk', 'result' => 'yes', 'context' => 'swim' },
+            good.merge('frame' => 11, 'grid' => Array.new(8) { Array.new(9) { 'a1' } }),
+            good.merge('frame' => 12, 'grid' => Array.new(8) { 'row' }),
+            good.merge('frame' => 13, 'static_sprites' => 'x'),
+            good.merge('frame' => 14, 'static_sprites' => [{ 'x' => 'a', 'y' => 1 }]),
+            good.merge('frame' => 15, 'static_sprites' => [5])]
     grid = Koholint::Viewer::Feed.grid('/nonexistent-malformed', [good, *bad], 90)
     assert_equal [[163, 16], 10], [grid[:place], grid[:frame]]
     assert_nil grid[:link]
