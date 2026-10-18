@@ -67,4 +67,11 @@ class EmulatorCacheTest < Minitest::Test
       assert_equal before.frame, Koholint::Perception.read(EmulatorCache.interactive).frame
     end
   end
+
+  def test_key_changes_with_the_source_list_and_includes_the_cache_builder
+    skip_without_rom!
+    assert_equal EmulatorCache.send(:key_for, ['a']), EmulatorCache.send(:key_for, ['a'])
+    refute_equal EmulatorCache.send(:key_for, ['a']), EmulatorCache.send(:key_for, ['b'])
+    assert_includes EmulatorCache.send(:key_sources), File.read(File.expand_path('support/emulator_cache.rb', __dir__))
+  end
 end

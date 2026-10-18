@@ -61,10 +61,14 @@ module EmulatorCache
       yield.tap { |emulator| store(name, emulator) }
     end
 
-    def key
-      sources = %w[boot_script perception game_state].map { |f| File.read(File.join(Koholint::Config::ROOT, 'lib', 'koholint', "#{f}.rb")) }
-      Digest::SHA256.hexdigest(Digest::SHA256.file(Koholint.rom_path).hexdigest + sources.join)[0, 12]
+    def key_sources
+      lib = %w[boot_script perception game_state].map { |f| File.read(File.join(Koholint::Config::ROOT, 'lib', 'koholint', "#{f}.rb")) }
+      lib << File.read(__FILE__)
     end
+
+    def key_for(sources) = Digest::SHA256.hexdigest(Digest::SHA256.file(Koholint.rom_path).hexdigest + sources.join)[0, 12]
+
+    def key = key_for(key_sources)
 
     def path(name) = File.join(dir, "#{key}-#{name}.zlib")
 
