@@ -47,10 +47,16 @@ module Koholint
       def sprites(reader, lcdc)
         Array.new(OAM_SPRITES) { |i| OAM + (i * 4) }.filter_map do |addr|
           y, x, tile, attr = Array.new(4) { |i| reader.read(addr + i) }
+          # OAM entries parked off screen are hidden, not sprites.
           next if y.zero? || y >= 160 || x.zero? || x >= 168
 
-          { x:, y:, tile:, attr:, pattern: digest(tile_bytes(reader, 0x10, tile)) }
+          { x:, y:, tile:, attr:, pattern: digest(sprite_bytes(reader, lcdc, tile)) }
         end
+      end
+
+      def sprite_bytes(reader, lcdc, tile)
+        numbers = lcdc.anybits?(0x04) ? [tile & 0xFE, tile | 1] : [tile]
+        numbers.flat_map { |number| tile_bytes(reader, 0x10, number) }
       end
 
       def digest(bytes) = Digest::SHA256.hexdigest(bytes.pack('C*'))[0, DIGEST_CHARS]

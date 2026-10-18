@@ -1,6 +1,7 @@
 require_relative 'test_helper'
 require 'koholint/vision/screen_snapshot'
 require 'koholint/vision/screen_vision'
+require 'koholint/emulator'
 require 'support/emulator_cache'
 
 class ScreenVisionTest < Minitest::Test
@@ -198,18 +199,66 @@ class ScreenVisionTest < Minitest::Test
     assert_equal snapshot(a).objects_hash, snapshot(b).objects_hash
   end
 
-  def test_starting_house_snapshot_on_the_real_screen
+  def test_hidden_sprites_are_skipped_on_each_axis
+    [[0, 0x40], [160, 0x40], [0x50, 0], [0x50, 168], [0x50, 0x40]].each do |y, x|
+      fake = reader
+      [y, x, 9, 0].each_with_index { |byte, i| fake.write(OAM + i, byte) }
+      assert_equal (y == 0x50 && x == 0x40) ? 1 : 0, snapshot(fake).sprites.size, "y=#{y} x=#{x}"
+    end
+  end
+
+  def test_tall_sprites_cover_two_tiles_when_lcdc_bit_2_is_set
+    fake = reader(lcdc: 0x95)
+    put_tile(fake, 8, 3)
+    put_tile(fake, 9, 4)
+    [0x50, 0x40, 9, 0x20].each_with_index { |byte, i| fake.write(OAM + i, byte) }
+    expected = Digest::SHA256.hexdigest((pattern(3) + pattern(4)).pack('C*'))[0, 8]
+    assert_equal [{ x: 0x40, y: 0x50, tile: 9, attr: 0x20, pattern: expected }], snapshot(fake).sprites
+  end
+
+  def test_tall_sprite_pattern_ignores_bit_0_of_the_tile_number
+    fake = reader(lcdc: 0x95)
+    put_tile(fake, 8, 3)
+    put_tile(fake, 9, 4)
+    [0x50, 0x40, 8, 0, 0x50, 0x50, 9, 0].each_with_index { |byte, i| fake.write(OAM + i, byte) }
+    patterns = snapshot(fake).sprites.map { |sprite| sprite[:pattern] }
+    assert_equal 1, patterns.uniq.size
+  end
+
+  def settled(emulator, frames: 120)
+    Koholint::Emulator.restore(emulator.dump).tap { |copy| frames.times { copy.step([]) } }
+  end
+
+  def real(emulator) = Koholint::Vision::ScreenVision.snapshot(emulator, place: [163, 16])
+
+  def test_starting_house_snapshot_on_a_settled_real_screen
     skip_without_rom!
-    emulator = EmulatorCache.playable
-    first = Koholint::Vision::ScreenVision.snapshot(emulator, place: [163, 16])
-    second = Koholint::Vision::ScreenVision.snapshot(emulator, place: [163, 16])
+    emulator = settled(EmulatorCache.playable)
+    first = real(emulator)
+    second = real(emulator)
     assert_equal 8, first.cells.size
     assert(first.cells.all? { |row| row.size == 10 })
     assert_equal [163, 16], first.place
-    distinct = first.cells.flatten.map(&:appearance).uniq.size
-    assert_operator distinct, :<=, 40
+    assert_operator first.cells.flatten.map(&:appearance).uniq.size, :<=, 25
     assert_equal first, second
     assert_equal first.terrain_hash, second.terrain_hash
     refute first.overlay
+  end
+
+  def test_settled_screen_has_stable_sprites
+    skip_without_rom!
+    emulator = settled(EmulatorCache.playable)
+    first = real(emulator)
+    second = real(emulator)
+    refute_empty first.sprites
+    assert_equal first.sprites.map { |sprite| sprite[:pattern] }, second.sprites.map { |sprite| sprite[:pattern] }
+    assert_equal first.objects_hash, second.objects_hash
+  end
+
+  def test_first_controllable_frame_differs_from_the_settled_screen
+    skip_without_rom!
+    playable = EmulatorCache.playable
+    # Task 2 handles unsettled screens (fade-in).
+    refute_equal real(playable).terrain_hash, real(settled(playable)).terrain_hash
   end
 end
