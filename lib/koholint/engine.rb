@@ -7,6 +7,7 @@ require 'koholint/keyframes'
 require 'koholint/perception'
 require 'koholint/replay'
 require 'koholint/run'
+require 'koholint/vision/grid_builder'
 
 module Koholint
   class Engine
@@ -19,7 +20,7 @@ module Koholint
       new(run: run, policy: policy, budget: budget, emulator: Replay.to(run, run.inputs.frames), **options)
     end
 
-    def initialize(run:, policy:, budget:, keyframe_every: 1800, point: DecisionPoint.move, emulator: nil, pacer: nil)
+    def initialize(run:, policy:, budget:, keyframe_every: 1800, point: DecisionPoint.move, emulator: nil, pacer: nil, grid: false)
       @run = run
       @policy = policy
       @budget = budget
@@ -28,6 +29,7 @@ module Koholint
       @pacer = pacer
       @emulator = emulator || Emulator.boot
       @keyframes = Keyframes.new(File.join(run.dir, 'keyframes'))
+      @builder = Vision::GridBuilder.new(trace: run.trace, beliefs: known_beliefs(run)) if grid
       @ram_hash = Digest::SHA256.hexdigest(@emulator.cartridge_ram)
     end
 
@@ -50,11 +52,14 @@ module Koholint
 
     private
 
+    def known_beliefs(run) = Vision::Beliefs.from_events(Trace.read(File.join(run.dir, 'trace.jsonl')))
+
     def iterate
       state = Perception.read(@emulator)
       @run.trace.emit(:perception, frame: state.frame, state: state.to_h, state_hash: @emulator.state_hash)
+      grid = @builder&.observe(@emulator, state)
       point = @policy.respond_to?(:point_for) ? @policy.point_for(state) : @point
-      result = @policy.decide(point, state, {})
+      result = @policy.decide(point, state, @builder ? { grid: } : {})
       choice = point.validate(result[:choice])
       @run.trace.emit(:decision, frame: state.frame, point: point.name.to_s, input: state.to_h, options: point.options || [],
                                  choice: choice, justification: result[:justification], confidence: result[:confidence],

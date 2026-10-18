@@ -28,6 +28,15 @@ class CliTest < Minitest::Test
     end
   end
 
+  def test_run_accepts_the_grid_flag
+    skip_without_rom!
+    Dir.mktmpdir do |dir|
+      code, out, = cli('run', '--frames', '120', '--grid', '--root', dir)
+      assert_equal 0, code
+      assert_match(/^stopped: frames$/, out)
+    end
+  end
+
   def test_fork_creates_child_run
     skip_without_rom!
     Dir.mktmpdir do |dir|

@@ -19,4 +19,5 @@ Plans: `docs/superpowers/plans/`. v1 is archived under the git tag `v1-archive`.
 - Game facts live in typed data with provenance (`data/addresses.json`, a run's `world.json`),
   never in prose. `verified` needs `verified_count >= 2` from independent checks.
 - The agent knows the manual and the genre, not a walkthrough: game facts are observed.
+- What remains to do lives in `ROADMAP.md` (only what is left; delete items as they land, git is the history).
 - Playing and evolving the flow are separate: a run only emits `suggestions.md`.

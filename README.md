@@ -18,3 +18,9 @@ finished run or one being written; Ctrl-C to stop). `run`/`resume --realtime` pa
 wall time so the viewer can keep up; pacing never changes the journal or the game state.
 The viewer listens on 127.0.0.1 only; `--host 0.0.0.0` opens it to other devices on the same network (read-only,
 no authentication: use it on a network you trust).
+
+Collision grid: `run --grid` (engine option `grid: true`) reads the screen each observation and probes unknown neighbour
+cells by walking. The trace gains `screen` and `screen_changed` (what the screen looks like), `affordance` (walk
+evidence per tile appearance), `grid_contradiction` (Link entered a cell believed blocked) and a `notable` of kind
+`grid_overlay_stuck` (more than 600 frames of overlay in one place, so the grid went dark). The live view has a grid
+toggle that overlays the believed passability on the video.
