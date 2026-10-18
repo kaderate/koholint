@@ -2,37 +2,19 @@
 $LOAD_PATH.unshift(File.expand_path('../lib', __dir__))
 require 'json'
 require 'koholint'
+require 'koholint/boot_script'
 require 'koholint/emulator'
-require 'koholint/input_log'
+require 'koholint/perception'
 
-def intro_inputs(i)
-  return i < 10 ? [:start] : (i % 120 < 3 ? [:start] : (i % 120 > 60 && i % 120 < 63 ? [:a] : [])) if i < 6000
-
-  j = i - 6000
-  if j < 3 then [:a]
-  elsif j >= 60 && j < 63 then [:start]
-  elsif j > 120 && (j % 90) < 3 then [:a]
-  else []
-  end
-end
-
-fixtures = File.expand_path('../test/fixtures', __dir__)
-path = File.join(fixtures, 'start_game.inputs')
-File.delete(path) if File.exist?(path)
-log = Koholint::InputLog.new(path)
 emulator = Koholint::Emulator.boot
-loop do
-  buttons = intro_inputs(emulator.frame)
-  emulator.step(buttons)
-  log.append(buttons)
-  hp = emulator.read(0xDB5A)
-  next unless emulator.frame > 6000 && hp.positive? && emulator.read(0xFF98).positive?
+until (state = Koholint::Perception.read(emulator)).controllable?
+  raise Koholint::Error, 'boot never became controllable' if emulator.frame > 3000
 
-  log.flush
-  expected = { frame: emulator.frame, room_id: emulator.read(0xFFF6), map_id: emulator.read(0xFFF7),
-               x: emulator.read(0xFF98), y: emulator.read(0xFF99), direction: emulator.read(0xFF9E),
-               hp: hp, max_hp: emulator.read(0xDB5B) * 8, state_hash: emulator.state_hash }
-  File.write(File.join(fixtures, 'start_game.expected.json'), JSON.pretty_generate(expected))
-  puts expected
-  break
+  macro = Koholint::BootScript.macro_for(state)
+  macro[:frames].times { emulator.step(macro[:buttons]) }
 end
+expected = { frame: state.frame, room_id: state.room_id, map_id: state.map_id, x: state.x, y: state.y,
+             direction: state.direction, hp: state.hp, max_hp: state.max_hp, game_mode: state.game_mode,
+             state_hash: emulator.state_hash }
+File.write(File.expand_path('../test/fixtures/start_game.expected.json', __dir__), JSON.pretty_generate(expected))
+puts expected
