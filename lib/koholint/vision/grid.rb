@@ -10,8 +10,8 @@ module Koholint
         @capabilities = capabilities
         @sprites = {}
         static_sprites.each do |sprite|
-          row = (sprite['y'] - 16) / 16
-          col = (sprite['x'] - 8) / 16
+          row = (sprite['y'] - 8) / 16
+          col = sprite['x'] / 16
           next unless row.between?(0, ROWS - 1) && col.between?(0, COLS - 1)
 
           @sprites[[row, col]] ||= sprite['pattern']

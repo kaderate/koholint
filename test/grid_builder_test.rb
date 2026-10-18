@@ -177,7 +177,7 @@ class GridBuilderTest < Minitest::Test
     @emulator.sprite(0, x: 40, y: 56)
     observe
     grid = observe
-    assert_equal @trace.of(:screen).last[:static_sprites].first[:pattern], grid.static_sprite(2, 2)
+    assert_equal @trace.of(:screen).last[:static_sprites].first[:pattern], grid.static_sprite(3, 2)
     assert_equal @trace.of(:screen).last[:grid][0][0], grid.appearance(0, 0)
   end
 

@@ -14,6 +14,8 @@ module Koholint
       # Link walks about 1 px per frame: 32 frames cross the 16 px to the next cell with a 2x margin.
       PROBE_HOLD_FRAMES = 32
       STEPS = { up: [-1, 0], down: [1, 0], left: [0, -1], right: [0, 1] }.freeze
+      # A stop only says the neighbour blocks when Link's center is within 4 px of its center line.
+      ALIGNMENT_TOLERANCE = 4
 
       def self.link_sprite?(sprite, state)
         (sprite[:y] - state.y).abs <= LINK_SPRITE_TOLERANCE &&
@@ -34,6 +36,7 @@ module Koholint
         @prober = prober
         @last = nil
         @stuck = nil
+        @discarded = {}
         @previous = nil
         @emitted = nil
         @statics = {}
@@ -59,7 +62,9 @@ module Koholint
         cell = self.class.link_cell(state.x, state.y)
         check_contradiction(state.frame, place, cell)
         spot = [place, state.x, state.y]
-        @stuck = probe_neighbours(emulator, state.frame, grid, cell) && spot if settled && cell && @prober && @stuck != spot
+        scope = [place, cell, snapshot.terrain_hash, @capabilities]
+        @discarded = { scope: } unless @discarded[:scope] == scope
+        @stuck = probe_neighbours(emulator, state, grid, cell) && spot if settled && cell && @prober && @stuck != spot
         @last = cell && { place:, cell:, grid: }
         grid
       end
@@ -107,10 +112,12 @@ module Koholint
 
       # All probes share one no-input control: one inconclusive voids all. Link is free only if some direction moves him;
       # returns whether he was shown not free, so the same spot is not reprobed until he moves.
-      def probe_neighbours(emulator, frame, grid, cell)
+      def probe_neighbours(emulator, state, grid, cell)
         neighbours = STEPS.to_h { |direction, (drow, dcol)| [direction, [cell[0] + drow, cell[1] + dcol]] }
                           .select { |_, (row, col)| row.between?(0, Grid::ROWS - 1) && col.between?(0, Grid::COLS - 1) }
-        unknown = neighbours.select { |direction, target| %i[unknown stale].include?(grid.passable(*target, direction)) }
+        unknown = neighbours.select do |direction, target|
+          %i[unknown stale].include?(grid.passable(*target, direction)) && ![:cell, [state.x, state.y]].include?(@discarded[direction])
+        end
         return if unknown.empty?
 
         probes = {}
@@ -118,29 +125,41 @@ module Koholint
           break if !unknown.key?(direction) && probes.values.any? { |probe| moved?(probe) }
 
           probes[direction] = @prober.run(emulator, direction:, method: :hold, frames: PROBE_HOLD_FRAMES)
-          return if probes[direction][:inconclusive]
+          next unless probes[direction][:inconclusive]
+
+          unknown.each_key { |key| @discarded[key] = :cell }
+          return
         end
         return true unless probes.values.any? { |probe| moved?(probe) }
 
         unknown.each do |direction, (row, col)|
-          result = walk_result(probes.fetch(direction), cell, direction) or next
-          record(grid.static_sprite(row, col) || grid.appearance(row, col), direction, result, frame)
+          result = walk_result(probes.fetch(direction), state, cell, direction)
+          if %i[yes no].include?(result)
+            record(grid.static_sprite(row, col) || grid.appearance(row, col), direction, result, state.frame)
+          else
+            @discarded[direction] = result == :misaligned ? [state.x, state.y] : :cell
+          end
         end
         false
       end
 
       def moved?(probe) = probe[:room_changed] || probe[:to] != probe[:from]
 
-      def walk_result(probe, cell, direction)
+      def walk_result(probe, state, cell, direction)
         return if probe[:room_changed] || probe[:hp_delta].negative?
 
         after = self.class.link_cell(probe[:to][:x], probe[:to][:y]) or return
-        return :no if after == cell
+        return aligned?(state, cell, direction) ? :no : :misaligned if after == cell
 
         drow, dcol = STEPS.fetch(direction)
         delta = [after[0] - cell[0], after[1] - cell[1]]
         cells = drow.zero? ? delta[1] * dcol : delta[0] * drow
         :yes if cells >= 1 && delta == [drow * cells, dcol * cells]
+      end
+
+      def aligned?(state, cell, direction)
+        offset = STEPS.fetch(direction)[0].zero? ? (state.y - 8) - ((cell[0] * 16) + 8) : state.x - ((cell[1] * 16) + 8)
+        offset.abs <= ALIGNMENT_TOLERANCE
       end
 
       def record(appearance, direction, result, frame)

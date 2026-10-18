@@ -36,15 +36,17 @@ class GridBuilderProbeTest < Minitest::Test
 
   class StubProber
     attr_reader :calls
+    attr_accessor :at
 
     def initialize(&result)
       @calls = []
       @result = result
+      @at = { x: 70, y: 52 }
     end
 
     def run(_emulator, direction:, method:, frames:)
       @calls << { direction:, method:, frames: }
-      { moved: false, from: { x: 70, y: 52 }, to: { x: 70, y: 52 }, room_changed: false, inconclusive: false, hp_delta: 0,
+      { moved: false, from: at, to: at, room_changed: false, inconclusive: false, hp_delta: 0,
         frames: frames + 10 }.merge(@result.call(direction))
     end
   end
@@ -139,8 +141,48 @@ class GridBuilderProbeTest < Minitest::Test
     emulator = FakeEmulator.new
     grid = 3.times.map { fake_observe(builder, emulator, link: [70, 52]) }.last
     assert_empty trace.of(:affordance)
-    assert_equal 8, prober.calls.size
+    assert_equal 4, prober.calls.size
     assert_equal :unknown, grid.passable(1, 4, :up)
+  end
+
+  def test_a_discarded_probe_waits_for_links_cell_to_change
+    prober = StubProber.new { |direction| direction == :up ? { room_changed: true } : {} }
+    trace = FakeTrace.new
+    builder = Builder.new(trace:, prober:)
+    emulator = FakeEmulator.new
+    4.times { fake_observe(builder, emulator, link: [70, 52]) }
+    assert_equal DIRECTIONS, prober.calls.map { |c| c[:direction] }
+    assert_equal %w[down left right], trace.of(:affordance).map { |e| e[:direction] }
+    fake_observe(builder, emulator, link: [71, 52])
+    assert_equal 4, prober.calls.size
+    prober.at = { x: 70, y: 68 }
+    2.times { fake_observe(builder, emulator, link: [70, 68]) }
+    assert_equal DIRECTIONS + %i[up], prober.calls.map { |c| c[:direction] }
+  end
+
+  def test_a_stop_misaligned_with_the_neighbour_records_nothing_until_aligned
+    prober = StubProber.new { |direction| direction == :down ? { to: { x: 78, y: 80 } } : {} }
+    prober.at = { x: 78, y: 52 }
+    trace = FakeTrace.new
+    builder = Builder.new(trace:, prober:)
+    emulator = FakeEmulator.new
+    3.times { fake_observe(builder, emulator, link: [78, 52]) }
+    assert_equal [%w[down yes], %w[left no], %w[right no]], trace.of(:affordance).map { |e| e.values_at(:direction, :result) }
+    assert_equal 4, prober.calls.size
+    prober.at = { x: 73, y: 52 }
+    fake_observe(builder, emulator, link: [73, 52])
+    assert_equal %i[up down], prober.calls.drop(4).map { |c| c[:direction] }
+    assert_equal %w[up no], trace.of(:affordance).last.values_at(:direction, :result)
+  end
+
+  def test_a_left_or_right_stop_needs_vertical_alignment
+    prober = StubProber.new { |direction| direction == :up ? { to: { x: 70, y: 30 } } : {} }
+    prober.at = { x: 70, y: 59 }
+    trace = FakeTrace.new
+    builder = Builder.new(trace:, prober:)
+    emulator = FakeEmulator.new
+    2.times { fake_observe(builder, emulator, link: [70, 59]) }
+    assert_equal [%w[up yes], %w[down no]], trace.of(:affordance).map { |e| e.values_at(:direction, :result) }
   end
 
   def test_an_inconclusive_probe_voids_the_whole_observation
@@ -254,8 +296,16 @@ class GridBuilderProbeTest < Minitest::Test
       assert_equal grid.static_sprite(row, col) || grid.appearance(row, col), event[:appearance], direction.to_s
       assert_equal expected[direction], grid.passable(row, col, direction), direction.to_s
     end
-    refute_nil grid.static_sprite(2, 5)
-    assert_equal grid.static_sprite(2, 5), events.fetch('right')[:appearance]
+    assert_nil grid.static_sprite(2, 5)
+    assert_equal grid.appearance(2, 5), events.fetch('right')[:appearance]
+  end
+
+  def test_house_objects_sit_on_the_cell_under_their_center
+    skip_without_rom!
+    grid = interactive_probes[2]
+    assert_equal({ [3, 5] => true, [4, 7] => true, [4, 8] => true },
+                 (0...8).to_a.product((0...10).to_a).select { |row, col| grid.static_sprite(row, col) }.to_h { |cell| [cell, true] })
+    assert_nil grid.static_sprite(*Builder.link_cell(70, 52))
   end
 
   def test_known_neighbours_are_never_reprobed
