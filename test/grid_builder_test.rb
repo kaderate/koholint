@@ -25,6 +25,8 @@ class GridBuilderTest < Minitest::Test
     def read(addr) = @memory[addr]
     def write(addr, value) = @memory[addr] = value
 
+    def tile(number, seed) = 16.times { |i| write(0x8000 + (number * 16) + i, seed + i) }
+
     def sprite(index, x:, y:, tile: 1)
       [y, x, tile, 0].each_with_index { |value, i| write(OAM + (index * 4) + i, value) }
     end
@@ -89,6 +91,43 @@ class GridBuilderTest < Minitest::Test
       observe
     end
     assert_equal 1, @trace.of(:screen).size
+  end
+
+  def test_an_animated_sprite_stays_static_with_its_smallest_pattern
+    @emulator.tile(1, 50)
+    @emulator.tile(2, 10)
+    6.times do |i|
+      @emulator.sprite(0, x: 40, y: 56, tile: i.even? ? 1 : 2)
+      observe
+    end
+    screens = @trace.of(:screen)
+    assert_equal 2, screens.size
+    smallest = %w[1 2].map { |t| pattern_of(t.to_i) }.min
+    assert_equal [{ x: 40, y: 56, pattern: smallest }], screens.last[:static_sprites]
+  end
+
+  def pattern_of(tile)
+    @emulator.sprite(39, x: 40, y: 56, tile:)
+    Koholint::Vision::ScreenVision.snapshot(@emulator, place: [0, 0]).sprites.last[:pattern].tap { @emulator.sprite(39, x: 0, y: 0) }
+  end
+
+  def test_a_position_that_empties_stops_being_static
+    @emulator.sprite(0, x: 40, y: 56)
+    2.times { observe }
+    @emulator.sprite(0, x: 0, y: 0)
+    observe
+    assert_equal [], @trace.of(:screen).last[:static_sprites]
+    assert_equal 3, @trace.of(:screen).size
+  end
+
+  def test_overlay_does_not_clear_statics_established_before_it
+    @emulator.sprite(0, x: 40, y: 56)
+    2.times { observe }
+    @emulator.write(DIALOG, 1)
+    observe
+    @emulator.write(DIALOG, 0)
+    3.times { observe }
+    assert_equal 2, @trace.of(:screen).size
   end
 
   def test_overlay_forgets_sprite_tracking
@@ -185,6 +224,54 @@ class GridBuilderTest < Minitest::Test
       assert(screens.all? { |s| s['grid'].size == 8 && s['grid'][0].size == 10 })
       assert(policy.contexts.all? { |c| c[:grid].nil? || c[:grid].is_a?(Koholint::Vision::Grid) })
       assert(policy.contexts.any? { |c| c[:grid].is_a?(Koholint::Vision::Grid) })
+    end
+  end
+
+  class DialogueProbe < Koholint::Policies::StartGame
+    attr_reader :log
+
+    def initialize(emulator)
+      super(Koholint::Policies::WalkAndTalk.new)
+      @emulator = emulator
+      @log = []
+    end
+
+    def point_for(state)
+      dialogue? ? Koholint::DecisionPoint.macro(:dialogue) : super
+    end
+
+    def dialogue? = @emulator.read(Koholint::Vision::ScreenVision::ADDRESSES.fetch(:dialog_state)).positive?
+
+    def decide(point, state, context)
+      @log << { frame: state.frame, dialog: @emulator.read(Koholint::Vision::ScreenVision::ADDRESSES.fetch(:dialog_state)),
+                grid: context[:grid] }
+      return super unless point.name == :dialogue
+
+      @pressed = !@pressed
+      choice = @pressed ? { buttons: [:a], frames: 3 } : { buttons: [], frames: 57 }
+      { choice:, justification: 'advance dialogue', confidence: 1.0, agent: 'test' }
+    end
+  end
+
+  def test_no_screen_is_recorded_during_a_dialogue_and_statics_survive_it
+    skip_without_rom!
+    emulator = EmulatorCache.at(700)
+    probe = DialogueProbe.new(emulator)
+    with_run do |run|
+      Koholint::Engine.new(run:, policy: probe, budget: Koholint::Budget.new(frames: 1500), emulator:, grid: true).run
+      screens = Koholint::Trace.read(File.join(run.dir, 'trace.jsonl')).select { |e| e['type'] == 'screen' }
+      dialogue = probe.log.select { |l| l[:dialog].positive? }
+      refute_empty dialogue
+      assert(dialogue.all? { |l| l[:grid].nil? })
+      screen_frames = screens.map { |s| s['frame'] }
+      assert_empty(dialogue.map { |l| l[:frame] } & screen_frames)
+      opened = probe.log.index { |l| l[:dialog].positive? }
+      closed = probe.log.index.with_index { |l, i| i > opened && l[:dialog].zero? }
+      refute_nil closed
+      assert_kind_of Koholint::Vision::Grid, probe.log[closed][:grid]
+      before = screens.select { |s| s['frame'] < probe.log[opened][:frame] }.last
+      refute_empty before['static_sprites']
+      assert(screens.select { |s| s['frame'] >= probe.log[closed][:frame] }.none? { |s| s['static_sprites'].empty? })
     end
   end
 

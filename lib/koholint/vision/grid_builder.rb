@@ -22,6 +22,8 @@ module Koholint
         @beliefs = Beliefs.new
         @previous = nil
         @emitted = nil
+        @statics = {}
+        @statics_place = nil
       end
 
       def observe(emulator, state)
@@ -32,9 +34,9 @@ module Koholint
           return nil
         end
 
-        current = snapshot.sprites.reject { |sprite| self.class.link_sprite?(sprite, state) }.map { |s| s.slice(:x, :y, :pattern) }
-        statics = static_sprites(place, current)
-        @previous = { place:, sprites: current }
+        current = snapshot.sprites.reject { |sprite| self.class.link_sprite?(sprite, state) }.group_by { |s| [s[:x], s[:y]] }
+        track(place, current)
+        statics = @statics.map { |(x, y), pattern| { x:, y:, pattern: } }.sort_by { |s| [s[:y], s[:x]] }
         emit(state.frame, snapshot, statics) if changed?(snapshot, statics)
         Grid.new(cells: grid_of(snapshot), static_sprites: statics.map { |s| s.transform_keys(&:to_s) }, beliefs: @beliefs,
                  capabilities: @capabilities)
@@ -42,10 +44,17 @@ module Koholint
 
       private
 
-      def static_sprites(place, current)
-        return [] unless @previous && @previous[:place] == place
-
-        (current & @previous[:sprites]).sort_by { |s| [s[:y], s[:x], s[:pattern]] }
+      # Static identity is the position; after an overlay the last statics stand until two observations are consecutive again.
+      def track(place, current)
+        if @previous && @previous[:place] == place
+          @statics = current.filter_map do |position, sprites|
+            [position, [@statics[position], *sprites.map { |s| s[:pattern] }].compact.min] if @previous[:positions].include?(position)
+          end.to_h
+        elsif @statics_place != place
+          @statics = {}
+        end
+        @statics_place = place
+        @previous = { place:, positions: current.keys }
       end
 
       def changed?(snapshot, statics)
