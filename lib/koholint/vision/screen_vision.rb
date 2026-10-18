@@ -12,6 +12,7 @@ module Koholint
       WX = 0xFF4B
       PLAYFIELD_LINES = 128
       SCREEN_RIGHT_WX = 167
+      # Values and meaning: notes of game_mode and game_submode in data/addresses.json (one boot run, hypotheses).
       PLAY_MODE = 0x0B
       PLAY_SETTLED_SUBMODE = 7
       ADDRESSES = Addresses.load.slice(:game_mode, :game_submode, :dialog_state).freeze
@@ -25,6 +26,7 @@ module Koholint
 
       module_function
 
+      # DMG mode only: no VBK bank or BG attribute map.
       def snapshot(reader, place:)
         lcdc = reader.read(LCDC)
         scx = reader.read(SCX)

@@ -73,5 +73,6 @@ class EmulatorCacheTest < Minitest::Test
     assert_equal EmulatorCache.send(:key_for, ['a']), EmulatorCache.send(:key_for, ['a'])
     refute_equal EmulatorCache.send(:key_for, ['a']), EmulatorCache.send(:key_for, ['b'])
     assert_includes EmulatorCache.send(:key_sources), File.read(File.expand_path('support/emulator_cache.rb', __dir__))
+    assert_includes EmulatorCache.send(:key_sources), File.read(File.expand_path('../lib/koholint/emulator.rb', __dir__))
   end
 end

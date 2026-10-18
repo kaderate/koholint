@@ -62,7 +62,7 @@ module EmulatorCache
     end
 
     def key_sources
-      lib = %w[boot_script perception game_state].map { |f| File.read(File.join(Koholint::Config::ROOT, 'lib', 'koholint', "#{f}.rb")) }
+      lib = %w[boot_script perception game_state emulator].map { |f| File.read(File.join(Koholint::Config::ROOT, 'lib', 'koholint', "#{f}.rb")) }
       lib << File.read(__FILE__)
     end
 
