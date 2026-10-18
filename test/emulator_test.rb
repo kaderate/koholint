@@ -2,6 +2,7 @@ require_relative 'test_helper'
 require 'tmpdir'
 require 'zlib'
 require 'koholint/emulator'
+require 'koholint/perception'
 require 'koholint/boot_script'
 require_relative 'support/emulator_cache'
 
@@ -37,7 +38,10 @@ class EmulatorTest < Minitest::Test
 
   def boot_to(frames)
     emulator = Koholint::Emulator.boot
-    frames.times { |f| emulator.step(Koholint::BootScript.input_at(f)) }
+    while emulator.frame < frames
+      macro = Koholint::BootScript.macro_for(Koholint::Perception.read(emulator))
+      [macro[:frames], frames - emulator.frame].min.times { emulator.step(macro[:buttons]) }
+    end
     emulator
   end
 
