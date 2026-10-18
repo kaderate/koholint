@@ -53,7 +53,8 @@ module Koholint
         end
 
         settled = @previous && @previous[:place] == place
-        current = snapshot.sprites.reject { |sprite| self.class.link_sprite?(sprite, state) }.group_by { |s| [s[:x], s[:y]] }
+        others = snapshot.sprites.reject { |sprite| self.class.link_sprite?(sprite, state) }
+        current = others.group_by { |s| [s[:x], s[:y]] }
         track(place, current)
         statics = @statics.map { |(x, y), pattern| { x:, y:, pattern: } }.sort_by { |s| [s[:y], s[:x]] }
         emit(state.frame, snapshot, statics) if changed?(snapshot, statics)
@@ -64,7 +65,10 @@ module Koholint
         spot = [place, state.x, state.y]
         scope = [place, cell, snapshot.terrain_hash, @capabilities]
         @discarded = { scope: } unless @discarded[:scope] == scope
-        @stuck = probe_neighbours(emulator, state, grid, cell) && spot if settled && cell && @prober && @stuck != spot
+        if settled && cell && @prober && @stuck != spot
+          @ahead = sprite_boxes(others, emulator.read(ScreenVision::LCDC).anybits?(0x04) ? 16 : 8)
+          @stuck = probe_neighbours(emulator, state, grid, cell) && spot
+        end
         @last = cell && { place:, cell:, grid: }
         grid
       end
@@ -149,12 +153,22 @@ module Koholint
         return if probe[:room_changed] || probe[:hp_delta].negative?
 
         after = self.class.link_cell(probe[:to][:x], probe[:to][:y]) or return
-        return aligned?(state, cell, direction) ? :no : :misaligned if after == cell
+        return aligned?(state, cell, direction) && !sprite_ahead?(state, direction) ? :no : :misaligned if after == cell
 
         drow, dcol = STEPS.fetch(direction)
         delta = [after[0] - cell[0], after[1] - cell[1]]
         cells = drow.zero? ? delta[1] * dcol : delta[0] * drow
         :yes if cells >= 1 && delta == [drow * cells, dcol * cells]
+      end
+
+      def sprite_boxes(sprites, height) = sprites.map { |s| [s[:x] - 8, s[:y] - 16, 8, height] }
+
+      # Only the strip Link would newly cover counts: the NPC next to the start already overlaps his own box.
+      def sprite_ahead?(state, direction)
+        drow, dcol = STEPS.fetch(direction)
+        left = state.x - 8 + (dcol * 16)
+        top = state.y - 16 + (drow * 16)
+        @ahead.any? { |x, y, w, h| x < left + 16 && left < x + w && y < top + 16 && top < y + h }
       end
 
       def aligned?(state, cell, direction)

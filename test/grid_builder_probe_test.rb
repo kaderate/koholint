@@ -24,6 +24,10 @@ class GridBuilderProbeTest < Minitest::Test
     end
 
     def read(addr) = @memory[addr]
+
+    def sprite(index, x:, y:)
+      [y, x, 1, 0].each_with_index { |value, i| @memory[0xFE00 + (index * 4) + i] = value }
+    end
   end
 
   class FakeTrace
@@ -175,6 +179,18 @@ class GridBuilderProbeTest < Minitest::Test
     assert_equal %w[up no], trace.of(:affordance).last.values_at(:direction, :result)
   end
 
+  def test_a_sprite_ahead_of_link_voids_a_stop_but_not_one_beside_or_far
+    prober = StubProber.new { |direction| direction == :up ? { to: { x: 70, y: 30 } } : {} }
+    trace = FakeTrace.new
+    builder = Builder.new(trace:, prober:)
+    emulator = FakeEmulator.new
+    emulator.sprite(0, x: 90, y: 52)
+    emulator.sprite(1, x: 76, y: 48)
+    emulator.sprite(2, x: 150, y: 130)
+    2.times { fake_observe(builder, emulator, link: [70, 52]) }
+    assert_equal [%w[up yes], %w[down no], %w[left no]], trace.of(:affordance).map { |e| e.values_at(:direction, :result) }
+  end
+
   def test_a_left_or_right_stop_needs_vertical_alignment
     prober = StubProber.new { |direction| direction == :up ? { to: { x: 70, y: 30 } } : {} }
     prober.at = { x: 70, y: 59 }
@@ -286,18 +302,19 @@ class GridBuilderProbeTest < Minitest::Test
     trace, prober, grid, = interactive_probes
     assert_equal 4, prober.calls.size
     events = trace.of(:affordance).to_h { |e| [e[:direction], e] }
-    assert_equal %w[down left right up], events.keys.sort
+    assert_equal %w[down left up], events.keys.sort
     expected = { up: :yes, down: :yes, left: :no, right: :no }
     assert_equal(expected, DIRECTIONS.to_h { |d| [d, direct_cell_change(d) ? :yes : :no] })
-    neighbours = { up: [1, 4], down: [3, 4], left: [2, 3], right: [2, 5] }
+    refute events.key?('right')
+    assert_equal :unknown, grid.passable(2, 5, :right)
+    expected.delete(:right)
+    neighbours = { up: [1, 4], down: [3, 4], left: [2, 3] }
     neighbours.each do |direction, (row, col)|
       event = events.fetch(direction.to_s)
       assert_equal expected[direction].to_s, event[:result], direction.to_s
       assert_equal grid.static_sprite(row, col) || grid.appearance(row, col), event[:appearance], direction.to_s
       assert_equal expected[direction], grid.passable(row, col, direction), direction.to_s
     end
-    assert_nil grid.static_sprite(2, 5)
-    assert_equal grid.appearance(2, 5), events.fetch('right')[:appearance]
   end
 
   def test_house_objects_sit_on_the_cell_under_their_center
@@ -312,7 +329,7 @@ class GridBuilderProbeTest < Minitest::Test
     skip_without_rom!
     trace, prober, = interactive_probes(observations: 5)
     assert_equal 4, prober.calls.size
-    assert_equal 4, trace.of(:affordance).size
+    assert_equal 3, trace.of(:affordance).size
   end
 
   def test_other_capabilities_reprobe_a_blocked_neighbour
@@ -321,9 +338,9 @@ class GridBuilderProbeTest < Minitest::Test
     interactive_probes(beliefs:)
     trace, prober, grid, = interactive_probes(beliefs:, capabilities: Capabilities.new(['swim']))
     assert_equal 4, prober.calls.size
-    right = trace.of(:affordance).find { |e| e[:direction] == 'right' }
-    assert_equal({ result: 'no', context: ['swim'] }, right.slice(:result, :context))
-    assert_equal :no, grid.passable(2, 5, :right)
+    left = trace.of(:affordance).find { |e| e[:direction] == 'left' }
+    assert_equal({ result: 'no', context: ['swim'] }, left.slice(:result, :context))
+    assert_equal :no, grid.passable(2, 3, :left)
   end
 
   def test_probing_leaves_the_real_emulator_untouched
