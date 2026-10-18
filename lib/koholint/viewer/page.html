@@ -12,7 +12,15 @@
   #banner { background: #b00; }
   #lost { background: #a60; }
   #main { display: flex; gap: 12px; padding: 12px; align-items: flex-start; }
-  #frame { width: 480px; height: 432px; image-rendering: pixelated; background: #000; flex: none; }
+  #stage { position: relative; width: 480px; height: 432px; flex: none; }
+  #frame { width: 480px; height: 432px; image-rendering: pixelated; background: #000; display: block; }
+  #overlay { position: absolute; left: 0; top: 0; width: 480px; height: 384px; display: none; }
+  #overlay div { position: absolute; box-sizing: border-box; width: 48px; height: 48px; border: 1px solid rgba(0, 0, 0, 0.25); }
+  #overlay div.link { border: 3px solid #fff; }
+  #legend { display: none; gap: 10px; padding: 4px 6px; background: #222; }
+  #legend i { display: inline-block; width: 10px; height: 10px; margin-right: 4px; }
+  #grid { background: #333; color: #ddd; border: 1px solid #555; font: inherit; padding: 2px 10px; cursor: pointer; }
+  #grid:disabled { color: #777; cursor: default; }
   #side { flex: 1; display: flex; flex-direction: column; }
   #sidebar { display: flex; justify-content: space-between; align-items: center; padding: 4px 6px; background: #222; }
   #mode { background: #333; color: #ddd; border: 1px solid #555; font: inherit; padding: 2px 10px; cursor: pointer; }
@@ -26,9 +34,10 @@
 <div id="banner">Replay diverged: the follower no longer matches the run.</div>
 <div id="lost">Connection lost, retrying...</div>
 <div id="main">
-  <img id="frame" alt="game frame">
+  <div id="stage"><img id="frame" alt="game frame"><div id="overlay"></div></div>
   <div id="side">
-    <div id="sidebar"><span>events</span><button id="mode" type="button"></button></div>
+    <div id="sidebar"><span>events</span><span><button id="grid" type="button"></button> <button id="mode" type="button"></button></span></div>
+    <div id="legend"></div>
     <div id="events"></div>
   </div>
 </div>
@@ -67,6 +76,30 @@
     if (hearts === null || hearts === undefined || !max) return '-';
     return hearts + '/' + max;
   }
+
+  var CELL = 48;
+  var COLORS = {
+    yes: 'rgba(60, 200, 80, 0.40)', no: 'rgba(230, 50, 50, 0.45)', mixed: 'rgba(170, 80, 220, 0.45)',
+    stale: 'rgba(240, 150, 30, 0.45)', unknown: 'rgba(150, 150, 150, 0.30)'
+  };
+  var STATES = ['yes', 'no', 'mixed', 'stale', 'unknown'];
+
+  function cellColor(state) { return COLORS[state] || COLORS.unknown; }
+
+  function cellRect(row, col) { return { left: col * CELL, top: row * CELL, size: CELL }; }
+
+  function gridExtent(rows, cols) { return { width: cols * CELL, height: rows * CELL }; }
+
+  function cellTitle(row, col, appearance, state) { return row + ',' + col + ' ' + appearance + ' ' + state; }
+
+  function legendEntries() {
+    return STATES.map(function (state) { return { state: state, color: cellColor(state) }; });
+  }
+
+  function gridButtonLabel(on, grid) {
+    if (!grid) return 'Grid (no data)';
+    return on ? 'Grid: on' : 'Grid: off';
+  }
   // pure:end
 
   var fields = [
@@ -86,6 +119,11 @@
   var events = document.getElementById('events');
   var img = document.getElementById('frame');
   var modeButton = document.getElementById('mode');
+  var gridButton = document.getElementById('grid');
+  var overlay = document.getElementById('overlay');
+  var legend = document.getElementById('legend');
+  var gridOn = storedGrid();
+  var lastGrid = null, lastGridKey = null;
   var counter = 0, frameBusy = false, stateBusy = false, frameOk = true, stateOk = true;
   var frameError = null, stateError = null;
   var mode = normalizeMode(storedMode());
@@ -98,6 +136,64 @@
   function storeMode(value) {
     try { window.localStorage.setItem('koholint.events.mode', value); } catch (e) { /* private mode */ }
   }
+
+  function storedGrid() {
+    try { return window.localStorage.getItem('koholint.grid') === 'on'; } catch (e) { return false; }
+  }
+
+  function storeGrid(value) {
+    try { window.localStorage.setItem('koholint.grid', value ? 'on' : 'off'); } catch (e) { /* private mode */ }
+  }
+
+  function renderLegend() {
+    legend.textContent = '';
+    legendEntries().forEach(function (entry) {
+      var item = document.createElement('span');
+      var swatch = document.createElement('i');
+      swatch.style.background = entry.color;
+      item.append(swatch, entry.state);
+      legend.appendChild(item);
+    });
+  }
+
+  function renderGrid(grid) {
+    lastGrid = grid;
+    gridButton.disabled = !grid;
+    gridButton.textContent = gridButtonLabel(gridOn, grid);
+    var visible = Boolean(grid) && gridOn;
+    overlay.style.display = visible ? 'block' : 'none';
+    legend.style.display = visible ? 'flex' : 'none';
+    var key = visible ? JSON.stringify(grid) : null;
+    if (key === lastGridKey) return;
+    lastGridKey = key;
+    overlay.textContent = '';
+    if (!visible) return;
+    var extent = gridExtent(grid.cells.length, grid.cells[0].length);
+    overlay.style.width = extent.width + 'px';
+    overlay.style.height = extent.height + 'px';
+    grid.cells.forEach(function (cells, row) {
+      cells.forEach(function (state, col) {
+        var rect = cellRect(row, col);
+        var cell = document.createElement('div');
+        cell.style.left = rect.left + 'px';
+        cell.style.top = rect.top + 'px';
+        cell.style.width = rect.size + 'px';
+        cell.style.height = rect.size + 'px';
+        cell.style.background = cellColor(state);
+        cell.title = cellTitle(row, col, grid.appearances[row][col], state);
+        if (grid.link && grid.link.row === row && grid.link.col === col) cell.className = 'link';
+        overlay.appendChild(cell);
+      });
+    });
+  }
+
+  gridButton.addEventListener('click', function () {
+    gridOn = !gridOn;
+    storeGrid(gridOn);
+    renderGrid(lastGrid);
+  });
+  renderLegend();
+  renderGrid(null);
 
   function text(value) {
     if (value === null || value === undefined) return '-';
@@ -185,7 +281,7 @@
     stateBusy = true;
     fetch('/state.json', { cache: 'no-store' })
       .then(checked).then(function (r) { return r.json(); })
-      .then(function (state) { renderBar(state); renderEvents(state.events || []); stateOk = true; stateError = null; })
+      .then(function (state) { renderBar(state); renderEvents(state.events || []); renderGrid(state.grid || null); stateOk = true; stateError = null; })
       .catch(function (e) { stateOk = false; stateError = messageOf(e); })
       .then(function () { stateBusy = false; updateLost(); });
   }

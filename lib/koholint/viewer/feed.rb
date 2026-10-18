@@ -2,6 +2,9 @@ require 'json'
 require 'koholint'
 require 'koholint/summary'
 require 'koholint/trace'
+require 'koholint/vision/capabilities'
+require 'koholint/vision/grid_builder'
+require 'koholint/vision/world'
 
 module Koholint
   module Viewer
@@ -12,6 +15,8 @@ module Koholint
       PROGRESS = %w[notable objective].freeze
       CACHE = {}
       CACHE_LOCK = Mutex.new
+      GRID_CACHE = {}
+      DIRECTIONS = %i[up down left right].freeze
 
       module_function
 
@@ -24,7 +29,8 @@ module Koholint
           status: summary.merge(run_id: File.basename(run_dir), flow_version: manifest['flow_version'],
                                 manifest_status: manifest['status'], budget: manifest['budget']),
           replay: { frame: follower.frame, journal_frames: follower.journal_frames, lag: follower.lag, sync: follower.sync },
-          events: events(trace, limit)
+          events: events(trace, limit),
+          grid: grid(run_dir, trace, follower.frame)
         }
       end
 
@@ -40,6 +46,46 @@ module Koholint
         end
       rescue SystemCallError
         []
+      end
+
+      def grid(run_dir, trace, frame)
+        CACHE_LOCK.synchronize do
+          cached = GRID_CACHE[run_dir]
+          return cached[2] if cached && cached[0].equal?(trace) && cached[1] == frame
+
+          build_grid(trace, frame).tap { |built| GRID_CACHE[run_dir] = [trace, frame, built] }
+        end
+      end
+
+      def build_grid(trace, frame)
+        screen = trace.reverse_each.find { |e| e['type'] == 'screen' && e['frame'] <= frame } or return nil
+        place = screen['place']
+        grid = Vision::World.from_events(trace, at_frame: frame).grid_for(place, Vision::Capabilities.new)
+        rows = (0...Vision::Grid::ROWS).to_a
+        cols = (0...Vision::Grid::COLS).to_a
+        { place:, frame: screen['frame'],
+          cells: rows.map { |row| cols.map { |col| cell_state(grid, row, col) } },
+          appearances: rows.map { |row| cols.map { |col| grid.appearance(row, col) } },
+          link: link_cell(trace, frame) }
+      end
+
+      def cell_state(grid, row, col)
+        beliefs = DIRECTIONS.map { |direction| grid.passable(row, col, direction) }
+        yes = beliefs.include?(:yes)
+        no = beliefs.include?(:no)
+        return 'mixed' if yes && no
+        return 'yes' if yes
+        return 'no' if no
+
+        beliefs.include?(:stale) ? 'stale' : 'unknown'
+      end
+
+      def link_cell(trace, frame)
+        state = trace.reverse_each.find { |e| e['type'] == 'perception' && e['frame'] <= frame }&.fetch('state', nil) or return nil
+        return nil unless state['x'].is_a?(Integer) && state['y'].is_a?(Integer)
+
+        row, col = Vision::GridBuilder.link_cell(state['x'], state['y'])
+        { row:, col: } if row
       end
 
       def read_manifest(run_dir)
