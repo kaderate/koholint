@@ -13,7 +13,12 @@
   #lost { background: #a60; }
   #main { display: flex; gap: 12px; padding: 12px; align-items: flex-start; }
   #frame { width: 480px; height: 432px; image-rendering: pixelated; background: #000; flex: none; }
-  #events { flex: 1; height: 432px; overflow-y: auto; background: #181818; padding: 6px; margin: 0; white-space: pre-wrap; }
+  #side { flex: 1; display: flex; flex-direction: column; }
+  #sidebar { display: flex; justify-content: space-between; align-items: center; padding: 4px 6px; background: #222; }
+  #mode { background: #333; color: #ddd; border: 1px solid #555; font: inherit; padding: 2px 10px; cursor: pointer; }
+  #events { height: 400px; overflow-y: auto; background: #181818; padding: 6px; margin: 0; white-space: pre-wrap; }
+  #events .action { color: #999; }
+  #events .decision { color: #dfe; }
 </style>
 </head>
 <body>
@@ -22,7 +27,10 @@
 <div id="lost">Connection lost, retrying...</div>
 <div id="main">
   <img id="frame" alt="game frame">
-  <pre id="events"></pre>
+  <div id="side">
+    <div id="sidebar"><span>events</span><button id="mode" type="button"></button></div>
+    <div id="events"></div>
+  </div>
 </div>
 <script>
 (function () {
@@ -37,11 +45,22 @@
     return JSON.stringify(choice);
   }
 
-  function formatEvent(e) {
-    var what = e.choice !== undefined ? formatChoice(e.choice) : e.skill;
-    return [e.frame, e.type, e.agent, what, e.params ? JSON.stringify(e.params) : '', e.confidence]
-      .filter(function (part) { return part !== undefined && part !== null && part !== ''; }).join(' ');
+  function formatEventPretty(e) {
+    var head = 'f' + e.frame + ' · ';
+    if (e.type === 'decision') {
+      var line = head + e.agent + ' decides ' + formatChoice(e.choice);
+      if (typeof e.confidence === 'number' && e.confidence < 1) line += ' (' + Math.round(e.confidence * 100) + '%)';
+      return line;
+    }
+    if (e.type === 'action') return head + e.skill + ' ' + formatChoice(e.params);
+    return head + e.type;
   }
+
+  function formatEventJson(e) { return JSON.stringify(e); }
+
+  function normalizeMode(mode) { return mode === 'json' ? 'json' : 'pretty'; }
+
+  function nextMode(mode) { return normalizeMode(mode) === 'json' ? 'pretty' : 'json'; }
 
   function formatHearts(s) {
     var hearts = s.status.hearts, max = s.status.max_hearts;
@@ -66,7 +85,19 @@
   var lost = document.getElementById('lost');
   var events = document.getElementById('events');
   var img = document.getElementById('frame');
-  var counter = 0, frameBusy = false, stateBusy = false, frameOk = true, stateOk = true, lastError = null;
+  var modeButton = document.getElementById('mode');
+  var counter = 0, frameBusy = false, stateBusy = false, frameOk = true, stateOk = true;
+  var frameError = null, stateError = null;
+  var mode = normalizeMode(storedMode());
+  var lastList = [];
+
+  function storedMode() {
+    try { return window.localStorage.getItem('koholint.events.mode'); } catch (e) { return null; }
+  }
+
+  function storeMode(value) {
+    try { window.localStorage.setItem('koholint.events.mode', value); } catch (e) { /* private mode */ }
+  }
 
   function text(value) {
     if (value === null || value === undefined) return '-';
@@ -89,14 +120,35 @@
   var lastEvents = null;
 
   function renderEvents(list) {
-    var rendered = list.map(formatEvent).join('\n');
+    lastList = list;
+    var format = mode === 'json' ? formatEventJson : formatEventPretty;
+    var lines = list.map(format);
+    var rendered = mode + '\n' + lines.join('\n');
     if (rendered === lastEvents) return;
     lastEvents = rendered;
     var pinned = events.scrollTop + events.clientHeight >= events.scrollHeight - 4;
     var top = events.scrollTop;
-    events.textContent = rendered;
+    events.textContent = '';
+    list.forEach(function (event, index) {
+      var row = document.createElement('div');
+      row.className = event.type;
+      row.textContent = lines[index];
+      events.appendChild(row);
+    });
     events.scrollTop = pinned ? events.scrollHeight : top;
   }
+
+  function renderModeButton() {
+    modeButton.textContent = mode === 'json' ? 'Format: JSON' : 'Format: readable';
+  }
+
+  modeButton.addEventListener('click', function () {
+    mode = nextMode(mode);
+    storeMode(mode);
+    renderModeButton();
+    renderEvents(lastList);
+  });
+  renderModeButton();
 
   function checked(r) {
     if (r.ok) return r;
@@ -105,10 +157,11 @@
 
   function updateLost() {
     lost.style.display = (frameOk && stateOk) ? 'none' : 'block';
-    lost.textContent = lastError ? 'Server error: ' + lastError : 'Connection lost, retrying...';
+    var error = stateError || frameError;
+    lost.textContent = error ? 'Server error: ' + error : 'Connection lost, retrying...';
   }
 
-  function failed(e) { lastError = (e instanceof TypeError) ? null : e.message; }
+  function messageOf(e) { return (e instanceof TypeError) ? null : e.message; }
 
   function pollFrame() {
     if (frameBusy) return;
@@ -121,9 +174,9 @@
         img.src = URL.createObjectURL(blob);
         if (old.indexOf('blob:') === 0) URL.revokeObjectURL(old);
         frameOk = true;
-        lastError = null;
+        frameError = null;
       })
-      .catch(function (e) { frameOk = false; failed(e); })
+      .catch(function (e) { frameOk = false; frameError = messageOf(e); })
       .then(function () { frameBusy = false; updateLost(); });
   }
 
@@ -132,8 +185,8 @@
     stateBusy = true;
     fetch('/state.json', { cache: 'no-store' })
       .then(checked).then(function (r) { return r.json(); })
-      .then(function (state) { renderBar(state); renderEvents(state.events || []); stateOk = true; lastError = null; })
-      .catch(function (e) { stateOk = false; failed(e); })
+      .then(function (state) { renderBar(state); renderEvents(state.events || []); stateOk = true; stateError = null; })
+      .catch(function (e) { stateOk = false; stateError = messageOf(e); })
       .then(function () { stateBusy = false; updateLost(); });
   }
 
