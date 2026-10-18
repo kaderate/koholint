@@ -164,6 +164,16 @@ class GridBuilderProbeTest < Minitest::Test
     assert_equal DIRECTIONS + %i[up], prober.calls.map { |c| c[:direction] }
   end
 
+  def test_the_probe_is_judged_from_where_it_started_not_from_the_state_argument
+    prober = StubProber.new { |direction| direction == :up ? { moved: true, to: { x: 70, y: 52 } } : {} }
+    prober.at = { x: 70, y: 68 }
+    trace = FakeTrace.new
+    builder = Builder.new(trace:, prober:)
+    emulator = FakeEmulator.new
+    2.times { fake_observe(builder, emulator, link: [70, 52]) }
+    assert_equal [%w[up yes], %w[down no], %w[left no], %w[right no]], trace.of(:affordance).map { |e| e.values_at(:direction, :result) }
+  end
+
   def test_a_stop_misaligned_with_the_neighbour_records_nothing_until_aligned
     prober = StubProber.new { |direction| direction == :down ? { to: { x: 78, y: 80 } } : {} }
     prober.at = { x: 78, y: 52 }
@@ -350,6 +360,20 @@ class GridBuilderProbeTest < Minitest::Test
     *, emulator = interactive_probes
     assert_equal hash, emulator.state_hash
     assert_equal 1630, emulator.frame
+  end
+
+  def test_a_resumed_engine_does_not_reprobe_what_the_trace_already_knows
+    skip_without_rom!
+    Dir.mktmpdir do |dir|
+      run = Koholint::Run.create(root: dir, flow_version: Koholint::FLOW_VERSION, budget: {})
+      counts = 2.times.map do
+        Koholint::Engine.new(run:, policy: Koholint::Policies::StartGame.new(Koholint::Policies::WalkAndTalk.new),
+                             budget: Koholint::Budget.new(frames: 400), emulator: EmulatorCache.interactive, grid: true).run
+        Koholint::Trace.read(File.join(run.dir, 'trace.jsonl')).count { |e| e['type'] == 'affordance' }
+      end
+      assert_operator counts.first, :>=, 4
+      assert_equal counts.first, counts.last
+    end
   end
 
   def play(grid:)

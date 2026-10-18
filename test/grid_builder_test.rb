@@ -57,6 +57,28 @@ class GridBuilderTest < Minitest::Test
     assert_empty @trace.events
   end
 
+  def test_a_persistent_overlay_emits_one_notable_until_a_normal_screen_resets_it
+    @emulator.write(DIALOG, 1)
+    21.times { observe }
+    assert_empty @trace.of(:notable)
+    observe
+    assert_equal [{ type: :notable, frame: 660, kind: 'grid_overlay_stuck', detail: [163, 16] }], @trace.of(:notable)
+    20.times { observe }
+    assert_equal 1, @trace.of(:notable).size
+    @emulator.write(DIALOG, 0)
+    observe
+    @emulator.write(DIALOG, 1)
+    25.times { observe }
+    assert_equal 2, @trace.of(:notable).size
+  end
+
+  def test_an_overlay_that_changes_place_restarts_the_count
+    @emulator.write(DIALOG, 1)
+    15.times { observe }
+    15.times { observe(place: [164, 16]) }
+    assert_empty @trace.of(:notable)
+  end
+
   def test_first_observation_emits_screen_with_no_static_sprites
     grid = observe
     assert_instance_of Koholint::Vision::Grid, grid

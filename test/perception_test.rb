@@ -46,4 +46,12 @@ class PerceptionTest < Minitest::Test
     table = Koholint::Addresses.load
     assert_equal 0xFFF6, table.fetch(:room_id)
   end
+
+  def test_the_mode_addresses_record_what_their_values_mean
+    entries = JSON.parse(File.read(Koholint::Addresses::DEFAULT_PATH)).to_h { |entry| [entry['name'], entry] }
+    %w[game_mode game_submode].each do |name|
+      assert_match(/\S/, entries.fetch(name)['note'].to_s, name)
+      Koholint::Addresses.validate!(entries.fetch(name))
+    end
+  end
 end

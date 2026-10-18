@@ -53,6 +53,29 @@ class SummaryTest < Minitest::Test
     end
   end
 
+  def test_a_diagnostic_notable_is_not_progress_and_not_last_notable
+    with_run do |run|
+      run.trace.emit(:perception, frame: 0, state: STATE, state_hash: 'h')
+      run.trace.emit(:notable, frame: 10, kind: 'grid_overlay_stuck', detail: [1, 2])
+      run.trace.emit(:perception, frame: 4000, state: STATE, state_hash: 'h')
+      summary = Koholint::Summary.for(run)
+      assert_equal 'stalled', summary[:health]
+      assert_nil summary[:last_notable]
+    end
+  end
+
+  def test_a_real_notable_after_a_diagnostic_is_progress
+    with_run do |run|
+      run.trace.emit(:perception, frame: 0, state: STATE, state_hash: 'h')
+      run.trace.emit(:notable, frame: 3900, kind: 'new_room', detail: 'x')
+      run.trace.emit(:notable, frame: 3950, kind: 'grid_overlay_stuck', detail: [1, 2])
+      run.trace.emit(:perception, frame: 4000, state: STATE, state_hash: 'h')
+      summary = Koholint::Summary.for(run)
+      assert_equal 'progressing', summary[:health]
+      assert_equal 'new_room', summary[:last_notable]['kind']
+    end
+  end
+
   def test_empty_trace_summary
     with_run do |run|
       assert_equal 'progressing', Koholint::Summary.for(run)[:health]
