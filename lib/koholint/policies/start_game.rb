@@ -11,7 +11,7 @@ module Koholint
       def decide(point, state, context)
         return @after.decide(point, state, context) if state.controllable?
 
-        { choice: BootScript.macro_at(state.frame), justification: 'boot script', confidence: 1.0, agent: 'start_game' }
+        { choice: BootScript.macro_for(state), justification: 'boot script', confidence: 1.0, agent: 'start_game' }
       end
     end
   end

@@ -1,5 +1,5 @@
 {
-  "frame": 6201,
+  "frame": 240,
   "room_id": 163,
   "map_id": 16,
   "x": 80,
@@ -7,5 +7,6 @@
   "direction": 3,
   "hp": 24,
   "max_hp": 24,
-  "state_hash": "f6d9f1085536c4b8a7c10b1f80ede0a5715e5e42043eb322cbfee51a5dac2dea"
+  "game_mode": 11,
+  "state_hash": "740d4e52e65972fc9755dcce6b7765a895ec73f2ee44b42886015396f97d0522"
 }

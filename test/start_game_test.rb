@@ -4,10 +4,11 @@ require 'koholint/engine'
 require 'koholint/policies/start_game'
 require 'koholint/policies/walk_and_talk'
 require 'koholint/summary'
-require 'support/emulator_cache'
 
 class StartGameTest < Minitest::Test
-  def state(frame, hp: 0, x: 0) = Koholint::GameState.new(frame: frame, hp: hp, x: x, milestone: :none)
+  def state(frame: 0, hp: 0, x: 0, mode: 0, sub: 0, name_length: 0)
+    Koholint::GameState.new(frame:, hp:, x:, game_mode: mode, game_submode: sub, name_length:, milestone: :none)
+  end
 
   def policy = Koholint::Policies::StartGame.new(Koholint::Policies::WalkAndTalk.new)
 
@@ -19,43 +20,34 @@ class StartGameTest < Minitest::Test
     assert_raises(Koholint::DecisionPoint::Invalid) { point.validate({ buttons: [:a], frames: 100_000 }) }
   end
 
-  def test_uses_the_boot_script_until_link_is_controllable
-    point = policy.point_for(state(0))
+  def test_follows_the_game_mode_until_link_is_controllable
+    s = state(mode: 2, sub: 7)
+    point = policy.point_for(s)
     assert_equal :boot, point.name
-    result = policy.decide(point, state(0), {})
-    assert_equal({ buttons: [:start], frames: 10 }, result[:choice])
+    result = policy.decide(point, s, {})
+    assert_equal({ buttons: [:a], frames: 3 }, result[:choice])
     assert_equal 'start_game', result[:agent]
   end
 
   def test_hands_over_to_the_walking_policy_once_link_has_hp_and_a_position
-    controllable = state(6201, hp: 24, x: 80)
+    controllable = state(frame: 400, hp: 24, x: 80, mode: 0x0B)
     assert_equal :move, policy.point_for(controllable).name
     assert_equal 'walk_and_talk', policy.decide(policy.point_for(controllable), controllable, {})[:agent]
   end
 
-  def run_from(emulator, frames)
+  def test_engine_run_from_a_cold_boot_reaches_a_playable_state_quickly
+    skip_without_rom!
     Dir.mktmpdir do |dir|
       run = Koholint::Run.create(root: dir, flow_version: Koholint::FLOW_VERSION, budget: {})
-      Koholint::Engine.new(run: run, policy: policy, emulator: emulator, budget: Koholint::Budget.new(frames: frames)).run
-      yield Koholint::Summary.for(run), Koholint::Trace.read(File.join(run.dir, 'trace.jsonl')).select { |e| e['type'] == 'perception' }
-    end
-  end
-
-  def test_engine_run_from_the_title_screen_reaches_a_playable_state
-    skip_without_rom!
-    run_from(EmulatorCache.at(5900), 700) do |summary, states|
-      assert_equal [5900, 0], [states.first['frame'], states.first['state']['hp']]
-      assert_equal 3.0, summary[:hearts]
-      assert_equal [163, 16], states.last['state'].values_at('room_id', 'map_id')
-    end
-  end
-
-  def test_full_boot_reaches_a_playable_state
-    skip 'set E2E=1 to run the full boot from frame 0' unless ENV['E2E']
-    skip_without_rom!
-    run_from(Koholint::Emulator.boot, 6600) do |summary, states|
-      assert_equal 3.0, summary[:hearts]
-      assert_empty states.select { |e| e['frame'] < 6000 && e['state']['hp'].positive? }
+      Koholint::Engine.new(run: run, policy: policy, budget: Koholint::Budget.new(frames: 900)).run
+      states = Koholint::Trace.read(File.join(run.dir, 'trace.jsonl')).select { |e| e['type'] == 'perception' }
+      playable = states.find { |e| e['state']['hp'].positive? && e['state']['x'].positive? }
+      assert playable, 'never became controllable'
+      assert_operator playable['frame'], :<, 700
+      assert_equal [163, 16], playable['state'].values_at('room_id', 'map_id')
+      assert_equal 3.0, Koholint::Summary.for(run)[:hearts]
+      modes = states.map { |e| e['state']['game_mode'] }.uniq
+      assert_equal [0, 2, 3], modes.first(3)
     end
   end
 end

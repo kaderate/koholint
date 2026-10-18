@@ -33,12 +33,26 @@ class EmulatorCacheTest < Minitest::Test
     end
   end
 
-  def test_cache_state_replays_the_boot_script
+  def test_cache_state_follows_the_boot_policy
     skip_without_rom!
     with_cache_dir do
       direct = Koholint::Emulator.boot
-      120.times { |frame| direct.step(Koholint::BootScript.input_at(frame)) }
+      while direct.frame < 120
+        macro = Koholint::BootScript.macro_for(Koholint::Perception.read(direct))
+        [macro[:frames], 120 - direct.frame].min.times { direct.step(macro[:buttons]) }
+      end
       assert_equal direct.state_hash, EmulatorCache.at(120).state_hash
+    end
+  end
+
+  def test_playable_state_is_controllable_and_cached
+    skip_without_rom!
+    with_cache_dir do |dir|
+      state = Koholint::Perception.read(EmulatorCache.playable)
+      assert state.controllable?
+      assert_equal [163, 16], [state.room_id, state.map_id]
+      assert_equal 1, Dir.children(dir).size
+      assert_equal state.frame, Koholint::Perception.read(EmulatorCache.playable).frame
     end
   end
 end

@@ -8,10 +8,10 @@ require 'support/emulator_cache'
 class PerceptionTest < Minitest::Test
   FIXTURES = File.expand_path('fixtures', __dir__)
 
-  def test_reads_known_state_after_boot_sequence
+  def test_reads_known_state_when_the_boot_sequence_ends
     skip_without_rom!
     expected = JSON.parse(File.read(File.join(FIXTURES, 'start_game.expected.json')))
-    emulator = EmulatorCache.at(expected['frame'], expect_hash: expected['state_hash'])
+    emulator = EmulatorCache.playable(expect_hash: expected['state_hash'])
     assert_equal expected['state_hash'], emulator.state_hash
     state = Koholint::Perception.read(emulator)
     assert_equal expected['frame'], state.frame
