@@ -41,18 +41,9 @@ module Koholint
         all = @evidence.fetch([appearance, action], [])
         return :unknown if all.empty?
 
-        relevant = direction ? relevant_for(all, direction) : relevant_undirected(all)
-        return :unknown if relevant.nil? || relevant.empty?
+        return query_directed(all, direction, context) if direction
 
-        decided = relevant.select { |entry| entry[:context] == context }
-        return :stale if decided.empty?
-
-        if direction.nil? && decided.map { |entry| entry[:direction] }.uniq.size > 1
-          latest_by_direction = decided.group_by { |entry| entry[:direction] }.transform_values { |entries| latest(entries)[:result] }
-          return :unknown if latest_by_direction.values.uniq.size > 1
-        end
-
-        latest(decided)[:result]
+        query_undirected(all, context)
       end
 
       private
@@ -62,8 +53,28 @@ module Koholint
         specific.empty? ? all.select { |entry| entry[:direction].nil? } : specific
       end
 
-      def relevant_undirected(all)
-        all.any? { |entry| entry[:direction].nil? } ? all : nil
+      def query_directed(all, direction, context)
+        relevant = relevant_for(all, direction)
+        return :unknown if relevant.empty?
+
+        decided = relevant.select { |entry| entry[:context] == context }
+        decided.empty? ? :stale : latest(decided)[:result]
+      end
+
+      def query_undirected(all, context)
+        directionless = all.select { |entry| entry[:direction].nil? }
+        return :unknown if directionless.empty?
+
+        in_context = all.select { |entry| entry[:context] == context }
+        return :stale if in_context.empty?
+
+        base = in_context.select { |entry| entry[:direction].nil? }
+        return :unknown if base.empty?
+
+        answer = latest(base)[:result]
+        directional = in_context.reject { |entry| entry[:direction].nil? }.group_by { |entry| entry[:direction] }
+        disagree = directional.values.any? { |entries| latest(entries)[:result] != answer }
+        disagree ? :unknown : answer
       end
 
       def latest(entries)

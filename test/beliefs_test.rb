@@ -67,6 +67,29 @@ class BeliefsTest < Minitest::Test
     assert_equal :stale, query(direction: :down)
   end
 
+  def test_directional_in_context_never_answers_undirected_query
+    swim = Caps.new(['swim'])
+    record(result: :no)
+    record(direction: :down, result: :yes, context: swim)
+    assert_equal :unknown, query(context: swim)
+    assert_equal :yes, query(direction: :down, context: swim)
+  end
+
+  def test_directional_query_falls_back_to_directionless_in_same_context
+    record(result: :no)
+    assert_equal :no, query(direction: :up)
+    record(direction: :down, result: :yes)
+    assert_equal :no, query(direction: :up)
+  end
+
+  def test_directionless_in_context_disagreeing_with_directional_is_unknown
+    record(result: :no)
+    record(direction: :down, result: :yes)
+    assert_equal :unknown, query
+    record(direction: :down, result: :no)
+    assert_equal :no, query
+  end
+
   def test_latest_evidence_wins_within_a_context
     record(result: :no)
     record(result: :yes)
