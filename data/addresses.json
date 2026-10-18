@@ -8,5 +8,6 @@
   {"name": "max_hearts", "addr": "0xDB5B", "source": "v1_ram_registry", "confidence": "hypothesis", "verified_count": 1},
   {"name": "game_mode", "addr": "0xDB95", "source": "boot_trace_2026-10-18", "confidence": "hypothesis", "verified_count": 1},
   {"name": "game_submode", "addr": "0xDB96", "source": "boot_trace_2026-10-18", "confidence": "hypothesis", "verified_count": 1},
-  {"name": "name_length", "addr": "0xDBAA", "source": "boot_trace_2026-10-18", "confidence": "hypothesis", "verified_count": 1}
+  {"name": "name_length", "addr": "0xDBAA", "source": "boot_trace_2026-10-18", "confidence": "hypothesis", "verified_count": 1},
+  {"name": "dialog_state", "addr": "0xC19F", "source": "dialog_probe_2026-10-18 (disassembly hypothesis wDialogState; 0 at rest, nonzero while a dialogue box is open)", "confidence": "hypothesis", "verified_count": 1}
 ]

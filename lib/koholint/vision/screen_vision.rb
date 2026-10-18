@@ -1,4 +1,5 @@
 require 'digest'
+require 'koholint/addresses'
 require 'koholint/vision/screen_snapshot'
 
 module Koholint
@@ -7,6 +8,13 @@ module Koholint
       LCDC = 0xFF40
       SCY = 0xFF42
       SCX = 0xFF43
+      WY = 0xFF4A
+      WX = 0xFF4B
+      PLAYFIELD_LINES = 128
+      SCREEN_RIGHT_WX = 167
+      PLAY_MODE = 0x0B
+      PLAY_SETTLED_SUBMODE = 7
+      ADDRESSES = Addresses.load.slice(:game_mode, :game_submode, :dialog_state).freeze
       OAM = 0xFE00
       OAM_SPRITES = 40
       CELL_ROWS = 8
@@ -22,9 +30,19 @@ module Koholint
         scx = reader.read(SCX)
         scy = reader.read(SCY)
         cells = Array.new(CELL_ROWS) { |row| Array.new(CELL_COLS) { |col| cell(reader, lcdc, scx, scy, row, col) } }
-        # Mid-transition the tilemap holds parts of two rooms.
-        overlay = (scx % 8).nonzero? || (scy % 8).nonzero? ? true : false
-        ScreenSnapshot.new(reader.respond_to?(:frame) ? reader.frame : 0, place, [scx, scy], cells, sprites(reader, lcdc), overlay)
+        ScreenSnapshot.new(reader.respond_to?(:frame) ? reader.frame : 0, place, [scx, scy], cells, sprites(reader, lcdc),
+                           overlay?(reader, lcdc, scx, scy))
+      end
+
+      def overlay?(reader, lcdc, scx, scy)
+        ram = ->(name) { reader.read(ADDRESSES.fetch(name)) }
+        lcdc.nobits?(0x80) || lcdc.nobits?(0x01) ||
+          # Mid-transition the tilemap holds parts of two rooms.
+          (scx % 8).positive? || (scy % 8).positive? ||
+          (lcdc.anybits?(0x20) && reader.read(WY) < PLAYFIELD_LINES && reader.read(WX) < SCREEN_RIGHT_WX) ||
+          (ram.(:game_mode) == PLAY_MODE && ram.(:game_submode) != PLAY_SETTLED_SUBMODE) ||
+          # Dialogue boxes are drawn into the BG tilemap itself, with no window register change.
+          ram.(:dialog_state).positive?
       end
 
       def cell(reader, lcdc, scx, scy, row, col)
