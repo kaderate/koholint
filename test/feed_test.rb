@@ -1,6 +1,7 @@
 require_relative 'test_helper'
 require 'tmpdir'
 require 'json'
+require 'fileutils'
 require 'koholint/trace'
 require 'koholint/viewer/feed'
 
@@ -213,5 +214,62 @@ class FeedTest < Minitest::Test
       assert_equal [[1, 1], 10, 'old'], [older[:place], older[:frame], older[:appearances][0][0]]
       assert_nil Koholint::Viewer::Feed.for(dir, Follower.new(5, 100, 0, :in_sync))[:grid]
     end
+  end
+
+  def count_world_events
+    counts = []
+    world = Koholint::Vision::World
+    original = world.method(:new)
+    world.define_singleton_method(:new) { |events, *rest| original.call(events, *rest).tap { counts << events.size } }
+    yield
+    counts
+  ensure
+    world.singleton_class.send(:remove_method, :new)
+  end
+
+  def test_the_grid_work_does_not_scale_with_unrelated_events
+    with_dir do |dir, trace|
+      screen_event(trace, 10)
+      affordance_event(trace, 20, 'a1', 'up', 'yes')
+      screen_event(trace, 30)
+      File.open(File.join(dir, 'trace.jsonl'), 'a') do |file|
+        10_000.times { |i| file.puts(JSON.generate(v: 1, type: 'action', frame: 40 + (i % 40), skill: 'press', params: {}, result: {})) }
+      end
+      counts = count_world_events { Koholint::Viewer::Feed.for(dir, FOLLOWER) }
+      assert_equal [3], counts
+    end
+  end
+
+  def test_caches_stay_bounded_across_many_run_dirs
+    dirs = Array.new(Koholint::Viewer::Feed::MAX_RUNS + 3) do
+      Dir.mktmpdir('run-x').tap do |dir|
+        File.write(File.join(dir, 'manifest.json'), JSON.generate('flow_version' => 'f'))
+        screen_event(Koholint::Trace.new(File.join(dir, 'trace.jsonl')), 10)
+        Koholint::Viewer::Feed.for(dir, FOLLOWER)
+      end
+    end
+    assert_operator Koholint::Viewer::Feed::CACHE.size, :<=, Koholint::Viewer::Feed::MAX_RUNS
+    assert_operator Koholint::Viewer::Feed::GRID_CACHE.size, :<=, Koholint::Viewer::Feed::MAX_RUNS
+    assert_equal [163, 16], Koholint::Viewer::Feed.for(dirs.last, FOLLOWER)[:grid][:place]
+  ensure
+    dirs&.each { |dir| FileUtils.remove_entry(dir) }
+  end
+
+  def test_malformed_events_never_take_the_grid_down
+    good = { 'type' => 'screen', 'frame' => 10, 'place' => [163, 16], 'grid' => Array.new(8) { Array.new(10) { 'a1' } }, 'static_sprites' => [] }
+    bad = [{ 'type' => 'screen', 'place' => [1, 1], 'grid' => [] }, { 'type' => 'screen', 'frame' => '5', 'place' => [1, 1], 'grid' => [] },
+           { 'type' => 'screen', 'frame' => 20, 'place' => nil, 'grid' => nil }, { 'type' => 'perception', 'state' => { 'x' => 40, 'y' => 40 } },
+           { 'type' => 'perception', 'frame' => 'x', 'state' => {} }, { 'type' => 'perception', 'frame' => 30, 'state' => 'bad' },
+           { 'type' => 'affordance', 'frame' => nil, 'appearance' => 'a1' },
+           { 'type' => 'affordance', 'frame' => 5, 'appearance' => 'a1', 'action' => 'walk', 'direction' => 'north', 'result' => 'yes' },
+           { 'type' => 'affordance', 'frame' => 'z', 'action' => 'walk', 'result' => 'yes' }]
+    grid = Koholint::Viewer::Feed.grid('/nonexistent-malformed', [good, *bad], 90)
+    assert_equal [[163, 16], 10], [grid[:place], grid[:frame]]
+    assert_nil grid[:link]
+  end
+
+  def test_a_screen_without_a_place_gives_no_grid
+    screen = { 'type' => 'screen', 'frame' => 10, 'place' => nil, 'grid' => [], 'static_sprites' => [] }
+    assert_nil Koholint::Viewer::Feed.grid('/nonexistent-no-place', [screen], 90)
   end
 end
