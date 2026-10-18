@@ -42,7 +42,7 @@ class GridBuilderTest < Minitest::Test
 
   def setup
     @trace = FakeTrace.new
-    @builder = Koholint::Vision::GridBuilder.new(trace: @trace)
+    @builder = Koholint::Vision::GridBuilder.new(trace: @trace, prober: nil)
     @emulator = FakeEmulator.new
   end
 
