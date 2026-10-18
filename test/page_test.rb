@@ -79,4 +79,29 @@ class PageTest < Minitest::Test
   def test_error_field_of_a_failed_response_is_shown
     assert_match(/\.error/, PAGE)
   end
+
+  def test_cell_states_map_to_semi_transparent_colors
+    colors = %w[yes no mixed stale unknown].map { |state| evaluate("cellColor('#{state}')") }
+    assert_equal 5, colors.uniq.size
+    assert(colors.all? { |c| c.start_with?('rgba(') })
+    assert_equal colors.last, evaluate("cellColor('garbage')")
+  end
+
+  def test_cell_geometry_is_48_px_from_the_top_left
+    assert_equal({ 'left' => 96, 'top' => 48, 'size' => 48 }, evaluate('cellRect(1, 2)'))
+    assert_equal({ 'width' => 480, 'height' => 384 }, evaluate('gridExtent(8, 10)'))
+  end
+
+  def test_cell_titles_and_legend
+    assert_equal '3,4 ab12 mixed', evaluate("cellTitle(3, 4, 'ab12', 'mixed')")
+    assert_equal %w[yes no mixed stale unknown], evaluate('legendEntries()').map { |entry| entry['state'] }
+    assert_equal 'Grid (no data)', evaluate('gridButtonLabel(true, null)')
+    assert_equal 'Grid: on', evaluate('gridButtonLabel(true, {cells: []})')
+    assert_equal 'Grid: off', evaluate('gridButtonLabel(false, {cells: []})')
+  end
+
+  def test_page_has_a_grid_toggle_that_remembers_the_choice
+    assert_match(/id="grid"/, PAGE)
+    assert_match(/koholint\.grid/, PAGE)
+  end
 end

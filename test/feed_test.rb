@@ -27,7 +27,7 @@ class FeedTest < Minitest::Test
       decision(trace, 2)
       trace.emit(:action, frame: 3, skill: 'walk', params: { 'dir' => 'up' }, result: {})
       doc = Koholint::Viewer::Feed.for(dir, FOLLOWER)
-      assert_equal %i[status replay events], doc.keys
+      assert_equal %i[status replay events grid], doc.keys
       assert_equal File.basename(dir), doc[:status][:run_id]
       assert_equal({ flow_version: 'f', manifest_status: 'running', budget: { 'frames' => 9 }, health: 'unknown',
                      hearts: 2.0, max_hearts: 3.0, objective: nil, last_notable: nil, highest_milestone: 'none',
@@ -128,6 +128,90 @@ class FeedTest < Minitest::Test
         error = assert_raises(Koholint::Error) { Koholint::Viewer::Feed.for(dir, FOLLOWER) }
         refute_includes error.message, "\n"
       end
+    end
+  end
+
+  def screen_event(trace, frame, place: [163, 16], name: 'a1')
+    trace.emit(:screen, frame:, place:, terrain_hash: "t#{frame}", objects_hash: 'o', grid: Array.new(8) { Array.new(10) { name } },
+                        static_sprites: [])
+  end
+
+  def affordance_event(trace, frame, appearance, direction, result)
+    trace.emit(:affordance, frame:, appearance:, action: 'walk', direction:, result:, method: 'probe', context: [], source: 'test')
+  end
+
+  def test_grid_is_nil_before_any_screen_event
+    with_dir do |dir, trace|
+      trace.emit(:perception, frame: 1, state: STATE, state_hash: 'h')
+      assert_nil Koholint::Viewer::Feed.for(dir, FOLLOWER)[:grid]
+    end
+  end
+
+  def test_grid_is_nil_when_the_only_screen_is_after_the_follower
+    with_dir do |dir, trace|
+      screen_event(trace, 95)
+      assert_nil Koholint::Viewer::Feed.for(dir, FOLLOWER)[:grid]
+    end
+  end
+
+  def test_grid_cells_follow_the_four_direction_beliefs
+    with_dir do |dir, trace|
+      screen_event(trace, 10, name: 'a1')
+      { 'up' => 'yes', 'down' => 'yes' }.each { |d, r| affordance_event(trace, 20, 'a1', d, r) }
+      grid = Koholint::Viewer::Feed.for(dir, FOLLOWER)[:grid]
+      assert_equal [163, 16], grid[:place]
+      assert_equal 10, grid[:frame]
+      assert_equal(['yes'] * 10, grid[:cells][3])
+      assert_equal 'a1', grid[:appearances][0][0]
+      assert_equal [8, 10], [grid[:cells].size, grid[:cells][0].size]
+    end
+  end
+
+  def test_cell_states
+    with_dir do |dir, trace|
+      names = %w[y n m s u]
+      trace.emit(:screen, frame: 10, place: [1, 1], terrain_hash: 't', objects_hash: 'o',
+                          grid: Array.new(8) { Array.new(10) { |c| names[c % 5] } }, static_sprites: [])
+      affordance_event(trace, 11, 'y', 'up', 'yes')
+      affordance_event(trace, 11, 'n', 'down', 'no')
+      affordance_event(trace, 11, 'm', 'up', 'yes')
+      affordance_event(trace, 11, 'm', 'left', 'no')
+      trace.emit(:affordance, frame: 12, appearance: 's', action: 'walk', direction: 'up', result: 'no', method: 'probe',
+                              context: ['swim'], source: 'test')
+      row = Koholint::Viewer::Feed.for(dir, FOLLOWER)[:grid][:cells][0]
+      assert_equal %w[yes no mixed stale unknown], row.first(5)
+    end
+  end
+
+  def test_link_cell_comes_from_the_latest_perception_at_the_follower_frame
+    with_dir do |dir, trace|
+      screen_event(trace, 10)
+      trace.emit(:perception, frame: 20, state: STATE.merge('x' => 40, 'y' => 40), state_hash: 'h')
+      trace.emit(:perception, frame: 80, state: STATE.merge('x' => 100, 'y' => 72), state_hash: 'h')
+      trace.emit(:perception, frame: 95, state: STATE.merge('x' => 0, 'y' => 8), state_hash: 'h')
+      assert_equal({ row: 4, col: 6 }, Koholint::Viewer::Feed.for(dir, FOLLOWER)[:grid][:link])
+      early = Koholint::Viewer::Feed.for(dir, Follower.new(30, 100, 0, :in_sync))[:grid][:link]
+      assert_equal({ row: 2, col: 2 }, early)
+    end
+  end
+
+  def test_link_is_nil_off_grid_or_without_perception
+    with_dir do |dir, trace|
+      screen_event(trace, 10)
+      assert_nil Koholint::Viewer::Feed.for(dir, FOLLOWER)[:grid][:link]
+      trace.emit(:perception, frame: 20, state: STATE.merge('x' => 200, 'y' => 8), state_hash: 'h')
+      assert_nil Koholint::Viewer::Feed.for(dir, FOLLOWER)[:grid][:link]
+    end
+  end
+
+  def test_an_earlier_follower_frame_gets_the_older_grid
+    with_dir do |dir, trace|
+      screen_event(trace, 10, place: [1, 1], name: 'old')
+      screen_event(trace, 80, place: [2, 2], name: 'new')
+      assert_equal [2, 2], Koholint::Viewer::Feed.for(dir, FOLLOWER)[:grid][:place]
+      older = Koholint::Viewer::Feed.for(dir, Follower.new(50, 100, 0, :in_sync))[:grid]
+      assert_equal [[1, 1], 10, 'old'], [older[:place], older[:frame], older[:appearances][0][0]]
+      assert_nil Koholint::Viewer::Feed.for(dir, Follower.new(5, 100, 0, :in_sync))[:grid]
     end
   end
 end
