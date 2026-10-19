@@ -28,7 +28,7 @@ class PromptsTest < Minitest::Test
   def test_no_game_facts
     points.each do |point|
       text = Koholint::Agents::Prompts.system_for(point).downcase
-      %w[sword shield beach marin tarin owl dungeon zelda heart rupee bed house].each { |word| refute_match(/\b#{word}/, text, word) }
+      %w[sword shield beach marin tarin owl dungeon zelda rupee bed house].each { |word| refute_match(/\b#{word}/, text, word) }
     end
   end
 

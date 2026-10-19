@@ -29,6 +29,8 @@ class AgentsContextTest < Minitest::Test
     cells[0][0] = 'wall'
     cells[0][1] = 'ledge'
     cells[0][2] = 'mystery'
+    cells[0][3] = 'old'
+    beliefs.record(appearance: 'old', action: :walk, direction: :up, result: :yes, method: 't', context: Koholint::Vision::Capabilities.new(['x']), frame: 2, source: 't')
     cells[3][5] = 'wall'
     cells[7][9] = 'wall'
     Koholint::Vision::Grid.new(cells:, static_sprites: [{ 'x' => 36, 'y' => 24, 'pattern' => 'pot' }], beliefs:,
@@ -54,11 +56,11 @@ class AgentsContextTest < Minitest::Test
       Phase: playing
       Place: room 163, map 16
       Link: row 3, col 4 (pixel x=68, y=60), facing up
-      Health: 24 of 24
+      Health: 3 of 3 hearts
 
       Grid (rows 0-7 top to bottom, cols 0-9 left to right):
           0 1 2 3 4 5 6 7 8 9
-       0  # ~ ? . . . . . . .
+       0  # ~ ? ! . . . . . .
        1  . . o . . . . . . .
        2  . . . . . . . . . .
        3  . . . . @ # . . . .
@@ -84,7 +86,7 @@ class AgentsContextTest < Minitest::Test
       - obj-1 achieved: Close the dialogue
 
       Last skill results:
-      - walk {"direction":"up","cells":2}: stopped_by blocked, 40 frames, moved 1 cells, room_changed false, hp_delta 0, dialogue open before false, after false
+      - walk {"direction":"up","cells":2}: stopped_by blocked, 40 frames, moved 1 cell, room_changed false, hp_delta 0, dialogue open before false, after false
 
       Manual notes:
       Use A to talk.
@@ -111,7 +113,8 @@ class AgentsContextTest < Minitest::Test
     assert_includes capped, 'old goal 30'
     refute_match(/old goal 1$/, capped)
     tiny = build(objective:, history:, last_results: results, max_chars: 100)
-    %w[Legend: Current\ objective].each { |part| assert_includes tiny, part }
+    %w[Grid Legend: Current\ objective].each { |part| assert_includes tiny, part }
+    assert_operator tiny.size, :>, 100
   end
 
   def test_results_limited_to_last_six

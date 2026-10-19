@@ -1,9 +1,10 @@
 require 'koholint/trace'
+require 'koholint/perception'
 
 module Koholint
   module Summary
     STALL_FRAMES = 3600
-    HP_PER_HEART = 8.0
+    HP_PER_HEART = Perception::HP_PER_HEART.to_f
     DIAGNOSTIC_NOTABLE_KINDS = %w[grid_overlay_stuck].freeze
     TERMINAL = %w[achieved abandoned failed].freeze
 

@@ -89,4 +89,13 @@ class DecisionTest < Minitest::Test
     assert_equal false, reach_cell[:additionalProperties]
     JSON.parse(JSON.generate(schema))
   end
+
+  def test_string_keyed_choices_are_normalised
+    objective = objective_point.validate({ 'title' => 'Talk', 'predicate' => { 'kind' => 'dialogue_closed' } })
+    assert_equal 'Talk', objective[:title]
+    point = Koholint::DecisionPoint.choose_skill(Koholint::Skills::Registry.default)
+    choice = point.validate({ 'skill' => 'walk', 'params' => { 'direction' => 'up', 'cells' => 2 } })
+    assert_equal 'walk', choice[:skill]
+    assert_raises(Koholint::DecisionPoint::Invalid) { point.validate({ 'skill' => 'walk' }) }
+  end
 end

@@ -32,6 +32,7 @@ module Koholint
     end
 
     def validate(choice)
+      choice = choice.transform_keys { |key| key.respond_to?(:to_sym) ? key.to_sym : key } if choice.is_a?(Hash)
       missing = choice.is_a?(Hash) ? output_schema - choice.keys : output_schema
       raise Invalid, "#{name}: choice missing #{missing.join(', ')}" unless missing.empty?
       return validate_skill(choice) if registry

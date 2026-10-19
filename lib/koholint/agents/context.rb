@@ -1,4 +1,5 @@
 require 'json'
+require 'koholint/perception'
 require 'koholint/vision/grid'
 
 module Koholint
@@ -41,9 +42,15 @@ module Koholint
       def self.header(state, link)
         ["Phase: #{state.phase}", "Place: room #{state.room_id}, map #{state.map_id}",
          "Link: row #{link[0]}, col #{link[1]} (pixel x=#{state.x}, y=#{state.y}), facing #{state.direction}",
-         "Health: #{state.hp} of #{state.max_hp}"].join("\n")
+         "Health: #{hearts(state.hp)} of #{hearts(state.max_hp)} hearts"].join("\n")
       end
       private_class_method :header
+
+      def self.hearts(hp) = (hp.to_f / Perception::HP_PER_HEART).to_s.delete_suffix('.0')
+      private_class_method :hearts
+
+      def self.cells(count) = "#{count} #{count == 1 ? 'cell' : 'cells'}"
+      private_class_method :cells
 
       def self.grid_block(grid, link)
         rows = (0...Vision::Grid::ROWS).map do |row|
@@ -89,7 +96,7 @@ module Koholint
         found = results.reverse.find { |r| r[:skill].to_s == 'walk' && r[:params].to_h.transform_keys(&:to_sym)[:direction].to_s == direction.to_s }
         return 'none' unless found
 
-        "#{found[:stopped_by]} after #{found[:moved_cells]} #{found[:moved_cells] == 1 ? 'cell' : 'cells'}"
+        "#{found[:stopped_by]} after #{cells(found[:moved_cells])}"
       end
       private_class_method :last_walk
 
@@ -103,7 +110,7 @@ module Koholint
       private_class_method :objective_block
 
       def self.result_line(r)
-        "#{r[:skill]} #{r[:params].to_json}: stopped_by #{r[:stopped_by]}, #{r[:frames]} frames, moved #{r[:moved_cells]} cells, " \
+        "#{r[:skill]} #{r[:params].to_json}: stopped_by #{r[:stopped_by]}, #{r[:frames]} frames, moved #{cells(r[:moved_cells])}, " \
           "room_changed #{r[:room_changed]}, hp_delta #{r[:hp_delta]}, dialogue open before #{r[:dialog_before]}, after #{r[:dialog_after]}"
       end
       private_class_method :result_line
