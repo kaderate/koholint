@@ -115,14 +115,24 @@ module Koholint
       private
 
       def hook_doubt(ledger)
-        ledger.instance_variable_set(:@on_doubt, method(:doubt)) unless ledger.instance_variable_get(:@on_doubt)
+        ledger.on_doubt ||= method(:doubt)
         ledger
       end
 
       def doubt(place:, cell:, direction:, count:)
+        return unless believed_free?(cell, direction)
+
         trace = @objectives.trace if @objectives.respond_to?(:trace)
         trace&.emit(:grid_contradiction, frame: @frame, place:, row: cell[0], col: cell[1], direction: direction.to_s, believed: 'yes',
                                          observed: "blocked x#{count}")
+      end
+
+      def believed_free?(cell, direction)
+        drow, dcol = Vision::GridBuilder::STEPS.fetch(direction.to_sym)
+        row = cell[0] + drow
+        col = cell[1] + dcol
+        @last_grid && row.between?(0, Vision::Grid::ROWS - 1) && col.between?(0, Vision::Grid::COLS - 1) &&
+          @last_grid.passable(row, col, direction.to_sym) == :yes
       end
 
       def note_no_path(choice, outcome, frame)

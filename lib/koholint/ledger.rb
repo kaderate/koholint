@@ -34,6 +34,8 @@ module Koholint
       room && map ? [room, map] : nil
     end
 
+    attr_accessor :on_doubt
+
     def initialize(on_doubt: nil)
       @on_doubt = on_doubt
       @counts = Hash.new(0)
