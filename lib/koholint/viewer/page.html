@@ -29,6 +29,7 @@
   #events .decision { color: #dfe; }
   #events .objective { color: #fd8; }
   #events .dialogue { color: #9cf; }
+  #events .reason { display: block; color: #8a9; margin: 0 0 4px 14px; font-size: 0.92em; white-space: pre-wrap; }
 </style>
 </head>
 <body>
@@ -152,6 +153,11 @@
     if (e.type === 'objective') return typeof e.title === 'string' ? e.title : '';
     if (e.type === 'dialogue') return typeof e.text === 'string' ? e.text : '';
     return '';
+  }
+
+  function formatReason(e) {
+    if (e.type !== 'decision' || typeof e.justification !== 'string') return '';
+    return truncate(e.justification.trim(), 600);
   }
 
   function formatEventJson(e) { return JSON.stringify(e); }
@@ -324,6 +330,13 @@
       row.textContent = lines[index];
       if (mode !== 'json') row.title = eventTitle(event);
       events.appendChild(row);
+      var reason = mode === 'json' ? '' : formatReason(event);
+      if (reason) {
+        var note = document.createElement('div');
+        note.className = 'reason';
+        note.textContent = reason;
+        events.appendChild(note);
+      }
     });
     events.scrollTop = pinned ? events.scrollHeight : top;
   }

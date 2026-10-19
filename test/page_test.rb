@@ -34,6 +34,14 @@ class PageTest < Minitest::Test
     assert_equal 'f8 · press start 3f', evaluate("formatEventPretty(#{JSON.generate(event)})")
   end
 
+  def test_a_decision_shows_its_reasoning_as_visible_text
+    event = { frame: 9, type: 'decision', agent: 'claude', justification: "  go left <b>x</b>  \n" }
+    assert_equal 'go left <b>x</b>', evaluate("formatReason(#{JSON.generate(event)})")
+    assert_equal '', evaluate("formatReason({type: 'action', justification: 'x'})")
+    assert_equal '', evaluate("formatReason({type: 'decision'})")
+    assert_equal 600, evaluate("formatReason({type: 'decision', justification: 'a'.repeat(900)}).length")
+  end
+
   def test_unknown_event_types_still_get_a_line
     assert_equal 'f1 · budget_stop', evaluate("formatEventPretty({frame: 1, type: 'budget_stop'})")
   end
