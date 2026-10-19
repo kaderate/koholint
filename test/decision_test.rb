@@ -78,6 +78,16 @@ class DecisionTest < Minitest::Test
     end
   end
 
+  def test_choose_objective_title_bounds
+    point = objective_point
+    predicate = { kind: 'dialogue_closed' }
+    point.validate({ title: 'x' * 80, predicate: })
+    [{ title: 'x' * 81, predicate: }, { title: "a\nb", predicate: }, { title: "a\e[0m", predicate: }].each do |choice|
+      assert_raises(Koholint::DecisionPoint::Invalid) { point.validate(choice) }
+    end
+    assert_equal 80, point.json_schema[:properties][:title][:maxLength]
+  end
+
   def test_choose_objective_json_schema
     schema = objective_point.json_schema
     assert_equal 'object', schema[:type]

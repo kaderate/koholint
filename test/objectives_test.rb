@@ -103,6 +103,32 @@ class ObjectivesTest < Minitest::Test
     assert_nil @objectives.current
   end
 
+  def test_open_dialogue_with_animating_counter_stalls
+    start({ kind: 'reach_place', place: [7, 8] })
+    @objectives.update(state(frame: 1, dialog: 134), frame: 1)
+    assert_nil @objectives.update(state(frame: 60, dialog: 137), frame: 60)
+    assert_nil @objectives.update(state(frame: 100, dialog: 140), frame: 100)
+    assert_equal :abandoned, @objectives.update(state(frame: 101, dialog: 141), frame: 101)
+    assert_equal 'stall', events.last['reason']
+  end
+
+  def test_open_dialogue_with_animating_counter_loops
+    start({ kind: 'reach_place', place: [7, 8] })
+    @objectives.update(state(frame: 1, dialog: 134), frame: 1)
+    2.times { @objectives.record_attempt(skill: 'wait', params: {}, result_summary: 'ok') }
+    assert_nil @objectives.update(state(frame: 2, dialog: 135), frame: 2)
+    @objectives.record_attempt(skill: 'wait', params: {}, result_summary: 'ok')
+    assert_equal :abandoned, @objectives.update(state(frame: 3, dialog: 137), frame: 3)
+    assert_equal 'loop', events.last['reason']
+  end
+
+  def test_dialogue_opening_counts_as_a_change
+    start({ kind: 'reach_place', place: [7, 8] })
+    @objectives.update(state(frame: 1), frame: 1)
+    assert_nil @objectives.update(state(frame: 90, dialog: 134), frame: 90)
+    assert_nil @objectives.update(state(frame: 150, dialog: 140), frame: 150)
+  end
+
   def test_change_resets_stall
     start({ kind: 'reach_place', place: [7, 8] })
     @objectives.update(state(frame: 10), frame: 10)
