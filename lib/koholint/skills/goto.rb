@@ -24,7 +24,9 @@ module Koholint
         end
 
         def result(state = @last)
-          super.merge(path_length: @initial_length.to_i, steps_done: @index, crossed: @crossed.map(&:dup))
+          merged = super.merge(path_length: @initial_length.to_i, steps_done: @index, crossed: @crossed.map(&:dup))
+          merged[:cause] = @cause if @cause && !@path
+          merged
         end
 
         private
@@ -42,8 +44,15 @@ module Koholint
 
         def plan(cell)
           path = cell && @planner&.path(from: cell, to: @target)
+          @cause = path ? nil : why_not(cell)
           @initial_length ||= path ? path.size - 1 : 0
           path
+        end
+
+        def why_not(cell)
+          return 'no grid' unless @planner
+
+          cell ? @planner.why_not(from: cell, to: @target) : 'no current cell'
         end
 
         def input_for(state)

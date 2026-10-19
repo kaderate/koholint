@@ -300,4 +300,44 @@ class ObjectivesTest < Minitest::Test
     assert_nil @objectives.update(state(room: 9), frame: 5)
     assert_equal :achieved, @objectives.update(state(room: 5), frame: 6)
   end
+
+  def test_no_path_abandons_as_unreachable_at_the_third
+    start({ kind: 'reach_place', place: [7, 8] })
+    assert_nil @objectives.note_no_path(frame: 1)
+    assert_nil @objectives.note_no_path(frame: 2)
+    assert_equal :abandoned, @objectives.note_no_path(frame: 3)
+    assert_equal 'unreachable', events.last['reason']
+    assert_nil @objectives.note_no_path(frame: 4)
+    assert_equal 1, events.count { |e| e['status'] == 'abandoned' }
+  end
+
+  def test_no_path_counter_resets_with_a_new_objective
+    start({ kind: 'reach_place', place: [7, 8] })
+    2.times { @objectives.note_no_path(frame: 1) }
+    @objectives.abandon(frame: 2, reason: 'x')
+    start({ kind: 'reach_place', place: [7, 8] })
+    2.times { assert_nil @objectives.note_no_path(frame: 3) }
+  end
+
+  def test_repeated_talking_loops_despite_the_dialogue_opening_and_closing
+    start({ kind: 'reach_place', place: [7, 8] })
+    outcome = nil
+    12.times do |i|
+      @objectives.update(state(frame: i * 2), frame: i * 2)
+      @objectives.record_attempt(skill: 'goto', params: { row: 1, col: 1 }, result_summary: 'ok')
+      outcome ||= @objectives.update(state(frame: (i * 2) + 1, dialog: 134 + i), frame: (i * 2) + 1)
+    end
+    assert_equal :abandoned, outcome
+    assert_equal 'loop', events.last['reason']
+  end
+
+  def test_boot_states_are_not_visited
+    @objectives.update(state(room: 1, map: 2), frame: 1)
+    @objectives.update(Koholint::GameState.new(game_mode: 0, game_submode: 0, room_id: 9, map_id: 9, x: 0, y: 0, hp: 0, dialog_state: 0, milestone: :none), frame: 2)
+    refute_includes @objectives.visited, [9, 9]
+  end
+
+  def test_trace_reader
+    assert_same @trace, @objectives.trace
+  end
 end

@@ -1,4 +1,5 @@
 require_relative 'test_helper'
+require 'koholint/ledger'
 require 'support/emulator_cache'
 require 'koholint/decision'
 require 'koholint/vision/grid_builder'
@@ -392,10 +393,23 @@ class SkillsTest < Minitest::Test
     assert_equal 0, result[:path_length]
   end
 
+  def test_goto_no_path_carries_a_cause
+    result, = goto(4, 8, grid: OpenGrid.new(walls: [[4, 8]]))
+    assert_equal 'target believed blocked', result[:cause]
+    result, = goto(4, 8, grid: OpenGrid.new(walls: (0..7).map { |row| [row, 7] }))
+    assert_equal 'no route over known cells', result[:cause]
+    ledger = Koholint::Ledger.new
+    place = [state.room_id, state.map_id]
+    2.times { ledger.record(place:, blocked_at: { row: 4, col: 5, direction: :right }) }
+    result, = goto(4, 6, ledger:, grid: OpenGrid.new(walls: [[3, 5], [5, 5], [3, 6], [5, 6], [4, 4]]))
+    assert_equal 'no route: doubtful edges (4,5) right', result[:cause]
+  end
+
   def test_goto_without_a_grid_is_no_path
     execution = registry.start('goto', state, { row: 4, col: 8 })
     result, inputs = simulate(execution, [88, 80])
     assert_equal :no_path, result[:stopped_by]
+    assert_equal 'no grid', result[:cause]
     assert_equal 1, inputs.size
   end
 

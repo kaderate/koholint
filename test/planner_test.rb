@@ -74,4 +74,32 @@ class PlannerTest < Minitest::Test
     assert_nil planner(walls: wall_line).path(from: [2, 1], to: [2, 3])
     assert_nil planner.path(from: [2, 1], to: [8, 3])
   end
+
+  def doubtful_ledger(cell, direction)
+    ledger = Koholint::Ledger.new
+    2.times { ledger.record(place: PLACE, blocked_at: { row: cell[0], col: cell[1], direction: }) }
+    ledger
+  end
+
+  def test_doubt_toward_an_unknown_cell_is_still_walkable
+    ledger = doubtful_ledger([2, 1], :right)
+    wall_line = (0..7).map { |row| [row, 2] } - [[2, 2]]
+    assert planner(ledger:, unknown: [[2, 2]], walls: wall_line).path(from: [2, 1], to: [2, 3])
+  end
+
+  def test_doubt_toward_a_believed_free_cell_is_refused
+    ledger = doubtful_ledger([2, 1], :right)
+    wall_line = (0..7).map { |row| [row, 2] } - [[2, 2]]
+    assert_nil planner(ledger:, walls: wall_line).path(from: [2, 1], to: [2, 3])
+  end
+
+  def test_why_not_causes
+    wall_line = (0..7).map { |row| [row, 2] } - [[2, 2]]
+    assert_equal 'target believed blocked', planner(walls: [[2, 3]]).why_not(from: [2, 1], to: [2, 3])
+    assert_equal 'target covered by an object', planner(sprites: [[2, 3]]).why_not(from: [2, 1], to: [2, 3])
+    assert_equal 'target is current cell', planner.why_not(from: [2, 1], to: [2, 1])
+    assert_equal 'no route over known cells', planner(walls: (0..7).map { |row| [row, 2] }).why_not(from: [2, 1], to: [2, 3])
+    assert_equal 'no route: doubtful edges (2,1) right',
+                 planner(ledger: doubtful_ledger([2, 1], :right), walls: wall_line).why_not(from: [2, 1], to: [2, 3])
+  end
 end

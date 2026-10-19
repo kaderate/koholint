@@ -13,6 +13,7 @@ module Koholint
     ATTEMPT_LIMIT = 10
     UNREACHABLE_PAIRS = 6
     UNREACHABLE_TOTAL = 8
+    UNREACHABLE_NO_PATH = 3
 
     def self.normalize(predicate)
       predicate.to_h.transform_keys(&:to_sym)
@@ -41,7 +42,7 @@ module Koholint
 
     TERMINAL = %w[achieved failed abandoned].freeze
 
-    attr_reader :current, :history, :visited
+    attr_reader :current, :history, :visited, :trace
 
     def self.resume(trace:, events:, frame:, **options)
       started = events.select { |e| e['type'] == 'objective' && e['status'] == 'started' }
@@ -77,6 +78,7 @@ module Koholint
       @last_state_part = nil
       @last_frame = frame
       @blocked_total = 0
+      @no_path = 0
       @blocked_pairs = Hash.new(0)
       @trace.emit(:objective, frame:, id:, status: 'started', title:, predicate: @current[:predicate])
       id
@@ -100,21 +102,20 @@ module Koholint
     def update(state, frame:)
       return nil if state.loading?
 
+      playing = %i[playing dialogue].include?(state.phase)
       place = [state.room_id, state.map_id]
-      first_visit = @visited.any? && !@visited.include?(place)
-      @visited << place unless @visited.include?(place)
+      first_visit = playing && @visited.any? && !@visited.include?(place)
+      @visited << place if playing && !@visited.include?(place)
       return nil unless @current
 
       @last_frame = frame
       cell = state.cell
       position = cell || [:px, state.x, state.y]
-      @last_state_part = [place, position, state.dialog_open?]
+      @last_state_part = [place, position]
       signature = [place, position, state.dialog_open?, state.hp]
       if signature != @signature
         @signature = signature
         @last_change_frame = frame
-        @last_key = nil
-        @repeat = 0
       end
       @dialogue_seen ||= state.dialog_open?
 
@@ -135,6 +136,15 @@ module Koholint
       @blocked_pairs[pair] += 1
       pairs = self.class.normalize(target)[:kind].to_s == 'reach_cell' && @blocked_pairs[pair] >= UNREACHABLE_PAIRS
       return finish(:abandoned, frame:, reason: 'unreachable') if pairs || @blocked_total >= UNREACHABLE_TOTAL
+
+      nil
+    end
+
+    def note_no_path(frame: @last_frame)
+      return nil unless @current
+
+      @no_path += 1
+      return finish(:abandoned, frame:, reason: 'unreachable') if @no_path >= UNREACHABLE_NO_PATH
 
       nil
     end
