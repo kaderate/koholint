@@ -90,7 +90,7 @@ module Koholint
       return nil if state.loading?
 
       place = [state.room_id, state.map_id]
-      cell = cell_of(state)
+      cell = state.cell
       @last_state_part = [place, cell, state.dialog_state]
       signature = [place, cell, state.dialog_state, state.hp]
       if signature != @signature
@@ -128,12 +128,6 @@ module Koholint
     end
 
     private
-
-    def cell_of(state)
-      return nil unless state.x && state.y
-
-      [(state.y - 8) / 16, state.x / 16]
-    end
 
     def died?(state)
       alive = state.hp.to_i.positive?

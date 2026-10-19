@@ -33,4 +33,14 @@ class GameStateTest < Minitest::Test
     assert_equal :dialogue, state(game_mode: 0x0B, game_submode: 7, dialog_state: 1).phase
     assert_equal :playing, state(game_mode: 0x0B, game_submode: 7, dialog_state: 0).phase
   end
+
+  def test_cell_is_the_grid_cell_under_link_or_nil_outside
+    assert_equal [0, 0], state(x: 0, y: 8).cell
+    assert_equal [3, 4], state(x: 68, y: 60).cell
+    assert_equal [7, 9], state(x: 159, y: 135).cell
+    assert_nil state(x: 160, y: 60).cell
+    assert_nil state(x: 68, y: 7).cell
+    assert_nil state(x: 68, y: 136).cell
+    assert_nil state(frame: 0).cell
+  end
 end
