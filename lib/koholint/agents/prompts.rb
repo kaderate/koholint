@@ -15,6 +15,7 @@ module Koholint
       OBJECTIVE = <<~TEXT.freeze
         Decision: choose the next objective.
         An objective is a short goal with a title and a predicate that the harness can check from memory. The predicate is one of four kinds: leave_place (place), reach_place (place), reach_cell (place, row, col) or dialogue_closed. A place is [room, map] as integers, row is 0-7 and col is 0-9.
+        leave_place means finding a way out of the current place. new_place (no fields) means reaching a place not yet visited in this run. reach_cell targets that are already reachable over cells observed free are refused: choose goals that need exploration.
         Pick an objective that is achievable from the current state and different from objectives that already failed or were abandoned. Give the exact fields of the chosen kind and no others.
         Output fields: title, predicate, justification, confidence.
       TEXT
@@ -22,6 +23,7 @@ module Koholint
       SKILL = <<~TEXT.freeze
         Decision: choose the next skill to run towards the current objective.
         A skill is a bounded action with parameters; the harness runs it and reports how it stopped. Choose exactly one skill from the schema with parameters that satisfy it.
+        goto walks several cells along a path planned over the grid and stops when blocked. Cells marked ! may be doubtful: they looked free but blocked Link repeatedly; goto avoids a doubtful edge, and the neighbour lines say how many times each direction was blocked.
         Do not repeat a skill that just stopped the same way from the same state; try something different or gather information. When on-screen text matters, transcribe it in the optional transcription field. When an image is attached it shows the top and the bottom of the screen stacked; a dialogue box may be in either.
         Output fields: skill, params, justification, confidence, and optionally transcription.
       TEXT

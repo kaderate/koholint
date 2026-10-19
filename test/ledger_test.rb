@@ -62,11 +62,11 @@ class LedgerTest < Minitest::Test
     assert_equal 2, Koholint::Ledger.from_events(events.first(2)).count(PLACE, [3, 4], :up)
   end
 
-  def test_from_events_counts_only_blocked_stops
+  def test_from_events_counts_any_result_carrying_blocked_at
     a = { room: 163, map: 16 }
     events = [{ type: 'action', result: { stopped_by: :done, blocked_at: blocked, from: a, to: a } },
               { type: 'action', result: { stopped_by: :blocked, blocked_at: blocked, from: a, to: a } }]
-    assert_equal 1, Koholint::Ledger.from_events(events).count(PLACE, [3, 4], :up)
+    assert_equal 2, Koholint::Ledger.from_events(events).count(PLACE, [3, 4], :up)
   end
 
   def test_malformed_blocked_at_is_ignored

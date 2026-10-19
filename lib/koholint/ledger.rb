@@ -14,7 +14,7 @@ module Koholint
         to = Ledger.place_of(Ledger.pick(result, :to))
         ledger.reset_unless(from) if from
         blocked_at = Ledger.pick(result, :blocked_at)
-        if from && blocked_at && Ledger.pick(result, :stopped_by).to_s == 'blocked'
+        if from && blocked_at
           ledger.record(place: from, blocked_at:)
         end
         ledger.reset_unless(to) if to

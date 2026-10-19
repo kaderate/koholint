@@ -20,10 +20,11 @@ module Koholint
           @position = [@start.x, @start.y]
           @still = 0
           @idle_reason = nil
+          @crossed = []
         end
 
         def result(state = @last)
-          super.merge(path_length: @initial_length.to_i, steps_done: @index)
+          super.merge(path_length: @initial_length.to_i, steps_done: @index, crossed: @crossed.map(&:dup))
         end
 
         private
@@ -81,6 +82,9 @@ module Koholint
           at = @path.index(cell)
           if at
             if at > @index
+              (@index...at).each do |i|
+                @crossed << [*@path[i], Navigation::Planner.direction_between(@path[i], @path[i + 1])]
+              end
               @index = at
               @arrived_by = Navigation::Planner.direction_between(@path[at - 1], cell)
               @settle = 0
