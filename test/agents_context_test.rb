@@ -1,0 +1,136 @@
+require_relative 'test_helper'
+require 'koholint/game_state'
+require 'koholint/vision/grid'
+require 'koholint/vision/beliefs'
+require 'koholint/vision/capabilities'
+require 'koholint/agents/context'
+
+class AgentsContextTest < Minitest::Test
+  Context = Koholint::Agents::Context
+
+  def state(**over)
+    Koholint::GameState.new(frame: 100, room_id: 163, map_id: 16, x: 68, y: 60, direction: :up, hp: 24, max_hp: 24,
+                            milestone: :none, game_mode: 0x0B, game_submode: 7, dialog_state: 0, **over)
+  end
+
+  def record(beliefs, appearance, direction, result)
+    beliefs.record(appearance:, action: :walk, direction:, result:, method: 'test', context: Koholint::Vision::Capabilities.new, frame: 1, source: 'test')
+  end
+
+  def grid
+    beliefs = Koholint::Vision::Beliefs.new
+    %i[up down left right].each do |d|
+      record(beliefs, 'floor', d, :yes)
+      record(beliefs, 'wall', d, :no)
+    end
+    record(beliefs, 'ledge', :down, :yes)
+    record(beliefs, 'ledge', :up, :no)
+    cells = Array.new(8) { Array.new(10) { 'floor' } }
+    cells[0][0] = 'wall'
+    cells[0][1] = 'ledge'
+    cells[0][2] = 'mystery'
+    cells[3][5] = 'wall'
+    cells[7][9] = 'wall'
+    Koholint::Vision::Grid.new(cells:, static_sprites: [{ 'x' => 36, 'y' => 24, 'pattern' => 'pot' }], beliefs:,
+                               capabilities: Koholint::Vision::Capabilities.new).freeze
+  end
+
+  def result(**over)
+    { skill: 'walk', params: { direction: 'up', cells: 2 }, frames: 40, moved_cells: 1, room_changed: false, hp_delta: 0,
+      dialog_before: false, dialog_after: false, stopped_by: 'blocked', **over }
+  end
+
+  def build(**over)
+    Context.build(state: state, grid: grid, objective: nil, history: [], attempts: [], manual: 'Use A to talk.',
+                  last_results: [], **over)
+  end
+
+  def test_snapshot
+    objective = { id: 'obj-2', title: 'Leave the room', predicate: { kind: 'leave_place', place: [163, 16] } }
+    text = build(objective:, attempts: ['walk {"direction":"up","cells":2} -> blocked'],
+                 history: [{ id: 'obj-1', title: 'Close the dialogue', outcome: :achieved, reason: nil }],
+                 last_results: [result])
+    expected = <<~TEXT.chomp
+      Phase: playing
+      Place: room 163, map 16
+      Link: row 3, col 4 (pixel x=68, y=60), facing up
+      Health: 24 of 24
+
+      Grid (rows 0-7 top to bottom, cols 0-9 left to right):
+          0 1 2 3 4 5 6 7 8 9
+       0  # ~ ? . . . . . . .
+       1  . . o . . . . . . .
+       2  . . . . . . . . . .
+       3  . . . . @ # . . . .
+       4  . . . . . . . . . .
+       5  . . . . . . . . . .
+       6  . . . . . . . . . .
+       7  . . . . . . . . . #
+      Legend: . passable, # blocked, ? unknown, ! stale, ~ one-way, o static object, @ Link
+      Unknown cells are not walls.
+
+      Neighbours of Link:
+      - up: cell (2,4) '.', belief yes, last walk: blocked after 1 cell
+      - right: cell (3,5) '#', belief no, last walk: none
+      - down: cell (4,4) '.', belief yes, last walk: none
+      - left: cell (3,3) '.', belief yes, last walk: none
+
+      Current objective: Leave the room
+      Predicate: {"kind":"leave_place","place":[163,16]}
+      Attempts on this objective:
+      - walk {"direction":"up","cells":2} -> blocked
+
+      Finished objectives:
+      - obj-1 achieved: Close the dialogue
+
+      Last skill results:
+      - walk {"direction":"up","cells":2}: stopped_by blocked, 40 frames, moved 1 cells, room_changed false, hp_delta 0, dialogue open before false, after false
+
+      Manual notes:
+      Use A to talk.
+    TEXT
+    assert_equal expected, text
+  end
+
+  def test_no_objective_and_edge_neighbours
+    text = Context.build(state: state(x: 0, y: 8), grid:, objective: nil, history: [], attempts: [], manual: '', last_results: [])
+    assert_includes text, 'Current objective: none'
+    assert_includes text, "- up: edge of the screen"
+    assert_includes text, "- left: edge of the screen"
+  end
+
+  def test_cap_drops_history_but_never_grid_objective_or_legend
+    objective = { id: 'obj-9', title: 'Current goal', predicate: { kind: 'dialogue_closed' } }
+    history = (1..30).map { |i| { id: "obj-#{i}", title: "old goal #{i}", outcome: :achieved, reason: nil } }
+    results = (1..6).map { |i| result(frames: i) }
+    full = build(objective:, history:, last_results: results, manual: 'm' * 500)
+    capped = build(objective:, history:, last_results: results, manual: 'm' * 500, max_chars: 2800)
+    assert_operator capped.size, :<=, 2800
+    assert_operator full.size, :>, 2800
+    %w[Grid Legend: Neighbours Current\ objective Predicate:].each { |part| assert_includes capped, part }
+    assert_includes capped, 'old goal 30'
+    refute_match(/old goal 1$/, capped)
+    tiny = build(objective:, history:, last_results: results, max_chars: 100)
+    %w[Legend: Current\ objective].each { |part| assert_includes tiny, part }
+  end
+
+  def test_results_limited_to_last_six
+    text = build(last_results: (1..9).map { |i| result(frames: i) })
+    assert_equal 6, text.scan('stopped_by blocked').size
+    assert_includes text, '9 frames'
+    refute_includes text, ' 3 frames'
+  end
+
+  def test_dialogue_never_shows_raw_counter
+    text = build(state: state(dialog_state: 133))
+    assert_includes text, 'Phase: dialogue'
+    refute_includes text, '133'
+  end
+
+  def test_returns_string_and_leaves_inputs_untouched
+    frozen_state = state.freeze
+    text = Context.build(state: frozen_state, grid:, objective: { id: 'x', title: 't', predicate: { kind: 'dialogue_closed' }.freeze }.freeze,
+                         history: [].freeze, attempts: [].freeze, manual: 'm'.freeze, last_results: [result.freeze].freeze)
+    assert_instance_of String, text
+  end
+end

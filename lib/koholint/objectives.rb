@@ -20,10 +20,21 @@ module Koholint
 
       fields = normalize(predicate)
       required = PREDICATES[fields[:kind].to_s] or return false
-      required.all? { |key| !fields[key].nil? }
+      return false unless (fields.keys - [:kind] - required).empty?
+
+      required.all? { |key| valid_field?(key, fields[key]) }
     rescue TypeError, ArgumentError
       false
     end
+
+    def self.valid_field?(key, value)
+      case key
+      when :place then value.is_a?(Array) && value.size == 2 && value.all?(Integer)
+      when :row then value.is_a?(Integer) && value.between?(0, 7)
+      when :col then value.is_a?(Integer) && value.between?(0, 9)
+      end
+    end
+    private_class_method :valid_field?
 
     attr_reader :current, :history
 

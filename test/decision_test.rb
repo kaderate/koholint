@@ -55,4 +55,38 @@ class DecisionTest < Minitest::Test
     result = Koholint::Policies::WithFallback.new(Koholint::Policies::WalkAndTalk.new, BadPrimary.new).decide(decision_point, state(0), {})
     refute result[:fallback]
   end
+
+  def objective_point = Koholint::DecisionPoint.choose_objective
+
+  def test_choose_objective_accepts_good_outputs
+    point = objective_point
+    assert_equal :choose_objective, point.name
+    assert_nil point.options
+    assert_equal %i[title predicate], point.output_schema
+    good = { title: 'Leave', predicate: { kind: 'leave_place', place: [163, 16] } }
+    assert_equal good, point.validate(good)
+    point.validate({ title: 'Talk', predicate: { 'kind' => 'dialogue_closed' } })
+    point.validate({ title: 'Go', predicate: { kind: 'reach_cell', place: [1, 2], row: 3, col: 4 } })
+  end
+
+  def test_choose_objective_rejects_bad_outputs
+    point = objective_point
+    [{ title: '', predicate: { kind: 'dialogue_closed' } }, { title: 7, predicate: { kind: 'dialogue_closed' } },
+     { title: 'x', predicate: { kind: 'win' } }, { title: 'x', predicate: { kind: 'reach_cell', place: [1, 2] } },
+     { title: 'x', predicate: { kind: 'leave_place', place: 'x' } }, { title: 'x' }].each do |choice|
+      assert_raises(Koholint::DecisionPoint::Invalid, choice.inspect) { point.validate(choice) }
+    end
+  end
+
+  def test_choose_objective_json_schema
+    schema = objective_point.json_schema
+    assert_equal 'object', schema[:type]
+    assert_equal %w[title predicate justification confidence], schema[:required]
+    kinds = schema[:properties][:predicate][:oneOf].map { |p| p[:properties][:kind][:enum] }
+    assert_equal [%w[leave_place], %w[reach_place], %w[reach_cell], %w[dialogue_closed]], kinds
+    reach_cell = schema[:properties][:predicate][:oneOf][2]
+    assert_equal %w[kind place row col], reach_cell[:required]
+    assert_equal false, reach_cell[:additionalProperties]
+    JSON.parse(JSON.generate(schema))
+  end
 end

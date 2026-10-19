@@ -35,6 +35,19 @@ class ObjectivesTest < Minitest::Test
     assert_equal %w[dialogue_closed leave_place reach_cell reach_place], Koholint::Objectives::PREDICATES.keys.sort
   end
 
+  def test_malformed_predicates_are_rejected
+    valid = Koholint::Objectives.method(:valid_predicate?)
+    [{ kind: 'leave_place', place: 'x' }, { kind: 'leave_place', place: [1] }, { kind: 'leave_place', place: [1, 2, 3] },
+     { kind: 'leave_place', place: [1, '2'] }, { kind: 'leave_place', place: [1.5, 2] },
+     { kind: 'reach_place', place: { a: 1 } }, { kind: 'reach_cell', place: [1, 2], row: 8, col: 2 },
+     { kind: 'reach_cell', place: [1, 2], row: 1, col: 10 }, { kind: 'reach_cell', place: [1, 2], row: -1, col: 0 },
+     { kind: 'reach_cell', place: [1, 2], row: '1', col: 2 }, { kind: 'dialogue_closed', place: [1, 2] },
+     { kind: 'leave_place', place: [1, 2], extra: 1 }, { 'kind' => 'leave_place', 'place' => 'x' }].each do |predicate|
+      refute valid.call(predicate), predicate.inspect
+    end
+    assert valid.call({ 'kind' => 'reach_cell', 'place' => [1, 2], 'row' => 7, 'col' => 9 })
+  end
+
   def test_start_emits_and_sets_current
     id = start({ kind: 'dialogue_closed' })
     assert_equal id, @objectives.current[:id]
