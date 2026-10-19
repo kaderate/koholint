@@ -33,6 +33,12 @@ class ClaudeCliTest < Minitest::Test
     false
   end
 
+  def grandchild_pid
+    event = events.find { |e| e['grandchild'] }
+    flunk 'fake never logged its grandchild' unless event
+    event['grandchild']
+  end
+
   def wait_gone(*pids)
     100.times do
       return true if pids.none? { |pid| alive?(pid) }
@@ -111,23 +117,35 @@ class ClaudeCliTest < Minitest::Test
   end
 
   def test_missing_command_gives_an_error_without_raising
-    reply = Koholint::Agents::ClaudeCli.new(command: '/nonexistent/claude', retries: 0).call(system: 's', prompt: 'p', schema: SCHEMA)
+    client = Koholint::Agents::ClaudeCli.new(command: '/nonexistent/claude', retries: 0)
+    reply = client.call(system: 's', prompt: 'p', schema: SCHEMA)
     assert_nil reply.output
     assert reply.error
   end
 
   def test_timeout_kills_the_process_group_and_removes_the_directory
-    reply = run_call('sleep', timeout: 3, retries: 0)
+    reply = run_call('sleep', timeout: 5, retries: 0)
     assert_nil reply.output
     assert_match(/timeout/, reply.error)
     pid = recorded['pid']
-    grandchild = events.find { |e| e['grandchild'] }['grandchild']
+    grandchild = grandchild_pid
     assert wait_gone(pid, grandchild), 'child or grandchild still alive after timeout'
     refute_path_exists recorded['cwd']
   end
 
+  def test_timeout_returns_promptly_when_a_detached_descendant_holds_stdout
+    started = Process.clock_gettime(Process::CLOCK_MONOTONIC)
+    reply = run_call('detached', timeout: 5, retries: 0)
+    elapsed = Process.clock_gettime(Process::CLOCK_MONOTONIC) - started
+    assert_match(/timeout/, reply.error)
+    assert_operator elapsed, :<, 5 + 4
+  ensure
+    detached = events.find { |e| e['grandchild'] }
+    Process.kill('KILL', detached['grandchild']) if detached && alive?(detached['grandchild'])
+  end
+
   def test_timeout_is_retried
-    run_call('sleep', timeout: 3, retries: 1)
+    run_call('sleep', timeout: 5, retries: 1)
     assert_equal 2, events.count { |e| e['pid'] }
   end
 
@@ -140,29 +158,73 @@ class ClaudeCliTest < Minitest::Test
 
   def violation(value, schema) = Koholint::Agents::ClaudeCli.new.send(:violation, value, schema)
 
-  def test_schema_keywords
-    {
-      { type: 'array', items: { type: 'integer' } } => [[[1, 2], nil], [[1, 'a'], /\[1\]/]],
-      { oneOf: [{ type: 'integer' }, { type: 'number', minimum: 0 }] } => [['x', /oneOf/], [1.5, nil], [1, /oneOf/]],
-      { anyOf: [{ type: 'string' }, { type: 'integer' }] } => [[1, nil], [1.5, /anyOf/]],
-      { type: 'object', properties: { a: { type: 'string' } }, additionalProperties: false } =>
-        [[{ 'a' => 'x' }, nil], [{ 'a' => 'x', 'b' => 1 }, /unexpected b/]],
-      { type: 'integer', minimum: 1, maximum: 5 } => [[3, nil], [0, /minimum/], [6, /maximum/]],
-      { type: 'string', minLength: 2, maxLength: 3 } => [['ab', nil], ['a', /minLength/], ['abcd', /maxLength/]],
-      { type: %w[string null] } => [['a', nil], [nil, nil], [1, /string or null/]],
-      { enum: %w[a b] } => [['a', nil], ['c', /enum/]],
-      { type: 'object', properties: { n: { type: 'object', required: ['k'] } } } =>
-        [[{ 'n' => { 'k' => 1 } }, nil], [{ 'n' => {} }, /n: missing k/]]
-    }.each do |schema, cases|
-      cases.each do |value, pattern|
-        problem = violation(value, schema)
-        if pattern
-          assert_match pattern, problem.to_s, "#{schema} with #{value.inspect}"
-        else
-          assert_nil problem, "#{schema} with #{value.inspect}"
-        end
-      end
-    end
+  def assert_valid(value, schema) = assert_nil(violation(value, schema), "#{schema} with #{value.inspect}")
+
+  def assert_invalid(value, schema, pattern)
+    assert_match pattern, violation(value, schema).to_s, "#{schema} with #{value.inspect}"
+  end
+
+  def test_schema_items
+    schema = { type: 'array', items: { type: 'integer' } }
+    assert_valid [1, 2], schema
+    assert_invalid [1, 'a'], schema, /\[1\]/
+  end
+
+  def test_schema_one_of
+    schema = { oneOf: [{ type: 'integer' }, { type: 'number', minimum: 0 }] }
+    assert_valid 1.5, schema
+    assert_invalid 'x', schema, /oneOf/
+    assert_invalid 1, schema, /oneOf/
+  end
+
+  def test_schema_any_of
+    schema = { anyOf: [{ type: 'string' }, { type: 'integer' }] }
+    assert_valid 1, schema
+    assert_invalid 1.5, schema, /anyOf/
+  end
+
+  def test_schema_additional_properties_false
+    schema = { type: 'object', properties: { a: { type: 'string' } }, additionalProperties: false }
+    assert_valid({ 'a' => 'x' }, schema)
+    assert_invalid({ 'a' => 'x', 'b' => 1 }, schema, /unexpected b/)
+  end
+
+  def test_schema_minimum_maximum
+    schema = { type: 'integer', minimum: 1, maximum: 5 }
+    assert_valid 3, schema
+    assert_invalid 0, schema, /minimum/
+    assert_invalid 6, schema, /maximum/
+  end
+
+  def test_schema_min_max_length
+    schema = { type: 'string', minLength: 2, maxLength: 3 }
+    assert_valid 'ab', schema
+    assert_invalid 'a', schema, /minLength/
+    assert_invalid 'abcd', schema, /maxLength/
+  end
+
+  def test_schema_array_valued_type
+    schema = { type: %w[string null] }
+    assert_valid 'a', schema
+    assert_valid nil, schema
+    assert_invalid 1, schema, /string or null/
+  end
+
+  def test_schema_integer_accepts_whole_floats
+    assert_valid 2.0, { type: 'integer' }
+    assert_invalid 2.5, { type: 'integer' }, /integer/
+  end
+
+  def test_schema_enum
+    schema = { enum: %w[a b] }
+    assert_valid 'a', schema
+    assert_invalid 'c', schema, /enum/
+  end
+
+  def test_schema_nested_required
+    schema = { type: 'object', properties: { n: { type: 'object', required: ['k'] } } }
+    assert_valid({ 'n' => { 'k' => 1 } }, schema)
+    assert_invalid({ 'n' => {} }, schema, /n: missing k/)
   end
 
   def test_live_call

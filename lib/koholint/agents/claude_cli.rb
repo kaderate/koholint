@@ -7,6 +7,8 @@ module Koholint
     Reply = Struct.new(:output, :cost_usd, :latency_ms, :tokens, :error)
 
     class ClaudeCli
+      READER_GRACE = 1
+
       def initialize(model: 'sonnet', command: 'claude', timeout: 90, max_call_usd: 0.25, retries: 1)
         @model = model
         @command = command
@@ -49,8 +51,12 @@ module Koholint
         pid = Process.spawn(*args, chdir: dir, pgroup: true, in: in_r, out: out_w, err: File::NULL)
         in_r.close
         out_w.close
-        reader = Thread.new { out_r.read }
-        reader.report_on_exception = false
+        buffer = +''
+        reader = Thread.new do
+          loop { buffer << out_r.readpartial(65_536) }
+        rescue EOFError, IOError
+          nil
+        end
         writer = Thread.new do
           in_w.write(prompt)
         rescue Errno::EPIPE
@@ -61,16 +67,21 @@ module Koholint
         waiter = Process.detach(pid)
         if waiter.join(@timeout)
           writer.join
-          [waiter.value, reader.value]
+          [waiter.value, drain(reader, buffer)]
         else
           kill_group(pid)
           waiter.join
           writer.join
-          reader.join
+          drain(reader, buffer)
           [:timeout, nil]
         end
       ensure
         [in_r, in_w, out_r, out_w].each { |io| io&.close unless io&.closed? }
+      end
+
+      def drain(reader, buffer)
+        reader.kill unless reader.join(READER_GRACE)
+        buffer
       end
 
       def kill_group(pid)
@@ -122,7 +133,7 @@ module Koholint
       def type_match?(type, value)
         case type
         when 'string' then value.is_a?(String)
-        when 'integer' then value.is_a?(Integer)
+        when 'integer' then value.is_a?(Integer) || (value.is_a?(Float) && value == value.floor)
         when 'number' then value.is_a?(Numeric)
         when 'boolean' then [true, false].include?(value)
         when 'array' then value.is_a?(Array)

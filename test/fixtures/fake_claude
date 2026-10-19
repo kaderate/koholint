@@ -3,7 +3,8 @@ require 'json'
 
 stdin = $stdin.read
 log = ENV.fetch('FAKE_CLAUDE_LOG')
-File.open(log, 'a') { |f| f.puts(JSON.generate(argv: ARGV, cwd: Dir.pwd, entries: Dir.children('.'), stdin: stdin, pid: Process.pid)) }
+record = { argv: ARGV, cwd: Dir.pwd, entries: Dir.children('.'), stdin: stdin, pid: Process.pid }
+File.open(log, 'a') { |f| f.puts(JSON.generate(record)) }
 
 result = { structured_output: { 'answer' => 'ok' }, total_cost_usd: 0.0123, duration_api_ms: 321, num_turns: 1,
            is_error: false, usage: { input_tokens: 10, output_tokens: 5 } }
@@ -14,6 +15,10 @@ when 'is_error' then puts JSON.generate(result.merge(is_error: true, structured_
 when 'no_structured' then puts JSON.generate(result.reject { |k, _| k == :structured_output })
 when 'schema_invalid' then puts JSON.generate(result.merge(structured_output: { 'answer' => 42 }))
 when 'exit1' then warn 'transport down'; exit 1
+when 'detached'
+  grandchild = fork { Process.setsid; sleep 30 }
+  File.open(log, 'a') { |f| f.puts(JSON.generate(grandchild: grandchild)) }
+  sleep 30
 when 'sleep'
   grandchild = fork { sleep 30 }
   File.open(log, 'a') { |f| f.puts(JSON.generate(grandchild: grandchild)) }
