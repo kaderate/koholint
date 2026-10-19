@@ -33,7 +33,7 @@ class AgentsContextTest < Minitest::Test
     beliefs.record(appearance: 'old', action: :walk, direction: :up, result: :yes, method: 't', context: Koholint::Vision::Capabilities.new(['x']), frame: 2, source: 't')
     cells[3][5] = 'wall'
     cells[7][9] = 'wall'
-    Koholint::Vision::Grid.new(cells:, static_sprites: [{ 'x' => 36, 'y' => 24, 'pattern' => 'pot' }], beliefs:,
+    Koholint::Vision::Grid.new(cells:, static_sprites: [{ 'x' => 40, 'y' => 32, 'pattern' => 'pot' }], beliefs:,
                                capabilities: Koholint::Vision::Capabilities.new).freeze
   end
 

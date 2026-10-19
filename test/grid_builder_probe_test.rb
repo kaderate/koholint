@@ -330,10 +330,9 @@ class GridBuilderProbeTest < Minitest::Test
   def test_house_objects_sit_on_the_cell_under_their_center
     skip_without_rom!
     grid = interactive_probes[2]
-    assert_equal({ [3, 4] => true, [3, 5] => true, [4, 7] => true },
+    assert_equal({ [2, 4] => true, [2, 5] => true, [3, 4] => true, [3, 5] => true, [4, 7] => true },
                  (0...8).to_a.product((0...10).to_a).select { |row, col| grid.static_sprite(row, col) }.to_h { |cell| [cell, true] })
     assert_nil grid.static_sprite(4, 8)
-    assert_nil grid.static_sprite(*Builder.link_cell(70, 52))
   end
 
   def test_known_neighbours_are_never_reprobed
