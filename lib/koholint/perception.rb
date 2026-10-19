@@ -14,7 +14,7 @@ module Koholint
                     x: read_byte.(:link_x), y: read_byte.(:link_y), direction: read_byte.(:link_direction),
                     hp: read_byte.(:hp), max_hp: read_byte.(:max_hearts) * HP_PER_HEART, milestone: :none,
                     game_mode: read_byte.(:game_mode), game_submode: read_byte.(:game_submode),
-                    name_length: read_byte.(:name_length))
+                    name_length: read_byte.(:name_length), dialog_state: read_byte.(:dialog_state))
     end
   end
 end

@@ -21,6 +21,24 @@ class PerceptionTest < Minitest::Test
     assert_equal :none, state.milestone
   end
 
+  def test_phase_before_control_and_while_playing
+    skip_without_rom!
+    assert_equal :playing, Koholint::Perception.read(EmulatorCache.interactive).phase
+    refute Koholint::Perception.read(EmulatorCache.interactive).dialog_open?
+  end
+
+  def test_dialogue_chain_is_dialogue_phase
+    skip_without_rom!
+    emulator = Koholint::Emulator.restore(EmulatorCache.at(700).dump)
+    400.times do
+      break if Koholint::Perception.read(emulator).dialog_open?
+
+      emulator.step
+    end
+    assert_equal :playing, Koholint::Perception.read(EmulatorCache.at(700)).phase
+    assert_equal :dialogue, Koholint::Perception.read(emulator).phase
+  end
+
   def with_entries(entries)
     Dir.mktmpdir do |dir|
       path = File.join(dir, 'addresses.json')
