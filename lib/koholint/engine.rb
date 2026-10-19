@@ -15,6 +15,7 @@ module Koholint
   class Engine
     SAVE_CHECK_EVERY = 60
     AGENT_FAILURE_LIMIT = 5
+    AGENT_REFUSAL_LIMIT = 10
 
     def self.resume(run_path, budget:, policy: nil, policy_factory: nil, flow_version: Koholint::FLOW_VERSION, **options)
       run = Run.open(run_path, flow_version: flow_version)
@@ -33,6 +34,7 @@ module Koholint
       @decision_point = decision_point
       @pacer = pacer
       @fallbacks = 0
+      @refusals = 0
       @emulator = emulator || Emulator.boot
       @keyframes = Keyframes.new(File.join(run.dir, 'keyframes'))
       @builder = Vision::GridBuilder.new(trace: run.trace, beliefs: known_beliefs(run)) if grid
@@ -120,6 +122,13 @@ module Koholint
     def note_fallback(result)
       return if @budget.exhausted
 
+      if result[:refused]
+        @refusals += 1
+        @budget.stop!(:agent_refusals) if @refusals >= AGENT_REFUSAL_LIMIT
+        return
+      end
+
+      @refusals = 0
       @fallbacks = result[:fallback] ? @fallbacks + 1 : 0
       @budget.stop!(:agent_failures) if @fallbacks >= AGENT_FAILURE_LIMIT
     end

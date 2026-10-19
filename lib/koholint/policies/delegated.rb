@@ -16,15 +16,21 @@ module Koholint
       DIALOGUE_PAGE_LIMIT = 40
       DIALOGUE_FRAME_LIMIT = 1800
       SHEET_PAGES = 8
+      REFUSAL_LIMIT = 3
+      STALE_SEQUENCE_FRAMES = 600
       Failure = Class.new(StandardError)
+      Refusal = Class.new(Failure)
+      REOPEN_WAIT = { skill: 'wait', params: { frames: 10 } }.freeze
       FALLBACK_CHOICE = { skill: 'wait', params: { frames: 30 } }.freeze
       HEMMED_WAIT = { skill: 'wait', params: { frames: 120 } }.freeze
       ADVANCE = { skill: 'advance_dialogue', params: {} }.freeze
       HEMMED_DIRECTIONS = 4
       HEMMED_WAIT_LIMIT = 1800 / HEMMED_WAIT[:params][:frames]
 
-      def initialize(client:, registry:, objectives:, manual: '', on_step: nil, ledger: Ledger.new)
-        @ledger = ledger
+      def initialize(client:, registry:, objectives:, manual: '', on_step: nil, ledger: nil)
+        @ledger = hook_doubt(ledger || Ledger.new)
+        @refusals = []
+        @frame = 0
         @client = client
         @registry = registry
         @objectives = objectives
@@ -52,9 +58,13 @@ module Koholint
       def decide(decision_point, state, context)
         @prompt = @image = @images = nil
         context[:ledger] = @ledger
-        @sequence = nil if decision_point.name == :choose_objective
+        remember_grid(state, context)
+        drop_stale_sequence(state)
         automatic = automatic_advance(decision_point, state, context)
         return automatic if automatic
+
+        reopen = reopen_wait(decision_point, state)
+        return reopen if reopen
 
         if decision_point.name == :choose_skill && !@sequence && hemmed?(state)
           return hemmed_wait if @hemmed[:waits] < HEMMED_WAIT_LIMIT
@@ -71,13 +81,16 @@ module Koholint
       rescue NameError, TypeError
         raise
       rescue StandardError => e
+        note_refusal(e, choice) if e.is_a?(Refusal)
         { choice: FALLBACK_CHOICE, justification: e.is_a?(Failure) ? e.message : "#{e.class}: #{e.message}", confidence: 0.0, agent: 'claude', latency_ms: 0,
-          cost_usd: cost_of(reply), fallback: true, decision_point: @skill_point, prompt: @prompt, image: @image, images: @images }
+          cost_usd: cost_of(reply), fallback: true, decision_point: @skill_point, prompt: @prompt, image: @image, images: @images,
+          **(e.is_a?(Refusal) ? { refused: true } : {}) }
       end
 
       def after_action(choice:, outcome:, state:, frame:)
         return unless choice.key?(:skill)
 
+        @frame = frame
         @page += 1 if choice[:skill] == 'advance_dialogue'
         unless state.phase == :dialogue
           @page = 0
@@ -91,6 +104,7 @@ module Koholint
         @last_results.shift while @last_results.size > RESULT_LIMIT
         note_walk(choice, outcome, state)
         feed_ledger(choice, outcome, state, frame)
+        note_no_path(choice, outcome, frame)
         unless @waiting
           @objectives.record_attempt(skill: choice[:skill], params: choice[:params], result_summary: summary(outcome))
         end
@@ -99,6 +113,54 @@ module Koholint
       end
 
       private
+
+      def hook_doubt(ledger)
+        ledger.instance_variable_set(:@on_doubt, method(:doubt)) unless ledger.instance_variable_get(:@on_doubt)
+        ledger
+      end
+
+      def doubt(place:, cell:, direction:, count:)
+        trace = @objectives.trace if @objectives.respond_to?(:trace)
+        trace&.emit(:grid_contradiction, frame: @frame, place:, row: cell[0], col: cell[1], direction: direction.to_s, believed: 'yes',
+                                         observed: "blocked x#{count}")
+      end
+
+      def note_no_path(choice, outcome, frame)
+        return unless choice[:skill] == 'goto' && outcome[:stopped_by].to_s == 'no_path' && @objectives.current
+
+        track { @objectives.note_no_path(frame:) }
+      end
+
+      def note_refusal(error, choice)
+        choice = {} unless choice.is_a?(Hash)
+        @refusals << { reason: error.message, title: choice[:title], predicate: choice[:predicate] }
+        @refusals.shift while @refusals.size > REFUSAL_LIMIT
+      end
+
+      def remember_grid(state, context)
+        place = [state.room_id, state.map_id]
+        @last_grid = nil unless @last_place == place
+        @last_place = place
+        @last_grid = context[:grid] if context[:grid]
+        context[:grid] ||= @last_grid
+      end
+
+      def drop_stale_sequence(state)
+        return unless @sequence
+
+        stale = state.phase != :dialogue && state.frame - @sequence[:last] > STALE_SEQUENCE_FRAMES
+        @sequence = nil if stale || @sequence[:place] != [state.room_id, state.map_id]
+      end
+
+      def reopen_wait(decision_point, state)
+        return unless decision_point.name == :choose_skill && @sequence && state.phase != :dialogue && !@sequence[:waited]
+
+        @sequence[:waited] = true
+        @waiting = true
+        @objectives.touch(frame: state.frame)
+        { choice: REOPEN_WAIT, justification: 'automatic dialogue advance: waiting for the dialogue to reopen', confidence: 1.0, agent: 'delegated',
+          latency_ms: 0, cost_usd: 0.0, fallback: false, prompt: nil, image: nil }
+      end
 
       def track
         before = @objectives.history.size
@@ -110,15 +172,16 @@ module Koholint
         predicate = Objectives.normalize(choice[:predicate])
         place = [state.room_id, state.map_id]
         if predicate[:kind].to_s == 'leave_place' && predicate[:place] != place
-          raise Failure, "leave_place must name the current place #{place.inspect}, not #{predicate[:place].inspect}"
+          raise Refusal, "leave_place must name the current place #{place.inspect}, not #{predicate[:place].inspect}"
         end
-        raise Failure, 'predicate is already true in the current state' if satisfied?(predicate, state, place)
+        raise Refusal, 'predicate is already true in the current state' if satisfied?(predicate, state, place)
         if trivial?(predicate, state, place, context)
-          raise Failure, 'reach_cell target is already reachable over cells observed free; choose a goal that needs exploration'
+          raise Refusal, 'reach_cell target is already reachable over cells observed free; choose a goal that needs exploration'
         end
-        raise Failure, 'dialogue_closed needs an open dialogue' if predicate[:kind].to_s == 'dialogue_closed' && !state.dialog_open?
+        raise Refusal, 'dialogue_closed needs an open dialogue' if predicate[:kind].to_s == 'dialogue_closed' && !state.dialog_open?
 
         clear_hemmed
+        @refusals.clear
         @objectives.start(frame: state.frame, title: choice[:title], predicate: choice[:predicate])
       end
 
@@ -211,6 +274,8 @@ module Koholint
           @sequence = { pages: [], start: state.frame, place: [state.room_id, state.map_id] }
           @objectives.touch(frame: state.frame)
         end
+        @sequence[:last] = state.frame
+        @sequence[:waited] = false
         @sequence[:pages] << rgb
         @auto = true
         { choice: ADVANCE, justification: 'automatic dialogue advance', confidence: 1.0, agent: 'delegated', latency_ms: 0, cost_usd: 0.0,
@@ -230,7 +295,7 @@ module Koholint
 
       def ask(decision_point, state, context)
         @prompt = Agents::Context.build(state:, grid: grid_for(state, context), objective: @objectives.current, history: @objectives.history,
-                                       attempts: @objectives.attempts_for_prompt, manual: @manual, last_results: @last_results, ledger: @ledger)
+                                       attempts: @objectives.attempts_for_prompt, manual: @manual, last_results: @last_results, ledger: @ledger, refusals: @refusals)
         if decision_point.name == :choose_skill && @sequence
           @pages_read = @sequence[:pages].size
           @images = Vision::DialogueShot.sheets(@sequence[:pages], per_sheet: SHEET_PAGES)
@@ -263,13 +328,9 @@ module Koholint
         chunks.first(DIALOGUE_PAGE_LIMIT).each_with_index.map { |t, i| { text: t, page: i + 1, frame: @read_at[:start], place: @read_at[:place] } }
       end
 
-      def grid_for(state, context)
-        place = [state.room_id, state.map_id]
-        @last_grid = nil unless @last_place == place
-        @last_place = place
-        @last_grid = context[:grid] if context[:grid]
-        @last_grid ||= Vision::Grid.new(cells: Array.new(Vision::Grid::ROWS) { Array.new(Vision::Grid::COLS) }, static_sprites: [],
-                                        beliefs: Vision::Beliefs.new, capabilities: Vision::Capabilities.new)
+      def grid_for(_state, _context)
+        @last_grid || Vision::Grid.new(cells: Array.new(Vision::Grid::ROWS) { Array.new(Vision::Grid::COLS) }, static_sprites: [],
+                                       beliefs: Vision::Beliefs.new, capabilities: Vision::Capabilities.new)
       end
 
       def answer(choice, reply, output)
@@ -280,7 +341,11 @@ module Koholint
       def cost_of(reply) = reply.respond_to?(:cost_usd) ? reply.cost_usd.to_f : 0.0
 
       def summary(outcome)
-        "stopped_by #{outcome[:stopped_by]}, moved #{outcome[:moved_cells]} cells, room_changed #{outcome[:room_changed]}, hp_delta #{outcome[:hp_delta]}"
+        text = "stopped_by #{outcome[:stopped_by]}, moved #{outcome[:moved_cells]} cells, room_changed #{outcome[:room_changed]}, hp_delta #{outcome[:hp_delta]}"
+        blocked = outcome[:blocked_at]
+        text += ", blocked_at (#{blocked[:row]},#{blocked[:col]}) #{blocked[:direction]}" if blocked.is_a?(Hash)
+        text += ", cause #{outcome[:cause]}" if outcome[:cause]
+        text
       end
     end
   end

@@ -29,4 +29,4 @@ Only what is left to do. When something lands, delete it here (git is the histor
 - Plan 4a parked: `Ledger` doubtful cells are recomputed per direction; `pick`/`place_of` are public class methods; a 170-char line in `agents/context.rb`.
 - Plan 4a parked: the ROM goto/walk tests hardcode distances and read `@centring`; no test for centring falling back to the other axis.
 - Plan 4a parked: automatic dialogue pages flush only on `choose_skill` tours; step results never carry `blocked_at` by decision.
-- Agent loop deferred: a dialogue read pending when a `choose_objective` tour comes is dropped (its transcription is lost).
+- Agent loop deferred: a failed sheet call loses the dialogue pages (their PNGs remain under `prompts/`).
