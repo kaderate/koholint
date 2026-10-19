@@ -93,6 +93,10 @@ module Koholint
       @last_key = key
     end
 
+    def touch(frame:)
+      @last_change_frame = frame if @current
+    end
+
     def update(state, frame:)
       return nil if state.loading?
 

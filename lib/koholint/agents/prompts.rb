@@ -25,16 +25,21 @@ module Koholint
         A skill is a bounded action with parameters; the harness runs it and reports how it stopped. Choose exactly one skill from the schema with parameters that satisfy it.
         goto walks several cells along a path planned over the grid and stops when blocked. Cells marked ! may be doubtful: they looked free but blocked Link repeatedly; goto avoids a doubtful edge, and the neighbour lines say how many times each direction was blocked.
         step moves Link a few pixels (1 to 16) along one axis and does not recentre him; the offset line shows how far he is from the centre of his cell, and a passage may be offset from the cell grid.
-        Do not repeat a skill that just stopped the same way from the same state; try something different or gather information. When on-screen text matters, transcribe it in the optional transcription field. When images are attached they are the pages of the dialogue that just closed, oldest first, each page showing the top and the bottom of the screen stacked, and the pages are stacked vertically in sheets. Then give the full transcription of all the pages, in order, in transcription, one paragraph per page separated by a blank line.
+        Do not repeat a skill that just stopped the same way from the same state; try something different or gather information. When on-screen text matters, transcribe it in the optional transcription field. When an image is attached it shows the top and the bottom of the screen stacked; a dialogue box may be in either.
         Output fields: skill, params, justification, confidence, and optionally transcription.
       TEXT
 
-      def self.system_for(decision_point)
+      SHEETS = <<~TEXT.freeze
+        The attached images are the pages of the dialogue that just closed, oldest first: each page shows the top and the bottom of the screen stacked, and the pages are stacked vertically in sheets. Give the full transcription of all the pages, in order, in transcription, one paragraph per page separated by a blank line.
+      TEXT
+
+      def self.system_for(decision_point, sheets: false)
         body = case decision_point.name
                when :choose_objective then OBJECTIVE
                when :choose_skill then SKILL
                else raise ArgumentError, "no system prompt for #{decision_point.name}"
                end
+        body = [body.chomp.sub(/^Output fields:.*\z/m, '').chomp, SHEETS.chomp, body[/^Output fields:.*/m]].join("\n") if sheets
         [ROLE, body, OUTPUT_RULES].join("\n")
       end
     end
