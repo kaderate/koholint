@@ -231,6 +231,24 @@ class DelegatedPolicyTest < Minitest::Test
     assert_equal({ text: 'Again', page: 0 }, decide_with_shot(p, open)[:transcription])
   end
 
+  def test_the_transcription_is_capped_and_stripped_of_control_characters
+    long = "A\u0000B\a\nC#{'x' * 600}"
+    p = policy(ScriptedClient.new(objective: objective, skill: talk(long)))
+    decide_with_shot(p, state)
+    text = decide_with_shot(p, state(dialog_state: 130))[:transcription][:text]
+    assert_equal 500, text.length
+    assert text.start_with?("AB\nCxxx")
+  end
+
+  def test_closing_with_advance_dialogue_resets_the_page_count
+    p = policy(ScriptedClient.new(objective: objective, skill: [talk('one'), talk('two')]))
+    decide_with_shot(p, state)
+    open = state(dialog_state: 130)
+    first = decide_with_shot(p, open)
+    p.after_action(choice: first[:choice], outcome: { dialog_after: false }, state: state, frame: 1)
+    assert_equal 0, decide_with_shot(p, open)[:transcription][:page]
+  end
+
   def test_a_transcription_outside_the_dialogue_phase_is_ignored
     p = policy(ScriptedClient.new(objective: objective, skill: ok('skill' => 'wait', 'params' => { 'frames' => 3 }, 'transcription' => 'ghost')))
     decide_with_shot(p, state)

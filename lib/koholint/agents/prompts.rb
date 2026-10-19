@@ -22,7 +22,7 @@ module Koholint
       SKILL = <<~TEXT.freeze
         Decision: choose the next skill to run towards the current objective.
         A skill is a bounded action with parameters; the harness runs it and reports how it stopped. Choose exactly one skill from the schema with parameters that satisfy it.
-        Do not repeat a skill that just stopped the same way from the same state; try something different or gather information. When on-screen text matters, transcribe it in the optional transcription field.
+        Do not repeat a skill that just stopped the same way from the same state; try something different or gather information. When on-screen text matters, transcribe it in the optional transcription field. When an image is attached it shows the top and the bottom of the screen stacked; a dialogue box may be in either.
         Output fields: skill, params, justification, confidence, and optionally transcription.
       TEXT
 

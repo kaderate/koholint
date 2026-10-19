@@ -20,18 +20,19 @@ class DialogueShotTest < Minitest::Test
     [width, height, (0...height).map { |row| raw.byteslice(row * stride + 1, width * 3) }]
   end
 
-  def test_crop_is_the_dialogue_band_upscaled_four_times
+  def test_crop_stacks_the_top_and_bottom_bands_upscaled_four_times
     skip_without_rom!
     emulator = EmulatorCache.at(700)
     emulator.step until Koholint::Perception.read(emulator).dialog_open?
     30.times { emulator.step }
     width, height, rows = decode(Koholint::Vision::DialogueShot.crop(emulator))
-    assert_equal [640, 192], [width, height]
+    assert_equal [640, 384], [width, height]
     full = emulator.frame_rgb
-    source = (80...128).map { |y| full.byteslice(y * 160 * 3, 160 * 3).unpack('a3' * 160) }
-    assert_equal source.first.flat_map { |p| [p] * 4 }.join, rows[0]
-    assert_equal rows[0], rows[3]
-    assert_equal source[1].flat_map { |p| [p] * 4 }.join, rows[4]
+    sources = (0...48).to_a + (80...128).to_a
+    sources.each_with_index do |y, i|
+      expected = full.byteslice(y * 160 * 3, 160 * 3).unpack('a3' * 160).flat_map { |p| [p] * 4 }.join
+      4.times { |k| assert_equal expected, rows[i * 4 + k], "source row #{y}" }
+    end
     assert_operator rows.join.bytes.uniq.size, :>, 2
   end
 end

@@ -9,6 +9,7 @@ module Koholint
   module Policies
     class Delegated
       RESULT_LIMIT = 6
+      TRANSCRIPTION_LIMIT = 500
       Failure = Class.new(StandardError)
       FALLBACK_CHOICE = { skill: 'wait', params: { frames: 30 } }.freeze
 
@@ -58,11 +59,13 @@ module Koholint
         @client.call(system: Agents::Prompts.system_for(decision_point), prompt:, schema: decision_point.json_schema, image:)
       end
 
+      def clean(text) = text.gsub(/[^\P{Cntrl}\n]/, '').strip[0, TRANSCRIPTION_LIMIT]
+
       def transcription_for(output, state, decision_point)
         text = output['transcription']
-        return {} unless decision_point.name == :choose_skill && state.phase == :dialogue && text.is_a?(String) && !text.strip.empty?
+        return {} unless decision_point.name == :choose_skill && state.phase == :dialogue && text.is_a?(String) && !clean(text).empty?
 
-        { transcription: { text: text.strip, page: @page } }
+        { transcription: { text: clean(text), page: @page } }
       end
 
       def grid_for(state, context)

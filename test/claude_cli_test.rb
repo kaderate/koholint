@@ -3,6 +3,7 @@ require 'base64'
 require 'json'
 require 'tmpdir'
 require 'koholint/agents/claude_cli'
+require 'koholint/png'
 
 class ClaudeCliTest < Minitest::Test
   FAKE = File.expand_path('fixtures/fake_claude', __dir__)
@@ -61,6 +62,7 @@ class ClaudeCliTest < Minitest::Test
   def test_argv_is_exactly_the_isolation_flags
     run_call(model: 'haiku', max_call_usd: 0.1)
     expected = ['-p', '--model', 'haiku', '--tools', '', '--no-session-persistence', '--setting-sources', '',
+                '--strict-mcp-config', '--disable-slash-commands',
                 '--output-format', 'json', '--json-schema', SCHEMA.to_json, '--system-prompt', 'be brief',
                 '--max-budget-usd', '0.1']
     assert_equal expected, recorded['argv']
@@ -155,6 +157,7 @@ class ClaudeCliTest < Minitest::Test
     assert_equal({ 'answer' => 'ok' }, reply.output)
     assert_in_delta 0.0123, reply.cost_usd
     expected = ['-p', '--model', 'haiku', '--tools', '', '--no-session-persistence', '--setting-sources', '',
+                '--strict-mcp-config', '--disable-slash-commands',
                 '--input-format', 'stream-json', '--output-format', 'stream-json', '--verbose',
                 '--json-schema', SCHEMA.to_json, '--system-prompt', 'be brief', '--max-budget-usd', '0.1']
     assert_equal expected, recorded['argv']
@@ -253,5 +256,26 @@ class ClaudeCliTest < Minitest::Test
     assert_nil reply.error
     assert reply.output['answer']
     assert_operator reply.cost_usd, :>, 0
+  end
+
+  def test_live_image_call
+    skip 'set LIVE_CLAUDE=1' unless ENV['LIVE_CLAUDE'] == '1'
+    schema = { type: 'object', properties: { transcription: { type: 'string' } }, required: ['transcription'], additionalProperties: false }
+    client = Koholint::Agents::ClaudeCli.new(model: 'haiku', timeout: 90)
+    reply = client.call(system: 'Transcribe the text in the image.', prompt: 'What does the image say?', schema:, image: hello_png)
+    assert_nil reply.error
+    assert_kind_of String, reply.output['transcription']
+    assert_operator reply.cost_usd, :>, 0
+  end
+
+  def hello_png
+    glyphs = { 'H' => %w[101 101 111 101 101], 'E' => %w[111 100 110 100 111], 'L' => %w[100 100 100 100 111], 'O' => %w[111 101 101 101 111] }
+    cell = 24
+    bitmap = 'HELLO'.chars.flat_map { |c| glyphs[c].map { |row| "#{row}0" } }
+    cols = 'HELLO'.size * 4
+    rows = (0...5).map { |r| 'HELLO'.chars.map { |c| "#{glyphs[c][r]}0" }.join }
+    pixels = rows.flat_map { |row| ([row.chars.flat_map { |b| ([b == '1' ? [0, 0, 0] : [255, 255, 255]] * cell).flatten }.pack('C*')] * cell) }
+    bitmap.clear
+    Koholint::Png.encode(rgb: pixels.join, width: cols * cell, height: 5 * cell)
   end
 end

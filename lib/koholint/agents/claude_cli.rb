@@ -32,7 +32,7 @@ module Koholint
       def argv(system, schema, image)
         format = image ? ['--input-format', 'stream-json', '--output-format', 'stream-json', '--verbose'] : ['--output-format', 'json']
         [@command, '-p', '--model', @model, '--tools', '', '--no-session-persistence', '--setting-sources', '',
-         *format, '--json-schema', JSON.generate(schema), '--system-prompt', system, '--max-budget-usd', @max_call_usd.to_s]
+         '--strict-mcp-config', '--disable-slash-commands', *format, '--json-schema', JSON.generate(schema), '--system-prompt', system, '--max-budget-usd', @max_call_usd.to_s]
       end
 
       def stdin_for(prompt, image)
