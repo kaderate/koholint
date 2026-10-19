@@ -8,7 +8,7 @@ require 'koholint/perception'
 class SkillsTest < Minitest::Test
   def registry = @registry ||= Koholint::Skills::Registry.default
 
-  def state(x: 80, y: 72, hp: 24, room_id: 1, dialog_state: 0, frame: 0)
+  def state(x: 88, y: 80, hp: 24, room_id: 1, dialog_state: 0, frame: 0)
     Koholint::GameState.new(frame:, room_id:, map_id: 0, x:, y:, hp:, dialog_state:, game_mode: 0x0B, game_submode: 7, milestone: :none)
   end
 
@@ -75,8 +75,8 @@ class SkillsTest < Minitest::Test
   end
 
   def test_walk_done_when_cell_changes
-    execution = registry.start('walk', state(y: 72), { direction: :up, cells: 1 })
-    states = (0..40).map { |i| state(y: 72 - i) }
+    execution = registry.start('walk', state(y: 80), { direction: :up, cells: 1 })
+    states = (0..40).map { |i| state(y: 80 - i) }
     inputs = drive(execution, states)
     result = execution.result(states[inputs.size])
     assert_equal :done, result[:stopped_by]
@@ -138,11 +138,11 @@ class SkillsTest < Minitest::Test
   end
 
   def test_walk_counts_net_cells
-    execution = registry.start('walk', state(y: 72), { direction: :up, cells: 2 })
-    ys = [72, 71, 70, 56, 40, 39]
+    execution = registry.start('walk', state(y: 80), { direction: :up, cells: 2 })
+    ys = [80, 79, 78, 64, 48, 47]
     inputs = drive(execution, ys.map { |y| state(y:) })
     assert_equal 4, inputs.size
-    result = execution.result(state(y: 40))
+    result = execution.result(state(y: 48))
     assert_equal :done, result[:stopped_by]
     assert_equal 2, result[:moved_cells]
   end
@@ -156,12 +156,81 @@ class SkillsTest < Minitest::Test
 
   def test_walk_bounce_across_a_boundary_is_not_progress
     execution = registry.start('walk', state(y: 72), { direction: :up, cells: 2 })
-    ys = [72, 71, 72, 71, 72, 71, 72] + [71] * 10
+    ys = [72, 71, 72, 71, 72, 71, 72] + [71] * 10 + [68] * 20
     inputs = drive(execution, ys.map { |y| state(y:) })
-    result = execution.result(state(y: 71))
+    result = execution.result(state(y: 68))
     assert_equal :blocked, result[:stopped_by]
     assert_operator inputs.size, :<, ys.size
     assert_operator result[:moved_cells], :<=, 1
+  end
+
+  def test_walk_blocked_at_y39_centres_up_and_ends_aligned
+    execution = registry.start('walk', state(y: 80), { direction: :up, cells: 5 })
+    states = (80).downto(39).map { |y| state(y:) } + [state(y: 39)] * 10 + (38).downto(30).map { |y| state(y:) }
+    inputs = drive(execution, states)
+    result = execution.result(state(y: 35))
+    assert_equal :blocked, result[:stopped_by]
+    assert_equal({ row: 1, col: 5, direction: :up }, result[:blocked_at])
+    assert_equal [[:up]], inputs.uniq
+    assert_operator inputs.size - (42 + 8), :<=, 7
+    assert_equal inputs.size, result[:frames]
+    assert result[:aligned]
+  end
+
+  def test_blocked_walk_reports_the_cell_and_direction
+    execution = registry.start('walk', state, { direction: :right, cells: 2 })
+    drive(execution, Array.new(40) { state })
+    result = execution.result(state)
+    assert_equal :blocked, result[:stopped_by]
+    assert_equal({ row: 4, col: 5, direction: :right }, result[:blocked_at])
+    assert result[:aligned]
+  end
+
+  def test_centring_is_skipped_on_dialogue_and_blocked_at_is_nil_otherwise
+    execution = registry.start('walk', state(y: 72), { direction: :up, cells: 3 })
+    event = state(y: 71, dialog_state: 129)
+    drive(execution, [state, event])
+    result = execution.result(event)
+    assert_equal :dialogue, result[:stopped_by]
+    assert_equal 1, result[:frames]
+    assert_nil result[:blocked_at]
+  end
+
+  def test_centring_stops_after_sixteen_frames_when_never_aligned
+    execution = registry.start('walk', state(y: 39), { direction: :up, cells: 1 })
+    inputs = drive(execution, Array.new(60) { state(y: 39) })
+    result = execution.result(state(y: 39))
+    assert_equal 8 + 16, inputs.size
+    assert_equal :blocked, result[:stopped_by]
+    refute result[:aligned]
+  end
+
+  def test_centring_aborts_on_budget
+    execution = registry.start('walk', state(y: 39), { direction: :up, cells: 1 })
+    9.times { execution.next_input(state(y: 39)) }
+    assert_equal [:up], execution.next_input(state(y: 39))
+    execution.abort(:budget)
+    result = execution.result(state(y: 39))
+    assert_equal :budget, result[:stopped_by]
+    assert_equal 9, result[:frames]
+  end
+
+  def test_press_and_wait_report_alignment_without_centring
+    execution = registry.start('wait', state(y: 39), { frames: 2 })
+    assert_equal [[], []], drive(execution, Array.new(5) { state(y: 39) })
+    result = execution.result(state(y: 39))
+    assert_equal({ dx: 0, dy: 7 }, result[:offset])
+    refute result[:aligned]
+    assert_nil result[:blocked_at]
+  end
+
+  def test_rom_walk_up_three_ends_aligned_and_a_left_walk_is_not_blocked
+    skip_without_rom!
+    emulator = fresh(EmulatorCache.interactive)
+    result, = run_skill(emulator, 'walk', { direction: :up, cells: 3 })
+    assert result[:aligned], result.inspect
+    result, = run_skill(emulator, 'walk', { direction: :left, cells: 3 })
+    refute_equal :blocked, result[:stopped_by], result.inspect
   end
 
   def test_hard_cap
