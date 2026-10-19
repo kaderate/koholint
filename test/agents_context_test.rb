@@ -62,6 +62,14 @@ class AgentsContextTest < Minitest::Test
     assert_includes text, "- right: cell (3,5) '#', belief no, last walk: blocked\n"
   end
 
+  def test_talk_to_results_show_the_path_and_what_happened
+    talk = result(skill: 'talk_to', params: { row: 2, col: 5 }, stopped_by: 'no_response', moved_cells: 2, path_length: 2, steps_done: 2, aligned: true,
+                  talked: false, standing_cell: { row: 1, col: 5 }, facing: :down)
+    assert_includes build(last_results: [talk]), 'talk_to {"row":2,"col":5}: stopped_by no_response, 40 frames, moved 2 cells, room_changed false, ' \
+                                                 'hp_delta 0, dialogue open before false, after false, path 2, steps 2, aligned true, ' \
+                                                 'talked false, standing cell (1,5), facing down'
+  end
+
   def test_a_later_walk_overrides_a_goto_block_for_that_direction
     goto = result(skill: 'goto', params: { row: 1, col: 9 }, stopped_by: 'blocked', path_length: 6, steps_done: 2, aligned: true,
                   blocked_at: { 'row' => 3, 'col' => 5, 'direction' => 'right' })

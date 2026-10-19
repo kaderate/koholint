@@ -139,7 +139,7 @@ module Koholint
       end
 
       def note_no_path(choice, outcome, frame)
-        return unless choice[:skill] == 'goto' && outcome[:stopped_by].to_s == 'no_path' && @objectives.current
+        return unless %w[goto talk_to].include?(choice[:skill]) && outcome[:stopped_by].to_s == 'no_path' && @objectives.current
 
         track { @objectives.note_no_path(frame:) }
       end
@@ -244,7 +244,7 @@ module Koholint
             @ledger.entered(place:, cell:, direction:)
             cell = [cell[0] + delta[0], cell[1] + delta[1]]
           end
-        elsif choice[:skill] == 'goto'
+        elsif %w[goto talk_to].include?(choice[:skill])
           Array(outcome[:crossed]).each { |row, col, direction| @ledger.entered(place:, cell: [row, col], direction:) }
         end
       end
@@ -369,6 +369,9 @@ module Koholint
         blocked = outcome[:blocked_at]
         text += ", blocked_at (#{blocked[:row]},#{blocked[:col]}) #{blocked[:direction]}" if blocked.is_a?(Hash)
         text += ", cause #{outcome[:cause]}" if outcome[:cause]
+        text += ", talked #{outcome[:talked]}" unless outcome[:talked].nil?
+        standing = outcome[:standing_cell]
+        text += ", standing_cell (#{standing[:row]},#{standing[:col]})" if standing.is_a?(Hash)
         text
       end
     end

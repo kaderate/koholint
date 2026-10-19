@@ -163,7 +163,13 @@ module Koholint
         line = "#{r[:skill]} #{r[:params].to_json}: stopped_by #{r[:stopped_by]}#{cause}, #{r[:frames]} frames, " \
                "moved #{r[:moved_px] ? "#{r[:moved_px]} px" : cells(r[:moved_cells])}, " \
                "room_changed #{r[:room_changed]}, hp_delta #{r[:hp_delta]}, dialogue open before #{r[:dialog_before]}, after #{r[:dialog_after]}"
-        line += ", path #{r[:path_length]}, steps #{r[:steps_done]}, aligned #{r[:aligned]}" if r[:skill].to_s == 'goto'
+        line += ", path #{r[:path_length]}, steps #{r[:steps_done]}, aligned #{r[:aligned]}" if %w[goto talk_to].include?(r[:skill].to_s)
+        if r[:skill].to_s == 'talk_to'
+          standing = r[:standing_cell]
+          line += ", talked #{r[:talked]}"
+          line += ", standing cell (#{standing[:row]},#{standing[:col]})" if standing
+          line += ", facing #{r[:facing]}" if r[:facing]
+        end
         block = blocked_at(r)
         block ? "#{line}, blocked at (#{block[:row]},#{block[:col]}) #{block[:direction]}" : line
       end
