@@ -1,0 +1,11 @@
+{
+  "link_footprint": {
+    "value": {
+      "width": 8,
+      "row_band": { "min_offset": -6, "max_offset": 6 },
+      "wall_stops": { "left_x": 20, "right_x": 108 }
+    },
+    "verified_count": 1,
+    "provenance": "ROM probe by button inputs only from EmulatorCache.interactive (Link at (70,52), place [163,16]): after N frames of up, 70 frames of left. Free to x=20 for y 38..28, blocked at x=68 for y 39..52, so the free row-1 band is y 26..38 (center 32, offsets -6..+6; 26 is also the top limit of the room, so the lower edge 38/39 is the measured one). Right walk at y=26 stops at x=108. Width 8 is inferred from the left stop x=20 against the 16 px wall cell, not measured separately; the row band is generalised from row 1 to other rows by the 16 px cell, not measured."
+  }
+}
