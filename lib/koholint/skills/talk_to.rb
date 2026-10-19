@@ -3,8 +3,9 @@ require 'koholint/skills/goto'
 module Koholint
   module Skills
     class TalkTo
-      FACE_FRAMES = 8
-      FACE_MIN_FRAMES = 3
+      FACE_FRAMES = 16
+      CONTACT_FRAMES = 3
+      FREE_PIXELS = 12
       PRESS_FRAMES = 3
       RESPONSE_FRAMES = 30
 
@@ -13,10 +14,12 @@ module Koholint
           @person = person
           @phase = :walk
           @standing = nil
+          @grid = nil
           @talked = false
           @face_frames = 0
           @face_origin = nil
           @face_last = nil
+          @face_still = 0
           @press_frames = 0
           @response_frames = 0
           super(target: nil, **rest)
@@ -40,10 +43,14 @@ module Koholint
 
         def centres? = @phase == :walk
 
+        def planner_for(context)
+          @grid = context[:grid]
+          super
+        end
+
         def initial_plan
           from = @start.cell
-          options = Navigation::Planner::DELTAS.keys.filter_map do |direction|
-            cell = [@person[0] + Navigation::Planner::DELTAS[direction][0], @person[1] + Navigation::Planner::DELTAS[direction][1]]
+          options = neighbours.filter_map do |cell|
             path = from && @planner&.path(from:, to: cell)
             [path.size, turns(path), cell] if path
           end
@@ -58,6 +65,13 @@ module Koholint
           plan(from)
         end
 
+        def neighbours
+          Navigation::Planner::DELTAS.values.filter_map do |dr, dc|
+            cell = [@person[0] + dr, @person[1] + dc]
+            cell if cell[0].between?(0, Geometry::ROWS - 1) && cell[1].between?(0, Geometry::COLS - 1) && !@grid&.static_sprite(*cell)
+          end
+        end
+
         def turns(path)
           directions = path.each_cons(2).map { |a, b| Navigation::Planner.direction_between(a, b) }
           directions.each_cons(2).count { |a, b| a != b }
@@ -67,8 +81,7 @@ module Koholint
           return 'no grid' unless @planner
           return 'no current cell' unless from
 
-          reasons = Navigation::Planner::DELTAS.map do |direction, (dr, dc)|
-            cell = [@person[0] + dr, @person[1] + dc]
+          reasons = neighbours.map do |cell|
             "(#{cell[0]},#{cell[1]}) #{@planner.why_not(from:, to: cell)}"
           end
           "no reachable cell next to the target: #{reasons.join('; ')}"
@@ -89,24 +102,32 @@ module Koholint
         end
 
         def face(state)
+          return finish(:target_free) if @face_frames.zero? && believed_free?
+
           position = [state.x, state.y]
           @face_origin ||= position
-          moved = (position[0] - @face_origin[0]).abs + (position[1] - @face_origin[1]).abs
-          stopped = @face_frames >= FACE_MIN_FRAMES && position == @face_last
-          return finish(:target_free) if moved > Geometry::CELL / 2 || (@face_frames >= FACE_FRAMES && !stopped && moved > Geometry::ALIGN_TOLERANCE)
+          @face_still = position == @face_last ? @face_still + 1 : 0
+          return begin_talk(state) if @face_still >= CONTACT_FRAMES
 
-          if stopped || @face_frames >= FACE_FRAMES
-            @phase = :talk
-            return talk(state)
-          end
+          axis = %i[left right].include?(@facing) ? 0 : 1
+          return finish(:target_free) if (position[axis] - @face_origin[axis]).abs >= FREE_PIXELS || @face_frames >= FACE_FRAMES
 
           @face_last = position
           @face_frames += 1
           [@facing]
         end
 
+        def believed_free?
+          @grid && !@grid.static_sprite(*@person) && @grid.passable(*@person, @facing) == :yes
+        end
+
+        def begin_talk(state)
+          @phase = :talk
+          talk(state)
+        end
+
         def talk(state)
-          if state.dialog_open?
+          if state.dialog_open? && !@start.dialog_open?
             @talked = true
             return finish(:done)
           end

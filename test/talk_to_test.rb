@@ -28,8 +28,7 @@ class TalkToTest < Minitest::Test
 
   def centre(row, col) = Koholint::Geometry.center_of(row, col)
 
-  # person: blocks Link; opens_after: A presses needed before dialogue opens (nil = never); free: person cell is walkable
-  def talk(row, col, from: [4, 5], grid: FakeGrid.new(sprites: [[row, col]]), ledger: nil, person: [row, col], opens_after: 1, free: false,
+  def talk(row, col, from: [4, 5], grid: FakeGrid.new(sprites: [[row, col]]), ledger: nil, solid: [row, col], opens_after: 1, free: false,
            dialogue_at: nil, room_change_at: nil, damage_at: nil, limit: 600)
     x, y = centre(*from)
     start = state(x:, y:)
@@ -52,7 +51,7 @@ class TalkToTest < Minitest::Test
       end
       dx, dy = { up: [0, -1], down: [0, 1], left: [-1, 0], right: [1, 0] }.fetch(buttons.first, [0, 0])
       cell = Koholint::Geometry.cell_for(x + dx + (7 * dx), y + dy + (7 * dy))
-      next if cell == person && !free
+      next if cell == solid && !free
       next if cell && grid.passable(*cell, nil) == :no
 
       x += dx
@@ -83,7 +82,8 @@ class TalkToTest < Minitest::Test
   end
 
   def test_fewest_turns_breaks_a_distance_tie
-    result, = talk(2, 7, from: [4, 5])
+    result, = talk(2, 6, from: [4, 5])
+    assert_equal({ row: 2, col: 5 }, result[:standing_cell])
     assert_equal :done, result[:stopped_by], result.inspect
   end
 
@@ -112,10 +112,89 @@ class TalkToTest < Minitest::Test
   end
 
   def test_target_free_when_link_walks_into_the_cell
-    result, inputs = talk(4, 8, grid: FakeGrid.new, free: true, opens_after: nil)
+    result, inputs = talk(4, 8, grid: FakeGrid.new(sprites: [[4, 8]]), free: true, opens_after: nil)
     assert_equal :target_free, result[:stopped_by]
     assert_equal false, result[:talked]
     refute_includes inputs, [:a]
+  end
+
+  def face_run(positions, grid: FakeGrid.new(sprites: [[4, 6]]), target: [4, 6], dialog_at: nil)
+    x, y = centre(4, 5)
+    execution = registry.start('talk_to', state(x:, y:), { row: target[0], col: target[1] }, { grid: })
+    inputs = []
+    index = 0
+    400.times do |i|
+      px, py = positions.call(i, x, y)
+      buttons = execution.next_input(state(x: px, y: py, dialog_state: dialog_at && i >= dialog_at ? 3 : 0))
+      break unless buttons
+
+      inputs << buttons
+      index += 1
+    end
+    [execution.result, inputs]
+  end
+
+  def test_contact_after_closing_some_pixels_goes_on_to_press_a
+    [5, 8].each do |closing|
+      positions = ->(i, x, y) { [x + [i, closing].min, y] }
+      result, inputs = face_run(positions, dialog_at: 20)
+      assert_equal :done, result[:stopped_by], "closing #{closing}: #{result.inspect}"
+      assert result[:talked]
+      assert_includes inputs, [:a]
+      assert_equal [:right], inputs.flatten.uniq - [:a]
+    end
+  end
+
+  def test_still_moving_after_the_cap_is_target_free
+    positions = ->(i, x, y) { [x + (i / 3), y] }
+    result, inputs = face_run(positions)
+    assert_equal :target_free, result[:stopped_by]
+    refute_includes inputs, [:a]
+    assert_operator inputs.size, :<=, 18
+  end
+
+  def test_twelve_pixels_along_the_facing_axis_is_target_free
+    result, inputs = face_run(->(i, x, y) { [x + i, y] })
+    assert_equal :target_free, result[:stopped_by]
+    refute_includes inputs, [:a]
+    assert_operator result[:frames], :<=, 15
+  end
+
+  def test_a_target_the_grid_believes_free_finishes_without_pressing
+    result, inputs = face_run(->(_i, x, y) { [x, y] }, grid: FakeGrid.new)
+    assert_equal :target_free, result[:stopped_by]
+    assert_equal [[]], inputs
+    assert_equal 1, result[:frames]
+  end
+
+  def test_a_tall_target_is_approached_from_next_to_a_covered_cell
+    grid = FakeGrid.new(sprites: [[3, 8], [4, 8]])
+    [[3, 8], [4, 8]].each do |row, col|
+      result, = talk(row, col, grid:, solid: [row, col])
+      assert_equal :done, result[:stopped_by], result.inspect
+      standing = [result[:standing_cell][:row], result[:standing_cell][:col]]
+      refute_includes [[3, 8], [4, 8]], standing
+      assert_includes [[row - 1, col], [row + 1, col], [row, col - 1], [row, col + 1]], standing
+    end
+  end
+
+  def test_a_covered_neighbour_is_never_the_standing_cell
+    result, = talk(4, 6, from: [4, 5], grid: FakeGrid.new(sprites: [[4, 6], [4, 5]]))
+    refute_equal({ row: 4, col: 5 }, result[:standing_cell])
+  end
+
+  def test_a_person_at_the_edge_of_the_grid
+    result, = talk(4, 9, grid: FakeGrid.new(sprites: [[4, 9]]))
+    assert_equal({ row: 4, col: 8 }, result[:standing_cell])
+    assert_equal :right, result[:facing]
+    assert_equal :done, result[:stopped_by]
+  end
+
+  def test_a_dialogue_open_at_the_start_is_not_a_talk
+    x, y = centre(4, 5)
+    execution = registry.start('talk_to', state(x:, y:, dialog_state: 3), { row: 4, col: 6 }, { grid: FakeGrid.new(sprites: [[4, 6]]) })
+    60.times { break unless execution.next_input(state(x:, y:, dialog_state: 3)) }
+    assert_equal false, execution.result[:talked]
   end
 
   def test_a_dialogue_before_a_is_pressed_is_an_interruption
@@ -159,7 +238,7 @@ class TalkToTest < Minitest::Test
   end
 
   def test_blocked_walk_reports_blocked_at
-    result, = talk(4, 9, grid: FakeGrid.new(sprites: [[4, 9]]), person: [4, 7])
+    result, = talk(4, 9, grid: FakeGrid.new(sprites: [[4, 9]]), solid: [4, 7])
     assert_equal :blocked, result[:stopped_by]
     assert_equal :right, result[:blocked_at][:direction]
   end
@@ -204,7 +283,12 @@ class TalkToTest < Minitest::Test
       [cell, execution.result(Koholint::Perception.read(copy)).slice(:stopped_by, :talked, :standing_cell, :facing, :frames, :cause, :to, :dialog_after)]
     end
     puts "\nROM talk_to: #{report.inspect}"
-    refute_empty people
+    refute(report.values.any? { |r| r[:stopped_by] == :no_path })
+    [[2, 5], [4, 7]].each do |cell|
+      assert_equal :done, report.fetch(cell)[:stopped_by], cell.inspect
+      assert report.fetch(cell)[:talked], cell.inspect
+      assert report.fetch(cell)[:dialog_after], cell.inspect
+    end
   end
 
   class ProbeAdapter
