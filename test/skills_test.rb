@@ -83,7 +83,9 @@ class SkillsTest < Minitest::Test
     assert_equal 1, result[:moved_cells]
     assert_equal({ row: 4, col: 5 }, result[:from].slice(:row, :col))
     assert_equal({ row: 3, col: 5 }, result[:to].slice(:row, :col))
-    assert_equal inputs.size, result[:frames]
+    assert_equal 12, inputs.size
+    assert_equal 3, inputs.last(3).count([:up])
+    assert_equal 9, result[:frames] - 3
   end
 
   def test_walk_blocked_after_eight_still_frames
@@ -186,6 +188,22 @@ class SkillsTest < Minitest::Test
     assert result[:aligned]
   end
 
+  def test_blocked_at_survives_a_dialogue_opening_during_centring
+    execution = registry.start('walk', state(y: 39), { direction: :left, cells: 1 })
+    inputs = drive(execution, Array.new(9) { state(y: 39) } + [state(y: 39, dialog_state: 129)])
+    result = execution.result(state(y: 39, dialog_state: 129))
+    assert_equal :dialogue, result[:stopped_by]
+    assert_equal({ row: 1, col: 5, direction: :left }, result[:blocked_at])
+    assert_equal [[:left]] * 8 + [[:up]], inputs
+  end
+
+  def test_centring_does_not_press_the_blocked_direction_again
+    execution = registry.start('walk', state(y: 39), { direction: :up, cells: 1 })
+    inputs = drive(execution, Array.new(40) { state(y: 39) })
+    assert_equal [[:up]] * 8, inputs
+    assert_equal :blocked, execution.result(state(y: 39))[:stopped_by]
+  end
+
   def test_centring_is_skipped_on_dialogue_and_blocked_at_is_nil_otherwise
     execution = registry.start('walk', state(y: 72), { direction: :up, cells: 3 })
     event = state(y: 71, dialog_state: 129)
@@ -197,7 +215,7 @@ class SkillsTest < Minitest::Test
   end
 
   def test_centring_stops_after_sixteen_frames_when_never_aligned
-    execution = registry.start('walk', state(y: 39), { direction: :up, cells: 1 })
+    execution = registry.start('walk', state(y: 39), { direction: :left, cells: 1 })
     inputs = drive(execution, Array.new(60) { state(y: 39) })
     result = execution.result(state(y: 39))
     assert_equal 8 + 16, inputs.size
@@ -206,7 +224,7 @@ class SkillsTest < Minitest::Test
   end
 
   def test_centring_aborts_on_budget
-    execution = registry.start('walk', state(y: 39), { direction: :up, cells: 1 })
+    execution = registry.start('walk', state(y: 39), { direction: :left, cells: 1 })
     9.times { execution.next_input(state(y: 39)) }
     assert_equal [:up], execution.next_input(state(y: 39))
     execution.abort(:budget)
@@ -227,11 +245,21 @@ class SkillsTest < Minitest::Test
   def test_rom_walk_up_three_ends_aligned_and_a_left_walk_is_not_blocked
     skip_without_rom!
     emulator = fresh(EmulatorCache.interactive)
-    result, = run_skill(emulator, 'walk', { direction: :up, cells: 3 })
+    execution = registry.start('walk', Koholint::Perception.read(emulator), { direction: :up, cells: 3 })
+    before_centring = nil
+    while (buttons = execution.next_input(Koholint::Perception.read(emulator)))
+      before_centring ||= Koholint::Perception.read(emulator) if execution.instance_variable_get(:@centring)
+      emulator.step(buttons)
+    end
+    final = Koholint::Perception.read(emulator)
+    assert_operator (before_centring.y - 32).abs, :>, Koholint::Geometry::ALIGN_TOLERANCE
+    result = execution.result(final)
     assert result[:aligned], result.inspect
+    assert_operator result[:offset][:dy].abs, :<=, Koholint::Geometry::ALIGN_TOLERANCE
     result, = run_skill(emulator, 'walk', { direction: :left, cells: 3 })
     refute_equal :blocked, result[:stopped_by], result.inspect
   end
+
 
   def test_hard_cap
     execution = Koholint::Skills::Wait::Run.new(skill: 'wait', params: {}, state:, duration: 1000)
