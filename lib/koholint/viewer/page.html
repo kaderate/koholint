@@ -60,8 +60,12 @@
 
   function formatPlace(place) { return Array.isArray(place) ? '[' + place.join(',') + ']' : ''; }
 
+  function formatParam(v) { return v !== null && typeof v === 'object' ? JSON.stringify(v) : String(v); }
+
   function formatSkillChoice(choice) {
-    var params = choice.params && typeof choice.params === 'object' ? Object.keys(choice.params).map(function (k) { return choice.params[k]; }) : [];
+    var p = choice.params && typeof choice.params === 'object' ? choice.params : {};
+    var keyed = choice.skill !== 'walk' && Object.keys(p).length > 1;
+    var params = Object.keys(p).map(function (k) { return keyed ? k + '=' + formatParam(p[k]) : formatParam(p[k]); });
     return [choice.skill].concat(params).join(' ');
   }
 
@@ -83,9 +87,15 @@
     return line;
   }
 
+  function truncate(value, max) {
+    var str = String(value);
+    return str.length > max ? str.slice(0, max - 1) + '…' : str;
+  }
+
   function formatObjective(s) {
-    var objective = s.status && s.status.objective;
-    return objective ? objective : 'none';
+    var st = s.status || {};
+    if (!st.objective) return 'none';
+    return truncate(st.objective_title || st.objective, 40);
   }
 
   function formatDollars(value) { return '$' + (typeof value === 'number' ? value : 0).toFixed(2); }
@@ -111,13 +121,14 @@
       var what = [p.kind || e.id, formatPlace(p.place)].filter(Boolean).join(' ');
       return head + 'objective: ' + what + ' ' + e.status + (e.reason ? ' (' + e.reason + ')' : '');
     }
-    if (e.type === 'dialogue') return typeof e.text === 'string' ? head + 'dialogue: "' + e.text + '"' : head + 'dialogue';
+    if (e.type === 'dialogue') return typeof e.text === 'string' ? head + 'dialogue: "' + truncate(e.text, 200) + '"' : head + 'dialogue';
     return head + e.type;
   }
 
   function eventTitle(e) {
     if (e.type === 'decision') return typeof e.justification === 'string' ? e.justification : '';
     if (e.type === 'objective') return typeof e.title === 'string' ? e.title : '';
+    if (e.type === 'dialogue') return typeof e.text === 'string' ? e.text : '';
     return '';
   }
 
@@ -265,6 +276,7 @@
       var item = document.createElement('span');
       var value = document.createElement('b');
       try { value.textContent = text(field[1](state)); } catch (e) { value.textContent = '-'; }
+      if (field[0] === 'objective' && state.status && state.status.objective) value.title = String(state.status.objective);
       if (field[0] === 'health') value.className = 'health-' + value.textContent;
       item.append(field[0] + ' ', value);
       bar.appendChild(item);

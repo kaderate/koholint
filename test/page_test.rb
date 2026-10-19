@@ -10,7 +10,10 @@ class PageTest < Minitest::Test
   end
 
   def evaluate(expression)
-    skip 'node is not installed' unless system('which node > /dev/null 2>&1')
+    unless system('which node > /dev/null 2>&1')
+      flunk 'node is not installed and CI is set' if ENV['CI']
+      skip 'node is not installed: page formatting tests not run'
+    end
     out, status = Open3.capture2('node', '-e', "#{pure_source}\nconsole.log(JSON.stringify(#{expression}));")
     assert status.success?
     JSON.parse(out)
@@ -155,11 +158,47 @@ class PageTest < Minitest::Test
     assert_equal '$0.00', evaluate('formatDollars(null)')
     assert_equal 'none', evaluate('formatObjective({status: {objective: null}})')
     assert_equal 'o1', evaluate("formatObjective({status: {objective: 'o1'}})")
+    assert_equal 'Leave the house', evaluate("formatObjective({status: {objective: 'o1', objective_title: 'Leave the house'}})")
+    long = evaluate("formatObjective({status: {objective: 'o1', objective_title: '#{'x' * 80}'}})")
+    assert_equal 40, long.length
+    assert long.end_with?('…')
     assert_equal 3, evaluate('formatCalls({status: {calls: 3}})')
     assert_equal 0, evaluate('formatCalls({status: {}})')
   end
 
-  def test_agent_text_is_only_ever_inserted_as_text
-    refute_match(/innerHTML/, PAGE)
+  PAYLOAD = %q(<script>alert(1)</script>"'&)
+
+  def test_untrusted_text_comes_out_verbatim_from_the_formatters
+    p = JSON.generate(PAYLOAD)
+    assert_equal PAYLOAD, evaluate("eventTitle({type: 'decision', justification: #{p}})")
+    assert_equal PAYLOAD, evaluate("eventTitle({type: 'dialogue', text: #{p}})")
+    assert_equal PAYLOAD, evaluate("eventTitle({type: 'objective', title: #{p}})")
+    assert_equal %(f1 · dialogue: "#{PAYLOAD}"), fmt({ frame: 1, type: 'dialogue', text: PAYLOAD })
+    assert_equal %(f1 · c decides objective "#{PAYLOAD}"), fmt({ frame: 1, type: 'decision', agent: 'c', choice: { title: PAYLOAD } })
+    assert_equal "f1 · c decides walk #{PAYLOAD}", fmt({ frame: 1, type: 'decision', agent: 'c', choice: { skill: 'walk', params: { a: PAYLOAD } } })
+    assert_equal PAYLOAD, evaluate("formatObjective({status: {objective: 'o', objective_title: #{p}}})")
+  end
+
+  def test_event_titles_do_not_leak_other_fields
+    assert_equal '', evaluate("eventTitle({type: 'action', justification: 'x', text: 'y'})")
+    assert_equal '', evaluate("eventTitle({type: 'decision', justification: {a: 1}})")
+  end
+
+  def test_agent_text_is_never_assigned_as_html
+    refute_match(/innerHTML|outerHTML|insertAdjacentHTML|document\.write/, PAGE)
+  end
+
+  def test_long_dialogue_is_truncated_in_the_row_and_whole_in_the_title
+    text = 'y' * 300
+    line = fmt({ frame: 1, type: 'dialogue', text: text })
+    assert_equal 'f1 · dialogue: "'.length + 200 + 1, line.length
+    assert_includes line, '…'
+    assert_equal text, evaluate("eventTitle({type: 'dialogue', text: '#{text}'})")
+  end
+
+  def test_multi_param_skills_other_than_walk_show_their_keys
+    skill = { skill: 'talk', params: { npc: 'old man', times: 2 } }
+    assert_equal 'f1 · c decides talk npc=old man times=2', fmt({ frame: 1, type: 'decision', agent: 'c', choice: skill })
+    assert_equal 'f1 · c decides use sword', fmt({ frame: 1, type: 'decision', agent: 'c', choice: { skill: 'use', params: { item: 'sword' } } })
   end
 end

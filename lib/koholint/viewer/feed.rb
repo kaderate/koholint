@@ -18,6 +18,8 @@ module Koholint
         'dialogue' => %w[frame type place text source page]
       }.freeze
 
+      DETERMINISTIC_AGENTS = %w[start_game walk_and_talk].freeze
+
       CACHE = {}
       CACHE_LOCK = Mutex.new
       GRID_CACHE = {}
@@ -34,7 +36,8 @@ module Koholint
         summary[:health] = 'unknown' if trace.none? { |e| Summary.progress?(e) } && %w[progressing stalled].include?(summary[:health])
         {
           status: summary.merge(run_id: File.basename(run_dir), flow_version: manifest['flow_version'],
-                                manifest_status: manifest['status'], budget: manifest['budget'], calls: calls(trace)),
+                                manifest_status: manifest['status'], budget: manifest['budget'], calls: calls(trace),
+                                objective_title: objective_title(trace, summary[:objective])),
           replay: { frame: follower.frame, journal_frames: follower.journal_frames, lag: follower.lag, sync: follower.sync },
           events: events(trace, limit),
           grid: grid(run_dir, trace, follower.frame)
@@ -42,7 +45,14 @@ module Koholint
       end
 
       def calls(trace)
-        trace.count { |e| e['type'] == 'decision' && (e['agent'] == 'claude' || e['cost_usd'].to_f.positive?) }
+        trace.count { |e| e['type'] == 'decision' && !DETERMINISTIC_AGENTS.include?(e['agent']) }
+      end
+
+      def objective_title(trace, id)
+        return nil unless id
+
+        started = trace.reverse_each.find { |e| e['type'] == 'objective' && e['id'] == id && e['status'] == 'started' }
+        started && (started['title'] || id)
       end
 
       def trace_events(run_dir)

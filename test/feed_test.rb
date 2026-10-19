@@ -32,7 +32,7 @@ class FeedTest < Minitest::Test
       assert_equal File.basename(dir), doc[:status][:run_id]
       assert_equal({ flow_version: 'f', manifest_status: 'running', budget: { 'frames' => 9 }, health: 'unknown',
                      hearts: 2.0, max_hearts: 3.0, objective: nil, last_notable: nil, highest_milestone: 'none',
-                     frames: 3, cost_usd: 0.1, calls: 1, run_id: File.basename(dir) }, doc[:status])
+                     frames: 3, cost_usd: 0.1, calls: 1, objective_title: nil, run_id: File.basename(dir) }, doc[:status])
       assert_equal({ frame: 90, journal_frames: 100, lag: 10, sync: :in_sync }, doc[:replay])
       assert_equal [{ frame: 2, type: 'decision', decision_point: 'move', agent: 'a', choice: { 'to' => 2 }, confidence: 0.5,
                       justification: 'j' },
@@ -53,7 +53,7 @@ class FeedTest < Minitest::Test
         file.puts(JSON.generate(v: 1, type: 'dialogue', frame: 5, place: [1, 2], text: 'Hi', source: 'agent', page: 0))
       end
       doc = Koholint::Viewer::Feed.for(dir, FOLLOWER)
-      assert_equal ['o1', 2, 0.75], doc[:status].values_at(:objective, :calls, :cost_usd)
+      assert_equal ['o1', 'Go out', 2, 0.75], doc[:status].values_at(:objective, :objective_title, :calls, :cost_usd)
       assert_equal [true, nil], doc[:events].select { |e| e[:agent] == 'claude' }.map { |e| e[:fallback] }
       assert_equal({ frame: 2, type: 'objective', id: 'o1', status: 'started', predicate: { 'kind' => 'leave_place' }, title: 'Go out' },
                    doc[:events].find { |e| e[:type] == 'objective' })
@@ -61,6 +61,24 @@ class FeedTest < Minitest::Test
                    doc[:events].find { |e| e[:type] == 'dialogue' })
       trace.emit(:objective, frame: 6, id: 'o1', status: 'achieved', predicate: {})
       assert_nil Koholint::Viewer::Feed.for(dir, FOLLOWER)[:status][:objective]
+      assert_nil Koholint::Viewer::Feed.for(dir, FOLLOWER)[:status][:objective_title]
+    end
+  end
+
+  def test_objective_title_falls_back_to_the_id
+    with_dir do |dir, trace|
+      trace.emit(:objective, frame: 2, id: 'o9', status: 'started', predicate: {})
+      assert_equal %w[o9 o9], Koholint::Viewer::Feed.for(dir, FOLLOWER)[:status].values_at(:objective, :objective_title)
+    end
+  end
+
+  def test_deterministic_agents_are_not_counted_as_calls
+    with_dir do |dir, trace|
+      %w[start_game walk_and_talk claude other].each_with_index do |agent, i|
+        trace.emit(:decision, frame: i, decision_point: 'move', input: {}, options: [], choice: {}, justification: 'j', confidence: 1.0,
+                              agent:, latency_ms: 0, cost_usd: 0.0)
+      end
+      assert_equal 2, Koholint::Viewer::Feed.for(dir, FOLLOWER)[:status][:calls]
     end
   end
 
