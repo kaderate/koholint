@@ -35,6 +35,26 @@ class StartGameTest < Minitest::Test
     assert_equal 'walk_and_talk', policy.decide(policy.decision_point_for(controllable), controllable, {})[:agent]
   end
 
+  def test_ready_policy_hands_over_only_after_two_boot_ticks_at_the_same_position
+    inner = Class.new do
+      attr_reader :observed
+
+      def observe(state, **) = (@observed = state.x)
+      def decision_point_for(_state) = Koholint::DecisionPoint.move
+    end.new
+    wrapper = Koholint::Policies::StartGame.new(inner, ready: ->(s) { s.game_mode == 0x0B })
+    moving = state(frame: 300, hp: 24, x: 80, mode: 0x0B)
+    wrapper.observe(moving, frame: 300)
+    assert_equal :boot, wrapper.decision_point_for(moving).name
+    shifted = state(frame: 305, hp: 24, x: 81, mode: 0x0B)
+    wrapper.observe(shifted, frame: 305)
+    assert_equal :boot, wrapper.decision_point_for(shifted).name
+    assert_equal 81, inner.observed
+    wrapper.observe(shifted, frame: 310)
+    assert_equal :move, wrapper.decision_point_for(shifted).name
+    assert_equal({ buttons: [], frames: 5 }, wrapper.decide(Koholint::DecisionPoint.macro(:boot), state(mode: 1), {})[:choice])
+  end
+
   def test_engine_run_from_a_cold_boot_reaches_a_playable_state_quickly
     skip_without_rom!
     Dir.mktmpdir do |dir|

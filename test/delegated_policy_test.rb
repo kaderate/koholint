@@ -1,5 +1,6 @@
 require_relative 'test_helper'
 require 'tmpdir'
+require 'digest'
 require 'koholint/engine'
 require 'koholint/agents/claude_cli'
 require 'koholint/policies/delegated'
@@ -84,6 +85,100 @@ class DelegatedPolicyTest < Minitest::Test
     assert_equal 'because', result[:justification]
     assert_equal 200, result[:latency_ms]
     assert_in_delta 0.01, result[:cost_usd]
+  end
+
+  def test_a_predicate_already_true_or_a_leave_of_another_place_is_rejected
+    cell = { 'kind' => 'reach_cell', 'place' => [163, 16], 'row' => 3, 'col' => 4 }
+    bad = [objective(kind: 'leave_place', place: [1, 2]), objective(kind: 'reach_place', place: [163, 16]),
+           ok('title' => 'go', 'predicate' => cell)]
+    bad.each do |reply|
+      p = policy(ScriptedClient.new(objective: reply))
+      _point, result = decide(p)
+      assert result[:fallback], reply.output.inspect
+      assert_equal 'wait', result[:choice][:skill]
+      assert_match(/leave_place must name|already true/, result[:justification])
+      assert_nil @objectives.current
+    end
+    elsewhere = ok('title' => 'go', 'predicate' => cell.merge('col' => 5))
+    [elsewhere, objective(kind: 'reach_place', place: [1, 2])].each do |reply|
+      p = policy(ScriptedClient.new(objective: reply))
+      refute decide(p).last[:fallback]
+      assert @objectives.current
+    end
+  end
+
+  def test_results_carry_the_prompt_and_the_image_sent
+    client = ScriptedClient.new(objective: objective, skill: talk)
+    p = policy(client)
+    first = decide_with_shot(p, state)
+    assert_equal client.calls.first[:prompt], first[:prompt]
+    assert_nil first[:image]
+    second = decide_with_shot(p, state(dialog_state: 130))
+    assert_equal [client.calls.last[:prompt], SHOT], second.values_at(:prompt, :image)
+  end
+
+  def test_leave_place_is_achieved_at_the_first_loaded_observation_without_a_client_call
+    steps = 0
+    p = policy(ScriptedClient.new(objective: objective, skill: walk))
+    p.instance_variable_set(:@on_step, -> { steps += 1 })
+    decide(p)
+    p.observe(state(frame: 110, game_submode: 3, room_id: 5), frame: 110)
+    assert @objectives.current
+    p.observe(state(frame: 130, room_id: 5), frame: 130)
+    assert_nil @objectives.current
+    assert_equal :achieved, @objectives.history.last[:outcome]
+    assert_equal [1, 1], [steps, p.instance_variable_get(:@client).calls.size]
+  end
+
+  def blocked_walk(p, direction, pos: [68, 60], frame: 101)
+    outcome = { skill: 'walk', params: { direction:, cells: 1 }, frames: 8, moved_cells: 0, room_changed: false, hp_delta: 0, stopped_by: 'blocked' }
+    p.after_action(choice: { skill: 'walk', params: outcome[:params] }, outcome:, state: state(x: pos[0], y: pos[1]), frame:)
+  end
+
+  def hemmed(p, directions = %w[up right down left])
+    decide(p)
+    directions.each { |d| blocked_walk(p, d) }
+  end
+
+  def test_hemmed_in_waits_deterministically_without_calling_the_client
+    client = ScriptedClient.new(objective: objective(kind: 'reach_place', place: [1, 2]), skill: walk)
+    p = policy(client)
+    hemmed(p)
+    calls = client.calls.size
+    2.times do
+      point, result = decide(p)
+      assert_equal :choose_skill, point.name
+      assert_equal({ skill: 'wait', params: { frames: 120 } }, result[:choice])
+      assert_equal ['delegated', false, 0.0], result.values_at(:agent, :fallback, :cost_usd)
+      assert_match(/deterministic/, result[:justification])
+      p.after_action(choice: result[:choice], outcome: { stopped_by: 'done', moved_cells: 0 }, state:, frame: 300)
+      p.observe(state, frame: 300)
+    end
+    assert_equal calls, client.calls.size
+    assert_equal 4, @objectives.current[:attempts].size
+  end
+
+  def test_hemmed_in_releases_when_the_position_the_dialogue_or_the_place_changes
+    [state(x: 69), state(room_id: 4), state(dialog_state: 3)].each do |moved|
+      client = ScriptedClient.new(objective: objective(kind: 'reach_place', place: [1, 2]), skill: walk)
+      p = policy(client)
+      hemmed(p)
+      p.observe(moved, frame: 400)
+      assert_equal 'claude', p.decide(p.decision_point_for(moved), moved, { grid: })[:agent]
+    end
+  end
+
+  def test_fewer_than_four_distinct_blocked_directions_do_not_trigger_the_wait
+    [%w[up up down left], %w[up right down]].each do |directions|
+      p = policy(ScriptedClient.new(objective: objective(kind: 'reach_place', place: [1, 2]), skill: walk))
+      hemmed(p, directions)
+      assert_equal 'claude', decide(p).last[:agent]
+    end
+    p = policy(ScriptedClient.new(objective: objective(kind: 'reach_place', place: [1, 2]), skill: walk))
+    decide(p)
+    %w[up right down].each { |d| blocked_walk(p, d) }
+    blocked_walk(p, 'left', pos: [70, 60])
+    assert_equal 'claude', decide(p).last[:agent]
   end
 
   def test_overlay_frames_reuse_the_last_grid_or_a_blank_one
@@ -277,6 +372,7 @@ class DelegatedPolicyTest < Minitest::Test
   def test_boot_wrapper_forwards_after_boot_only
     delegated = policy(ScriptedClient.new(objective: objective))
     wrapper = Koholint::Policies::StartGame.new(delegated, ready: ->(s) { %i[playing dialogue].include?(s.phase) })
+    2.times { |i| wrapper.observe(state, frame: i) }
     assert_equal :boot, wrapper.decision_point_for(state(game_mode: 1)).name
     assert_equal :choose_objective, wrapper.decision_point_for(state).name
     assert_equal :choose_objective, wrapper.decision_point_for(state(dialog_state: 3)).name
@@ -288,7 +384,7 @@ class DelegatedEngineTest < Minitest::Test
   include DelegatedHelpers
 
   def wait(frames = 30) = ok('skill' => 'wait', 'params' => { 'frames' => frames })
-  def leave_unreachable = ok('title' => 'leave', 'predicate' => { 'kind' => 'leave_place', 'place' => [0, 0] })
+  def leave_house = ok('title' => 'leave', 'predicate' => { 'kind' => 'leave_place', 'place' => [163, 16] })
   def down = Reply.new(nil, 0.0, nil, nil, 'transport down')
 
   def agent_engine(run, client, emulator: nil, **limits)
@@ -309,7 +405,7 @@ class DelegatedEngineTest < Minitest::Test
   def test_scripted_run_traces_cost_objectives_and_replays_bit_exact
     skip_without_rom!
     with_run do |run|
-      client = ScriptedClient.new(objective: [ok('title' => 'x')] + [leave_unreachable] * 40, default: wait)
+      client = ScriptedClient.new(objective: [ok('title' => 'x')] + [leave_house] * 40, default: wait)
       assert_equal :frames, agent_engine(run, client, frames: 800).run
       agent = events(run, :decision).select { |d| d['agent'] == 'claude' }
       assert_equal %w[choose_skill choose_objective choose_skill], agent.first(3).map { |d| d['decision_point'] }
@@ -318,7 +414,7 @@ class DelegatedEngineTest < Minitest::Test
       assert_equal 'wait', agent.first['choice']['skill']
       assert_equal [200, 0.01], [agent[1]['latency_ms'], agent[1]['cost_usd']]
       statuses = events(run, :objective).map { |e| e['status'] }
-      assert_includes statuses, 'achieved'
+      assert_includes statuses, 'abandoned'
       assert_equal [], Koholint::Replay.verify(run, every: 600).reject(&:last)
     end
   end
@@ -326,7 +422,7 @@ class DelegatedEngineTest < Minitest::Test
   def test_cap_smaller_than_one_reply_stops_cleanly_on_dollars
     skip_without_rom!
     with_run do |run|
-      client = ScriptedClient.new(default: leave_unreachable)
+      client = ScriptedClient.new(default: leave_house)
       assert_equal :dollars, agent_engine(run, client, emulator: EmulatorCache.interactive, dollars: 0.005).run
       assert_equal 1, client.calls.size
       assert_equal ['dollars'], events(run, :budget_stop).map { |e| e['kind'] }
@@ -348,7 +444,7 @@ class DelegatedEngineTest < Minitest::Test
   def test_a_success_resets_the_failure_count
     skip_without_rom!
     with_run do |run|
-      script = [down] * 4 + [leave_unreachable, wait] + [down] * 4 + [wait]
+      script = [down] * 4 + [leave_house, wait] + [down] * 4 + [wait]
       client = eng = nil
       stopper = -> { client.calls.size >= 10 ? eng.request_stop : nil; down }
       client = ScriptedClient.new(objective: script.first(5), skill: script.drop(5), default: stopper)
@@ -365,7 +461,7 @@ class DelegatedEngineTest < Minitest::Test
     with_run do |run|
       eng = nil
       talk = -> { eng.request_stop; ok('skill' => 'advance_dialogue', 'params' => {}, 'transcription' => 'Ah! Enfin...') }
-      client = ScriptedClient.new(objective: leave_unreachable, skill: talk)
+      client = ScriptedClient.new(objective: leave_house, skill: talk)
       eng = agent_engine(run, client, emulator:)
       assert_equal :stopped, eng.run
       image = client.calls.find { |c| c[:image] }[:image]
@@ -376,6 +472,85 @@ class DelegatedEngineTest < Minitest::Test
       assert_equal 0, event['page']
       assert_equal 2, event['place'].size
       refute_includes File.read(File.join(run.dir, 'trace.jsonl')), 'PNG'
+    end
+  end
+
+  def prompt_files(run) = Dir.glob(File.join(run.dir, 'prompts', '*')).map { |f| File.basename(f) }.sort
+
+  def test_the_engine_writes_prompts_and_images_and_traces_their_hash
+    skip_without_rom!
+    emulator = EmulatorCache.at(700)
+    emulator.step until Koholint::Perception.read(emulator).dialog_open?
+    with_run do |run|
+      eng = nil
+      talk = -> { eng.request_stop; ok('skill' => 'advance_dialogue', 'params' => {}) }
+      client = ScriptedClient.new(objective: leave_house, skill: talk)
+      eng = agent_engine(run, client, emulator:)
+      eng.run
+      agent = events(run, :decision).select { |d| d['agent'] == 'claude' }
+      assert_equal [false, true], agent.map { |d| d['image'] }
+      agent.zip(client.calls).each do |event, call|
+        base = "#{event['frame']}-#{event['decision_point']}"
+        assert_equal call[:prompt], File.read(File.join(run.dir, 'prompts', "#{base}.txt"))
+        assert_equal Digest::SHA256.hexdigest(call[:prompt]), event['prompt_sha']
+      end
+      png = Dir.glob(File.join(run.dir, 'prompts', '*.png'))
+      assert_equal 1, png.size
+      assert File.binread(png.first).start_with?("\x89PNG".b)
+      assert_equal [], Koholint::Replay.verify(run, every: 600).reject(&:last)
+    end
+  end
+
+  class Spy
+    attr_reader :observed, :cancelled
+
+    def initialize = (@observed = []; @cancelled = false)
+    def observe(state, frame:) = @observed << [state.phase, frame]
+    def cancel = @cancelled = true
+    def decision_point_for(_state) = Koholint::DecisionPoint.macro(:spy)
+    def decide(*) = { choice: { buttons: [], frames: 5 }, justification: 'x', confidence: 1.0, agent: 'spy' }
+  end
+
+  def test_observe_runs_on_every_tour_and_request_stop_cancels_the_policy
+    skip_without_rom!
+    with_run do |run|
+      spy = Spy.new
+      eng = Koholint::Engine.new(run:, policy: spy, budget: Koholint::Budget.new(frames: 400))
+      eng.run
+      assert_equal events(run, :perception).map { |e| e['frame'] }, spy.observed.map(&:last)
+      eng.request_stop
+      assert spy.cancelled
+    end
+  end
+
+  def test_the_agent_gets_control_only_once_link_has_stopped_moving
+    skip_without_rom!
+    with_run do |run|
+      eng = nil
+      client = ScriptedClient.new(default: -> { eng.request_stop; leave_house })
+      eng = agent_engine(run, client)
+      eng.run
+      first = events(run, :decision).find { |d| d['agent'] == 'claude' }
+      earlier = events(run, :perception).select { |p| p['frame'] <= first['frame'] }.last(2).map { |p| p['state'].values_at('x', 'y', 'game_mode') }
+      assert_equal earlier.first, earlier.last
+      assert_equal :playing, Koholint::GameState.new(**first['input'].transform_keys(&:to_sym)).phase
+    end
+  end
+
+  def test_a_two_step_budget_stops_after_the_second_terminal_objective
+    skip_without_rom!
+    with_run do |run|
+      budget = Koholint::Budget.new(steps: 2)
+      objectives = Koholint::Objectives.new(trace: run.trace, stall_frames: 30)
+      far = ok('title' => 'far', 'predicate' => { 'kind' => 'reach_place', 'place' => [0, 0] })
+      client = ScriptedClient.new(objective: [far, far, far], default: wait)
+      delegated = Koholint::Policies::Delegated.new(client:, registry: Koholint::Skills::Registry.default, objectives:, on_step: budget.method(:step_done))
+      policy = Koholint::Policies::StartGame.new(delegated, ready: ->(s) { %i[playing dialogue].include?(s.phase) })
+      eng = Koholint::Engine.new(run:, policy:, budget:, grid: true, emulator: EmulatorCache.interactive)
+      assert_equal :steps, eng.run
+      assert_equal ['steps'], events(run, :budget_stop).map { |e| e['kind'] }
+      assert_equal 1, events(run, :stop).size
+      assert_equal %w[abandoned abandoned], events(run, :objective).map { |e| e['status'] }.select { |s| s != 'started' }
     end
   end
 
