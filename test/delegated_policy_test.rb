@@ -705,7 +705,7 @@ class DelegatedLedgerTest < Minitest::Test
     block(p, frame: 102)
     p.decide(p.decision_point_for(state), state, context)
     assert_includes client.calls.last[:prompt], 'blocked 2 times'
-    assert_includes client.calls.last[:prompt], '!'
+    assert_includes neighbour_line(client, 'up'), '!'
   end
 
   def test_the_policy_hands_its_ledger_to_the_skills_through_the_context
@@ -727,6 +727,7 @@ class DelegatedLedgerTest < Minitest::Test
     assert @objectives.current
     Koholint::Objectives::UNREACHABLE_PAIRS.times { |i| block(p, frame: 101 + i) }
     assert_nil @objectives.current
+    assert_equal 1, @objectives.history.count { |h| h[:outcome] == :abandoned }
     assert_equal 'unreachable', @objectives.history.last[:reason]
     assert_equal :choose_objective, p.decision_point_for(state).name
   end
@@ -750,6 +751,23 @@ class DelegatedLedgerTest < Minitest::Test
               from: { room: 163, map: 16, row: 3, col: 4 }, to: { room: 163, map: 16, row: 2, col: 4 }, blocked_at: nil }
     p.after_action(choice: { skill: 'walk', params: moved[:params] }, outcome: moved, state: state(y: 44), frame: 110)
     refute ledger.doubtful?(PLACE, [3, 4], :up)
+  end
+
+  def goto_outcome(crossed:, to:)
+    { skill: 'goto', params: { row: to[0], col: to[1] }, moved_cells: crossed.size, stopped_by: 'done', blocked_at: nil, crossed:,
+      from: { room: 163, map: 16, row: 3, col: 4 }, to: { room: 163, map: 16, row: to[0], col: to[1] } }
+  end
+
+  def test_goto_undoubts_only_the_edges_it_crossed
+    p = policy(ScriptedClient.new(objective: objective(kind: 'reach_place', place: [1, 2]), skill: walk))
+    ledger = p.instance_variable_get(:@ledger)
+    p.decide(p.decision_point_for(state), state, { grid: free_grid })
+    [[3, 4, :right], [3, 5, :right], [2, 6, :down]].each { |r, c, d| 2.times { ledger.record(place: PLACE, blocked_at: { row: r, col: c, direction: d }) } }
+    outcome = goto_outcome(crossed: [[3, 4, :right], [3, 5, :right]], to: [3, 6])
+    p.after_action(choice: { skill: 'goto', params: outcome[:params] }, outcome:, state: state(x: 104), frame: 110)
+    refute ledger.doubtful?(PLACE, [3, 4], :right)
+    refute ledger.doubtful?(PLACE, [3, 5], :right)
+    assert ledger.doubtful?(PLACE, [2, 6], :down)
   end
 
   def test_new_place_starts_and_is_achieved_on_a_first_visit

@@ -95,7 +95,9 @@ module Koholint
           raise Failure, "leave_place must name the current place #{place.inspect}, not #{predicate[:place].inspect}"
         end
         raise Failure, 'predicate is already true in the current state' if satisfied?(predicate, state, place)
-        raise Failure, 'reach_cell target is already reachable over cells observed free; choose a goal that needs exploration' if trivial?(predicate, state, place, context)
+        if trivial?(predicate, state, place, context)
+          raise Failure, 'reach_cell target is already reachable over cells observed free; choose a goal that needs exploration'
+        end
         raise Failure, 'dialogue_closed needs an open dialogue' if predicate[:kind].to_s == 'dialogue_closed' && !state.dialog_open?
 
         clear_hemmed
@@ -146,9 +148,7 @@ module Koholint
             cell = [cell[0] + delta[0], cell[1] + delta[1]]
           end
         elsif choice[:skill] == 'goto'
-          Navigation::Planner::DELTAS.each do |direction, (dr, dc)|
-            @ledger.entered(place:, cell: [to[:row] - dr, to[:col] - dc], direction:)
-          end
+          Array(outcome[:crossed]).each { |row, col, direction| @ledger.entered(place:, cell: [row, col], direction:) }
         end
       end
 

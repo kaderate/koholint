@@ -311,6 +311,16 @@ class SkillsTest < Minitest::Test
     assert_equal result[:frames], inputs.size
   end
 
+  def test_goto_exposes_the_edges_it_crossed
+    result, = goto(4, 8)
+    assert_equal [[4, 5, :right], [4, 6, :right], [4, 7, :right]], result[:crossed]
+  end
+
+  def test_goto_blocked_after_one_step_crosses_one_edge
+    result, = goto(4, 8, walls: [[4, 7]])
+    assert_equal [[4, 5, :right]], result[:crossed]
+  end
+
   def test_goto_turns_after_centring
     result, = goto(2, 6, start: [88, 80])
     assert_equal :done, result[:stopped_by]
