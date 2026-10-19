@@ -85,7 +85,7 @@ class EngineTest < Minitest::Test
     def initialize(emulator) = (@emulator = emulator
                                 super())
 
-    def decide(point, state, context)
+    def decide(decision_point, state, context)
       @emulator.instance_variable_get(:@driver).motherboard.mmu.mbc.external_ram.bytes[3] = 0x42 if state.frame >= 120
       super
     end

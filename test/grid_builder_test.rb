@@ -211,7 +211,7 @@ class GridBuilderTest < Minitest::Test
     Class.new(Koholint::Policies::WalkAndTalk) do
       attr_reader :contexts
 
-      def decide(point, state, context)
+      def decide(decision_point, state, context)
         (@contexts ||= []) << context
         super
       end
@@ -258,16 +258,16 @@ class GridBuilderTest < Minitest::Test
       @log = []
     end
 
-    def point_for(state)
+    def decision_point_for(state)
       dialogue? ? Koholint::DecisionPoint.macro(:dialogue) : super
     end
 
     def dialogue? = @emulator.read(Koholint::Vision::ScreenVision::ADDRESSES.fetch(:dialog_state)).positive?
 
-    def decide(point, state, context)
+    def decide(decision_point, state, context)
       @log << { frame: state.frame, dialog: @emulator.read(Koholint::Vision::ScreenVision::ADDRESSES.fetch(:dialog_state)),
                 grid: context[:grid] }
-      return super unless point.name == :dialogue
+      return super unless decision_point.name == :dialogue
 
       @pressed = !@pressed
       choice = @pressed ? { buttons: [:a], frames: 3 } : { buttons: [], frames: 57 }

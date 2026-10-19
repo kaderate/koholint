@@ -13,26 +13,26 @@ class StartGameTest < Minitest::Test
   def policy = Koholint::Policies::StartGame.new(Koholint::Policies::WalkAndTalk.new)
 
   def test_macro_point_validates_free_form_macros_only
-    point = Koholint::DecisionPoint.macro(:boot)
-    assert_equal({ buttons: [:start], frames: 3 }, point.validate({ buttons: [:start], frames: 3 }))
-    assert_raises(Koholint::DecisionPoint::Invalid) { point.validate({ buttons: [:bogus], frames: 3 }) }
-    assert_raises(Koholint::DecisionPoint::Invalid) { point.validate({ buttons: [:a], frames: 0 }) }
-    assert_raises(Koholint::DecisionPoint::Invalid) { point.validate({ buttons: [:a], frames: 100_000 }) }
+    decision_point = Koholint::DecisionPoint.macro(:boot)
+    assert_equal({ buttons: [:start], frames: 3 }, decision_point.validate({ buttons: [:start], frames: 3 }))
+    assert_raises(Koholint::DecisionPoint::Invalid) { decision_point.validate({ buttons: [:bogus], frames: 3 }) }
+    assert_raises(Koholint::DecisionPoint::Invalid) { decision_point.validate({ buttons: [:a], frames: 0 }) }
+    assert_raises(Koholint::DecisionPoint::Invalid) { decision_point.validate({ buttons: [:a], frames: 100_000 }) }
   end
 
   def test_follows_the_game_mode_until_link_is_controllable
     s = state(mode: 2, sub: 7)
-    point = policy.point_for(s)
-    assert_equal :boot, point.name
-    result = policy.decide(point, s, {})
+    decision_point = policy.decision_point_for(s)
+    assert_equal :boot, decision_point.name
+    result = policy.decide(decision_point, s, {})
     assert_equal({ buttons: [:a], frames: 3 }, result[:choice])
     assert_equal 'start_game', result[:agent]
   end
 
   def test_hands_over_to_the_walking_policy_once_link_has_hp_and_a_position
     controllable = state(frame: 400, hp: 24, x: 80, mode: 0x0B)
-    assert_equal :move, policy.point_for(controllable).name
-    assert_equal 'walk_and_talk', policy.decide(policy.point_for(controllable), controllable, {})[:agent]
+    assert_equal :move, policy.decision_point_for(controllable).name
+    assert_equal 'walk_and_talk', policy.decide(policy.decision_point_for(controllable), controllable, {})[:agent]
   end
 
   def test_engine_run_from_a_cold_boot_reaches_a_playable_state_quickly

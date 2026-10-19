@@ -20,12 +20,12 @@ module Koholint
       new(run: run, policy: policy, budget: budget, emulator: Replay.to(run, run.inputs.frames), **options)
     end
 
-    def initialize(run:, policy:, budget:, keyframe_every: 1800, point: DecisionPoint.move, emulator: nil, pacer: nil, grid: false)
+    def initialize(run:, policy:, budget:, keyframe_every: 1800, decision_point: DecisionPoint.move, emulator: nil, pacer: nil, grid: false)
       @run = run
       @policy = policy
       @budget = budget
       @keyframe_every = keyframe_every
-      @point = point
+      @decision_point = decision_point
       @pacer = pacer
       @emulator = emulator || Emulator.boot
       @keyframes = Keyframes.new(File.join(run.dir, 'keyframes'))
@@ -58,10 +58,10 @@ module Koholint
       state = Perception.read(@emulator)
       @run.trace.emit(:perception, frame: state.frame, state: state.to_h, state_hash: @emulator.state_hash)
       grid = @builder&.observe(@emulator, state)
-      point = @policy.respond_to?(:point_for) ? @policy.point_for(state) : @point
-      result = @policy.decide(point, state, @builder ? { grid: } : {})
-      choice = point.validate(result[:choice])
-      @run.trace.emit(:decision, frame: state.frame, point: point.name.to_s, input: state.to_h, options: point.options || [],
+      decision_point = @policy.respond_to?(:decision_point_for) ? @policy.decision_point_for(state) : @decision_point
+      result = @policy.decide(decision_point, state, @builder ? { grid: } : {})
+      choice = decision_point.validate(result[:choice])
+      @run.trace.emit(:decision, frame: state.frame, decision_point: decision_point.name.to_s, input: state.to_h, options: decision_point.options || [],
                                  choice: choice, justification: result[:justification], confidence: result[:confidence],
                                  agent: result[:agent], latency_ms: 0, cost_usd: 0.0, fallback: result[:fallback] || false)
       frames = press(choice)

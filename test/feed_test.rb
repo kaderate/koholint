@@ -18,7 +18,7 @@ class FeedTest < Minitest::Test
   end
 
   def decision(trace, frame)
-    trace.emit(:decision, frame:, point: 'move', input: {}, options: [], choice: { 'to' => frame }, justification: 'j',
+    trace.emit(:decision, frame:, decision_point: 'move', input: {}, options: [], choice: { 'to' => frame }, justification: 'j',
                           confidence: 0.5, agent: 'a', latency_ms: 1, cost_usd: 0.1)
   end
 

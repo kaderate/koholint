@@ -78,7 +78,7 @@
 **Files:** Create `lib/koholint/trace.rb`; Test `test/trace_test.rb`
 
 **Interfaces:**
-- Produces: `Trace.new(path, schema_version: 1)`; `#emit(type, frame:, **fields) -> Hash` appends one JSON line and returns it, raising `Trace::InvalidEvent` if `type` is unknown or required fields are missing; `Trace.read(path) -> Array<Hash>` (ignores a truncated last line); types and required fields: `perception{state}`, `decision{point, input, options, choice, justification, confidence, agent, latency_ms, cost_usd}`, `action{skill, params, result}`, `notable{kind, detail}`, `objective{id, status, predicate}` (status ∈ achieved/abandoned/failed/started), `budget_stop{kind}`, `stop{reason}`, `keyframe{path}`, `save{path, sav_sha256, source}` (source ∈ `game`/`stop`). Every line carries `v`, `type`, `frame`.
+- Produces: `Trace.new(path, schema_version: 1)`; `#emit(type, frame:, **fields) -> Hash` appends one JSON line and returns it, raising `Trace::InvalidEvent` if `type` is unknown or required fields are missing; `Trace.read(path) -> Array<Hash>` (ignores a truncated last line); types and required fields: `perception{state}`, `decision{decision_point, input, options, choice, justification, confidence, agent, latency_ms, cost_usd}`, `action{skill, params, result}`, `notable{kind, detail}`, `objective{id, status, predicate}` (status ∈ achieved/abandoned/failed/started), `budget_stop{kind}`, `stop{reason}`, `keyframe{path}`, `save{path, sav_sha256, source}` (source ∈ `game`/`stop`). Every line carries `v`, `type`, `frame`.
 
 - [ ] **Step 1: Test** `emit_rejects_unknown_type`, `emit_rejects_missing_required_field`, `read_ignores_truncated_last_line` (write a valid line then half a line), `lines_are_append_only` (second `Trace.new` on same path appends).
 - [ ] **Step 2–4:** FAIL → implement (flush each emit) → PASS.
@@ -137,7 +137,7 @@
 **Files:** Create `lib/koholint/decision.rb`, `lib/koholint/policies/walk_and_talk.rb`; Test `test/decision_test.rb`
 
 **Interfaces:**
-- Produces: `DecisionPoint.new(name:, options:, output_schema:)`; `#validate(choice) -> choice` raising `DecisionPoint::Invalid`; `Policy` protocol `#decide(point, state, context) -> {choice:, justification:, confidence:, agent:}`; `Policies::WalkAndTalk` deterministic: cycles `up,right,down,left` for 30 frames each and presses `a` for 2 frames every 10th cycle; `Policies::WithFallback.new(primary, fallback)` retries once on `Invalid`, then returns the fallback's choice flagged `fallback: true`.
+- Produces: `DecisionPoint.new(name:, options:, output_schema:)`; `#validate(choice) -> choice` raising `DecisionPoint::Invalid`; `Policy` protocol `#decide(decision_point, state, context) -> {choice:, justification:, confidence:, agent:}`; `Policies::WalkAndTalk` deterministic: cycles `up,right,down,left` for 30 frames each and presses `a` for 2 frames every 10th cycle; `Policies::WithFallback.new(primary, fallback)` retries once on `Invalid`, then returns the fallback's choice flagged `fallback: true`.
 
 - [ ] **Step 1: Test** `invalid_choice_raises`, `walk_and_talk_is_deterministic_for_same_frame`, `fallback_used_after_one_retry` (primary stub raising `Invalid` twice → result has `fallback: true`, primary called exactly twice).
 - [ ] **Step 2–4:** FAIL → implement → PASS.

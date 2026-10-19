@@ -8,26 +8,26 @@ class DecisionTest < Minitest::Test
   def state(frame) = Koholint::GameState.new(frame: frame, milestone: :none)
 
   def test_invalid_choice_raises
-    point = Koholint::DecisionPoint.move
-    assert_raises(Koholint::DecisionPoint::Invalid) { point.validate({ buttons: [:b], frames: 5 }) }
-    assert_equal point.options.first, point.validate(point.options.first)
+    decision_point = Koholint::DecisionPoint.move
+    assert_raises(Koholint::DecisionPoint::Invalid) { decision_point.validate({ buttons: [:b], frames: 5 }) }
+    assert_equal decision_point.options.first, decision_point.validate(decision_point.options.first)
   end
 
   def test_walk_and_talk_is_deterministic_for_same_frame
-    point = Koholint::DecisionPoint.move
+    decision_point = Koholint::DecisionPoint.move
     policy = Koholint::Policies::WalkAndTalk.new
-    first = policy.decide(point, state(95), {})
-    assert_equal first, policy.decide(point, state(95), {})
-    assert_includes point.options, first[:choice]
+    first = policy.decide(decision_point, state(95), {})
+    assert_equal first, policy.decide(decision_point, state(95), {})
+    assert_includes decision_point.options, first[:choice]
     assert_equal 'walk_and_talk', first[:agent]
   end
 
   def test_walk_and_talk_presses_a_every_tenth_cycle
-    point = Koholint::DecisionPoint.move
+    decision_point = Koholint::DecisionPoint.move
     policy = Koholint::Policies::WalkAndTalk.new
-    assert_equal({ buttons: [:up], frames: 30 }, policy.decide(point, state(0), {})[:choice])
-    assert_equal({ buttons: [:right], frames: 30 }, policy.decide(point, state(30), {})[:choice])
-    assert_equal({ buttons: [:a], frames: 2 }, policy.decide(point, state(30 * 9), {})[:choice])
+    assert_equal({ buttons: [:up], frames: 30 }, policy.decide(decision_point, state(0), {})[:choice])
+    assert_equal({ buttons: [:right], frames: 30 }, policy.decide(decision_point, state(30), {})[:choice])
+    assert_equal({ buttons: [:a], frames: 2 }, policy.decide(decision_point, state(30 * 9), {})[:choice])
   end
 
   class BadPrimary
@@ -35,24 +35,24 @@ class DecisionTest < Minitest::Test
 
     def initialize = @calls = 0
 
-    def decide(_point, _state, _context)
+    def decide(_decision_point, _state, _context)
       @calls += 1
       { choice: { buttons: [:b], frames: 1 }, justification: 'x', confidence: 1.0, agent: 'bad' }
     end
   end
 
   def test_fallback_used_after_one_retry
-    point = Koholint::DecisionPoint.move
+    decision_point = Koholint::DecisionPoint.move
     primary = BadPrimary.new
-    result = Koholint::Policies::WithFallback.new(primary, Koholint::Policies::WalkAndTalk.new).decide(point, state(0), {})
+    result = Koholint::Policies::WithFallback.new(primary, Koholint::Policies::WalkAndTalk.new).decide(decision_point, state(0), {})
     assert_equal 2, primary.calls
     assert result[:fallback]
     assert_equal 'walk_and_talk', result[:agent]
   end
 
   def test_valid_primary_is_not_flagged
-    point = Koholint::DecisionPoint.move
-    result = Koholint::Policies::WithFallback.new(Koholint::Policies::WalkAndTalk.new, BadPrimary.new).decide(point, state(0), {})
+    decision_point = Koholint::DecisionPoint.move
+    result = Koholint::Policies::WithFallback.new(Koholint::Policies::WalkAndTalk.new, BadPrimary.new).decide(decision_point, state(0), {})
     refute result[:fallback]
   end
 end

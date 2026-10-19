@@ -18,9 +18,9 @@ class SummaryTest < Minitest::Test
     with_run do |run|
       t = run.trace
       t.emit(:perception, frame: 0, state: STATE, state_hash: 'h')
-      t.emit(:decision, frame: 0, point: 'move', input: {}, options: [], choice: {}, justification: 'j', confidence: 1.0,
+      t.emit(:decision, frame: 0, decision_point: 'move', input: {}, options: [], choice: {}, justification: 'j', confidence: 1.0,
                         agent: 'a', latency_ms: 5, cost_usd: 0.25)
-      t.emit(:decision, frame: 30, point: 'move', input: {}, options: [], choice: {}, justification: 'j', confidence: 1.0,
+      t.emit(:decision, frame: 30, decision_point: 'move', input: {}, options: [], choice: {}, justification: 'j', confidence: 1.0,
                         agent: 'a', latency_ms: 5, cost_usd: 0.5)
       t.emit(:objective, frame: 40, id: 'find-sword', status: 'started', predicate: 'item sword')
       t.emit(:notable, frame: 50, kind: 'new_room', detail: '163/16')

@@ -7,7 +7,7 @@ module Koholint
 
     REQUIRED = {
       perception: %i[state],
-      decision: %i[point input options choice justification confidence agent latency_ms cost_usd],
+      decision: %i[decision_point input options choice justification confidence agent latency_ms cost_usd],
       action: %i[skill params result],
       notable: %i[kind detail],
       objective: %i[id status predicate],

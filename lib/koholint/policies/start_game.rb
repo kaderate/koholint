@@ -6,10 +6,10 @@ module Koholint
     class StartGame
       def initialize(after) = @after = after
 
-      def point_for(state) = state.controllable? ? DecisionPoint.move : DecisionPoint.macro(:boot)
+      def decision_point_for(state) = state.controllable? ? DecisionPoint.move : DecisionPoint.macro(:boot)
 
-      def decide(point, state, context)
-        return @after.decide(point, state, context) if state.controllable?
+      def decide(decision_point, state, context)
+        return @after.decide(decision_point, state, context) if state.controllable?
 
         { choice: BootScript.macro_for(state), justification: 'boot script', confidence: 1.0, agent: 'start_game' }
       end
