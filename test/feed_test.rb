@@ -32,10 +32,35 @@ class FeedTest < Minitest::Test
       assert_equal File.basename(dir), doc[:status][:run_id]
       assert_equal({ flow_version: 'f', manifest_status: 'running', budget: { 'frames' => 9 }, health: 'unknown',
                      hearts: 2.0, max_hearts: 3.0, objective: nil, last_notable: nil, highest_milestone: 'none',
-                     frames: 3, cost_usd: 0.1, run_id: File.basename(dir) }, doc[:status])
+                     frames: 3, cost_usd: 0.1, calls: 1, run_id: File.basename(dir) }, doc[:status])
       assert_equal({ frame: 90, journal_frames: 100, lag: 10, sync: :in_sync }, doc[:replay])
-      assert_equal [{ frame: 2, type: 'decision', agent: 'a', choice: { 'to' => 2 }, confidence: 0.5 },
-                    { frame: 3, type: 'action', skill: 'walk', params: { 'dir' => 'up' } }], doc[:events]
+      assert_equal [{ frame: 2, type: 'decision', decision_point: 'move', agent: 'a', choice: { 'to' => 2 }, confidence: 0.5,
+                      justification: 'j' },
+                    { frame: 3, type: 'action', skill: 'walk', params: { 'dir' => 'up' }, result: {} }], doc[:events]
+    end
+  end
+
+  def test_objective_calls_and_dollars_come_from_the_trace
+    with_dir do |dir, trace|
+      trace.emit(:decision, frame: 1, decision_point: 'boot', input: {}, options: [], choice: {}, justification: 'boot script', confidence: 1.0,
+                            agent: 'start_game', latency_ms: 0, cost_usd: 0.0)
+      trace.emit(:objective, frame: 2, id: 'o1', status: 'started', predicate: { kind: 'leave_place' }, title: 'Go out')
+      trace.emit(:decision, frame: 3, decision_point: 'choose_skill', input: {}, options: [], choice: {}, justification: 'j', confidence: 1.0,
+                            agent: 'claude', latency_ms: 5, cost_usd: 0.25, fallback: true)
+      trace.emit(:decision, frame: 4, decision_point: 'choose_skill', input: {}, options: [], choice: {}, justification: 'j', confidence: 1.0,
+                            agent: 'claude', latency_ms: 5, cost_usd: 0.5)
+      File.open(File.join(dir, 'trace.jsonl'), 'a') do |file|
+        file.puts(JSON.generate(v: 1, type: 'dialogue', frame: 5, place: [1, 2], text: 'Hi', source: 'agent', page: 0))
+      end
+      doc = Koholint::Viewer::Feed.for(dir, FOLLOWER)
+      assert_equal ['o1', 2, 0.75], doc[:status].values_at(:objective, :calls, :cost_usd)
+      assert_equal [true, nil], doc[:events].select { |e| e[:agent] == 'claude' }.map { |e| e[:fallback] }
+      assert_equal({ frame: 2, type: 'objective', id: 'o1', status: 'started', predicate: { 'kind' => 'leave_place' }, title: 'Go out' },
+                   doc[:events].find { |e| e[:type] == 'objective' })
+      assert_equal({ frame: 5, type: 'dialogue', place: [1, 2], text: 'Hi', source: 'agent', page: 0 },
+                   doc[:events].find { |e| e[:type] == 'dialogue' })
+      trace.emit(:objective, frame: 6, id: 'o1', status: 'achieved', predicate: {})
+      assert_nil Koholint::Viewer::Feed.for(dir, FOLLOWER)[:status][:objective]
     end
   end
 

@@ -11,7 +11,12 @@ module Koholint
   module Viewer
     module Feed
       RunDir = Struct.new(:dir)
-      FIELDS = { 'decision' => %w[frame type agent choice confidence], 'action' => %w[frame type skill params] }.freeze
+      FIELDS = {
+        'decision' => %w[frame type decision_point agent choice confidence justification fallback],
+        'action' => %w[frame type skill params result],
+        'objective' => %w[frame type id status predicate title reason],
+        'dialogue' => %w[frame type place text source page]
+      }.freeze
 
       CACHE = {}
       CACHE_LOCK = Mutex.new
@@ -29,11 +34,15 @@ module Koholint
         summary[:health] = 'unknown' if trace.none? { |e| Summary.progress?(e) } && %w[progressing stalled].include?(summary[:health])
         {
           status: summary.merge(run_id: File.basename(run_dir), flow_version: manifest['flow_version'],
-                                manifest_status: manifest['status'], budget: manifest['budget']),
+                                manifest_status: manifest['status'], budget: manifest['budget'], calls: calls(trace)),
           replay: { frame: follower.frame, journal_frames: follower.journal_frames, lag: follower.lag, sync: follower.sync },
           events: events(trace, limit),
           grid: grid(run_dir, trace, follower.frame)
         }
+      end
+
+      def calls(trace)
+        trace.count { |e| e['type'] == 'decision' && (e['agent'] == 'claude' || e['cost_usd'].to_f.positive?) }
       end
 
       def trace_events(run_dir)

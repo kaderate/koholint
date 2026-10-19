@@ -27,6 +27,8 @@
   #events { height: 400px; overflow-y: auto; background: #181818; padding: 6px; margin: 0; white-space: pre-wrap; }
   #events .action { color: #999; }
   #events .decision { color: #dfe; }
+  #events .objective { color: #fd8; }
+  #events .dialogue { color: #9cf; }
 </style>
 </head>
 <body>
@@ -54,15 +56,69 @@
     return JSON.stringify(choice);
   }
 
+  function plural(n, word) { return n + ' ' + word + (n === 1 ? '' : 's'); }
+
+  function formatPlace(place) { return Array.isArray(place) ? '[' + place.join(',') + ']' : ''; }
+
+  function formatSkillChoice(choice) {
+    var params = choice.params && typeof choice.params === 'object' ? Object.keys(choice.params).map(function (k) { return choice.params[k]; }) : [];
+    return [choice.skill].concat(params).join(' ');
+  }
+
+  function formatDecisionChoice(choice) {
+    if (choice && typeof choice === 'object' && typeof choice.skill === 'string') return formatSkillChoice(choice);
+    if (choice && typeof choice === 'object' && typeof choice.title === 'string') return 'objective "' + choice.title + '"';
+    return formatChoice(choice);
+  }
+
+  var PAST = { walk: 'walked' };
+
+  function formatResult(e) {
+    var r = e.result;
+    var verb = PAST[e.skill] || e.skill;
+    var line = typeof r.moved_cells === 'number' ? verb + ' ' + plural(r.moved_cells, 'cell') : verb;
+    if (r.stopped_by) line += r.stopped_by === 'done' ? ', done' : ', stopped: ' + r.stopped_by;
+    if (r.room_changed) line += ', room changed';
+    if (typeof r.hp_delta === 'number' && r.hp_delta !== 0) line += ', hp ' + (r.hp_delta > 0 ? '+' : '') + r.hp_delta;
+    return line;
+  }
+
+  function formatObjective(s) {
+    var objective = s.status && s.status.objective;
+    return objective ? objective : 'none';
+  }
+
+  function formatDollars(value) { return '$' + (typeof value === 'number' ? value : 0).toFixed(2); }
+
+  function formatCalls(s) { return (s.status && s.status.calls) || 0; }
+
   function formatEventPretty(e) {
     var head = 'f' + e.frame + ' · ';
     if (e.type === 'decision') {
-      var line = head + e.agent + ' decides ' + formatChoice(e.choice);
+      var line = head + (e.agent || '?') + ' decides';
+      var choice = formatDecisionChoice(e.choice);
+      if (choice) line += ' ' + choice;
       if (typeof e.confidence === 'number' && e.confidence < 1) line += ' (' + Math.round(e.confidence * 100) + '%)';
+      if (e.fallback) line += ' [fallback]';
       return line;
     }
-    if (e.type === 'action') return head + e.skill + ' ' + formatChoice(e.params);
+    if (e.type === 'action') {
+      if (e.result && (e.result.stopped_by || typeof e.result.moved_cells === 'number')) return head + formatResult(e);
+      return head + e.skill + ' ' + formatChoice(e.params);
+    }
+    if (e.type === 'objective') {
+      var p = e.predicate || {};
+      var what = [p.kind || e.id, formatPlace(p.place)].filter(Boolean).join(' ');
+      return head + 'objective: ' + what + ' ' + e.status + (e.reason ? ' (' + e.reason + ')' : '');
+    }
+    if (e.type === 'dialogue') return typeof e.text === 'string' ? head + 'dialogue: "' + e.text + '"' : head + 'dialogue';
     return head + e.type;
+  }
+
+  function eventTitle(e) {
+    if (e.type === 'decision') return typeof e.justification === 'string' ? e.justification : '';
+    if (e.type === 'objective') return typeof e.title === 'string' ? e.title : '';
+    return '';
   }
 
   function formatEventJson(e) { return JSON.stringify(e); }
@@ -107,6 +163,9 @@
     ['flow', function (s) { return s.status.flow_version; }],
     ['health', function (s) { return s.status.health; }],
     ['hearts', formatHearts],
+    ['objective', formatObjective],
+    ['spent', function (s) { return formatDollars(s.status.cost_usd); }],
+    ['calls', formatCalls],
     ['frame', function (s) { return s.replay.frame; }],
     ['lag', function (s) { return s.replay.lag; }],
     ['sync', function (s) { return s.replay.sync; }],
@@ -229,6 +288,7 @@
       var row = document.createElement('div');
       row.className = event.type;
       row.textContent = lines[index];
+      if (mode !== 'json') row.title = eventTitle(event);
       events.appendChild(row);
     });
     events.scrollTop = pinned ? events.scrollHeight : top;

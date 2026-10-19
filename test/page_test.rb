@@ -104,4 +104,62 @@ class PageTest < Minitest::Test
     assert_match(/id="grid"/, PAGE)
     assert_match(/koholint\.grid/, PAGE)
   end
+
+  def fmt(event) = evaluate("formatEventPretty(#{JSON.generate(event)})")
+
+  def test_a_skill_decision_reads_as_a_sentence
+    event = { frame: 1234, type: 'decision', agent: 'claude', choice: { skill: 'walk', params: { direction: 'up', cells: 2 } },
+              justification: 'door is north', confidence: 1 }
+    assert_equal 'f1234 · claude decides walk up 2', fmt(event)
+    assert_equal 'door is north', evaluate("eventTitle(#{JSON.generate(event)})")
+  end
+
+  def test_fallback_decisions_are_marked
+    event = { frame: 2, type: 'decision', agent: 'claude', choice: { buttons: [], frames: 30 }, fallback: true }
+    assert_equal 'f2 · claude decides idle 30f [fallback]', fmt(event)
+  end
+
+  def test_objective_choices_show_the_title
+    event = { frame: 3, type: 'decision', agent: 'claude', choice: { title: 'Leave the house', predicate: { kind: 'leave_place' } } }
+    assert_equal 'f3 · claude decides objective "Leave the house"', fmt(event)
+  end
+
+  def test_decisions_with_missing_fields_do_not_throw
+    assert_equal 'f4 · ? decides', fmt({ frame: 4, type: 'decision' })
+    assert_equal 'f4 · claude decides walk', fmt({ frame: 4, type: 'decision', agent: 'claude', choice: { skill: 'walk' } })
+  end
+
+  def test_skill_results_read_as_what_happened
+    result = { skill: 'walk', moved_cells: 1, stopped_by: 'blocked' }
+    assert_equal 'f9 · walked 1 cell, stopped: blocked', fmt({ frame: 9, type: 'action', skill: 'walk', params: {}, result: result })
+    result = { skill: 'walk', moved_cells: 2, stopped_by: 'done', hp_delta: -1, room_changed: true }
+    assert_equal 'f9 · walked 2 cells, done, room changed, hp -1', fmt({ frame: 9, type: 'action', skill: 'walk', params: {}, result: result })
+    assert_equal 'f9 · walked 0 cells, stopped: damage', fmt({ frame: 9, type: 'action', skill: 'walk', result: { moved_cells: 0, stopped_by: 'damage' } })
+  end
+
+  def test_objective_events_read_with_status_and_reason
+    event = { frame: 5, type: 'objective', id: 'o1', status: 'started', predicate: { kind: 'leave_place', place: [163, 16] } }
+    assert_equal 'f5 · objective: leave_place [163,16] started', fmt(event)
+    event = { frame: 6, type: 'objective', id: 'o1', status: 'abandoned', reason: 'stall', predicate: { kind: 'leave_place', place: [163, 16] } }
+    assert_equal 'f6 · objective: leave_place [163,16] abandoned (stall)', fmt(event)
+    assert_equal 'f7 · objective: o2 failed', fmt({ frame: 7, type: 'objective', id: 'o2', status: 'failed' })
+  end
+
+  def test_dialogue_is_a_quoted_line
+    assert_equal 'f8 · dialogue: "Hello, Link!"', fmt({ frame: 8, type: 'dialogue', text: 'Hello, Link!', place: [1, 2] })
+    assert_equal 'f8 · dialogue', fmt({ frame: 8, type: 'dialogue' })
+  end
+
+  def test_status_bar_formats
+    assert_equal '$0.12', evaluate('formatDollars(0.1234)')
+    assert_equal '$0.00', evaluate('formatDollars(null)')
+    assert_equal 'none', evaluate('formatObjective({status: {objective: null}})')
+    assert_equal 'o1', evaluate("formatObjective({status: {objective: 'o1'}})")
+    assert_equal 3, evaluate('formatCalls({status: {calls: 3}})')
+    assert_equal 0, evaluate('formatCalls({status: {}})')
+  end
+
+  def test_agent_text_is_only_ever_inserted_as_text
+    refute_match(/innerHTML/, PAGE)
+  end
 end
