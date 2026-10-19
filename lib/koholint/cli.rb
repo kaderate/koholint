@@ -3,6 +3,10 @@ require 'optparse'
 require 'koholint'
 require 'koholint/budget'
 require 'koholint/engine'
+require 'koholint/agents/claude_cli'
+require 'koholint/objectives'
+require 'koholint/policies/delegated'
+require 'koholint/skills/registry'
 require 'koholint/policies/start_game'
 require 'koholint/policies/walk_and_talk'
 require 'koholint/replay'
@@ -14,7 +18,11 @@ require 'koholint/viewer'
 module Koholint
   module CLI
     USAGE = 'usage: koholint run|resume <run_dir>|fork <run_dir> --at-frame N|verify <run_dir>|summary <run_dir>|watch <run_dir> ' \
-            '[--frames N --minutes N --dollars X --root DIR --realtime --grid --port N --host H --from live|start --speed X]'.freeze
+            '[--frames N --minutes N --dollars X --root DIR --realtime --grid --port N --host H --from live|start --speed X ' \
+            '--agent --model M --max-dollars X --claude-command PATH]'.freeze
+
+    DEFAULT_MODEL = 'sonnet'.freeze
+    DEFAULT_MAX_DOLLARS = 1.0
 
     module_function
 
@@ -30,6 +38,10 @@ module Koholint
         o.on('--at-frame N', Integer) { |v| options[:at_frame] = v }
         o.on('--realtime') { options[:realtime] = true }
         o.on('--grid') { options[:grid] = true }
+        o.on('--agent') { options[:agent] = true }
+        o.on('--model M') { |v| options[:model] = v }
+        o.on('--max-dollars X', Float) { |v| options[:dollars] = v }
+        o.on('--claude-command PATH') { |v| options[:claude_command] = v }
         o.on('--port N', Integer) { |v| options[:port] = v }
         o.on('--host H') { |v| options[:host] = v }
         o.on('--from MODE', %w[live start]) { |v| options[:from] = v.to_sym }
@@ -47,14 +59,17 @@ module Koholint
 
     def dispatch(command, args, options, out)
       flow = options.fetch(:flow_version, Koholint::FLOW_VERSION)
+      options = options.merge(dollars: options.fetch(:dollars, DEFAULT_MAX_DOLLARS), grid: true) if options[:agent]
       limits = options.slice(:frames, :active_seconds, :dollars)
       case command
       when 'run'
+        policy = policy_for(options)
         run = Run.create(root: options.fetch(:root, 'runs'), flow_version: flow, budget: limits)
-        play(Engine.new(run: run, policy: default_policy, budget: Budget.new(**limits), **engine_options(options)), run, out)
+        play(Engine.new(run: run, policy: policy.call(run), budget: Budget.new(**limits), **engine_options(options)), run, out)
       when 'resume'
+        policy = policy_for(options)
         run = Run.open(run_dir(args), flow_version: flow)
-        engine = Engine.resume(run.dir, policy: default_policy, budget: Budget.new(**limits), flow_version: flow, **engine_options(options))
+        engine = Engine.resume(run.dir, policy: policy, budget: Budget.new(**limits), flow_version: flow, **engine_options(options))
         play(engine, run, out)
       when 'fork'
         at_frame = options.fetch(:at_frame) { raise OptionParser::MissingArgument, '--at-frame' }
@@ -76,7 +91,34 @@ module Koholint
 
     def run_dir(args) = args.first || raise(OptionParser::MissingArgument, 'run_dir')
 
-    def default_policy = Policies::StartGame.new(Policies::WalkAndTalk.new)
+    def policy_for(options)
+      return ->(_run) { Policies::StartGame.new(Policies::WalkAndTalk.new) } unless options[:agent]
+
+      command = options.fetch(:claude_command, 'claude')
+      command = File.expand_path(command) if command.include?(File::SEPARATOR)
+      raise Koholint::Error, "claude executable not found: #{command}" unless executable?(command)
+
+      client = Agents::ClaudeCli.new(model: options.fetch(:model, DEFAULT_MODEL), command:)
+      manual = manual_text
+      lambda do |run|
+        delegated = Policies::Delegated.new(client:, registry: Skills::Registry.default, objectives: Objectives.new(trace: run.trace), manual:)
+        Policies::StartGame.new(delegated, ready: ->(state) { %i[playing dialogue].include?(state.phase) })
+      end
+    end
+
+    def executable?(command)
+      return File.executable?(command) && !File.directory?(command) if command.include?(File::SEPARATOR)
+
+      ENV.fetch('PATH', '').split(File::PATH_SEPARATOR).any? { |dir| File.executable?(File.join(dir, command)) }
+    end
+
+    def manual_text
+      root = File.expand_path('../..', __dir__)
+      %w[docs/GAME_MANUAL_NOTES.md manual/notice.txt].filter_map do |file|
+        path = File.join(root, file)
+        File.read(path) if File.file?(path)
+      end.join("\n\n")
+    end
 
     def play(engine, run, out)
       previous = %w[INT TERM].to_h { |sig| [sig, Signal.trap(sig) { engine.request_stop }] }

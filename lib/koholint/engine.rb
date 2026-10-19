@@ -16,6 +16,7 @@ module Koholint
     def self.resume(run_path, policy:, budget:, flow_version: Koholint::FLOW_VERSION, **options)
       run = Run.open(run_path, flow_version: flow_version)
       run.lock!
+      policy = policy.call(run) if policy.respond_to?(:call)
       run.truncate_trace!(run.inputs.frames)
       new(run: run, policy: policy, budget: budget, emulator: Replay.to(run, run.inputs.frames), **options)
     end
@@ -60,14 +61,17 @@ module Koholint
       grid = @builder&.observe(@emulator, state)
       decision_point = @policy.respond_to?(:decision_point_for) ? @policy.decision_point_for(state) : @decision_point
       result = @policy.decide(decision_point, state, @builder ? { grid: } : {})
-      choice = decision_point.validate(result[:choice])
+      chosen = result[:decision_point] || decision_point
+      choice = chosen.validate(result[:choice])
+      @budget.tick(cost: result[:cost_usd].to_f)
       @run.trace.emit(:decision, frame: state.frame, decision_point: decision_point.name.to_s, input: state.to_h, options: decision_point.options || [],
                                  choice: choice, justification: result[:justification], confidence: result[:confidence],
-                                 agent: result[:agent], latency_ms: 0, cost_usd: 0.0, fallback: result[:fallback] || false)
+                                 agent: result[:agent], latency_ms: result[:latency_ms].to_i, cost_usd: result[:cost_usd].to_f, fallback: result[:fallback] || false)
       if choice.key?(:skill)
-        outcome = execute(choice, state, decision_point.registry)
+        outcome = execute(choice, state, chosen.registry)
         @run.trace.emit(:action, frame: @emulator.frame, skill: choice[:skill], params: choice[:params], result: outcome)
-      else
+        @policy.after_action(choice:, outcome:, state: Perception.read(@emulator), frame: @emulator.frame) if @policy.respond_to?(:after_action)
+      elsif !choice.key?(:title)
         frames = press(choice)
         @run.trace.emit(:action, frame: @emulator.frame, skill: 'press', params: choice, result: { frames: frames })
       end

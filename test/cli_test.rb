@@ -121,6 +121,50 @@ class CliTest < Minitest::Test
     end
   end
 
+  FAKE_CLAUDE = File.expand_path('fixtures/fake_claude', __dir__)
+
+  def with_fake_claude
+    Dir.mktmpdir do |dir|
+      ENV['FAKE_CLAUDE_LOG'] = File.join(dir, 'log.json')
+      yield dir
+    end
+  ensure
+    ENV.delete('FAKE_CLAUDE_LOG')
+  end
+
+  def test_agent_run_calls_the_claude_command_and_stops_at_the_dollar_cap
+    skip_without_rom!
+    with_fake_claude do |dir|
+      code, out, = cli('run', '--agent', '--claude-command', FAKE_CLAUDE, '--model', 'haiku', '--max-dollars', '0.02', '--root', dir)
+      assert_equal 0, code
+      assert_match(/^stopped: dollars$/, out)
+      run_dir = out[/^run (.+)$/, 1]
+      decisions = Koholint::Trace.read(File.join(run_dir, 'trace.jsonl')).select { |e| e['type'] == 'decision' && e['agent'] == 'claude' }
+      assert_equal 2, decisions.size
+      assert(decisions.all? { |d| d['fallback'] && d['cost_usd'] == 0.0123 })
+      argv = JSON.parse(File.readlines(ENV.fetch('FAKE_CLAUDE_LOG')).first)['argv']
+      assert_equal 'haiku', argv[argv.index('--model') + 1]
+      assert_equal 0, cli('verify', run_dir)[0]
+    end
+  end
+
+  def test_resume_accepts_the_agent_flags
+    skip_without_rom!
+    with_fake_claude do |dir|
+      run_dir = cli('run', '--frames', '300', '--root', dir)[1][/^run (.+)$/, 1]
+      code, out, = cli('resume', run_dir, '--agent', '--claude-command', FAKE_CLAUDE, '--max-dollars', '0.01')
+      assert_equal 0, code
+      assert_match(/^stopped: dollars$/, out)
+    end
+  end
+
+  def test_agent_without_claude_executable_is_a_one_line_error
+    code, _out, err = cli('run', '--agent', '--claude-command', '/nope/claude', '--frames', '10')
+    assert_equal 1, code
+    assert_equal 1, err.lines.size
+    assert_match(/claude/, err)
+  end
+
   def http(port, path)
     Net::HTTP.start('127.0.0.1', port.to_i, open_timeout: 10, read_timeout: 20) { |h| h.get(path).body }
   end
