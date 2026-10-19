@@ -67,6 +67,7 @@ class DecisionTest < Minitest::Test
     assert_equal good, point.validate(good)
     point.validate({ title: 'Talk', predicate: { 'kind' => 'dialogue_closed' } })
     point.validate({ title: 'Go', predicate: { kind: 'reach_cell', place: [1, 2], row: 3, col: 4 } })
+    point.validate({ title: 'Explore', predicate: { kind: 'new_place' } })
   end
 
   def test_choose_objective_rejects_bad_outputs
@@ -93,7 +94,7 @@ class DecisionTest < Minitest::Test
     assert_equal 'object', schema[:type]
     assert_equal %w[title predicate justification confidence], schema[:required]
     kinds = schema[:properties][:predicate][:oneOf].map { |p| p[:properties][:kind][:enum] }
-    assert_equal [%w[leave_place], %w[reach_place], %w[reach_cell], %w[dialogue_closed]], kinds
+    assert_equal [%w[leave_place], %w[reach_place], %w[reach_cell], %w[dialogue_closed], %w[new_place]], kinds
     reach_cell = schema[:properties][:predicate][:oneOf][2]
     assert_equal %w[kind place row col], reach_cell[:required]
     assert_equal false, reach_cell[:additionalProperties]
