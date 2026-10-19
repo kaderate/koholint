@@ -28,7 +28,7 @@ class FeedTest < Minitest::Test
       decision(trace, 2)
       trace.emit(:action, frame: 3, skill: 'walk', params: { 'dir' => 'up' }, result: {})
       doc = Koholint::Viewer::Feed.for(dir, FOLLOWER)
-      assert_equal %i[status replay events grid], doc.keys
+      assert_equal %i[status replay events grid activity server_now latency budget], doc.keys
       assert_equal File.basename(dir), doc[:status][:run_id]
       assert_equal({ flow_version: 'f', manifest_status: 'running', budget: { 'frames' => 9 }, health: 'unknown',
                      hearts: 2.0, max_hearts: 3.0, objective: nil, last_notable: nil, highest_milestone: 'none',
@@ -351,5 +351,45 @@ class FeedTest < Minitest::Test
   def test_a_screen_without_a_place_gives_no_grid
     screen = { 'type' => 'screen', 'frame' => 10, 'place' => nil, 'grid' => [], 'static_sprites' => [] }
     assert_nil Koholint::Viewer::Feed.grid('/nonexistent-no-place', [screen], 90)
+  end
+
+  def test_activity_is_parsed_and_tolerates_a_missing_or_garbled_file
+    with_dir do |dir, trace|
+      trace.emit(:perception, frame: 1, state: STATE, state_hash: 'h')
+      assert_nil Koholint::Viewer::Feed.for(dir, FOLLOWER)[:activity]
+      File.write(File.join(dir, 'activity.json'), '{"kind":"deciding","labe')
+      assert_nil Koholint::Viewer::Feed.for(dir, FOLLOWER)[:activity]
+      File.write(File.join(dir, 'activity.json'), '[1]')
+      assert_nil Koholint::Viewer::Feed.for(dir, FOLLOWER)[:activity]
+      File.write(File.join(dir, 'activity.json'), JSON.generate(kind: 'deciding', label: 'x', started_at: 1.5))
+      doc = Koholint::Viewer::Feed.for(dir, FOLLOWER)
+      assert_equal 'deciding', doc[:activity]['kind']
+      assert_kind_of Float, doc[:server_now]
+    end
+  end
+
+  def test_latency_and_budget_come_from_model_decisions
+    manifest = { 'flow_version' => 'f', 'status' => 'running', 'budget' => { 'dollars' => 2.0 } }
+    with_dir(manifest:) do |dir, trace|
+      [1000, 2000, 3000, 4000, 10_000].each_with_index do |ms, i|
+        trace.emit(:decision, frame: i + 1, decision_point: 'choose_skill', input: {}, options: [], choice: {}, justification: 'j', confidence: 1.0,
+                              agent: 'claude', latency_ms: ms, cost_usd: 0.1)
+      end
+      trace.emit(:decision, frame: 9, decision_point: 'choose_skill', input: {}, options: [], choice: {}, justification: 'auto', confidence: 1.0,
+                            agent: 'delegated', latency_ms: 0, cost_usd: 0.0)
+      doc = Koholint::Viewer::Feed.for(dir, FOLLOWER)
+      assert_equal({ last_ms: 10_000, median_ms: 3000, p90_ms: 10_000, count: 5 }, doc[:latency])
+      assert_equal 2.0, doc[:budget][:cap]
+      assert_in_delta 0.5, doc[:budget][:spent]
+      assert_equal 5, doc[:budget][:calls]
+    end
+  end
+
+  def test_latency_is_empty_and_budget_has_no_cap_without_data
+    with_dir do |dir, _trace|
+      doc = Koholint::Viewer::Feed.for(dir, FOLLOWER)
+      assert_equal({ last_ms: nil, median_ms: nil, p90_ms: nil, count: 0 }, doc[:latency])
+      assert_nil doc[:budget][:cap]
+    end
   end
 end

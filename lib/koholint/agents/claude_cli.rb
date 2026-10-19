@@ -9,6 +9,7 @@ module Koholint
 
     class ClaudeCli
       READER_GRACE = 1
+      attr_reader :model
       STDERR_KEEP = 2048
 
       def initialize(model: 'sonnet', command: 'claude', timeout: 90, max_call_usd: 0.25, retries: 1, lenient: [])

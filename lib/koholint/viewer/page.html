@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <title>Koholint live</title>
 <style>
-  body { margin: 0; background: #111; color: #ddd; font: 13px/1.4 monospace; }
+  body { margin: 0; overflow-x: hidden; background: #111; color: #ddd; font: 13px/1.4 monospace; }
   #bar { display: flex; flex-wrap: wrap; gap: 6px 18px; padding: 8px 12px; background: #222; }
   #bar b { color: #8f8; font-weight: normal; }
   #bar b.health-unknown { color: #aaa; }
@@ -21,7 +21,33 @@
   #legend i { display: inline-block; width: 10px; height: 10px; margin-right: 4px; }
   #grid { background: #333; color: #ddd; border: 1px solid #555; font: inherit; padding: 2px 10px; cursor: pointer; }
   #grid:disabled { color: #777; cursor: default; }
-  #side { flex: 1; display: flex; flex-direction: column; }
+  #activity { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 14px; padding: 10px 12px; background: #1a2a22; border-bottom: 1px solid #2c4; }
+  #activity.stopped { background: #2a1a1a; border-color: #a44; }
+  #activity.idle { background: #1d1d1d; border-color: #444; }
+  #dot { width: 12px; height: 12px; border-radius: 50%; background: #2c4; flex: none; animation: pulse 1.2s ease-in-out infinite; }
+  #activity.stopped #dot, #activity.idle #dot { animation: none; background: #777; }
+  @keyframes pulse { 0%, 100% { opacity: 1; transform: scale(1); } 50% { opacity: 0.35; transform: scale(0.7); } }
+  @media (prefers-reduced-motion: reduce) { #dot { animation: none; } }
+  #activity-label { font-size: 1.25em; color: #fff; }
+  #activity-timer { font-size: 1.25em; color: #8f8; font-variant-numeric: tabular-nums; }
+  #activity-detail { color: #9ab; flex-basis: 100%; }
+  .panel { background: #181818; border: 1px solid #333; padding: 8px 10px; margin-bottom: 10px; overflow-wrap: anywhere; }
+  .panel h2 { margin: 0 0 4px; font-size: 0.85em; font-weight: normal; color: #888; text-transform: uppercase; letter-spacing: 0.08em; }
+  #reasoning-text { font-size: 1.25em; line-height: 1.5; color: #eef; white-space: pre-wrap; }
+  #reasoning-head, #reasoning-plan, #objective-predicate, #objective-attempts, #budget-line { color: #9ab; }
+  #reasoning-plan { margin-top: 6px; color: #dfe; }
+  #objective-title { font-size: 1.15em; color: #fd8; }
+  #meter { height: 6px; background: #333; margin: 4px 0; }
+  #meter-fill { height: 100%; width: 0; background: #2c4; }
+  #meter-fill.high { background: #e83; }
+  @media (max-width: 800px) {
+    #main { flex-direction: column; align-items: stretch; }
+    #stage { width: 100%; max-width: 480px; height: auto; aspect-ratio: 10 / 9; }
+    #frame { width: 100%; height: 100%; }
+    #overlay { transform-origin: 0 0; }
+    #events { height: 300px; }
+  }
+  #side { flex: 1; min-width: 0; display: flex; flex-direction: column; }
   #sidebar { display: flex; justify-content: space-between; align-items: center; padding: 4px 6px; background: #222; }
   #mode { background: #333; color: #ddd; border: 1px solid #555; font: inherit; padding: 2px 10px; cursor: pointer; }
   #events { height: 400px; overflow-y: auto; background: #181818; padding: 6px; margin: 0; white-space: pre-wrap; }
@@ -33,12 +59,16 @@
 </style>
 </head>
 <body>
+<div id="activity" class="idle"><span id="dot"></span><span id="activity-label">Waiting for the engine...</span><span id="activity-timer"></span><span id="activity-detail"></span></div>
 <div id="bar"></div>
 <div id="banner">Replay diverged: the follower no longer matches the run.</div>
 <div id="lost">Connection lost, retrying...</div>
 <div id="main">
   <div id="stage"><img id="frame" alt="game frame"><div id="overlay"></div></div>
   <div id="side">
+    <div class="panel" id="reasoning"><h2>Reasoning</h2><div id="reasoning-head"></div><div id="reasoning-text"></div><div id="reasoning-plan"></div></div>
+    <div class="panel" id="objective"><h2>Objective</h2><div id="objective-title"></div><div id="objective-predicate"></div><div id="objective-attempts"></div></div>
+    <div class="panel" id="budget"><h2>Budget</h2><div id="meter"><div id="meter-fill"></div></div><div id="budget-line"></div></div>
     <div id="sidebar"><span>events</span><span><button id="grid" type="button"></button> <button id="mode" type="button"></button></span></div>
     <div id="legend"></div>
     <div id="events"></div>
@@ -199,6 +229,99 @@
   function gridButtonLabel(on, grid) {
     if (!grid) return 'Grid (no data)';
     return on ? 'Grid: on' : 'Grid: off';
+  }
+
+  function formatElapsed(ms) {
+    var total = Math.max(0, Number(ms) || 0);
+    if (total < 60000) return (Math.floor(total / 100) / 10).toFixed(1) + ' s';
+    var seconds = Math.floor(total / 1000);
+    var rest = seconds % 60;
+    return Math.floor(seconds / 60) + ' min ' + (rest < 10 ? '0' : '') + rest + ' s';
+  }
+
+  var ACTIVITY_KINDS = {
+    deciding: 'Deciding', reading_dialogue: 'Reading dialogue', mapping: 'Mapping the screen',
+    acting: 'Acting', pacing: 'Pacing', idle: 'Idle', stopped: 'Stopped'
+  };
+
+  function activityLabel(a) {
+    if (!a || typeof a !== 'object') return 'Waiting for the engine...';
+    if (typeof a.label === 'string' && a.label) return a.label;
+    return ACTIVITY_KINDS[a.kind] || (typeof a.kind === 'string' && a.kind ? a.kind : 'Working');
+  }
+
+  function elapsedSince(a, serverNow, receivedAt, now) {
+    if (!a || typeof a.started_at !== 'number' || typeof serverNow !== 'number') return 0;
+    return Math.max(0, serverNow * 1000 + (now - receivedAt) - a.started_at * 1000);
+  }
+
+  function formatLastCall(latency) {
+    if (!latency || typeof latency.last_ms !== 'number') return '';
+    return 'last call ' + formatElapsed(latency.last_ms);
+  }
+
+  function activityDetail(a, latency) {
+    if (!a || typeof a !== 'object') return '';
+    var d = a.detail && typeof a.detail === 'object' ? a.detail : {};
+    var parts = [];
+    if (a.kind === 'stopped') return typeof d.reason === 'string' ? 'reason: ' + d.reason : '';
+    if (a.kind === 'deciding' || a.kind === 'reading_dialogue') {
+      if (d.model) parts.push('model ' + d.model);
+      if (Number.isInteger(d.images)) parts.push(plural(d.images, 'image'));
+      var hint = formatLastCall(latency);
+      if (hint) parts.push(hint);
+    } else if (typeof d.skill === 'string') {
+      var params = d.params && typeof d.params === 'object' && Object.keys(d.params).length ? ' ' + JSON.stringify(d.params) : '';
+      parts.push(d.skill + params);
+    }
+    return parts.join(' · ');
+  }
+
+  function predicateInWords(p) {
+    if (!p || typeof p !== 'object') return '';
+    var place = Array.isArray(p.place) ? ' ' + formatPlace(p.place) : '';
+    if (p.kind === 'reach_cell') return 'reach cell (' + p.row + ', ' + p.col + ') in' + place;
+    if (p.kind === 'reach_place') return 'reach' + place;
+    if (p.kind === 'leave_place') return 'leave' + place;
+    if (p.kind === 'dialogue_closed') return 'close the open dialogue';
+    return typeof p.kind === 'string' ? p.kind.replace(/_/g, ' ') + place : '';
+  }
+
+  function meterPercent(spent, cap) {
+    if (typeof spent !== 'number' || typeof cap !== 'number' || !(cap > 0)) return null;
+    return Math.max(0, Math.min(100, Math.round(spent / cap * 100)));
+  }
+
+  function formatBudgetLine(b, latency) {
+    b = b || {};
+    var line = formatDollars(b.spent) + (typeof b.cap === 'number' ? ' / ' + formatDollars(b.cap) : '') + ' · ' + plural(b.calls || 0, 'call');
+    if (latency && typeof latency.median_ms === 'number') line += ' · median ' + formatElapsed(latency.median_ms);
+    return line;
+  }
+
+  function latestReasoning(list) {
+    for (var i = list.length - 1; i >= 0; i--) {
+      var e = list[i];
+      if (e.type === 'decision' && e.agent === 'claude' && typeof e.justification === 'string' && e.justification.trim()) return e;
+    }
+    return null;
+  }
+
+  function reasoningHead(e) {
+    var line = 'f' + e.frame + ' · ' + (e.agent || '?') + ' decides ' + formatDecisionChoice(e.choice);
+    if (typeof e.confidence === 'number') line += ' (' + Math.round(e.confidence * 100) + '%)';
+    return line;
+  }
+
+  function objectiveView(list, status) {
+    var started = null, attempts = 0;
+    for (var i = list.length - 1; i >= 0; i--) {
+      var e = list[i];
+      if (e.type === 'action') attempts += 1;
+      if (e.type === 'objective' && e.status === 'started' && e.id === (status || {}).objective) { started = e; break; }
+    }
+    if (!started) return null;
+    return { title: started.title || started.id, predicate: predicateInWords(started.predicate), attempts: attempts };
   }
   // pure:end
 
@@ -400,10 +523,61 @@
     stateBusy = true;
     fetch('/state.json', { cache: 'no-store' })
       .then(checked).then(function (r) { return r.json(); })
-      .then(function (state) { renderBar(state); renderEvents(state.events || []); renderGrid(state.grid || null); stateOk = true; stateError = null; })
+      .then(function (state) { renderBar(state); renderActivity(state); renderPanels(state); renderEvents(state.events || []); renderGrid(state.grid || null); stateOk = true; stateError = null; })
       .catch(function (e) { stateOk = false; stateError = messageOf(e); })
       .then(function () { stateBusy = false; updateLost(); });
   }
+
+
+  var activityState = { activity: null, serverNow: null, receivedAt: 0, latency: null };
+  var activityEl = document.getElementById('activity');
+  var activityLabelEl = document.getElementById('activity-label');
+  var activityTimerEl = document.getElementById('activity-timer');
+  var activityDetailEl = document.getElementById('activity-detail');
+  var stage = document.getElementById('stage');
+
+  function renderActivity(state) {
+    activityState = { activity: state.activity || null, serverNow: state.server_now, receivedAt: Date.now(), latency: state.latency || null };
+    var a = activityState.activity;
+    activityEl.className = a && (a.kind === 'stopped' || a.kind === 'idle') ? a.kind : '';
+    activityLabelEl.textContent = activityLabel(a);
+    activityDetailEl.textContent = activityDetail(a, activityState.latency);
+    tickActivity();
+  }
+
+  function tickActivity() {
+    var a = activityState.activity;
+    if (!a || a.kind === 'stopped') { activityTimerEl.textContent = ''; return; }
+    activityTimerEl.textContent = formatElapsed(elapsedSince(a, activityState.serverNow, activityState.receivedAt, Date.now()));
+  }
+
+  function renderPanels(state) {
+    var list = state.events || [];
+    var reasoning = latestReasoning(list);
+    document.getElementById('reasoning-head').textContent = reasoning ? reasoningHead(reasoning) : '';
+    document.getElementById('reasoning-text').textContent = reasoning ? reasoning.justification.trim() : 'No agent decision yet.';
+    document.getElementById('reasoning-plan').textContent = reasoning && typeof reasoning.plan === 'string' ? 'plan: ' + reasoning.plan.trim() : '';
+    var objective = objectiveView(list, state.status);
+    document.getElementById('objective-title').textContent = objective ? objective.title : 'none';
+    document.getElementById('objective-predicate').textContent = objective ? objective.predicate : '';
+    document.getElementById('objective-attempts').textContent = objective ? plural(objective.attempts, 'action') + ' so far' : '';
+    var budget = state.budget || {};
+    var percent = meterPercent(budget.spent, budget.cap);
+    document.getElementById('meter').style.display = percent === null ? 'none' : 'block';
+    var fill = document.getElementById('meter-fill');
+    fill.style.width = (percent || 0) + '%';
+    fill.className = percent !== null && percent >= 80 ? 'high' : '';
+    document.getElementById('budget-line').textContent = formatBudgetLine(budget, state.latency);
+  }
+
+  function fitOverlay() {
+    var scale = stage.clientWidth / 480;
+    overlay.style.transform = scale < 1 ? 'scale(' + scale + ')' : '';
+  }
+
+  setInterval(tickActivity, 100);
+  window.addEventListener('resize', fitOverlay);
+  fitOverlay();
 
   setInterval(pollFrame, 100);
   setInterval(pollState, 500);

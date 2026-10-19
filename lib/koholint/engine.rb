@@ -68,12 +68,16 @@ module Koholint
     def iterate
       state = Perception.read(@emulator)
       @run.trace.emit(:perception, frame: state.frame, state: state.to_h, state_hash: @emulator.state_hash)
-      grid = @builder&.observe(@emulator, state)
+      if @builder
+        activity(:mapping, 'mapping the screen')
+        grid = @builder.observe(@emulator, state)
+      end
       @policy.observe(state, frame: state.frame) if @policy.respond_to?(:observe)
       return if @budget.exhausted
 
       decision_point = @policy.respond_to?(:decision_point_for) ? @policy.decision_point_for(state) : @decision_point
       context = context_for(grid)
+      activity(:deciding, 'deciding what to do', decision_point: decision_point.name.to_s)
       result = @policy.decide(decision_point, state, context)
       @budget.tick(cost: result[:cost_usd].to_f)
       chosen = result[:fallback] && result[:decision_point] || decision_point
@@ -86,14 +90,19 @@ module Koholint
                                  agent: result[:agent], latency_ms: result[:latency_ms].to_i, cost_usd: result[:cost_usd].to_f, fallback: result[:fallback] || false,
                                  **seen, **(result[:plan] ? { plan: result[:plan] } : {}))
       if choice.key?(:skill)
+        activity(:acting, "acting: #{choice[:skill]}", skill: choice[:skill], params: choice[:params])
         outcome = execute(choice, state, chosen.registry, context)
         @run.trace.emit(:action, frame: @emulator.frame, skill: choice[:skill], params: choice[:params], result: outcome)
         @policy.after_action(choice:, outcome:, state: Perception.read(@emulator), frame: @emulator.frame) if @policy.respond_to?(:after_action)
       elsif chosen.name != :choose_objective
+        activity(:acting, 'acting: press', skill: 'press', params: choice)
         frames = press(choice)
         @run.trace.emit(:action, frame: @emulator.frame, skill: 'press', params: choice, result: { frames: frames })
       end
+      activity(:idle, 'between decisions')
     end
+
+    def activity(kind, label, **detail) = @run.write_activity(kind:, label:, frame: @emulator.frame, detail:)
 
     def context_for(grid)
       context = @builder ? { grid: } : {}
@@ -172,7 +181,10 @@ module Koholint
 
     def finish_frames(done)
       @run.inputs.flush
-      @pacer&.pace(done)
+      if @pacer
+        activity(:pacing, 'pacing to real time')
+        @pacer.pace(done)
+      end
       done
     end
 
@@ -211,6 +223,7 @@ module Koholint
       checkpoint_keyframe
       @run.trace.emit(:stop, frame: @emulator.frame, reason: reason.to_s)
       @run.status = reason == :error ? 'crashed' : 'stopped'
+      activity(:stopped, "stopped: #{reason}", reason: reason.to_s)
       reason
     end
   end

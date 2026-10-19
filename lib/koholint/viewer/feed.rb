@@ -14,7 +14,7 @@ module Koholint
       EVENT_LIMIT = 300
 
       FIELDS = {
-        'decision' => %w[frame type decision_point agent choice confidence justification fallback],
+        'decision' => %w[frame type decision_point agent choice confidence justification fallback plan],
         'action' => %w[frame type skill params result],
         'objective' => %w[frame type id status predicate title reason],
         'dialogue' => %w[frame type place text source page]
@@ -42,8 +42,38 @@ module Koholint
                                 objective_title: objective_title(trace, summary[:objective])),
           replay: { frame: follower.frame, journal_frames: follower.journal_frames, lag: follower.lag, sync: follower.sync },
           events: events(trace, limit),
-          grid: grid(run_dir, trace, follower.frame)
+          grid: grid(run_dir, trace, follower.frame),
+          activity: activity(run_dir),
+          server_now: Time.now.to_f,
+          latency: latency(trace),
+          budget: budget(manifest, trace)
         }
+      end
+
+      def activity(run_dir)
+        parsed = JSON.parse(File.read(File.join(run_dir, 'activity.json')))
+        parsed.is_a?(Hash) ? parsed : nil
+      rescue SystemCallError, JSON::ParserError
+        nil
+      end
+
+      def latency(trace)
+        samples = trace.select { |e| e['type'] == 'decision' && model_call?(e) && e['latency_ms'].is_a?(Numeric) }.map { |e| e['latency_ms'] }
+        return { last_ms: nil, median_ms: nil, p90_ms: nil, count: 0 } if samples.empty?
+
+        { last_ms: samples.last, median_ms: percentile(samples, 0.5), p90_ms: percentile(samples, 0.9), count: samples.size }
+      end
+
+      def percentile(samples, fraction)
+        sorted = samples.sort
+        sorted[((sorted.size - 1) * fraction).ceil]
+      end
+
+      def model_call?(event) = event['agent'] == 'claude' && event['latency_ms'].to_i.positive?
+
+      def budget(manifest, trace)
+        cap = manifest['budget'].is_a?(Hash) ? manifest['budget']['dollars'] : nil
+        { spent: trace.select { |e| e['type'] == 'decision' }.sum { |e| e['cost_usd'].to_f }, cap: cap.is_a?(Numeric) ? cap : nil, calls: calls(trace) }
       end
 
       def calls(trace)

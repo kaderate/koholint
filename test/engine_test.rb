@@ -253,4 +253,18 @@ class EngineTest < Minitest::Test
       assert probe.seen[:dialogue_shot].respond_to?(:call)
     end
   end
+
+  def test_activity_ends_stopped_and_is_never_read_by_verify_or_resume
+    skip_without_rom!
+    with_run do |_dir, run|
+      engine(run, frames: 300).run
+      path = File.join(run.dir, 'activity.json')
+      assert_equal 'stopped', JSON.parse(File.read(path))['kind']
+      refute File.exist?("#{path}.tmp")
+      File.write(path, 'not json{')
+      assert_equal [], Koholint::Replay.verify(run, every: 600).reject(&:last)
+      resumed = Koholint::Engine.resume(run.dir, policy: Koholint::Policies::WalkAndTalk.new, budget: Koholint::Budget.new(frames: 300))
+      assert_equal 600, resumed.run.then { Koholint::InputLog.load(File.join(run.dir, 'inputs.log')).frames }
+    end
+  end
 end
