@@ -50,13 +50,16 @@ module Koholint
       { type: 'object',
         properties: registry.schema.merge(justification: { type: 'string' },
                                            confidence: { type: 'number', minimum: 0, maximum: 1 },
-                                           transcription: { type: 'string' }),
+                                           transcription: { type: 'string' },
+                                           plan: PLAN_SCHEMA),
         required: %w[skill params justification confidence], additionalProperties: false }
     end
 
     private
 
     TITLE_MAX = 80
+    PLAN_MAX = 200
+    PLAN_SCHEMA = { type: 'string', maxLength: PLAN_MAX }.freeze
     PLACE_SCHEMA = { type: 'array', items: { type: 'integer' }, minItems: 2, maxItems: 2 }.freeze
     FIELD_SCHEMAS = { place: PLACE_SCHEMA, row: { type: 'integer', minimum: 0, maximum: 7 },
                       col: { type: 'integer', minimum: 0, maximum: 9 } }.freeze
@@ -68,7 +71,8 @@ module Koholint
       end
       { type: 'object',
         properties: { title: { type: 'string', minLength: 1, maxLength: TITLE_MAX }, predicate: { oneOf: predicates },
-                      justification: { type: 'string' }, confidence: { type: 'number', minimum: 0, maximum: 1 } },
+                      justification: { type: 'string' }, confidence: { type: 'number', minimum: 0, maximum: 1 },
+                      plan: PLAN_SCHEMA },
         required: %w[title predicate justification confidence], additionalProperties: false }
     end
 

@@ -84,7 +84,7 @@ module Koholint
       @run.trace.emit(:decision, frame: state.frame, decision_point: chosen.name.to_s, input: state.to_h, options: chosen.options || [],
                                  choice: choice, justification: result[:justification], confidence: result[:confidence],
                                  agent: result[:agent], latency_ms: result[:latency_ms].to_i, cost_usd: result[:cost_usd].to_f, fallback: result[:fallback] || false,
-                                 **seen)
+                                 **seen, **(result[:plan] ? { plan: result[:plan] } : {}))
       if choice.key?(:skill)
         outcome = execute(choice, state, chosen.registry, context)
         @run.trace.emit(:action, frame: @emulator.frame, skill: choice[:skill], params: choice[:params], result: outcome)

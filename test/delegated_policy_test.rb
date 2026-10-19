@@ -131,6 +131,46 @@ class DelegatedPolicyTest < Minitest::Test
     assert_equal [1, 1], [steps, p.instance_variable_get(:@client).calls.size]
   end
 
+  def with_plan(reply, plan) = Koholint::Agents::Reply.new(reply.output.merge('plan' => plan), reply.cost_usd, 200, {}, nil)
+
+  def test_the_plan_is_stored_cleaned_capped_and_shown_in_the_next_prompt
+    client = ScriptedClient.new(objective: with_plan(objective, "go\e talk\nto him #{'x' * 300}"), skill: [walk, walk])
+    p = policy(client)
+    _point, first = decide(p)
+    assert_equal 200, first[:plan].size
+    assert_match(/\Ago talk to him x+\z/, first[:plan])
+    refute_includes client.calls[0][:prompt], 'Your plan'
+    decide(p)
+    assert_includes client.calls[1][:prompt], "follow it unless the situation changed): #{first[:plan]}"
+    _point, second = decide(p)
+    refute second.key?(:plan)
+    assert_includes client.calls[2][:prompt], first[:plan]
+  end
+
+  def test_a_new_plan_replaces_the_old_one_and_a_fallback_keeps_it
+    client = ScriptedClient.new(objective: with_plan(objective, 'first'), skill: [with_plan(walk, 'second'), failing('boom'), walk])
+    p = policy(client)
+    decide(p)
+    decide(p)
+    assert_includes client.calls[1][:prompt], 'follow it unless the situation changed): first'
+    _point, fallback = decide(p)
+    assert fallback[:fallback]
+    assert_includes client.calls[2][:prompt], 'follow it unless the situation changed): second'
+    decide(p)
+    assert_includes client.calls[3][:prompt], 'follow it unless the situation changed): second'
+  end
+
+  def test_the_plan_is_cleared_when_an_objective_ends
+    client = ScriptedClient.new(objective: [with_plan(objective, 'leave'), objective], skill: walk)
+    p = policy(client)
+    decide(p)
+    p.observe(state(frame: 110, game_submode: 3, room_id: 5), frame: 110)
+    p.observe(state(frame: 130, room_id: 5), frame: 130)
+    assert_nil @objectives.current
+    decide(p, state(room_id: 5))
+    refute_includes client.calls[1][:prompt], 'Your plan'
+  end
+
   def blocked_walk(p, direction, pos: [68, 60], frame: 101)
     outcome = { skill: 'walk', params: { direction:, cells: 1 }, frames: 8, moved_cells: 0, room_changed: false, hp_delta: 0, stopped_by: 'blocked' }
     p.after_action(choice: { skill: 'walk', params: outcome[:params] }, outcome:, state: state(x: pos[0], y: pos[1]), frame:)

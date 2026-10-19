@@ -160,6 +160,11 @@
     return truncate(e.justification.trim(), 600);
   }
 
+  function formatPlan(e) {
+    if (e.type !== 'decision' || typeof e.plan !== 'string' || !e.plan.trim()) return '';
+    return 'plan: ' + truncate(e.plan.trim(), 200);
+  }
+
   function formatEventJson(e) { return JSON.stringify(e); }
 
   function normalizeMode(mode) { return mode === 'json' ? 'json' : 'pretty'; }
@@ -336,6 +341,13 @@
         note.className = 'reason';
         note.textContent = reason;
         events.appendChild(note);
+      }
+      var plan = mode === 'json' ? '' : formatPlan(event);
+      if (plan) {
+        var planNote = document.createElement('div');
+        planNote.className = 'reason';
+        planNote.textContent = plan;
+        events.appendChild(planNote);
       }
     });
     events.scrollTop = pinned ? events.scrollHeight : top;
