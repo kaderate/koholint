@@ -41,7 +41,7 @@ module Koholint
         { button:, frames: params[:frames] }
       end
 
-      def start(state, params)
+      def start(state, params, _context = {})
         params = normalize(params)
         Run.new(skill: name, params:, state:, button: params[:button], hold: params[:frames])
       end

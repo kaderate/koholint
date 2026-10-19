@@ -60,7 +60,7 @@ module Koholint
         { direction:, cells: params[:cells] }
       end
 
-      def start(state, params)
+      def start(state, params, _context = {})
         params = normalize(params)
         Run.new(skill: name, params:, state:, direction: params[:direction], cells: params[:cells])
       end

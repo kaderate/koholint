@@ -1,5 +1,6 @@
 require 'koholint'
 require 'koholint/skills/advance_dialogue'
+require 'koholint/skills/goto'
 require 'koholint/skills/press'
 require 'koholint/skills/wait'
 require 'koholint/skills/walk'
@@ -17,7 +18,7 @@ module Koholint
     end
 
     class Registry
-      def self.default = new([Walk.new, Press.new, AdvanceDialogue.new, Wait.new])
+      def self.default = new([Walk.new, Press.new, AdvanceDialogue.new, Wait.new, Goto.new])
 
       def initialize(skills)
         @skills = skills.to_h { |skill| [skill.name, skill] }
@@ -31,7 +32,7 @@ module Koholint
 
       def validate(name, params) = fetch(name).normalize(params)
 
-      def start(name, state, params) = fetch(name).start(state, params)
+      def start(name, state, params, context = {}) = fetch(name).start(state, params, context)
 
       def schema
         { skill: { type: 'string', enum: names }, params: { anyOf: @skills.values.map(&:params_schema) } }

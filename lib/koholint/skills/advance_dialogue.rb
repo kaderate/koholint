@@ -26,7 +26,7 @@ module Koholint
         {}
       end
 
-      def start(state, params) = Run.new(skill: name, params: normalize(params), state:)
+      def start(state, params, _context = {}) = Run.new(skill: name, params: normalize(params), state:)
     end
   end
 end

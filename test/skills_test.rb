@@ -1,6 +1,8 @@
 require_relative 'test_helper'
 require 'support/emulator_cache'
 require 'koholint/decision'
+require 'koholint/vision/grid_builder'
+require 'koholint/calibration/walk_probe'
 require 'koholint/game_state'
 require 'koholint/skills/registry'
 require 'koholint/perception'
@@ -24,7 +26,7 @@ class SkillsTest < Minitest::Test
   end
 
   def test_registry_names_and_unknown_skill
-    assert_equal %w[walk press advance_dialogue wait], registry.names
+    assert_equal %w[walk press advance_dialogue wait goto], registry.names
     assert_raises(ArgumentError) { registry.fetch('fly') }
     assert_raises(ArgumentError) { registry.start('fly', state, {}) }
   end
@@ -264,6 +266,135 @@ class SkillsTest < Minitest::Test
   def test_hard_cap
     execution = Koholint::Skills::Wait::Run.new(skill: 'wait', params: {}, state:, duration: 1000)
     assert_equal 400, drive(execution, Array.new(500) { state }).size
+  end
+
+  class OpenGrid
+    def initialize(walls: []) = @walls = walls
+    def static_sprite(_row, _col) = nil
+    def passable(row, col, _direction) = @walls.include?([row, col]) ? :no : :yes
+  end
+
+  def simulate(execution, start, walls: [], limit: 600)
+    x, y = start
+    hp = 24
+    inputs = []
+    limit.times do
+      current = state(x:, y:)
+      buttons = execution.next_input(current)
+      break unless buttons
+
+      inputs << buttons
+      dx, dy = { up: [0, -1], down: [0, 1], left: [-1, 0], right: [1, 0] }.fetch(buttons.first, [0, 0])
+      nx = x + dx
+      ny = y + dy
+      cell = Koholint::Geometry.cell_for(nx + (7 * dx), ny + (7 * dy))
+      next if cell && walls.include?(cell)
+
+      x = nx
+      y = ny
+    end
+    [execution.result(state(x:, y:, hp:)), inputs]
+  end
+
+  def goto(row, col, start: [88, 80], grid: OpenGrid.new, ledger: nil, **walls)
+    execution = registry.start('goto', state(x: start[0], y: start[1]), { row:, col: }, { grid:, ledger: }.compact)
+    simulate(execution, start, **walls)
+  end
+
+  def test_goto_three_cells_ends_done_and_aligned
+    result, inputs = goto(4, 8)
+    assert_equal :done, result[:stopped_by]
+    assert_equal 3, result[:path_length]
+    assert_equal 3, result[:steps_done]
+    assert result[:aligned]
+    assert_equal [4, 8], [result[:to][:row], result[:to][:col]]
+    assert_equal result[:frames], inputs.size
+  end
+
+  def test_goto_turns_after_centring
+    result, = goto(2, 6, start: [88, 80])
+    assert_equal :done, result[:stopped_by]
+    assert result[:aligned]
+    assert_equal [2, 6], [result[:to][:row], result[:to][:col]]
+  end
+
+  def test_goto_blocked_segment_reports_blocked_at
+    result, = goto(4, 8, grid: OpenGrid.new, walls: [[4, 7]])
+    assert_equal :blocked, result[:stopped_by]
+    assert_equal({ row: 4, col: 6, direction: :right }, result[:blocked_at])
+    assert_operator result[:steps_done], :<, result[:path_length]
+  end
+
+  def test_goto_unreachable_target_is_no_path_after_one_frame
+    wall = (0..7).map { |row| [row, 7] }
+    result, inputs = goto(4, 8, grid: OpenGrid.new(walls: wall))
+    assert_equal :no_path, result[:stopped_by]
+    assert_equal 1, result[:frames]
+    assert_equal [[]], inputs
+    assert_equal 0, result[:path_length]
+  end
+
+  def test_goto_without_a_grid_is_no_path
+    execution = registry.start('goto', state, { row: 4, col: 8 })
+    result, inputs = simulate(execution, [88, 80])
+    assert_equal :no_path, result[:stopped_by]
+    assert_equal 1, inputs.size
+  end
+
+  def test_goto_to_the_current_cell_spends_a_frame_and_is_done
+    result, = goto(4, 5)
+    assert_equal :done, result[:stopped_by]
+    assert_operator result[:frames], :>=, 1
+    assert_equal 0, result[:path_length]
+  end
+
+  def test_goto_stops_on_room_change_and_damage
+    execution = registry.start('goto', state, { row: 4, col: 9 }, { grid: OpenGrid.new })
+    execution.next_input(state)
+    execution.next_input(state(room_id: 2))
+    assert_equal :room_change, execution.result.fetch(:stopped_by)
+    execution = registry.start('goto', state, { row: 4, col: 9 }, { grid: OpenGrid.new })
+    execution.next_input(state)
+    execution.next_input(state(hp: 20))
+    assert_equal :damage, execution.result.fetch(:stopped_by)
+  end
+
+  def test_goto_params_are_validated
+    [{ row: 8, col: 0 }, { row: 0, col: 10 }, { row: -1, col: 0 }, { row: 'a', col: 0 }, { row: 1 }, { row: 1, col: 1, x: 1 }].each do |bad|
+      assert_raises(ArgumentError, bad.inspect) { registry.start('goto', state, bad, { grid: OpenGrid.new }) }
+    end
+  end
+
+  class DirectProber
+    def run(emulator, **options) = Koholint::Calibration::WalkProbe.run(emulator, **options)
+  end
+
+  class SilentTrace
+    def emit(*, **) = nil
+  end
+
+  def interactive_grid(emulator)
+    builder = Koholint::Vision::GridBuilder.new(trace: SilentTrace.new, prober: DirectProber.new)
+    state = Koholint::Perception.read(emulator)
+    5.times.map { builder.observe(emulator, state) }.last
+  end
+
+  def test_rom_goto_across_the_starting_house_ends_aligned_on_the_target
+    skip_without_rom!
+    grid = interactive_grid(EmulatorCache.interactive)
+    [[1, 4], [1, 6], [1, 2]].each do |row, col|
+      refute grid.static_sprite(row, col)
+      emulator = fresh(EmulatorCache.interactive)
+      execution = registry.start('goto', Koholint::Perception.read(emulator), { row:, col: }, { grid: })
+      while (buttons = execution.next_input(Koholint::Perception.read(emulator)))
+        emulator.step(buttons)
+      end
+      result = execution.result(Koholint::Perception.read(emulator))
+      assert_equal :done, result[:stopped_by], [row, col].inspect
+      assert result[:aligned]
+      assert_equal [row, col], result.fetch(:to).values_at(:row, :col)
+      assert_operator result[:frames], :<=, 400
+    end
   end
 
   def test_choose_skill_validate_and_schema

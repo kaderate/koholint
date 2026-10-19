@@ -71,7 +71,8 @@ module Koholint
       return if @budget.exhausted
 
       decision_point = @policy.respond_to?(:decision_point_for) ? @policy.decision_point_for(state) : @decision_point
-      result = @policy.decide(decision_point, state, context_for(grid))
+      context = context_for(grid)
+      result = @policy.decide(decision_point, state, context)
       @budget.tick(cost: result[:cost_usd].to_f)
       chosen = result[:fallback] && result[:decision_point] || decision_point
       choice = chosen.validate(result[:choice])
@@ -83,7 +84,7 @@ module Koholint
                                  agent: result[:agent], latency_ms: result[:latency_ms].to_i, cost_usd: result[:cost_usd].to_f, fallback: result[:fallback] || false,
                                  **seen)
       if choice.key?(:skill)
-        outcome = execute(choice, state, chosen.registry)
+        outcome = execute(choice, state, chosen.registry, context)
         @run.trace.emit(:action, frame: @emulator.frame, skill: choice[:skill], params: choice[:params], result: outcome)
         @policy.after_action(choice:, outcome:, state: Perception.read(@emulator), frame: @emulator.frame) if @policy.respond_to?(:after_action)
       elsif chosen.name != :choose_objective
@@ -133,8 +134,8 @@ module Koholint
       finish_frames(done)
     end
 
-    def execute(choice, state, registry)
-      execution = registry.start(choice[:skill], state, choice[:params])
+    def execute(choice, state, registry, context = {})
+      execution = registry.start(choice[:skill], state, choice[:params], context)
       current = state
       loop do
         buttons = execution.next_input(current)
