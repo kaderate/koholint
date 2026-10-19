@@ -10,7 +10,10 @@ class PageTest < Minitest::Test
   end
 
   def evaluate(expression)
-    skip 'node is not installed' unless system('which node > /dev/null 2>&1')
+    unless system('which node > /dev/null 2>&1')
+      flunk 'node is not installed and CI is set' if ENV['CI']
+      skip 'node is not installed: page formatting tests not run'
+    end
     out, status = Open3.capture2('node', '-e', "#{pure_source}\nconsole.log(JSON.stringify(#{expression}));")
     assert status.success?
     JSON.parse(out)
@@ -103,5 +106,99 @@ class PageTest < Minitest::Test
   def test_page_has_a_grid_toggle_that_remembers_the_choice
     assert_match(/id="grid"/, PAGE)
     assert_match(/koholint\.grid/, PAGE)
+  end
+
+  def fmt(event) = evaluate("formatEventPretty(#{JSON.generate(event)})")
+
+  def test_a_skill_decision_reads_as_a_sentence
+    event = { frame: 1234, type: 'decision', agent: 'claude', choice: { skill: 'walk', params: { direction: 'up', cells: 2 } },
+              justification: 'door is north', confidence: 1 }
+    assert_equal 'f1234 · claude decides walk up 2', fmt(event)
+    assert_equal 'door is north', evaluate("eventTitle(#{JSON.generate(event)})")
+  end
+
+  def test_fallback_decisions_are_marked
+    event = { frame: 2, type: 'decision', agent: 'claude', choice: { buttons: [], frames: 30 }, fallback: true }
+    assert_equal 'f2 · claude decides idle 30f [fallback]', fmt(event)
+  end
+
+  def test_objective_choices_show_the_title
+    event = { frame: 3, type: 'decision', agent: 'claude', choice: { title: 'Leave the house', predicate: { kind: 'leave_place' } } }
+    assert_equal 'f3 · claude decides objective "Leave the house"', fmt(event)
+  end
+
+  def test_decisions_with_missing_fields_do_not_throw
+    assert_equal 'f4 · ? decides', fmt({ frame: 4, type: 'decision' })
+    assert_equal 'f4 · claude decides walk', fmt({ frame: 4, type: 'decision', agent: 'claude', choice: { skill: 'walk' } })
+  end
+
+  def test_skill_results_read_as_what_happened
+    result = { skill: 'walk', moved_cells: 1, stopped_by: 'blocked' }
+    assert_equal 'f9 · walked 1 cell, stopped: blocked', fmt({ frame: 9, type: 'action', skill: 'walk', params: {}, result: result })
+    result = { skill: 'walk', moved_cells: 2, stopped_by: 'done', hp_delta: -1, room_changed: true }
+    assert_equal 'f9 · walked 2 cells, done, room changed, hp -1', fmt({ frame: 9, type: 'action', skill: 'walk', params: {}, result: result })
+    assert_equal 'f9 · walked 0 cells, stopped: damage', fmt({ frame: 9, type: 'action', skill: 'walk', result: { moved_cells: 0, stopped_by: 'damage' } })
+  end
+
+  def test_objective_events_read_with_status_and_reason
+    event = { frame: 5, type: 'objective', id: 'o1', status: 'started', predicate: { kind: 'leave_place', place: [163, 16] } }
+    assert_equal 'f5 · objective: leave_place [163,16] started', fmt(event)
+    event = { frame: 6, type: 'objective', id: 'o1', status: 'abandoned', reason: 'stall', predicate: { kind: 'leave_place', place: [163, 16] } }
+    assert_equal 'f6 · objective: leave_place [163,16] abandoned (stall)', fmt(event)
+    assert_equal 'f7 · objective: o2 failed', fmt({ frame: 7, type: 'objective', id: 'o2', status: 'failed' })
+  end
+
+  def test_dialogue_is_a_quoted_line
+    assert_equal 'f8 · dialogue: "Hello, Link!"', fmt({ frame: 8, type: 'dialogue', text: 'Hello, Link!', place: [1, 2] })
+    assert_equal 'f8 · dialogue', fmt({ frame: 8, type: 'dialogue' })
+  end
+
+  def test_status_bar_formats
+    assert_equal '$0.12', evaluate('formatDollars(0.1234)')
+    assert_equal '$0.00', evaluate('formatDollars(null)')
+    assert_equal 'none', evaluate('formatObjective({status: {objective: null}})')
+    assert_equal 'o1', evaluate("formatObjective({status: {objective: 'o1'}})")
+    assert_equal 'Leave the house', evaluate("formatObjective({status: {objective: 'o1', objective_title: 'Leave the house'}})")
+    long = evaluate("formatObjective({status: {objective: 'o1', objective_title: '#{'x' * 80}'}})")
+    assert_equal 40, long.length
+    assert long.end_with?('…')
+    assert_equal 3, evaluate('formatCalls({status: {calls: 3}})')
+    assert_equal 0, evaluate('formatCalls({status: {}})')
+  end
+
+  PAYLOAD = %q(<script>alert(1)</script>"'&)
+
+  def test_untrusted_text_comes_out_verbatim_from_the_formatters
+    p = JSON.generate(PAYLOAD)
+    assert_equal PAYLOAD, evaluate("eventTitle({type: 'decision', justification: #{p}})")
+    assert_equal PAYLOAD, evaluate("eventTitle({type: 'dialogue', text: #{p}})")
+    assert_equal PAYLOAD, evaluate("eventTitle({type: 'objective', title: #{p}})")
+    assert_equal %(f1 · dialogue: "#{PAYLOAD}"), fmt({ frame: 1, type: 'dialogue', text: PAYLOAD })
+    assert_equal %(f1 · c decides objective "#{PAYLOAD}"), fmt({ frame: 1, type: 'decision', agent: 'c', choice: { title: PAYLOAD } })
+    assert_equal "f1 · c decides walk #{PAYLOAD}", fmt({ frame: 1, type: 'decision', agent: 'c', choice: { skill: 'walk', params: { a: PAYLOAD } } })
+    assert_equal PAYLOAD, evaluate("formatObjective({status: {objective: 'o', objective_title: #{p}}})")
+  end
+
+  def test_event_titles_do_not_leak_other_fields
+    assert_equal '', evaluate("eventTitle({type: 'action', justification: 'x', text: 'y'})")
+    assert_equal '', evaluate("eventTitle({type: 'decision', justification: {a: 1}})")
+  end
+
+  def test_agent_text_is_never_assigned_as_html
+    refute_match(/innerHTML|outerHTML|insertAdjacentHTML|document\.write/, PAGE)
+  end
+
+  def test_long_dialogue_is_truncated_in_the_row_and_whole_in_the_title
+    text = 'y' * 300
+    line = fmt({ frame: 1, type: 'dialogue', text: text })
+    assert_equal 'f1 · dialogue: "'.length + 200 + 1, line.length
+    assert_includes line, '…'
+    assert_equal text, evaluate("eventTitle({type: 'dialogue', text: '#{text}'})")
+  end
+
+  def test_multi_param_skills_other_than_walk_show_their_keys
+    skill = { skill: 'talk', params: { npc: 'old man', times: 2 } }
+    assert_equal 'f1 · c decides talk npc=old man times=2', fmt({ frame: 1, type: 'decision', agent: 'c', choice: skill })
+    assert_equal 'f1 · c decides use sword', fmt({ frame: 1, type: 'decision', agent: 'c', choice: { skill: 'use', params: { item: 'sword' } } })
   end
 end
