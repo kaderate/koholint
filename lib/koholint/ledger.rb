@@ -34,7 +34,8 @@ module Koholint
       room && map ? [room, map] : nil
     end
 
-    def initialize
+    def initialize(on_doubt: nil)
+      @on_doubt = on_doubt
       @counts = Hash.new(0)
     end
 
@@ -44,7 +45,9 @@ module Koholint
       direction = Ledger.pick(blocked_at, :direction)
       return unless row && col && direction.respond_to?(:to_sym)
 
-      @counts[edge(place, [row, col], direction)] += 1
+      key = edge(place, [row, col], direction)
+      @counts[key] += 1
+      @on_doubt&.call(place:, cell: [row, col], direction: key.last, count: @counts[key]) if @counts[key] == DOUBT_AT
     end
 
     def entered(place:, cell:, direction:) = @counts.delete(edge(place, cell, direction))

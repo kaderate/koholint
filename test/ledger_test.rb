@@ -85,4 +85,15 @@ class LedgerTest < Minitest::Test
     ledger.entered(place: PLACE, cell: [3, 4], direction: :up)
     assert_equal 1, ledger.count(PLACE, [3, 4], :left)
   end
+
+  def test_on_doubt_fires_once_at_the_second_record
+    calls = []
+    ledger = Koholint::Ledger.new(on_doubt: ->(**args) { calls << args })
+    ledger.record(place: PLACE, blocked_at: blocked)
+    assert_empty calls
+    ledger.record(place: PLACE, blocked_at: blocked)
+    assert_equal [{ place: PLACE, cell: [3, 4], direction: :up, count: 2 }], calls
+    ledger.record(place: PLACE, blocked_at: blocked)
+    assert_equal 1, calls.size
+  end
 end
