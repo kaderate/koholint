@@ -5,6 +5,7 @@ require 'koholint/ledger'
 require 'koholint/navigation/planner'
 require 'koholint/vision/beliefs'
 require 'koholint/vision/capabilities'
+require 'koholint/vision/dialogue_shot'
 require 'koholint/vision/grid'
 
 module Koholint
@@ -12,9 +13,13 @@ module Koholint
     class Delegated
       RESULT_LIMIT = 6
       TRANSCRIPTION_LIMIT = 500
+      DIALOGUE_PAGE_LIMIT = 40
+      DIALOGUE_FRAME_LIMIT = 1800
+      SHEET_PAGES = 8
       Failure = Class.new(StandardError)
       FALLBACK_CHOICE = { skill: 'wait', params: { frames: 30 } }.freeze
       HEMMED_WAIT = { skill: 'wait', params: { frames: 120 } }.freeze
+      ADVANCE = { skill: 'advance_dialogue', params: {} }.freeze
       HEMMED_DIRECTIONS = 4
       HEMMED_WAIT_LIMIT = 1800 / HEMMED_WAIT[:params][:frames]
 
@@ -29,6 +34,8 @@ module Koholint
         @walks = []
         @hemmed = nil
         @page = 0
+        @sequence = nil
+        @agent_driven = false
         @skill_point = DecisionPoint.choose_skill(registry)
       end
 
@@ -43,9 +50,12 @@ module Koholint
       def cancel = (@client.cancel if @client.respond_to?(:cancel))
 
       def decide(decision_point, state, context)
-        @prompt = @image = nil
+        @prompt = @image = @images = nil
         context[:ledger] = @ledger
-        if decision_point.name == :choose_skill && hemmed?(state)
+        automatic = automatic_advance(decision_point, state, context)
+        return automatic if automatic
+
+        if decision_point.name == :choose_skill && !@sequence && hemmed?(state)
           return hemmed_wait if @hemmed[:waits] < HEMMED_WAIT_LIMIT
 
           clear_hemmed
@@ -61,14 +71,21 @@ module Koholint
         raise
       rescue StandardError => e
         { choice: FALLBACK_CHOICE, justification: e.is_a?(Failure) ? e.message : "#{e.class}: #{e.message}", confidence: 0.0, agent: 'claude', latency_ms: 0,
-          cost_usd: cost_of(reply), fallback: true, decision_point: @skill_point, prompt: @prompt, image: @image }
+          cost_usd: cost_of(reply), fallback: true, decision_point: @skill_point, prompt: @prompt, image: @image, images: @images }
       end
 
       def after_action(choice:, outcome:, state:, frame:)
         return unless choice.key?(:skill)
 
         @page += 1 if choice[:skill] == 'advance_dialogue'
-        @page = 0 unless state.phase == :dialogue
+        unless state.phase == :dialogue
+          @page = 0
+          @agent_driven = false
+        end
+        if @auto
+          @auto = false
+          return track { @objectives.update(state, frame:) }
+        end
         @last_results << outcome
         @last_results.shift while @last_results.size > RESULT_LIMIT
         note_walk(choice, outcome, state)
@@ -180,6 +197,25 @@ module Koholint
         @walks.clear
       end
 
+      def automatic_advance(decision_point, state, context)
+        return unless decision_point.name == :choose_skill && state.phase == :dialogue && !@agent_driven
+
+        if @sequence && sequence_full?(state)
+          @agent_driven = true
+          return
+        end
+        rgb = context[:dialogue_rgb]&.call or return
+        @sequence ||= { pages: [], start: state.frame }
+        @sequence[:pages] << rgb
+        @auto = true
+        { choice: ADVANCE, justification: 'automatic dialogue advance', confidence: 1.0, agent: 'delegated', latency_ms: 0, cost_usd: 0.0,
+          fallback: false, prompt: nil, image: nil }
+      end
+
+      def sequence_full?(state)
+        @sequence[:pages].size >= DIALOGUE_PAGE_LIMIT || state.frame - @sequence[:start] >= DIALOGUE_FRAME_LIMIT
+      end
+
       def hemmed_wait
         @waiting = true
         @hemmed[:waits] += 1
@@ -190,17 +226,31 @@ module Koholint
       def ask(decision_point, state, context)
         @prompt = Agents::Context.build(state:, grid: grid_for(state, context), objective: @objectives.current, history: @objectives.history,
                                        attempts: @objectives.attempts_for_prompt, manual: @manual, last_results: @last_results, ledger: @ledger)
-        @image = context[:dialogue_shot]&.call if state.phase == :dialogue && decision_point.name == :choose_skill
-        @client.call(system: Agents::Prompts.system_for(decision_point), prompt: @prompt, schema: decision_point.json_schema, image: @image)
+        if decision_point.name == :choose_skill && @sequence
+          @pages_read = @sequence[:pages].size
+          @images = Vision::DialogueShot.sheets(@sequence[:pages], per_sheet: SHEET_PAGES)
+          @sequence = nil
+          @page = @pages_read
+        elsif state.phase == :dialogue && decision_point.name == :choose_skill
+          @image = context[:dialogue_shot]&.call
+        end
+        pictures = @images ? { images: @images } : { image: @image }
+        @client.call(system: Agents::Prompts.system_for(decision_point), prompt: @prompt, schema: decision_point.json_schema, **pictures)
       end
 
       def clean(text) = text.gsub(/[^\P{Cntrl}\n]/, '').strip[0, TRANSCRIPTION_LIMIT]
 
       def transcription_for(output, state, decision_point)
         text = output['transcription']
-        return {} unless decision_point.name == :choose_skill && state.phase == :dialogue && text.is_a?(String) && !clean(text).empty?
+        return {} unless decision_point.name == :choose_skill && text.is_a?(String)
+        return { transcription: sequence_pages(text) }.reject { |_, v| v.empty? } if @images
+        return {} unless state.phase == :dialogue && !clean(text).empty?
 
         { transcription: { text: clean(text), page: @page } }
+      end
+
+      def sequence_pages(text)
+        text.split(/\n[^\S\n]*\n/).map { |chunk| clean(chunk) }.reject(&:empty?).first(DIALOGUE_PAGE_LIMIT).each_with_index.map { |t, i| { text: t, page: i + 1 } }
       end
 
       def grid_for(state, context)
@@ -214,7 +264,7 @@ module Koholint
 
       def answer(choice, reply, output)
         { choice:, justification: output['justification'].to_s, confidence: output['confidence']&.to_f, agent: 'claude',
-          latency_ms: reply.latency_ms.to_i, cost_usd: reply.cost_usd.to_f, prompt: @prompt, image: @image }
+          latency_ms: reply.latency_ms.to_i, cost_usd: reply.cost_usd.to_f, prompt: @prompt, image: @image, images: @images }
       end
 
       def cost_of(reply) = reply.respond_to?(:cost_usd) ? reply.cost_usd.to_f : 0.0

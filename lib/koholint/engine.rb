@@ -95,7 +95,7 @@ module Koholint
 
     def context_for(grid)
       context = @builder ? { grid: } : {}
-      context.merge(dialogue_shot: -> { Vision::DialogueShot.crop(@emulator) })
+      context.merge(dialogue_shot: -> { Vision::DialogueShot.crop(@emulator) }, dialogue_rgb: -> { Vision::DialogueShot.rgb(@emulator) })
     end
 
     def record_prompt(result, frame, name)
@@ -106,14 +106,15 @@ module Koholint
       FileUtils.mkdir_p(dir)
       File.write(File.join(dir, "#{frame}-#{name}.txt"), prompt)
       File.binwrite(File.join(dir, "#{frame}-#{name}.png"), result[:image]) if result[:image]
-      { prompt_sha: Digest::SHA256.hexdigest(prompt), image: !result[:image].nil? }
+      Array(result[:images]).each_with_index { |png, n| File.binwrite(File.join(dir, "#{frame}-#{name}-#{n + 1}.png"), png) }
+      { prompt_sha: Digest::SHA256.hexdigest(prompt), image: !result[:image].nil? || !Array(result[:images]).empty? }
     end
 
     def emit_dialogue(transcription, state)
-      return unless transcription
-
-      @run.trace.emit(:dialogue, frame: state.frame, place: [state.room_id, state.map_id], text: transcription[:text],
-                                 source: 'agent', page: transcription[:page])
+      [transcription].flatten(1).compact.each do |entry|
+        @run.trace.emit(:dialogue, frame: state.frame, place: [state.room_id, state.map_id], text: entry[:text],
+                                   source: 'agent', page: entry[:page])
+      end
     end
 
     def note_fallback(result)
