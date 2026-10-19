@@ -48,6 +48,11 @@ class AgentsContextTest < Minitest::Test
                   last_results: [], **over)
   end
 
+  def test_step_result_shows_pixels
+    text = build(last_results: [result(skill: 'step', params: { direction: 'up', pixels: 5 }, moved_px: 5, stopped_by: 'done')])
+    assert_includes text, 'step {"direction":"up","pixels":5}: stopped_by done, 40 frames, moved 5 px, room_changed'
+  end
+
   def test_snapshot
     objective = { id: 'obj-2', title: 'Leave the room', predicate: { kind: 'leave_place', place: [163, 16] } }
     text = build(objective:, attempts: ['walk {"direction":"up","cells":2} -> blocked'],
@@ -57,6 +62,7 @@ class AgentsContextTest < Minitest::Test
       Phase: playing
       Place: room 163, map 16
       Link: row 3, col 4 (pixel x=68, y=60), facing up
+      Link offset from cell centre (positive = right of / below the centre): dx=-4, dy=-4
       Health: 3 of 3 hearts
 
       Grid (rows 0-7 top to bottom, cols 0-9 left to right):

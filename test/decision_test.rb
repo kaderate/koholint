@@ -110,6 +110,16 @@ class DecisionTest < Minitest::Test
     assert_raises(Koholint::DecisionPoint::Invalid) { point.validate({ 'skill' => 'walk' }) }
   end
 
+  def test_choose_skill_schema_and_validation_cover_step
+    point = Koholint::DecisionPoint.choose_skill(Koholint::Skills::Registry.default)
+    step = point.json_schema.to_json
+    assert_includes step, '"step"'
+    pixels = JSON.parse(step).dig("properties", "params", "anyOf").find { |s| s["title"] == "step" }["properties"]["pixels"]
+    assert_equal [1, 16], [pixels["minimum"], pixels["maximum"]]
+    [0, 17].each { |n| assert_raises(Koholint::DecisionPoint::Invalid) { point.validate({ "skill" => "step", "params" => { "direction" => "up", "pixels" => n } }) } }
+    assert_equal "step", point.validate({ "skill" => "step", "params" => { "direction" => "up", "pixels" => 8 } })[:skill]
+  end
+
   def test_malformed_params_raise_invalid_for_every_skill
     registry = Koholint::Skills::Registry.default
     point = Koholint::DecisionPoint.choose_skill(registry)

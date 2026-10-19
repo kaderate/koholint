@@ -26,7 +26,7 @@ class SkillsTest < Minitest::Test
   end
 
   def test_registry_names_and_unknown_skill
-    assert_equal %w[walk press advance_dialogue wait goto], registry.names
+    assert_equal %w[walk press advance_dialogue wait goto step], registry.names
     assert_raises(ArgumentError) { registry.fetch('fly') }
     assert_raises(ArgumentError) { registry.start('fly', state, {}) }
   end
@@ -242,6 +242,54 @@ class SkillsTest < Minitest::Test
     assert_equal({ dx: 0, dy: 7 }, result[:offset])
     refute result[:aligned]
     assert_nil result[:blocked_at]
+  end
+
+  def test_step_right_is_done_after_the_pixels_and_does_not_centre
+    execution = registry.start('step', state(x: 88), { direction: :right, pixels: 8 })
+    inputs = drive(execution, (88..100).map { |x| state(x:) })
+    assert_equal Array.new(8) { [:right] }, inputs
+    result = execution.result(state(x: 96))
+    assert_equal :done, result[:stopped_by]
+    assert_equal 8, result[:moved_px]
+    assert_equal 8, result[:frames]
+  end
+
+  def test_step_blocked_after_eight_still_frames
+    execution = registry.start('step', state, { direction: :up, pixels: 5 })
+    assert_equal Array.new(8) { [:up] }, drive(execution, Array.new(12) { state })
+    result = execution.result(state)
+    assert_equal :blocked, result[:stopped_by]
+    assert_equal 0, result[:moved_px]
+    assert_nil result[:blocked_at]
+  end
+
+  def test_step_stops_on_dialogue
+    execution = registry.start('step', state, { direction: :left, pixels: 3 })
+    assert_equal [[:left]], drive(execution, [state, state(dialog_state: 1)])
+    assert_equal :dialogue, execution.stopped_by
+  end
+
+  def test_step_stops_on_frame_cap
+    execution = registry.start('step', state, { direction: :left, pixels: 16 })
+    drive(execution, Array.new(200) { |i| state(x: 88 - (i / 7)) })
+    assert_equal :frame_cap, execution.stopped_by
+  end
+
+  def test_step_params_range_errors
+    [{ direction: :up, pixels: 0 }, { direction: :up, pixels: 17 }, { direction: :north, pixels: 3 }, { direction: :up }].each do |bad|
+      assert_raises(ArgumentError, bad.inspect) { registry.validate('step', bad) }
+    end
+    assert_equal({ direction: :up, pixels: 5 }, registry.validate('step', { 'direction' => 'up', 'pixels' => 5 }))
+  end
+
+  def test_rom_step_up_moves_the_pixels
+    skip_without_rom!
+    emulator = fresh(EmulatorCache.interactive)
+    start = Koholint::Perception.read(emulator)
+    result, = run_skill(emulator, 'step', { direction: :up, pixels: 5 })
+    final = Koholint::Perception.read(emulator)
+    assert_in_delta 5, start.y - final.y, 1
+    assert_in_delta 5, result[:moved_px], 1
   end
 
   def test_rom_walk_up_three_ends_aligned_and_a_left_walk_is_not_blocked
