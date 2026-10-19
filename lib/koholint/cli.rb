@@ -4,6 +4,8 @@ require 'koholint'
 require 'koholint/budget'
 require 'koholint/engine'
 require 'koholint/agents/claude_cli'
+require 'koholint/game_state'
+require 'koholint/ledger'
 require 'koholint/objectives'
 require 'koholint/policies/delegated'
 require 'koholint/skills/registry'
@@ -103,14 +105,26 @@ module Koholint
       client = Agents::ClaudeCli.new(model: options.fetch(:model, DEFAULT_MODEL), command:)
       manual = manual_text
       lambda do |run|
-        delegated = Policies::Delegated.new(client:, registry: Skills::Registry.default, objectives: objectives_for(run), manual:, on_step: budget.method(:step_done))
+        delegated = Policies::Delegated.new(client:, registry: Skills::Registry.default, objectives: objectives_for(run), ledger: ledger_for(run), manual:, on_step: budget.method(:step_done))
         Policies::StartGame.new(delegated, ready: ->(state) { %i[playing dialogue].include?(state.phase) })
       end
     end
 
     def objectives_for(run)
       events = Trace.read(File.join(run.dir, 'trace.jsonl'))
-      Objectives.resume(trace: run.trace, events:, frame: run.inputs.frames)
+      Objectives.resume(trace: run.trace, events:, frame: run.inputs.frames, visited: visited_places(events))
+    end
+
+    def ledger_for(run) = Ledger.from_events(Trace.read(File.join(run.dir, 'trace.jsonl')))
+
+    def visited_places(events)
+      events.filter_map do |event|
+        state = event['state']
+        next unless event['type'] == 'perception' && state.is_a?(Hash)
+
+        game = GameState.new(game_mode: state['game_mode'], game_submode: state['game_submode'])
+        [state['room_id'], state['map_id']] unless %i[loading boot].include?(game.phase)
+      end.uniq
     end
 
     def executable?(command)

@@ -8,6 +8,12 @@ What the printed instruction booklet says about the mechanics.
 - A "!?" mark on the map shows important locations you need to visit to proceed through the game.
 - A "message" mark on the map marks a location where you heard an important message. Press A there to make the message appear again.
 
+## Controls
+
+- A talks to people, reads signs, advances messages page by page and interacts with the world.
+- B cancels a message when it can.
+- An item can be assigned to each of A and B. Contextual actions win over the assigned item: facing a person, A talks even with a held item assigned to it.
+
 ## Actions
 
 - Pushing: stand next to a stone or statue-shaped object and hold a direction into it. Sometimes objects are hidden under stones, and a movable stone may open a dungeon door.

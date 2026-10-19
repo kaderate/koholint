@@ -158,6 +158,44 @@ class CliTest < Minitest::Test
     end
   end
 
+  def test_resume_refuses_a_flow_1_run
+    skip_without_rom!
+    Dir.mktmpdir do |dir|
+      run = Koholint::Run.create(root: dir, flow_version: 'flow-1', budget: {})
+      code, _out, err = cli('resume', run.dir)
+      assert_equal 1, code
+      assert_match(/flow-1/, err)
+    end
+  end
+
+  def test_resume_rebuilds_the_ledger_and_visited_places_from_the_trace
+    skip_without_rom!
+    Dir.mktmpdir do |dir|
+      run = Koholint::Run.create(root: dir, flow_version: Koholint::FLOW_VERSION, budget: {})
+      playing = { 'game_mode' => 0x0B, 'game_submode' => 7, 'x' => 40, 'y' => 40 }
+      run.trace.emit(:perception, frame: 1, state: playing.merge('room_id' => 1, 'map_id' => 2), state_hash: 'h')
+      run.trace.emit(:perception, frame: 2, state: playing.merge('game_submode' => 3, 'room_id' => 9, 'map_id' => 9), state_hash: 'h')
+      run.trace.emit(:perception, frame: 3, state: playing.merge('game_mode' => 1, 'room_id' => 8, 'map_id' => 8), state_hash: 'h')
+      run.trace.emit(:perception, frame: 4, state: playing.merge('room_id' => 3, 'map_id' => 2), state_hash: 'h')
+      run.trace.emit(:perception, frame: 5, state: playing.merge('room_id' => 1, 'map_id' => 2), state_hash: 'h')
+      2.times do |n|
+        run.trace.emit(:action, frame: 6 + n, skill: 'goto', params: { row: 1, col: 1 },
+                                result: { from: { room: 1, map: 2 }, to: { room: 1, map: 2 }, stopped_by: 'blocked',
+                                          blocked_at: { row: 2, col: 3, direction: 'up' } })
+      end
+      2.times { |n| run.trace.emit(:objective, frame: 8 + n, id: "obj-#{n + 1}", status: 'started', title: 't', predicate: { kind: 'new_place' }) }
+      run.trace.emit(:objective, frame: 11, id: 'obj-1', status: 'achieved', title: 't', predicate: { kind: 'new_place' })
+
+      ledger = Koholint::CLI.ledger_for(run)
+      assert ledger.doubtful?([1, 2], [2, 3], :up)
+      assert_equal 2, ledger.count([1, 2], [2, 3], :up)
+      objectives = Koholint::CLI.objectives_for(run)
+      assert_equal [[1, 2], [3, 2]], objectives.visited
+      objectives.start(frame: 20, title: 'next', predicate: { kind: 'new_place' })
+      assert_equal 'obj-3', objectives.current[:id]
+    end
+  end
+
   def test_agent_without_claude_executable_is_a_one_line_error
     code, _out, err = cli('run', '--agent', '--claude-command', '/nope/claude', '--frames', '10')
     assert_equal 1, code
