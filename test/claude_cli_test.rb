@@ -17,13 +17,30 @@ class ClaudeCliTest < Minitest::Test
     ENV['FAKE_CLAUDE_LOG'] = @log
     ENV['FAKE_CLAUDE_MODE'] = mode
     client = Koholint::Agents::ClaudeCli.new(command: FAKE, **options)
-    client.call(system: 'be brief', prompt: 'hello there', schema: SCHEMA, image: image)
+    client.call(system: 'be brief', prompt: 'hello there', schema: SCHEMA, image:)
   ensure
     ENV.delete('FAKE_CLAUDE_LOG')
     ENV.delete('FAKE_CLAUDE_MODE')
   end
 
-  def recorded = JSON.parse(File.read(@log))
+  def events = File.readlines(@log).map { |line| JSON.parse(line) }
+  def recorded = events.first
+
+  def alive?(pid)
+    Process.kill(0, pid)
+    true
+  rescue Errno::ESRCH
+    false
+  end
+
+  def wait_gone(*pids)
+    100.times do
+      return true if pids.none? { |pid| alive?(pid) }
+
+      sleep 0.1
+    end
+    false
+  end
 
   def test_success_returns_output_cost_latency_tokens
     reply = run_call
@@ -34,18 +51,12 @@ class ClaudeCliTest < Minitest::Test
     assert_equal({ 'input_tokens' => 10, 'output_tokens' => 5 }, reply.tokens)
   end
 
-  def test_argv_carries_the_isolation_flags
+  def test_argv_is_exactly_the_isolation_flags
     run_call(model: 'haiku', max_call_usd: 0.1)
-    argv = recorded['argv']
-    assert_equal '-p', argv.first
-    assert_equal 'haiku', argv[argv.index('--model') + 1]
-    assert_equal '', argv[argv.index('--tools') + 1]
-    assert_equal '', argv[argv.index('--setting-sources') + 1]
-    assert_includes argv, '--no-session-persistence'
-    assert_equal 'json', argv[argv.index('--output-format') + 1]
-    assert_equal SCHEMA.to_json, argv[argv.index('--json-schema') + 1]
-    assert_equal 'be brief', argv[argv.index('--system-prompt') + 1]
-    assert_equal '0.1', argv[argv.index('--max-budget-usd') + 1]
+    expected = ['-p', '--model', 'haiku', '--tools', '', '--no-session-persistence', '--setting-sources', '',
+                '--output-format', 'json', '--json-schema', SCHEMA.to_json, '--system-prompt', 'be brief',
+                '--max-budget-usd', '0.1']
+    assert_equal expected, recorded['argv']
   end
 
   def test_prompt_goes_on_stdin
@@ -87,10 +98,16 @@ class ClaudeCliTest < Minitest::Test
     assert_match(/schema/, reply.error)
   end
 
-  def test_nonzero_exit_gives_an_error_and_is_retried
+  def test_nonzero_exit_gives_an_error_and_is_retried_once
     reply = run_call('exit1', retries: 1)
     assert_nil reply.output
     assert reply.error
+    assert_equal 2, events.size
+  end
+
+  def test_schema_violation_is_not_retried
+    run_call('schema_invalid', retries: 2)
+    assert_equal 1, events.size
   end
 
   def test_missing_command_gives_an_error_without_raising
@@ -99,19 +116,19 @@ class ClaudeCliTest < Minitest::Test
     assert reply.error
   end
 
-  def test_timeout_kills_the_process_and_gives_an_error
-    reply = run_call('sleep', timeout: 1, retries: 0)
+  def test_timeout_kills_the_process_group_and_removes_the_directory
+    reply = run_call('sleep', timeout: 3, retries: 0)
     assert_nil reply.output
     assert_match(/timeout/, reply.error)
     pid = recorded['pid']
-    gone = 50.times.any? do
-      Process.kill(0, pid)
-      sleep 0.1
-      false
-    rescue Errno::ESRCH
-      true
-    end
-    assert gone, 'child still alive after timeout'
+    grandchild = events.find { |e| e['grandchild'] }['grandchild']
+    assert wait_gone(pid, grandchild), 'child or grandchild still alive after timeout'
+    refute_path_exists recorded['cwd']
+  end
+
+  def test_timeout_is_retried
+    run_call('sleep', timeout: 3, retries: 1)
+    assert_equal 2, events.count { |e| e['pid'] }
   end
 
   def test_image_is_unsupported_and_runs_nothing
@@ -119,6 +136,33 @@ class ClaudeCliTest < Minitest::Test
     assert_nil reply.output
     assert_equal 'image_unsupported', reply.error
     refute_path_exists @log
+  end
+
+  def violation(value, schema) = Koholint::Agents::ClaudeCli.new.send(:violation, value, schema)
+
+  def test_schema_keywords
+    {
+      { type: 'array', items: { type: 'integer' } } => [[[1, 2], nil], [[1, 'a'], /\[1\]/]],
+      { oneOf: [{ type: 'integer' }, { type: 'number', minimum: 0 }] } => [['x', /oneOf/], [1.5, nil], [1, /oneOf/]],
+      { anyOf: [{ type: 'string' }, { type: 'integer' }] } => [[1, nil], [1.5, /anyOf/]],
+      { type: 'object', properties: { a: { type: 'string' } }, additionalProperties: false } =>
+        [[{ 'a' => 'x' }, nil], [{ 'a' => 'x', 'b' => 1 }, /unexpected b/]],
+      { type: 'integer', minimum: 1, maximum: 5 } => [[3, nil], [0, /minimum/], [6, /maximum/]],
+      { type: 'string', minLength: 2, maxLength: 3 } => [['ab', nil], ['a', /minLength/], ['abcd', /maxLength/]],
+      { type: %w[string null] } => [['a', nil], [nil, nil], [1, /string or null/]],
+      { enum: %w[a b] } => [['a', nil], ['c', /enum/]],
+      { type: 'object', properties: { n: { type: 'object', required: ['k'] } } } =>
+        [[{ 'n' => { 'k' => 1 } }, nil], [{ 'n' => {} }, /n: missing k/]]
+    }.each do |schema, cases|
+      cases.each do |value, pattern|
+        problem = violation(value, schema)
+        if pattern
+          assert_match pattern, problem.to_s, "#{schema} with #{value.inspect}"
+        else
+          assert_nil problem, "#{schema} with #{value.inspect}"
+        end
+      end
+    end
   end
 
   def test_live_call

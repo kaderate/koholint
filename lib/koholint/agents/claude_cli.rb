@@ -7,9 +7,6 @@ module Koholint
     Reply = Struct.new(:output, :cost_usd, :latency_ms, :tokens, :error)
 
     class ClaudeCli
-      TYPES = { 'string' => String, 'integer' => Integer, 'number' => Numeric, 'boolean' => [true, false].freeze,
-                'array' => Array, 'object' => Hash }.freeze
-
       def initialize(model: 'sonnet', command: 'claude', timeout: 90, max_call_usd: 0.25, retries: 1)
         @model = model
         @command = command
@@ -53,6 +50,7 @@ module Koholint
         in_r.close
         out_w.close
         reader = Thread.new { out_r.read }
+        reader.report_on_exception = false
         writer = Thread.new do
           in_w.write(prompt)
         rescue Errno::EPIPE
@@ -68,6 +66,7 @@ module Koholint
           kill_group(pid)
           waiter.join
           writer.join
+          reader.join
           [:timeout, nil]
         end
       ensure
@@ -84,7 +83,9 @@ module Koholint
         return failure("timeout after #{@timeout}s") if status == :timeout
 
         data = parse(out)
-        return failure(status.success? ? 'invalid json' : "transport: exit #{status.exitstatus}") unless data.is_a?(Hash)
+        unless data.is_a?(Hash)
+          return failure(status.success? ? 'invalid json' : "transport: exit #{status.exitstatus}")
+        end
 
         cost = data['total_cost_usd']
         latency = data['duration_api_ms']
@@ -111,19 +112,72 @@ module Koholint
 
       def violation(value, schema)
         schema = schema.transform_keys(&:to_s)
-        type = TYPES[schema['type']]
-        return "expected #{schema['type']}" if type && !type.is_a?(Array) && !value.is_a?(type)
-        return "expected #{schema['type']}" if type.is_a?(Array) && !type.include?(value)
-        return "#{value.inspect} not in enum" if schema['enum'] && !schema['enum'].include?(value)
-        return nil unless value.is_a?(Hash)
+        types = Array(schema['type']).map(&:to_s)
+        return "expected #{types.join(' or ')}" unless types.empty? || types.any? { |t| type_match?(t, value) }
+        return "#{value.inspect} not in enum" if schema['enum'] && schema['enum'].map(&:to_s).none?(value.to_s)
 
+        combinator_violation(value, schema) || scalar_violation(value, schema) || container_violation(value, schema)
+      end
+
+      def type_match?(type, value)
+        case type
+        when 'string' then value.is_a?(String)
+        when 'integer' then value.is_a?(Integer)
+        when 'number' then value.is_a?(Numeric)
+        when 'boolean' then [true, false].include?(value)
+        when 'array' then value.is_a?(Array)
+        when 'object' then value.is_a?(Hash)
+        when 'null' then value.nil?
+        else false
+        end
+      end
+
+      def combinator_violation(value, schema)
+        if schema['oneOf']
+          matches = schema['oneOf'].count { |sub| violation(value, sub).nil? }
+          return "matches #{matches} of oneOf, expected 1" unless matches == 1
+        end
+        return 'matches none of anyOf' if schema['anyOf'] && schema['anyOf'].all? { |sub| violation(value, sub) }
+
+        nil
+      end
+
+      def scalar_violation(value, schema)
+        if value.is_a?(Numeric)
+          return "#{value} below minimum" if schema['minimum'] && value < schema['minimum']
+          return "#{value} above maximum" if schema['maximum'] && value > schema['maximum']
+        elsif value.is_a?(String)
+          return 'shorter than minLength' if schema['minLength'] && value.length < schema['minLength']
+          return 'longer than maxLength' if schema['maxLength'] && value.length > schema['maxLength']
+        end
+        nil
+      end
+
+      def container_violation(value, schema)
+        if value.is_a?(Array) && schema['items']
+          value.each_with_index do |item, i|
+            problem = violation(item, schema['items'])
+            return "[#{i}]: #{problem}" if problem
+          end
+        elsif value.is_a?(Hash)
+          return object_violation(value, schema)
+        end
+        nil
+      end
+
+      def object_violation(value, schema)
         missing = Array(schema['required']).map(&:to_s) - value.keys
         return "missing #{missing.join(', ')}" unless missing.empty?
 
-        (schema['properties'] || {}).each do |key, sub|
-          next unless value.key?(key.to_s)
+        properties = (schema['properties'] || {}).transform_keys(&:to_s)
+        if schema['additionalProperties'] == false
+          extra = value.keys - properties.keys
+          return "unexpected #{extra.join(', ')}" unless extra.empty?
+        end
+        properties.each do |key, sub|
+          next unless value.key?(key)
 
-          problem = violation(value[key.to_s], sub)
+          problem = violation(value[key], sub)
           return "#{key}: #{problem}" if problem
         end
         nil
