@@ -24,6 +24,7 @@ module Koholint
         Decision: choose the next skill to run towards the current objective.
         A skill is a bounded action with parameters; the harness runs it and reports how it stopped. Choose exactly one skill from the schema with parameters that satisfy it.
         goto walks several cells along a path planned over the grid and stops when blocked. Cells marked ! may be doubtful: they looked free but blocked Link repeatedly; goto avoids a doubtful edge, and the neighbour lines say how many times each direction was blocked.
+        talk_to walks next to a person or object at (row, col), faces it and presses A; use it instead of composing walk and press yourself.
         step moves Link a few pixels (1 to 16) along one axis and does not recentre him; the offset line shows how far he is from the centre of his cell, and a passage may be offset from the cell grid.
         Do not repeat a skill that just stopped the same way from the same state; try something different or gather information. When on-screen text matters, transcribe it in the optional transcription field. When an image is attached it shows the top and the bottom of the screen stacked; a dialogue box may be in either.
         Output fields: skill, params, justification, confidence, and optionally transcription.
