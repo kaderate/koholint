@@ -4,6 +4,7 @@ require 'koholint/vision/grid'
 require 'koholint/vision/beliefs'
 require 'koholint/vision/capabilities'
 require 'koholint/agents/context'
+require 'koholint/ledger'
 
 class AgentsContextTest < Minitest::Test
   Context = Koholint::Agents::Context
@@ -68,7 +69,7 @@ class AgentsContextTest < Minitest::Test
        5  . . . . . . . . . .
        6  . . . . . . . . . .
        7  . . . . . . . . . #
-      Legend: . passable, # blocked, ? unknown, ! stale, ~ one-way, o static object, @ Link
+      Legend: . passable, # blocked, ? unknown, ! stale or doubtful, ~ one-way, o static object, @ Link
       Unknown cells are not walls.
 
       Neighbours of Link:
@@ -92,6 +93,29 @@ class AgentsContextTest < Minitest::Test
       Use A to talk.
     TEXT
     assert_equal expected, text
+  end
+
+  def test_doubtful_neighbour_is_drawn_and_counted
+    ledger = Koholint::Ledger.new
+    2.times { ledger.record(place: [163, 16], blocked_at: { row: 3, col: 4, direction: :down }) }
+    ledger.record(place: [163, 16], blocked_at: { row: 3, col: 4, direction: :left })
+    text = build(ledger:)
+    assert_includes text, " 4  . . . . ! . . . . ."
+    assert_includes text, "- down: cell (4,4) '!', belief yes, last walk: none, blocked 2 times"
+    assert_includes text, "- left: cell (3,3) '.', belief yes, last walk: none, blocked 1 time\n"
+    assert_equal build, build(ledger: Koholint::Ledger.new)
+  end
+
+  def test_doubt_needs_a_free_belief_and_keeps_objects_visible
+    ledger = Koholint::Ledger.new
+    2.times { ledger.record(place: [163, 16], blocked_at: { row: 3, col: 4, direction: :right }) }
+    text = build(ledger:)
+    assert_includes text, "- right: cell (3,5) '#', belief no, last walk: none, blocked 2 times"
+    assert_includes text, " 3  . . . . @ # . . . ."
+    2.times { ledger.record(place: [163, 16], blocked_at: { row: 1, col: 3, direction: :left }) }
+    text = build(state: state(x: 52, y: 28), ledger:)
+    assert_includes text, "- left: cell (1,2) 'o'"
+    assert_includes text, 'blocked 2 times'
   end
 
   def test_no_objective_and_edge_neighbours
