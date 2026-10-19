@@ -241,4 +241,69 @@ class PageTest < Minitest::Test
     assert_equal 'f1 · c decides talk npc=old man times=2', fmt({ frame: 1, type: 'decision', agent: 'c', choice: skill })
     assert_equal 'f1 · c decides use sword', fmt({ frame: 1, type: 'decision', agent: 'c', choice: { skill: 'use', params: { item: 'sword' } } })
   end
+
+  def test_elapsed_time_reads_in_seconds_then_minutes
+    assert_equal '4.2 s', evaluate('formatElapsed(4250)')
+    assert_equal '0.0 s', evaluate('formatElapsed(-5)')
+    assert_equal '59.9 s', evaluate('formatElapsed(59999)')
+    assert_equal '1 min 05 s', evaluate('formatElapsed(65000)')
+    assert_equal '12 min 30 s', evaluate('formatElapsed(750000)')
+  end
+
+  def test_activity_label_falls_back_for_unknown_kinds
+    assert_equal 'asking', evaluate("activityLabel({kind: 'deciding', label: 'asking'})")
+    assert_equal 'Mapping the screen', evaluate("activityLabel({kind: 'mapping'})")
+    assert_equal 'teleporting', evaluate("activityLabel({kind: 'teleporting'})")
+    assert_equal 'Working', evaluate('activityLabel({})')
+    assert_equal 'Waiting for the engine...', evaluate('activityLabel(null)')
+  end
+
+  def test_elapsed_follows_the_server_clock_between_polls
+    assert_equal 3500, evaluate('elapsedSince({started_at: 100}, 102, 5000, 6500)')
+    assert_equal 0, evaluate('elapsedSince({started_at: 200}, 102, 5000, 6500)')
+    assert_equal 0, evaluate('elapsedSince(null, 102, 5000, 6500)')
+  end
+
+  def test_activity_detail_shows_model_images_and_last_call
+    a = { kind: 'deciding', detail: { model: 'sonnet', images: 2 } }
+    assert_equal 'model sonnet · 2 images · last call 4.2 s', evaluate("activityDetail(#{JSON.generate(a)}, {last_ms: 4200})")
+    acting = { kind: 'acting', detail: { skill: 'goto', params: { row: 1, col: 2 } } }
+    assert_equal 'goto {"row":1,"col":2}', evaluate("activityDetail(#{JSON.generate(acting)}, null)")
+    assert_equal 'reason: frames', evaluate("activityDetail({kind: 'stopped', detail: {reason: 'frames'}}, null)")
+  end
+
+  def test_predicates_read_in_words
+    assert_equal 'reach cell (3, 4) in [1,2]', evaluate("predicateInWords({kind: 'reach_cell', row: 3, col: 4, place: [1, 2]})")
+    assert_equal 'leave [1,2]', evaluate("predicateInWords({kind: 'leave_place', place: [1, 2]})")
+    assert_equal 'close the open dialogue', evaluate("predicateInWords({kind: 'dialogue_closed'})")
+    assert_equal 'find item', evaluate("predicateInWords({kind: 'find_item'})")
+    assert_equal '', evaluate('predicateInWords(null)')
+  end
+
+  def test_meter_percentage_is_clamped_and_hidden_without_a_cap
+    assert_equal 50, evaluate('meterPercent(1, 2)')
+    assert_equal 100, evaluate('meterPercent(5, 2)')
+    assert_equal 0, evaluate('meterPercent(-1, 2)')
+    assert_nil evaluate('meterPercent(1, null)')
+    assert_nil evaluate('meterPercent(1, 0)')
+    assert_equal '$0.75 / $1.50 · 3 calls · median 4.0 s', evaluate('formatBudgetLine({spent: 0.75, cap: 1.5, calls: 3}, {median_ms: 4000})')
+  end
+
+  def test_reasoning_and_objective_panels_come_from_the_events
+    events = [{ type: 'objective', id: 'o1', status: 'started', title: 'Go out', predicate: { kind: 'leave_place', place: [1, 2] } },
+              { type: 'decision', frame: 3, agent: 'claude', justification: 'older', choice: {} },
+              { type: 'action', skill: 'walk' },
+              { type: 'decision', frame: 4, agent: 'start_game', justification: 'boot', choice: {} },
+              { type: 'decision', frame: 5, agent: 'claude', justification: 'newest', confidence: 0.8, choice: { skill: 'goto', params: { row: 1, col: 2 } } },
+              { type: 'action', skill: 'goto' }]
+    json = JSON.generate(events)
+    assert_equal 'newest', evaluate("latestReasoning(#{json}).justification")
+    assert_equal 'f5 · claude decides goto (1, 2) (80%)', evaluate("reasoningHead(latestReasoning(#{json}))")
+    assert_equal({ 'title' => 'Go out', 'predicate' => 'leave [1,2]', 'attempts' => 2 }, evaluate("objectiveView(#{json}, {objective: 'o1'})"))
+    assert_nil evaluate("objectiveView(#{json}, {objective: 'other'})")
+  end
+
+  def test_agent_text_never_goes_through_inner_html
+    refute_match(/innerHTML|insertAdjacentHTML|document\.write/, PAGE)
+  end
 end
