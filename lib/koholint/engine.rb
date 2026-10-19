@@ -1,4 +1,5 @@
 require 'digest'
+require 'fileutils'
 require 'koholint/budget'
 require 'koholint/canonical_save'
 require 'koholint/decision'
@@ -37,7 +38,10 @@ module Koholint
       @ram_hash = Digest::SHA256.hexdigest(@emulator.cartridge_ram)
     end
 
-    def request_stop = @budget.stop!
+    def request_stop
+      @budget.stop!
+      @policy.cancel if @policy.respond_to?(:cancel)
+    end
 
     def run
       @run.lock!
@@ -62,6 +66,9 @@ module Koholint
       state = Perception.read(@emulator)
       @run.trace.emit(:perception, frame: state.frame, state: state.to_h, state_hash: @emulator.state_hash)
       grid = @builder&.observe(@emulator, state)
+      @policy.observe(state, frame: state.frame) if @policy.respond_to?(:observe)
+      return if @budget.exhausted
+
       decision_point = @policy.respond_to?(:decision_point_for) ? @policy.decision_point_for(state) : @decision_point
       result = @policy.decide(decision_point, state, context_for(grid))
       @budget.tick(cost: result[:cost_usd].to_f)
@@ -69,9 +76,11 @@ module Koholint
       choice = chosen.validate(result[:choice])
       note_fallback(result)
       emit_dialogue(result[:transcription], state)
+      seen = record_prompt(result, state.frame, chosen.name)
       @run.trace.emit(:decision, frame: state.frame, decision_point: chosen.name.to_s, input: state.to_h, options: chosen.options || [],
                                  choice: choice, justification: result[:justification], confidence: result[:confidence],
-                                 agent: result[:agent], latency_ms: result[:latency_ms].to_i, cost_usd: result[:cost_usd].to_f, fallback: result[:fallback] || false)
+                                 agent: result[:agent], latency_ms: result[:latency_ms].to_i, cost_usd: result[:cost_usd].to_f, fallback: result[:fallback] || false,
+                                 **seen)
       if choice.key?(:skill)
         outcome = execute(choice, state, chosen.registry)
         @run.trace.emit(:action, frame: @emulator.frame, skill: choice[:skill], params: choice[:params], result: outcome)
@@ -85,6 +94,17 @@ module Koholint
     def context_for(grid)
       context = @builder ? { grid: } : {}
       context.merge(dialogue_shot: -> { Vision::DialogueShot.crop(@emulator) })
+    end
+
+    def record_prompt(result, frame, name)
+      prompt = result[:prompt]
+      return {} unless prompt
+
+      dir = File.join(@run.dir, 'prompts')
+      FileUtils.mkdir_p(dir)
+      File.write(File.join(dir, "#{frame}-#{name}.txt"), prompt)
+      File.binwrite(File.join(dir, "#{frame}-#{name}.png"), result[:image]) if result[:image]
+      { prompt_sha: Digest::SHA256.hexdigest(prompt), image: !result[:image].nil? }
     end
 
     def emit_dialogue(transcription, state)

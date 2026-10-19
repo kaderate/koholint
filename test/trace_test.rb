@@ -86,4 +86,15 @@ class TraceTest < Minitest::Test
     assert_raises(Koholint::Trace::InvalidEvent) { trace.emit(:dialogue, frame: 1, place: [1, 2], text: 'Hi', source: 'agent') }
     assert_raises(Koholint::Trace::InvalidEvent) { trace.emit(:dialogue, frame: 1, place: [1, 2], text: 'Hi', source: 'ocr', page: 0) }
   end
+
+  def test_decision_prompt_fields_are_optional_but_validated
+    Dir.mktmpdir do |dir|
+      trace = Koholint::Trace.new(File.join(dir, 'trace.jsonl'))
+      base = { decision_point: 'p', input: {}, options: [], choice: {}, justification: 'j', confidence: 1.0, agent: 'claude', latency_ms: 0, cost_usd: 0.0 }
+      trace.emit(:decision, frame: 1, **base)
+      trace.emit(:decision, frame: 2, **base, prompt_sha: 'a' * 64, image: false)
+      assert_raises(Koholint::Trace::InvalidEvent) { trace.emit(:decision, frame: 3, **base, prompt_sha: 'xyz') }
+      assert_raises(Koholint::Trace::InvalidEvent) { trace.emit(:decision, frame: 3, **base, image: 'yes') }
+    end
+  end
 end

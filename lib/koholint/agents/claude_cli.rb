@@ -17,11 +17,21 @@ module Koholint
         @timeout = timeout
         @max_call_usd = max_call_usd
         @retries = retries
+        @cancelled = false
+        @pid = nil
+      end
+
+      def cancel
+        @cancelled = true
+        pid = @pid
+        kill_group(pid) if pid
       end
 
       def call(system:, prompt:, schema:, image: nil)
         reply = nil
         (@retries + 1).times do
+          return failure('cancelled') if @cancelled
+
           reply = attempt(system:, prompt:, schema:, image:)
           break unless reply.error&.start_with?('timeout', 'transport')
         end
@@ -46,6 +56,8 @@ module Koholint
       def attempt(system:, prompt:, schema:, image:)
         Dir.mktmpdir('koholint-claude') do |dir|
           status, out, err = run(argv(system, schema, image), stdin_for(prompt, image), dir)
+          return failure('cancelled') if @cancelled
+
           interpret(status, out, schema, stream: !image.nil?, err:)
         end
       rescue SystemCallError => e
@@ -57,6 +69,8 @@ module Koholint
         out_r, out_w = IO.pipe
         err_r, err_w = IO.pipe
         pid = Process.spawn(*args, chdir: dir, pgroup: true, in: in_r, out: out_w, err: err_w)
+        @pid = pid
+        kill_group(pid) if @cancelled
         in_r.close
         out_w.close
         err_w.close
@@ -95,6 +109,7 @@ module Koholint
           [:timeout, nil, '']
         end
       ensure
+        @pid = nil
         [in_r, in_w, out_r, out_w, err_r, err_w].each { |io| io&.close unless io&.closed? }
       end
 
