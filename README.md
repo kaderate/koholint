@@ -24,3 +24,7 @@ cells by walking. The trace gains `screen` and `screen_changed` (what the screen
 evidence per tile appearance), `grid_contradiction` (Link entered a cell believed blocked) and a `notable` of kind
 `grid_overlay_stuck` (more than 600 frames of overlay in one place, so the grid went dark). The live view has a grid
 toggle that overlays the believed passability on the video.
+
+Budgets: `run`/`resume` accept `--frames N`, `--minutes N`, `--dollars X` and `--steps N` (objectives that reach a terminal outcome;
+only meaningful with `--agent`). With `--agent`, the engine also writes what the agent saw to `runs/<id>/prompts/<frame>-<decision_point>.txt`
+(and `.png` when an image was sent; gitignored, not part of replay); the `decision` trace event carries its `prompt_sha`. Ctrl-C cancels an in-flight agent call.

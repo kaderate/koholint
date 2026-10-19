@@ -147,6 +147,24 @@ class ClaudeCliTest < Minitest::Test
     Process.kill('KILL', detached['grandchild']) if detached && alive?(detached['grandchild'])
   end
 
+  def test_cancel_kills_the_in_flight_call_without_retry
+    ENV['FAKE_CLAUDE_LOG'] = @log
+    ENV['FAKE_CLAUDE_MODE'] = 'sleep'
+    client = Koholint::Agents::ClaudeCli.new(command: FAKE, timeout: 60, retries: 1)
+    caller = Thread.new { client.call(system: 'be brief', prompt: 'hello there', schema: SCHEMA) }
+    Thread.pass until File.exist?(@log) && events.any? { |e| e['grandchild'] }
+    client.cancel
+    reply = caller.value
+    assert_equal 'cancelled', reply.error
+    assert_equal 1, events.count { |e| e['pid'] }
+    assert wait_gone(recorded['pid'], grandchild_pid)
+    assert_equal 'cancelled', client.call(system: 's', prompt: 'p', schema: SCHEMA).error
+    assert_equal 1, events.count { |e| e['pid'] }
+  ensure
+    ENV.delete('FAKE_CLAUDE_LOG')
+    ENV.delete('FAKE_CLAUDE_MODE')
+  end
+
   def test_timeout_is_retried
     run_call('sleep', timeout: 5, retries: 1)
     assert_equal 2, events.count { |e| e['pid'] }

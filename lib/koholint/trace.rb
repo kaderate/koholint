@@ -22,6 +22,7 @@ module Koholint
       dialogue: %i[place text source page]
     }.freeze
     ALLOWED = { dialogue: { source: %w[agent] } }.freeze
+    OPTIONAL = { decision: { prompt_sha: ->(v) { v.is_a?(String) && v.match?(/\A\h{64}\z/) }, image: ->(v) { [true, false].include?(v) } } }.freeze
 
     def self.read(path)
       return [] unless File.exist?(path)
@@ -46,6 +47,10 @@ module Koholint
 
       ALLOWED.fetch(type.to_sym, {}).each do |field, values|
         raise InvalidEvent, "#{type} #{field} must be one of #{values.join(', ')}" unless values.include?(fields[field])
+      end
+
+      OPTIONAL.fetch(type.to_sym, {}).each do |field, valid|
+        raise InvalidEvent, "#{type} #{field} is invalid" if fields.key?(field) && !valid.call(fields[field])
       end
 
       event = JSON.parse(JSON.generate({ v: @version, type: type.to_s, frame: frame }.merge(fields)))
