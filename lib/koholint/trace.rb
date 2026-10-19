@@ -18,8 +18,10 @@ module Koholint
       screen: %i[place terrain_hash objects_hash grid static_sprites],
       screen_changed: %i[place cells],
       affordance: %i[appearance action direction result method context source],
-      grid_contradiction: %i[place row col direction believed observed]
+      grid_contradiction: %i[place row col direction believed observed],
+      dialogue: %i[place text source page]
     }.freeze
+    ALLOWED = { dialogue: { source: %w[agent] } }.freeze
 
     def self.read(path)
       return [] unless File.exist?(path)
@@ -41,6 +43,10 @@ module Koholint
       required = REQUIRED[type.to_sym] or raise InvalidEvent, "unknown event type #{type.inspect}"
       missing = required - fields.keys
       raise InvalidEvent, "#{type} missing #{missing.join(', ')}" unless missing.empty?
+
+      ALLOWED.fetch(type.to_sym, {}).each do |field, values|
+        raise InvalidEvent, "#{type} #{field} must be one of #{values.join(', ')}" unless values.include?(fields[field])
+      end
 
       event = JSON.parse(JSON.generate({ v: @version, type: type.to_s, frame: frame }.merge(fields)))
       File.open(@path, 'a') do |file|

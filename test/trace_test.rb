@@ -77,4 +77,13 @@ class TraceTest < Minitest::Test
       assert_equal [9], Koholint::Trace.read(path).map { |e| e['frame'] }
     end
   end
+
+  def test_dialogue_event_requires_its_fields_and_an_agent_source
+    path = File.join(Dir.mktmpdir, 'trace.jsonl')
+    trace = Koholint::Trace.new(path)
+    event = trace.emit(:dialogue, frame: 1, place: [1, 2], text: 'Hi', source: 'agent', page: 0)
+    assert_equal 'Hi', event['text']
+    assert_raises(Koholint::Trace::InvalidEvent) { trace.emit(:dialogue, frame: 1, place: [1, 2], text: 'Hi', source: 'agent') }
+    assert_raises(Koholint::Trace::InvalidEvent) { trace.emit(:dialogue, frame: 1, place: [1, 2], text: 'Hi', source: 'ocr', page: 0) }
+  end
 end

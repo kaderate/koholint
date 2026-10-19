@@ -22,8 +22,7 @@ module Koholint
       def params_schema = { type: 'object', title: name, properties: {}, additionalProperties: false }
 
       def normalize(params)
-        raise ArgumentError, 'advance_dialogue takes no params' unless params.nil? || params.empty?
-
+        Skills.symbolize(params, [])
         {}
       end
 

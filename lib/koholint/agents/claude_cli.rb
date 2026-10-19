@@ -1,3 +1,4 @@
+require 'base64'
 require 'json'
 require 'tmpdir'
 require 'fileutils'
@@ -18,11 +19,9 @@ module Koholint
       end
 
       def call(system:, prompt:, schema:, image: nil)
-        return Reply.new(nil, nil, nil, nil, 'image_unsupported') if image
-
         reply = nil
         (@retries + 1).times do
-          reply = attempt(system:, prompt:, schema:)
+          reply = attempt(system:, prompt:, schema:, image:)
           break unless reply.error&.start_with?('timeout', 'transport')
         end
         reply
@@ -30,16 +29,23 @@ module Koholint
 
       private
 
-      def argv(system, schema)
+      def argv(system, schema, image)
+        format = image ? ['--input-format', 'stream-json', '--output-format', 'stream-json', '--verbose'] : ['--output-format', 'json']
         [@command, '-p', '--model', @model, '--tools', '', '--no-session-persistence', '--setting-sources', '',
-         '--output-format', 'json', '--json-schema', JSON.generate(schema), '--system-prompt', system,
-         '--max-budget-usd', @max_call_usd.to_s]
+         *format, '--json-schema', JSON.generate(schema), '--system-prompt', system, '--max-budget-usd', @max_call_usd.to_s]
       end
 
-      def attempt(system:, prompt:, schema:)
+      def stdin_for(prompt, image)
+        return prompt unless image
+
+        source = { type: 'base64', media_type: 'image/png', data: Base64.strict_encode64(image) }
+        "#{JSON.generate(type: 'user', message: { role: 'user', content: [{ type: 'image', source: }, { type: 'text', text: prompt }] })}\n"
+      end
+
+      def attempt(system:, prompt:, schema:, image:)
         Dir.mktmpdir('koholint-claude') do |dir|
-          status, out = run(argv(system, schema), prompt, dir)
-          interpret(status, out, schema)
+          status, out = run(argv(system, schema, image), stdin_for(prompt, image), dir)
+          interpret(status, out, schema, stream: !image.nil?)
         end
       rescue SystemCallError => e
         failure("transport: #{e.message}")
@@ -90,10 +96,10 @@ module Koholint
         nil
       end
 
-      def interpret(status, out, schema)
+      def interpret(status, out, schema, stream: false)
         return failure("timeout after #{@timeout}s") if status == :timeout
 
-        data = parse(out)
+        data = stream ? result_line(out) : parse(out)
         unless data.is_a?(Hash)
           return failure(status.success? ? 'invalid json' : "transport: exit #{status.exitstatus}")
         end
@@ -111,6 +117,14 @@ module Koholint
         return reply.call("schema violation: #{problem}") if problem
 
         Reply.new(output, cost, latency, tokens, nil)
+      end
+
+      def result_line(out)
+        out.to_s.lines.reverse_each do |line|
+          data = parse(line)
+          return data if data.is_a?(Hash) && data['type'] == 'result'
+        end
+        nil
       end
 
       def parse(out)

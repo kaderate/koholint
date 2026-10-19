@@ -7,6 +7,7 @@ require 'koholint/keyframes'
 require 'koholint/perception'
 require 'koholint/replay'
 require 'koholint/run'
+require 'koholint/vision/dialogue_shot'
 require 'koholint/vision/grid_builder'
 
 module Koholint
@@ -62,11 +63,12 @@ module Koholint
       @run.trace.emit(:perception, frame: state.frame, state: state.to_h, state_hash: @emulator.state_hash)
       grid = @builder&.observe(@emulator, state)
       decision_point = @policy.respond_to?(:decision_point_for) ? @policy.decision_point_for(state) : @decision_point
-      result = @policy.decide(decision_point, state, @builder ? { grid: } : {})
+      result = @policy.decide(decision_point, state, context_for(grid))
       @budget.tick(cost: result[:cost_usd].to_f)
       chosen = result[:fallback] && result[:decision_point] || decision_point
       choice = chosen.validate(result[:choice])
       note_fallback(result)
+      emit_dialogue(result[:transcription], state)
       @run.trace.emit(:decision, frame: state.frame, decision_point: chosen.name.to_s, input: state.to_h, options: chosen.options || [],
                                  choice: choice, justification: result[:justification], confidence: result[:confidence],
                                  agent: result[:agent], latency_ms: result[:latency_ms].to_i, cost_usd: result[:cost_usd].to_f, fallback: result[:fallback] || false)
@@ -78,6 +80,18 @@ module Koholint
         frames = press(choice)
         @run.trace.emit(:action, frame: @emulator.frame, skill: 'press', params: choice, result: { frames: frames })
       end
+    end
+
+    def context_for(grid)
+      context = @builder ? { grid: } : {}
+      context.merge(dialogue_shot: -> { Vision::DialogueShot.crop(@emulator) })
+    end
+
+    def emit_dialogue(transcription, state)
+      return unless transcription
+
+      @run.trace.emit(:dialogue, frame: state.frame, place: [state.room_id, state.map_id], text: transcription[:text],
+                                 source: 'agent', page: transcription[:page])
     end
 
     def note_fallback(result)

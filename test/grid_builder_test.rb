@@ -297,9 +297,9 @@ class GridBuilderTest < Minitest::Test
     end
   end
 
-  def test_engine_without_grid_passes_an_empty_context
+  def test_engine_without_grid_passes_no_grid
     skip_without_rom!
-    play(grid: false, frames: 120) { |_run, policy, _emulator| assert(policy.contexts.all?(&:empty?)) }
+    play(grid: false, frames: 120) { |_run, policy, _emulator| assert(policy.contexts.none? { |c| c.key?(:grid) }) }
   end
 
   def test_link_standing_still_never_has_static_sprites_but_objects_do

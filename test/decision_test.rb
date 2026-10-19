@@ -98,4 +98,15 @@ class DecisionTest < Minitest::Test
     assert_equal 'walk', choice[:skill]
     assert_raises(Koholint::DecisionPoint::Invalid) { point.validate({ 'skill' => 'walk' }) }
   end
+
+  def test_malformed_params_raise_invalid_for_every_skill
+    registry = Koholint::Skills::Registry.default
+    point = Koholint::DecisionPoint.choose_skill(registry)
+    [5, 'up', nil, [1], 1.5].each do |bad|
+      registry.names.each do |name|
+        assert_raises(Koholint::DecisionPoint::Invalid, "#{name} with #{bad.inspect}") { point.validate({ 'skill' => name, 'params' => bad }) }
+      end
+    end
+    assert_raises(Koholint::DecisionPoint::Invalid) { point.validate({ 'skill' => 5, 'params' => {} }) }
+  end
 end

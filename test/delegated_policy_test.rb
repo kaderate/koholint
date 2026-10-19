@@ -199,6 +199,63 @@ class DelegatedPolicyTest < Minitest::Test
     refute_equal client.calls.first[:prompt][/Grid.*Legend/m], client.calls.last[:prompt][/Grid.*Legend/m]
   end
 
+  SHOT = 'PNGBYTES'.b
+  def talk(text = nil) = ok({ 'skill' => 'advance_dialogue', 'params' => {} }.merge(text ? { 'transcription' => text } : {}))
+
+  def decide_with_shot(policy, state)
+    policy.decide(policy.decision_point_for(state), state, { grid:, dialogue_shot: -> { SHOT } })
+  end
+
+  def test_the_crop_is_sent_only_in_the_dialogue_phase_with_a_skill_choice
+    client = ScriptedClient.new(objective: objective, skill: [walk, walk, walk])
+    p = policy(client)
+    decide_with_shot(p, state(dialog_state: 130))
+    decide_with_shot(p, state)
+    decide_with_shot(p, state(dialog_state: 130))
+    decide_with_shot(p, state(game_submode: 3, dialog_state: 130))
+    assert_equal [nil, nil, SHOT, nil], client.calls.map { |c| c[:image] }
+  end
+
+  def test_a_transcription_is_returned_with_the_page_counted_since_the_dialogue_opened
+    client = ScriptedClient.new(objective: objective, skill: [talk('Hello'), talk(' '), talk('Next'), talk('Again')])
+    p = policy(client)
+    decide_with_shot(p, state)
+    open = state(dialog_state: 130)
+    first = decide_with_shot(p, open)
+    assert_equal({ text: 'Hello', page: 0 }, first[:transcription])
+    p.after_action(choice: first[:choice], outcome: { stopped_by: 'done' }, state: open, frame: 1)
+    assert_nil decide_with_shot(p, open)[:transcription]
+    p.after_action(choice: first[:choice], outcome: { stopped_by: 'done' }, state: open, frame: 2)
+    assert_equal({ text: 'Next', page: 2 }, decide_with_shot(p, open)[:transcription])
+    p.after_action(choice: first[:choice], outcome: { stopped_by: 'done' }, state: state, frame: 3)
+    assert_equal({ text: 'Again', page: 0 }, decide_with_shot(p, open)[:transcription])
+  end
+
+  def test_a_transcription_outside_the_dialogue_phase_is_ignored
+    p = policy(ScriptedClient.new(objective: objective, skill: ok('skill' => 'wait', 'params' => { 'frames' => 3 }, 'transcription' => 'ghost')))
+    decide_with_shot(p, state)
+    assert_nil decide_with_shot(p, state)[:transcription]
+  end
+
+  def test_a_failing_image_call_falls_back_to_wait
+    p = policy(ScriptedClient.new(objective: objective, skill: failing('claude error: image')))
+    decide_with_shot(p, state)
+    result = decide_with_shot(p, state(dialog_state: 130))
+    assert result[:fallback]
+    assert_equal 'wait', result[:choice][:skill]
+    assert_nil result[:transcription]
+  end
+
+  def test_malformed_params_fall_back_instead_of_crashing
+    [5, 'x', nil, [1]].each do |bad|
+      p = policy(ScriptedClient.new(objective: objective, skill: ok('skill' => 'advance_dialogue', 'params' => bad)))
+      decide(p)
+      result = decide(p).last
+      assert result[:fallback], bad.inspect
+      assert_equal 'wait', result[:choice][:skill]
+    end
+  end
+
   def test_boot_wrapper_forwards_after_boot_only
     delegated = policy(ScriptedClient.new(objective: objective))
     wrapper = Koholint::Policies::StartGame.new(delegated, ready: ->(s) { %i[playing dialogue].include?(s.phase) })
@@ -274,11 +331,33 @@ class DelegatedEngineTest < Minitest::Test
     skip_without_rom!
     with_run do |run|
       script = [down] * 4 + [leave_unreachable, wait] + [down] * 4 + [wait]
-      client = ScriptedClient.new(objective: script.first(5), skill: script.drop(5), default: down)
+      client = eng = nil
+      stopper = -> { client.calls.size >= 10 ? eng.request_stop : nil; down }
+      client = ScriptedClient.new(objective: script.first(5), skill: script.drop(5), default: stopper)
       eng = agent_engine(run, client, emulator: EmulatorCache.interactive)
-      Thread.new { sleep 0.2 until client.calls.size >= 10; eng.request_stop }
       assert_equal :stopped, eng.run
       assert_operator client.calls.size, :>=, 10
+    end
+  end
+
+  def test_a_dialogue_crop_goes_to_the_agent_and_only_its_text_to_the_trace
+    skip_without_rom!
+    emulator = EmulatorCache.at(700)
+    emulator.step until Koholint::Perception.read(emulator).dialog_open?
+    with_run do |run|
+      eng = nil
+      talk = -> { eng.request_stop; ok('skill' => 'advance_dialogue', 'params' => {}, 'transcription' => 'Ah! Enfin...') }
+      client = ScriptedClient.new(objective: leave_unreachable, skill: talk)
+      eng = agent_engine(run, client, emulator:)
+      assert_equal :stopped, eng.run
+      image = client.calls.find { |c| c[:image] }[:image]
+      assert image.start_with?("\x89PNG".b)
+      event = events(run, :dialogue).first
+      assert_equal 'Ah! Enfin...', event['text']
+      assert_equal 'agent', event['source']
+      assert_equal 0, event['page']
+      assert_equal 2, event['place'].size
+      refute_includes File.read(File.join(run.dir, 'trace.jsonl')), 'PNG'
     end
   end
 

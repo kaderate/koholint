@@ -39,6 +39,24 @@ class SkillsTest < Minitest::Test
     assert_raises(ArgumentError) { registry.start('wait', state, { frames: 5, extra: 1 }) }
   end
 
+  def test_non_hash_params_are_rejected_for_every_skill
+    [5, 'up', nil, [1], 1.5, true].each do |bad|
+      registry.names.each do |name|
+        assert_raises(ArgumentError, "#{name} with #{bad.inspect}") { registry.validate(name, bad) }
+        assert_raises(ArgumentError, "#{name} with #{bad.inspect}") { registry.start(name, state, bad) }
+      end
+    end
+  end
+
+  def test_ill_typed_param_values_are_rejected
+    [{ direction: 5, cells: 1 }, { direction: [:up], cells: 1 }, { direction: :up, cells: 'two' }, { direction: :up, cells: [1] }].each do |bad|
+      assert_raises(ArgumentError, bad.inspect) { registry.validate('walk', bad) }
+    end
+    [{ button: 5, frames: 3 }, { button: :a, frames: '3' }, { button: {}, frames: 3 }].each { |bad| assert_raises(ArgumentError, bad.inspect) { registry.validate('press', bad) } }
+    [{ frames: 'x' }, { frames: [5] }, { frames: nil }].each { |bad| assert_raises(ArgumentError, bad.inspect) { registry.validate('wait', bad) } }
+    assert_raises(ArgumentError) { registry.validate('advance_dialogue', { x: 1 }) }
+  end
+
   def test_string_keys_and_values_are_accepted
     assert_equal({ direction: :up, cells: 2 }, registry.validate('walk', { 'direction' => 'up', 'cells' => 2 }))
   end

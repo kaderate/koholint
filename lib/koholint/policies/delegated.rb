@@ -18,6 +18,7 @@ module Koholint
         @objectives = objectives
         @manual = manual.to_s
         @last_results = []
+        @page = 0
         @skill_point = DecisionPoint.choose_skill(registry)
       end
 
@@ -29,7 +30,7 @@ module Koholint
 
         choice = decision_point.validate(reply.output).slice(*decision_point.output_schema)
         @objectives.start(frame: state.frame, title: choice[:title], predicate: choice[:predicate]) if decision_point.name == :choose_objective
-        answer(choice, reply, reply.output)
+        answer(choice, reply, reply.output).merge(transcription_for(reply.output, state, decision_point))
       rescue NameError, TypeError
         raise
       rescue StandardError => e
@@ -40,6 +41,8 @@ module Koholint
       def after_action(choice:, outcome:, state:, frame:)
         return unless choice.key?(:skill)
 
+        @page += 1 if choice[:skill] == 'advance_dialogue'
+        @page = 0 unless state.phase == :dialogue
         @last_results << outcome
         @last_results.shift while @last_results.size > RESULT_LIMIT
         @objectives.record_attempt(skill: choice[:skill], params: choice[:params], result_summary: summary(outcome))
@@ -51,7 +54,15 @@ module Koholint
       def ask(decision_point, state, context)
         prompt = Agents::Context.build(state:, grid: grid_for(state, context), objective: @objectives.current, history: @objectives.history,
                                        attempts: @objectives.attempts_for_prompt, manual: @manual, last_results: @last_results)
-        @client.call(system: Agents::Prompts.system_for(decision_point), prompt:, schema: decision_point.json_schema)
+        image = context[:dialogue_shot]&.call if state.phase == :dialogue && decision_point.name == :choose_skill
+        @client.call(system: Agents::Prompts.system_for(decision_point), prompt:, schema: decision_point.json_schema, image:)
+      end
+
+      def transcription_for(output, state, decision_point)
+        text = output['transcription']
+        return {} unless decision_point.name == :choose_skill && state.phase == :dialogue && text.is_a?(String) && !text.strip.empty?
+
+        { transcription: { text: text.strip, page: @page } }
       end
 
       def grid_for(state, context)

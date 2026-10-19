@@ -1,4 +1,5 @@
 require_relative 'test_helper'
+require 'base64'
 require 'json'
 require 'tmpdir'
 require 'koholint/agents/claude_cli'
@@ -149,11 +150,29 @@ class ClaudeCliTest < Minitest::Test
     assert_equal 2, events.count { |e| e['pid'] }
   end
 
-  def test_image_is_unsupported_and_runs_nothing
-    reply = run_call(image: 'PNGBYTES')
+  def test_image_goes_on_stdin_as_a_stream_json_user_message
+    reply = run_call(image: "\x89PNG-bytes".b, model: 'haiku', max_call_usd: 0.1)
+    assert_equal({ 'answer' => 'ok' }, reply.output)
+    assert_in_delta 0.0123, reply.cost_usd
+    expected = ['-p', '--model', 'haiku', '--tools', '', '--no-session-persistence', '--setting-sources', '',
+                '--input-format', 'stream-json', '--output-format', 'stream-json', '--verbose',
+                '--json-schema', SCHEMA.to_json, '--system-prompt', 'be brief', '--max-budget-usd', '0.1']
+    assert_equal expected, recorded['argv']
+    lines = recorded['stdin'].lines
+    assert_equal 1, lines.size
+    message = JSON.parse(lines.first)
+    assert_equal 'user', message['type']
+    image, text = message['message']['content']
+    assert_equal({ 'type' => 'base64', 'media_type' => 'image/png', 'data' => Base64.strict_encode64("\x89PNG-bytes".b) }, image['source'])
+    assert_equal 'hello there', text['text']
+    refute_includes recorded['stdin'], Dir.pwd
+    assert_empty recorded['entries']
+  end
+
+  def test_image_call_failure_is_reported
+    reply = run_call('is_error', image: 'PNG')
     assert_nil reply.output
-    assert_equal 'image_unsupported', reply.error
-    refute_path_exists @log
+    assert_match(/claude error: boom/, reply.error)
   end
 
   def violation(value, schema) = Koholint::Agents::ClaudeCli.new.send(:violation, value, schema)
