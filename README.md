@@ -33,4 +33,4 @@ Agent skills: `goto row col` walks to a cell of the known grid with a shortest p
 `blocked_at` when a move hit a wall), and `step direction pixels` moves a few pixels. A ledger counts blocked edges per place; an edge
 blocked twice is marked doubtful in the context, and an objective that keeps failing is abandoned as `unreachable`. Dialogue pages are
 advanced automatically (one `decision` with agent `delegated` and cost 0 per page) and read once from the page sheets. `--steps N` counts
-finished objectives. `resume` rebuilds the ledger and the visited places from the trace; the flow version is `flow-2`.
+finished objectives. `resume` rebuilds the ledger and the visited places from the trace; the flow version is `flow-3`. `talk_to` walks next to a person, faces them and presses A; the agent also writes a one-line `plan` that the next call sees, and the live view shows its reasoning and plan under each decision.
