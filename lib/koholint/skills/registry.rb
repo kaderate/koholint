@@ -3,6 +3,7 @@ require 'koholint/skills/advance_dialogue'
 require 'koholint/skills/goto'
 require 'koholint/skills/press'
 require 'koholint/skills/step'
+require 'koholint/skills/talk_to'
 require 'koholint/skills/wait'
 require 'koholint/skills/walk'
 
@@ -19,7 +20,7 @@ module Koholint
     end
 
     class Registry
-      def self.default = new([Walk.new, Press.new, AdvanceDialogue.new, Wait.new, Goto.new, Step.new])
+      def self.default = new([Walk.new, Press.new, AdvanceDialogue.new, Wait.new, Goto.new, Step.new, TalkTo.new])
 
       def initialize(skills)
         @skills = skills.to_h { |skill| [skill.name, skill] }

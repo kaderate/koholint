@@ -12,7 +12,7 @@ module Koholint
           super(**rest)
           @target = target
           @planner = planner_for(context)
-          @path = plan(@start.cell)
+          @path = initial_plan
           @index = 0
           @arrived_by = nil
           @settle = 0
@@ -41,6 +41,8 @@ module Koholint
 
           Navigation::Planner.new(grid:, ledger: context[:ledger], place: [@start.room_id, @start.map_id])
         end
+
+        def initial_plan = plan(@start.cell)
 
         def plan(cell)
           path = cell && @planner&.path(from: cell, to: @target)

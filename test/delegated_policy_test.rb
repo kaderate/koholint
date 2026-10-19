@@ -999,6 +999,36 @@ class DelegatedLedgerTest < Minitest::Test
     assert ledger.doubtful?(PLACE, [2, 6], :down)
   end
 
+  def test_talk_to_crossed_edges_are_cleared_like_goto
+    p = policy(ScriptedClient.new(objective: objective(kind: 'reach_place', place: [1, 2]), skill: walk))
+    ledger = p.instance_variable_get(:@ledger)
+    p.decide(p.decision_point_for(state), state, { grid: free_grid })
+    [[3, 4, :right], [2, 6, :down]].each { |r, c, d| 2.times { ledger.record(place: PLACE, blocked_at: { row: r, col: c, direction: d }) } }
+    outcome = goto_outcome(crossed: [[3, 4, :right]], to: [3, 5]).merge(skill: 'talk_to', stopped_by: 'no_response', talked: false,
+                                                                         standing_cell: { row: 3, col: 5 })
+    p.after_action(choice: { skill: 'talk_to', params: outcome[:params] }, outcome:, state: state(x: 104), frame: 110)
+    refute ledger.doubtful?(PLACE, [3, 4], :right)
+    assert ledger.doubtful?(PLACE, [2, 6], :down)
+    assert_equal 0, ledger.count(PLACE, [3, 5], :right)
+  end
+
+  def test_talk_to_no_path_counts_but_no_response_does_not_and_the_summary_shows_the_talk
+    @objectives = NoPathObjectives.new(trace:)
+    p = Koholint::Policies::Delegated.new(client: ScriptedClient.new(objective: reach_cell(1, 9), skill: walk), registry: Koholint::Skills::Registry.default,
+                                          objectives: @objectives)
+    p.decide(p.decision_point_for(state), state, { grid: unknown_grid })
+    params = { row: 2, col: 5 }
+    sealed = { skill: 'talk_to', params:, stopped_by: 'no_path', cause: 'no reachable cell next to the target', moved_cells: 0, talked: false }
+    p.after_action(choice: { skill: 'talk_to', params: }, outcome: sealed, state:, frame: 140)
+    assert_equal [140], @objectives.no_paths
+    quiet = { skill: 'talk_to', params:, stopped_by: 'no_response', moved_cells: 1, talked: false, standing_cell: { row: 1, col: 5 } }
+    p.after_action(choice: { skill: 'talk_to', params: }, outcome: quiet, state:, frame: 150)
+    assert_equal [140], @objectives.no_paths
+    attempt = @objectives.attempts_for_prompt.last
+    assert_includes attempt, 'talked false'
+    assert_includes attempt, 'standing_cell (1,5)'
+  end
+
   def test_new_place_starts_and_is_achieved_on_a_first_visit
     p = policy(ScriptedClient.new(objective: ok('title' => 'discover', 'predicate' => { 'kind' => 'new_place' }), skill: walk), visited: [PLACE])
     refute decide(p).last[:fallback]
