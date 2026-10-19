@@ -52,6 +52,7 @@ module Koholint
       def decide(decision_point, state, context)
         @prompt = @image = @images = nil
         context[:ledger] = @ledger
+        @sequence = nil if decision_point.name == :choose_objective
         automatic = automatic_advance(decision_point, state, context)
         return automatic if automatic
 
@@ -202,10 +203,14 @@ module Koholint
 
         if @sequence && sequence_full?(state)
           @agent_driven = true
+          @objectives.touch(frame: state.frame)
           return
         end
         rgb = context[:dialogue_rgb]&.call or return
-        @sequence ||= { pages: [], start: state.frame }
+        unless @sequence
+          @sequence = { pages: [], start: state.frame, place: [state.room_id, state.map_id] }
+          @objectives.touch(frame: state.frame)
+        end
         @sequence[:pages] << rgb
         @auto = true
         { choice: ADVANCE, justification: 'automatic dialogue advance', confidence: 1.0, agent: 'delegated', latency_ms: 0, cost_usd: 0.0,
@@ -229,16 +234,19 @@ module Koholint
         if decision_point.name == :choose_skill && @sequence
           @pages_read = @sequence[:pages].size
           @images = Vision::DialogueShot.sheets(@sequence[:pages], per_sheet: SHEET_PAGES)
+          @read_at = @sequence.slice(:start, :place)
           @sequence = nil
           @page = @pages_read
+          @objectives.touch(frame: state.frame)
+          @prompt += "\nDialogue pages attached: #{@pages_read} pages. Transcribe them in transcription, one paragraph per page separated by a blank line."
         elsif state.phase == :dialogue && decision_point.name == :choose_skill
           @image = context[:dialogue_shot]&.call
         end
         pictures = @images ? { images: @images } : { image: @image }
-        @client.call(system: Agents::Prompts.system_for(decision_point), prompt: @prompt, schema: decision_point.json_schema, **pictures)
+        @client.call(system: Agents::Prompts.system_for(decision_point, sheets: !@images.nil?), prompt: @prompt, schema: decision_point.json_schema, **pictures)
       end
 
-      def clean(text) = text.gsub(/[^\P{Cntrl}\n]/, '').strip[0, TRANSCRIPTION_LIMIT]
+      def clean(text, cap: TRANSCRIPTION_LIMIT) = text.gsub(/[^\P{Cntrl}\n]/, '').strip.then { |t| cap ? t[0, cap] : t }
 
       def transcription_for(output, state, decision_point)
         text = output['transcription']
@@ -250,7 +258,9 @@ module Koholint
       end
 
       def sequence_pages(text)
-        text.split(/\n[^\S\n]*\n/).map { |chunk| clean(chunk) }.reject(&:empty?).first(DIALOGUE_PAGE_LIMIT).each_with_index.map { |t, i| { text: t, page: i + 1 } }
+        paragraphs = text.split(/\n[^\S\n]*\n/).map { |chunk| clean(chunk, cap: nil) }.reject(&:empty?)
+        chunks = paragraphs.flat_map { |paragraph| paragraph.scan(/.{1,#{TRANSCRIPTION_LIMIT}}/m) }
+        chunks.first(DIALOGUE_PAGE_LIMIT).each_with_index.map { |t, i| { text: t, page: i + 1, frame: @read_at[:start], place: @read_at[:place] } }
       end
 
       def grid_for(state, context)

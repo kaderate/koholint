@@ -326,10 +326,6 @@ class DelegatedPolicyTest < Minitest::Test
   SHOT = 'PNGBYTES'.b
   def talk(text = nil) = ok({ 'skill' => 'advance_dialogue', 'params' => {} }.merge(text ? { 'transcription' => text } : {}))
 
-  def decide_with_shot(policy, state)
-    policy.decide(policy.decision_point_for(state), state, { grid:, dialogue_shot: -> { SHOT } })
-  end
-
   PAGE = ("\x10".b * (640 * 384 * 3)).freeze
   OPEN = { dialog_state: 130 }.freeze
 
@@ -365,7 +361,8 @@ class DelegatedPolicyTest < Minitest::Test
     assert_nil client.calls.last[:image]
     assert_equal 1, client.calls.last[:images].size
     assert client.calls.last[:images].first.start_with?("\x89PNG".b)
-    assert_equal [{ text: 'One', page: 1 }, { text: 'Two', page: 2 }, { text: 'Three', page: 3 }], result[:transcription]
+    assert_equal [{ text: 'One', page: 1, frame: 100, place: [163, 16] }, { text: 'Two', page: 2, frame: 100, place: [163, 16] },
+                  { text: 'Three', page: 3, frame: 100, place: [163, 16] }], result[:transcription]
     assert_equal 1, result[:images].size
     assert_nil decide_with_shot(p, state(frame: 301))[:transcription]
   end
@@ -401,16 +398,65 @@ class DelegatedPolicyTest < Minitest::Test
     assert_equal 1, client.calls.size
     capped = decide_with_shot(p, state(frame: 1299, **OPEN))
     assert_equal 5, capped[:images].size
-    assert_equal 40, capped[:images].size * 8 - 0 - (capped[:images].size * 8 - 40)
+    assert_includes client.calls.last[:prompt], '40 pages'
+    assert_includes client.calls.last[:system], 'stacked vertically in sheets'
     assert_equal 'Early', capped[:transcription].first[:text]
     advance(p, capped, state(frame: 1300, **OPEN), 1300)
     driven = decide_with_shot(p, state(frame: 1330, **OPEN))
     assert_equal SHOT, client.calls.last[:image]
-    assert_equal 'agent', driven[:justification] == 'because' ? 'agent' : driven[:agent]
+    assert_equal 'claude', driven[:agent]
+    refute_includes client.calls.last[:system], 'stacked vertically in sheets'
     advance(p, driven, state(frame: 1360), 1360)
     decide_with_shot(p, state(frame: 1361))
     again = decide_with_shot(p, state(frame: 1400, **OPEN))
     assert_equal 'automatic dialogue advance', again[:justification]
+  end
+
+  def test_a_dialogue_does_not_stall_the_objective_and_a_stuck_one_is_still_bounded
+    p = policy(ScriptedClient.new(objective: objective, skill: ok('skill' => 'wait', 'params' => { 'frames' => 3 })), stall_frames: 1800)
+    decide_with_shot(p, state(frame: 100))
+    @objectives.update(state(frame: 100), frame: 100)
+    at = state(frame: 1899, **OPEN)
+    @objectives.update(at, frame: 1899)
+    result = decide_with_shot(p, at)
+    advance(p, result, at, 1929)
+    assert @objectives.current
+    pages(p, 39, from: 1929)
+    capped = state(frame: 3100, **OPEN)
+    decide_with_shot(p, capped)
+    @objectives.update(capped, frame: 3100)
+    assert @objectives.current
+    @objectives.update(capped, frame: 3100 + 1799)
+    assert @objectives.current
+    @objectives.update(capped, frame: 3100 + 1800)
+    assert_nil @objectives.current
+  end
+
+  def test_pages_pending_at_an_objective_tour_are_dropped
+    client = ScriptedClient.new(objective: [objective, objective], skill: ok('skill' => 'wait', 'params' => { 'frames' => 3 }, 'transcription' => 'Fresh'))
+    p = policy(client)
+    decide_with_shot(p, state)
+    pages(p, 2)
+    p.instance_variable_get(:@objectives).instance_variable_set(:@current, nil)
+    decide_with_shot(p, state(frame: 200))
+    pages(p, 1, from: 300)
+    result = decide_with_shot(p, state(frame: 400))
+    assert_includes client.calls.last[:prompt], '1 pages'
+    assert_equal [{ text: 'Fresh', page: 1, frame: 300, place: [163, 16] }], result[:transcription]
+  end
+
+  def test_the_transcription_keeps_every_paragraph_and_splits_long_blocks
+    long = 'y' * 1100
+    client = ScriptedClient.new(objective: objective, skill: [ok('skill' => 'wait', 'params' => { 'frames' => 3 }, 'transcription' => long),
+                                                              ok('skill' => 'wait', 'params' => { 'frames' => 3 }, 'transcription' => "a\n\nb\n\nc")])
+    p = policy(client)
+    decide_with_shot(p, state)
+    pages(p, 1)
+    result = decide_with_shot(p, state(frame: 200))
+    assert_equal [500, 500, 100], result[:transcription].map { |t| t[:text].length }
+    assert_equal [1, 2, 3], result[:transcription].map { |t| t[:page] }
+    pages(p, 1, from: 300)
+    assert_equal %w[a b c], decide_with_shot(p, state(frame: 400))[:transcription].map { |t| t[:text] }
   end
 
   def test_the_frame_guard_also_asks_the_model
@@ -448,13 +494,15 @@ class DelegatedPolicyTest < Minitest::Test
   end
 
   def test_a_failing_image_call_falls_back_to_wait
-    p = policy(ScriptedClient.new(objective: objective, skill: failing('claude error: image')))
+    p = policy(ScriptedClient.new(objective: objective, skill: failing('claude error: image'), default: failing('again')))
     decide_with_shot(p, state)
     pages(p, 2)
     result = decide_with_shot(p, state(frame: 200))
     assert result[:fallback]
     assert_equal 'wait', result[:choice][:skill]
     assert_nil result[:transcription]
+    again = decide_with_shot(p, state(frame: 200))
+    assert_nil again[:images]
   end
 
   def test_malformed_params_fall_back_instead_of_crashing

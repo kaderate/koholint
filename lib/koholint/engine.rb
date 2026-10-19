@@ -112,7 +112,7 @@ module Koholint
 
     def emit_dialogue(transcription, state)
       [transcription].flatten(1).compact.each do |entry|
-        @run.trace.emit(:dialogue, frame: state.frame, place: [state.room_id, state.map_id], text: entry[:text],
+        @run.trace.emit(:dialogue, frame: entry[:frame] || state.frame, place: entry[:place] || [state.room_id, state.map_id], text: entry[:text],
                                    source: 'agent', page: entry[:page])
       end
     end

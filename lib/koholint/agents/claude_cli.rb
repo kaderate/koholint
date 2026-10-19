@@ -48,7 +48,7 @@ module Koholint
       end
 
       def stdin_for(prompt, images)
-        return prompt if images.empty?
+        return prompt unless images.any?
 
         blocks = images.map { |png| { type: 'image', source: { type: 'base64', media_type: 'image/png', data: Base64.strict_encode64(png) } } }
         "#{JSON.generate(type: 'user', message: { role: 'user', content: [*blocks, { type: 'text', text: prompt }] })}\n"
