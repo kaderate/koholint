@@ -16,6 +16,7 @@ module Koholint
       KEEP_FINISHED = 5
       KEEP_REFUSALS = 3
       TRIGGER_AT = 2
+      THINGS_LIMIT = 12
 
       def self.build(state:, grid:, objective:, history:, attempts:, manual:, last_results:, max_chars: 9000, ledger: nil, refusals: [], plan: nil, triggers: nil, talk_log: nil)
         link = state.cell
@@ -77,7 +78,7 @@ module Koholint
       def self.things_block(grid, talk_log, place)
         return [] unless talk_log
 
-        lines = talk_log.lines(grid, place)
+        lines = talk_log.lines(grid, place, limit: THINGS_LIMIT)
         lines.empty? ? [] : ["Things on screen you can interact with:\n#{lines.join("\n")}"]
       end
       private_class_method :things_block

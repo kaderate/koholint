@@ -77,6 +77,15 @@ class AgentsContextTest < Minitest::Test
     assert_includes build(talk_log: log), '- at (1,2): talked to 1 time (dialogue opened 1)'
   end
 
+  def test_the_things_section_is_bounded
+    sprites = [0, 2, 4, 6].flat_map { |r| [0, 2, 4, 6, 8].map { |c| { 'x' => c * 16 + 8, 'y' => r * 16 + 16, 'pattern' => "s#{r}#{c}" } } }
+    big = Koholint::Vision::Grid.new(cells: Array.new(8) { Array.new(10) { 'floor' } }, static_sprites: sprites, beliefs: Koholint::Vision::Beliefs.new,
+                                     capabilities: Koholint::Vision::Capabilities.new)
+    text = Context.build(state:, grid: big, objective: nil, history: [], attempts: [], manual: '', last_results: [], talk_log: Koholint::TalkLog.new)
+    assert_equal 12, text.scan(/^- at \(/).size
+    assert_includes text, '... 8 more objects'
+  end
+
   def test_step_result_shows_pixels
     text = build(last_results: [result(skill: 'step', params: { direction: 'up', pixels: 5 }, moved_px: 5, stopped_by: 'done')])
     assert_includes text, 'step {"direction":"up","pixels":5}: stopped_by done, 40 frames, moved 5 px, room_changed'

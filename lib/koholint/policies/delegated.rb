@@ -114,11 +114,11 @@ module Koholint
         @last_results.shift while @last_results.size > RESULT_LIMIT
         note_walk(choice, outcome, state)
         feed_ledger(choice, outcome, state, frame)
-        feed_triggers(choice, outcome, state)
+        opened = feed_triggers(choice, outcome, state)
         feed_talk_log(choice, outcome, state)
         note_no_path(choice, outcome, frame)
         unless @waiting
-          @objectives.record_attempt(skill: choice[:skill], params: choice[:params], result_summary: summary(outcome))
+          @objectives.record_attempt(skill: choice[:skill], params: choice[:params], result_summary: summary(outcome, opened))
         end
         @waiting = false
         track { @objectives.update(state, frame:) }
@@ -245,12 +245,11 @@ module Koholint
       end
 
       def feed_triggers(choice, outcome, state)
-        @interrupted = nil
         return unless Triggers.scripted?(skill: choice[:skill], params: choice[:params], result: outcome)
 
         cell = Triggers.cell_of(outcome)
         @triggers.record(place: place_of(outcome, :to, state), cell:, skill: choice[:skill], direction: Triggers.direction_of(choice[:skill], choice[:params]))
-        @interrupted = cell && @triggers.count(place_of(outcome, :to, state), cell)
+        cell && @triggers.count(place_of(outcome, :to, state), cell)
       end
 
       def feed_talk_log(choice, outcome, state)
@@ -395,16 +394,13 @@ module Koholint
 
       def cost_of(reply) = reply.respond_to?(:cost_usd) ? reply.cost_usd.to_f : 0.0
 
-      def summary(outcome)
+      def summary(outcome, opened = nil)
         text = "stopped_by #{outcome[:stopped_by]}, moved #{outcome[:moved_cells]} cells, room_changed #{outcome[:room_changed]}, hp_delta #{outcome[:hp_delta]}"
         blocked = outcome[:blocked_at]
         text += ", blocked_at (#{blocked[:row]},#{blocked[:col]}) #{blocked[:direction]}" if blocked.is_a?(Hash)
         text += ", cause #{outcome[:cause]}" if outcome[:cause]
         text += ", talked #{outcome[:talked]}" unless outcome[:talked].nil?
-        if @interrupted
-          text += ", dialogue opened by itself x#{@interrupted}"
-          @interrupted = nil
-        end
+        text += ", dialogue opened by itself x#{opened}" if opened
         standing = outcome[:standing_cell]
         text += ", standing_cell (#{standing[:row]},#{standing[:col]})" if standing.is_a?(Hash)
         text

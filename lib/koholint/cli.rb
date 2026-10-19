@@ -107,19 +107,20 @@ module Koholint
       client = Agents::ClaudeCli.new(model: options.fetch(:model, DEFAULT_MODEL), command:)
       manual = manual_text
       lambda do |run|
-        delegated = Policies::Delegated.new(client:, registry: Skills::Registry.default, objectives: objectives_for(run), ledger: ledger_for(run), triggers: Triggers.from_events(events_for(run)), talk_log: TalkLog.from_events(events_for(run)), manual:, on_step: budget.method(:step_done))
+        events = events_for(run)
+        delegated = Policies::Delegated.new(client:, registry: Skills::Registry.default, objectives: objectives_for(run, events), ledger: ledger_for(run, events),
+                                            triggers: Triggers.from_events(events), talk_log: TalkLog.from_events(events), manual:, on_step: budget.method(:step_done))
         Policies::StartGame.new(delegated, ready: ->(state) { %i[playing dialogue].include?(state.phase) })
       end
     end
 
-    def objectives_for(run)
-      events = Trace.read(File.join(run.dir, 'trace.jsonl'))
+    def objectives_for(run, events = events_for(run))
       Objectives.resume(trace: run.trace, events:, frame: run.inputs.frames, visited: visited_places(events))
     end
 
     def events_for(run) = Trace.read(File.join(run.dir, 'trace.jsonl'))
 
-    def ledger_for(run) = Ledger.from_events(events_for(run))
+    def ledger_for(run, events = events_for(run)) = Ledger.from_events(events)
 
     def visited_places(events)
       events.filter_map do |event|
