@@ -4,6 +4,7 @@ require 'koholint/vision/grid'
 require 'koholint/vision/beliefs'
 require 'koholint/vision/capabilities'
 require 'koholint/agents/context'
+require 'koholint/ledger'
 
 class AgentsContextTest < Minitest::Test
   Context = Koholint::Agents::Context
@@ -68,7 +69,7 @@ class AgentsContextTest < Minitest::Test
        5  . . . . . . . . . .
        6  . . . . . . . . . .
        7  . . . . . . . . . #
-      Legend: . passable, # blocked, ? unknown, ! stale, ~ one-way, o static object, @ Link
+      Legend: . passable, # blocked, ? unknown, ! stale or doubtful, ~ one-way, o static object, @ Link
       Unknown cells are not walls.
 
       Neighbours of Link:
@@ -92,6 +93,17 @@ class AgentsContextTest < Minitest::Test
       Use A to talk.
     TEXT
     assert_equal expected, text
+  end
+
+  def test_doubtful_neighbour_is_drawn_and_counted
+    ledger = Koholint::Ledger.new
+    2.times { ledger.record(place: [163, 16], blocked_at: { row: 3, col: 4, direction: :down }) }
+    ledger.record(place: [163, 16], blocked_at: { row: 3, col: 4, direction: :left })
+    text = build(ledger:)
+    assert_includes text, " 4  . . . . ! . . . . ."
+    assert_includes text, "- down: cell (4,4) '!', belief yes, last walk: none, blocked 2 times"
+    assert_includes text, "- left: cell (3,3) '.', belief yes, last walk: none, blocked 1 time\n"
+    assert_equal build, build(ledger: Koholint::Ledger.new)
   end
 
   def test_no_objective_and_edge_neighbours

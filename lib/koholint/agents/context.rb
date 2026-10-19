@@ -6,7 +6,7 @@ require 'koholint/vision/grid'
 module Koholint
   module Agents
     module Context
-      LEGEND = 'Legend: . passable, # blocked, ? unknown, ! stale, ~ one-way, o static object, @ Link'.freeze
+      LEGEND = 'Legend: . passable, # blocked, ? unknown, ! stale or doubtful, ~ one-way, o static object, @ Link'.freeze
       DIRECTIONS = %i[up right down left].freeze
       DELTAS = { up: [-1, 0], right: [0, 1], down: [1, 0], left: [0, -1] }.freeze
       RESULT_LIMIT = 6
@@ -14,10 +14,11 @@ module Koholint
       KEEP_RESULTS = 3
       KEEP_FINISHED = 5
 
-      def self.build(state:, grid:, objective:, history:, attempts:, manual:, last_results:, max_chars: 9000)
+      def self.build(state:, grid:, objective:, history:, attempts:, manual:, last_results:, max_chars: 9000, ledger: nil)
         link = state.cell
+        place = [state.room_id, state.map_id]
         results = last_results.last(RESULT_LIMIT).map { |r| r.transform_keys(&:to_sym) }
-        fixed = [header(state, link), grid_block(grid, link), neighbours(grid, link, results), objective_block(objective, attempts)]
+        fixed = [header(state, link), grid_block(grid, link, ledger, place), neighbours(grid, link, results, ledger, place), objective_block(objective, attempts)]
         finished = history.map { |h| "- #{h[:id]} #{h[:outcome]}#{h[:reason] ? " (#{h[:reason]})" : ''}: #{h[:title]}" }
         lines = results.map { |r| "- #{result_line(r)}" }
         notes = trim_manual(manual.to_s)
@@ -66,9 +67,10 @@ module Koholint
       def self.cells(count) = "#{count} #{count == 1 ? 'cell' : 'cells'}"
       private_class_method :cells
 
-      def self.grid_block(grid, link)
+      def self.grid_block(grid, link, ledger, place)
+        doubt = doubtful_cells(ledger, place, link)
         rows = (0...Vision::Grid::ROWS).map do |row|
-          cells = (0...Vision::Grid::COLS).map { |col| [row, col] == link ? '@' : symbol(grid, row, col) }
+          cells = (0...Vision::Grid::COLS).map { |col| [row, col] == link ? '@' : (doubt.include?([row, col]) ? '!' : symbol(grid, row, col)) }
           format(' %d  %s', row, cells.join(' '))
         end
         ["Grid (rows 0-7 top to bottom, cols 0-9 left to right):", "    #{(0...Vision::Grid::COLS).to_a.join(' ')}", *rows,
@@ -91,7 +93,14 @@ module Koholint
       end
       private_class_method :symbol
 
-      def self.neighbours(grid, link, results)
+      def self.doubtful_cells(ledger, place, link)
+        return [] unless ledger && link
+
+        DIRECTIONS.select { |d| ledger.doubtful?(place, link, d) }.map { |d| [link[0] + DELTAS[d][0], link[1] + DELTAS[d][1]] }
+      end
+      private_class_method :doubtful_cells
+
+      def self.neighbours(grid, link, results, ledger, place)
         return "Neighbours of Link:\n- Link is outside the 8x10 grid (doorway or screen edge): no neighbour cells" unless link
 
         rows = DIRECTIONS.map do |direction|
@@ -101,8 +110,11 @@ module Koholint
             next "- #{direction}: edge of the screen"
           end
 
-          "- #{direction}: cell (#{row},#{col}) '#{symbol(grid, row, col)}', belief #{grid.passable(row, col, direction)}, " \
-            "last walk: #{last_walk(results, direction)}"
+          shown = ledger&.doubtful?(place, link, direction) ? '!' : symbol(grid, row, col)
+          times = ledger ? ledger.count(place, link, direction) : 0
+          blocked = times.positive? ? ", blocked #{times} #{times == 1 ? 'time' : 'times'}" : ''
+          "- #{direction}: cell (#{row},#{col}) '#{shown}', belief #{grid.passable(row, col, direction)}, " \
+            "last walk: #{last_walk(results, direction)}#{blocked}"
         end
         "Neighbours of Link:\n#{rows.join("\n")}"
       end
