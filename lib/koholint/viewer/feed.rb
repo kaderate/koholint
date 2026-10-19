@@ -11,6 +11,8 @@ module Koholint
   module Viewer
     module Feed
       RunDir = Struct.new(:dir)
+      EVENT_LIMIT = 300
+
       FIELDS = {
         'decision' => %w[frame type decision_point agent choice confidence justification fallback],
         'action' => %w[frame type skill params result],
@@ -29,7 +31,7 @@ module Koholint
 
       module_function
 
-      def for(run_dir, follower, limit: 30)
+      def for(run_dir, follower, limit: EVENT_LIMIT)
         manifest = read_manifest(run_dir)
         trace = trace_events(run_dir)
         summary = Summary.from_events(trace)

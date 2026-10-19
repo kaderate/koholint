@@ -98,6 +98,16 @@ class FeedTest < Minitest::Test
       5.times { |i| decision(trace, i) }
       assert_equal [2, 3, 4], Koholint::Viewer::Feed.for(dir, FOLLOWER, limit: 3)[:events].map { |e| e[:frame] }
     end
+
+    def test_the_feed_keeps_the_last_300_events_by_default
+      Dir.mktmpdir do |dir|
+        trace = Koholint::Trace.new(File.join(dir, 'trace.jsonl'))
+        350.times { |frame| trace.emit(:decision, frame:, decision_point: 'move', input: {}, options: [], choice: {}, justification: 'j', confidence: 1.0, agent: 'x', latency_ms: 0, cost_usd: 0.0, fallback: false) }
+        frames = Koholint::Viewer::Feed.for(dir, FOLLOWER)[:events].map { |e| e[:frame] }
+        assert_equal 300, frames.size
+        assert_equal [50, 349], [frames.first, frames.last]
+      end
+    end
   end
 
   def test_empty_trace
