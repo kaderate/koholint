@@ -30,7 +30,7 @@ module Koholint
       HEMMED_DIRECTIONS = 4
       HEMMED_WAIT_LIMIT = 1800 / HEMMED_WAIT[:params][:frames]
 
-      def initialize(client:, registry:, objectives:, manual: '', on_step: nil, ledger: nil, triggers: nil, talk_log: nil)
+      def initialize(client:, registry:, objectives:, manual: '', on_step: nil, on_activity: nil, ledger: nil, triggers: nil, talk_log: nil)
         @ledger = hook_doubt(ledger || Ledger.new)
         @triggers = triggers || Triggers.new
         @talk_log = talk_log || TalkLog.new
@@ -42,6 +42,7 @@ module Koholint
         @objectives = objectives
         @manual = manual.to_s
         @on_step = on_step
+        @on_activity = on_activity
         @last_results = []
         @walks = []
         @hemmed = nil
@@ -323,6 +324,7 @@ module Koholint
         @sequence[:waited] = false
         @sequence[:pages] << rgb
         @auto = true
+        announce(:acting, "automatic dialogue advance, page #{@page + 1}", state, skill: ADVANCE[:skill], page: @page + 1)
         { choice: ADVANCE, justification: 'automatic dialogue advance', confidence: 1.0, agent: 'delegated', latency_ms: 0, cost_usd: 0.0,
           fallback: false, prompt: nil, image: nil }
       end
@@ -353,9 +355,22 @@ module Koholint
         elsif state.phase == :dialogue && decision_point.name == :choose_skill
           @image = context[:dialogue_shot]&.call
         end
+        announce_call(decision_point, state)
         pictures = @images ? { images: @images } : { image: @image }
         @client.call(system: Agents::Prompts.system_for(decision_point, sheets: !@images.nil?), prompt: @prompt, schema: decision_point.json_schema, **pictures)
       end
+
+      def announce_call(decision_point, state)
+        count = @images ? @images.size : (@image ? 1 : 0)
+        model = @client.model if @client.respond_to?(:model)
+        if @images
+          announce(:reading_dialogue, "reading #{@pages_read} dialogue pages", state, decision_point: decision_point.name.to_s, model:, images: count, pages: @pages_read)
+        else
+          announce(:deciding, 'asking the agent', state, decision_point: decision_point.name.to_s, model:, images: count)
+        end
+      end
+
+      def announce(kind, label, state, **detail) = @on_activity&.call(kind:, label:, frame: state.frame, detail: detail.compact)
 
       def remember_plan(output)
         text = output['plan']

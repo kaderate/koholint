@@ -71,6 +71,18 @@ end
 class DelegatedPolicyTest < Minitest::Test
   include DelegatedHelpers
 
+  def test_reports_activity_before_the_model_call
+    seen = []
+    client = ScriptedClient.new(objective: objective, skill: walk)
+    p = Koholint::Policies::Delegated.new(client:, registry: Koholint::Skills::Registry.default, objectives: (@objectives = Koholint::Objectives.new(trace: trace)),
+                                          manual: 'notes', on_activity: ->(a) { seen << a })
+    decide(p)
+    assert_equal :deciding, seen.last[:kind]
+    assert_equal 'choose_objective', seen.last[:detail][:decision_point]
+    assert_equal 0, seen.last[:detail][:images]
+    assert_kind_of Integer, seen.last[:frame]
+  end
+
   def test_asks_for_an_objective_first_then_for_skills
     p = policy(ScriptedClient.new(objective: objective, skill: walk))
     point, result = decide(p)

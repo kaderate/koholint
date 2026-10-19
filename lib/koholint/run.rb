@@ -115,6 +115,18 @@ module Koholint
       end
     end
 
+    def write_activity(fields)
+      key = fields.values_at(:kind, :detail)
+      return if key == @activity_key
+
+      @activity_key = key
+      tmp = File.join(dir, 'activity.json.tmp')
+      File.write(tmp, JSON.generate({ started_at: wall_clock, detail: {} }.merge(fields)))
+      File.rename(tmp, File.join(dir, 'activity.json'))
+    rescue SystemCallError
+      nil
+    end
+
     def write_manifest
       tmp = File.join(dir, 'manifest.json.tmp')
       File.write(tmp, JSON.pretty_generate(@manifest))
@@ -122,6 +134,8 @@ module Koholint
     end
 
     private
+
+    def wall_clock = Time.now.to_f
 
     def rewrite_trace(path, events)
       tmp = "#{path}.tmp"

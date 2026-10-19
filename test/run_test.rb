@@ -70,4 +70,32 @@ class RunTest < Minitest::Test
       assert_equal 'stopped', Koholint::Run.open(run.dir, flow_version: 'f1', rom_path: rom).manifest['status']
     end
   end
+
+  def test_write_activity_is_atomic_and_skips_unchanged_states
+    with_env do |dir, rom|
+      run = Koholint::Run.create(root: dir, flow_version: 'f1', budget: {}, rom_path: rom)
+      path = File.join(run.dir, 'activity.json')
+      run.write_activity(kind: 'deciding', label: 'asking', frame: 3, detail: { model: 'sonnet' })
+      first = JSON.parse(File.read(path))
+      assert_equal %w[kind label frame detail started_at].sort, first.keys.sort
+      assert_kind_of Float, first['started_at']
+      refute File.exist?("#{path}.tmp")
+      run.write_activity(kind: 'deciding', label: 'asking', frame: 9, detail: { model: 'sonnet' })
+      assert_equal 3, JSON.parse(File.read(path))['frame']
+      run.write_activity(kind: 'idle', label: 'between', frame: 9, detail: {})
+      assert_equal 'idle', JSON.parse(File.read(path))['kind']
+      refute File.exist?("#{path}.tmp")
+    end
+  end
+
+  def test_activity_is_ignored_by_fork_and_open
+    with_env do |dir, rom|
+      run = Koholint::Run.create(root: dir, flow_version: 'f1', budget: {}, rom_path: rom)
+      File.write(File.join(run.dir, 'activity.json'), 'garbage{')
+      reopened = Koholint::Run.open(run.dir, flow_version: 'f1', rom_path: rom)
+      child = reopened.fork(at_frame: 0, flow_version: 'f1', rom_path: rom)
+      refute File.exist?(File.join(child.dir, 'activity.json'))
+      reopened.truncate_trace!(0)
+    end
+  end
 end
