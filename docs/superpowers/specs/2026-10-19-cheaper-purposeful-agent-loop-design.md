@@ -58,13 +58,19 @@ Add a controls section to `docs/AGENT_MANUAL.md` (it counts against the 3000-cha
 - B cancels dialogues when it can.
 - An item can be assigned to each of A and B. Contextual actions win over the assigned item: facing an NPC, A talks even if a sword is assigned to it.
 
+### Half-cell navigation (owner's point, goal 7)
+- The collision and survey resolution becomes the **8 px tile lattice** (16 x 20 tiles per screen). Link's position is a pixel position; a position is walkable when Link's footprint (the measured collision band, a few pixels smaller than a cell: the builder measures it with probes, not from memory) overlaps no blocked tile. Beliefs keep working per appearance, now with a **tile-level appearance** (the 8x8 tile pattern, plus the 16x16 block pattern as today) so a door drawn across two blocks is recognised as a door, not as two half-doors.
+- The agent still sees the 8x10 cell view (cheap to read); each cell carries a flag when its navigability is partial (`half`) and `goto` accepts a target in tile units (`row`/`col` in tiles, or a cell plus `offset: half`), so "centre on the doorway" is expressible. Paths are planned on the tile lattice and walked in segments ending aligned.
+- The probe boundary is unchanged: only `vision/grid_builder` uses `Calibration`; the lattice is built from the same snapshots and probes.
+- Risk: more probes (a room has 320 tiles); the per-appearance generalisation keeps it near the cost measured for 21 appearances. The builder measures the real count before committing to the lattice.
+
 ### Room survey and alignment (goal 7)
 Measured by a throwaway spike on the first run's starting house (report: `.superpowers/sdd/2026-10-18-first-agent-loop/spike-map-report.md`, scripts were in /tmp/spike-map, nothing committed). Findings that shape this block:
 - The probe-based grid was mostly right: of the starting house, 30 cells agreed free, 25 agreed blocked, **0 false walls**, 2 wrong, 22 unknown (walls, unreachable cells, the two door cells). Terrain alone is constant per appearance (21 distinct appearances); the only mixed-truth classes come from NPC sprites standing on a floor appearance.
 - The 25-call failure at cell (1,1) was **alignment, not belief**: the belief "free" was true (Link can stand there at y=32), but the agent stopped a `walk up 3` at y=39. `GameState#cell` calls y=39 row 1, yet the collision band of row 1 is y 26..38, so at y=39 Link overlaps row 2 (the beds), and left/right walks stop against them. The builder had correctly discarded its own probe at y=39 as `misaligned`.
 - The two wrong cells, (2,4) and (2,5), are believed free but blocked by an NPC whose 8x16 sprites cover rows 2 and 3: `Grid` maps a static sprite to one cell only.
 - A survey costs about 0.8 s per probe: one representative per appearance is about 17 s per room, all four directions of the 31 reachable cells about 99 s. A vision model is **not needed for passability**; I drop the vision-model labelling idea for now (it stays a possible helper for the meaning of cells: exit, chest, sign).
-- Unresolved: the two doorway cells (7,4) and (7,5) look free yet Link stops at y=121 with no room change; the cause was not found. Leaving the house depends on it.
+- Doorway (owner, 2026-10-19): the exit is exactly one cell wide but **straddles two grid cells**, (7,4) and (7,5). The 16 px grid (2x2 background tiles per cell, aligned on the screen origin) is therefore too coarse for navigation: navigability can be decided at half-cell (8 px tile) granularity. The spike saw Link stop at y=121 without a room change; the likely cause is that he was not centred on the doorway's real x-span (to be confirmed by the builder). Leaving the house depends on this.
 
 Changes:
 - **Aligned stops.** `walk` and `goto` end each segment with a deterministic centring step: after the movement stops, nudge Link along the other axis until his position is within the cell's collision band centre (a few frames, state-based, no sleeps), and report `aligned: true/false` plus the pixel offset in the result. The context shows when Link is not aligned.
