@@ -15,11 +15,11 @@ class ClaudeCliTest < Minitest::Test
 
   def teardown = FileUtils.rm_rf(File.dirname(@log))
 
-  def run_call(mode = 'success', image: nil, **options)
+  def run_call(mode = 'success', image: nil, images: [], **options)
     ENV['FAKE_CLAUDE_LOG'] = @log
     ENV['FAKE_CLAUDE_MODE'] = mode
     client = Koholint::Agents::ClaudeCli.new(command: FAKE, **options)
-    client.call(system: 'be brief', prompt: 'hello there', schema: SCHEMA, image:)
+    client.call(system: 'be brief', prompt: 'hello there', schema: SCHEMA, image:, images:)
   ensure
     ENV.delete('FAKE_CLAUDE_LOG')
     ENV.delete('FAKE_CLAUDE_MODE')
@@ -198,6 +198,15 @@ class ClaudeCliTest < Minitest::Test
     assert_equal 'hello there', text['text']
     refute_includes recorded['stdin'], Dir.pwd
     assert_empty recorded['entries']
+  end
+
+  def test_several_images_become_several_blocks_before_the_text
+    run_call(images: %w[one two three].map(&:b))
+    assert_includes recorded['argv'], 'stream-json'
+    content = JSON.parse(recorded['stdin'].lines.first)['message']['content']
+    assert_equal %w[image image image text], content.map { |b| b['type'] }
+    assert_equal %w[one two three], content.first(3).map { |b| Base64.decode64(b['source']['data']) }
+    assert_equal 'hello there', content.last['text']
   end
 
   def test_image_call_failure_is_reported

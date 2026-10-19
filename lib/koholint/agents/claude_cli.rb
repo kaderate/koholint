@@ -27,12 +27,13 @@ module Koholint
         kill_group(pid) if pid
       end
 
-      def call(system:, prompt:, schema:, image: nil)
+      def call(system:, prompt:, schema:, image: nil, images: [])
+        pictures = [*images, *image]
         reply = nil
         (@retries + 1).times do
           return failure('cancelled') if @cancelled
 
-          reply = attempt(system:, prompt:, schema:, image:)
+          reply = attempt(system:, prompt:, schema:, images: pictures)
           break unless reply.error&.start_with?('timeout', 'transport')
         end
         reply
@@ -40,25 +41,25 @@ module Koholint
 
       private
 
-      def argv(system, schema, image)
-        format = image ? ['--input-format', 'stream-json', '--output-format', 'stream-json', '--verbose'] : ['--output-format', 'json']
+      def argv(system, schema, images)
+        format = !images.empty? ? ['--input-format', 'stream-json', '--output-format', 'stream-json', '--verbose'] : ['--output-format', 'json']
         [@command, '-p', '--model', @model, '--tools', '', '--no-session-persistence', '--setting-sources', '',
          '--strict-mcp-config', '--disable-slash-commands', *format, '--json-schema', JSON.generate(schema), '--system-prompt', system, '--max-budget-usd', @max_call_usd.to_s]
       end
 
-      def stdin_for(prompt, image)
-        return prompt unless image
+      def stdin_for(prompt, images)
+        return prompt if images.empty?
 
-        source = { type: 'base64', media_type: 'image/png', data: Base64.strict_encode64(image) }
-        "#{JSON.generate(type: 'user', message: { role: 'user', content: [{ type: 'image', source: }, { type: 'text', text: prompt }] })}\n"
+        blocks = images.map { |png| { type: 'image', source: { type: 'base64', media_type: 'image/png', data: Base64.strict_encode64(png) } } }
+        "#{JSON.generate(type: 'user', message: { role: 'user', content: [*blocks, { type: 'text', text: prompt }] })}\n"
       end
 
-      def attempt(system:, prompt:, schema:, image:)
+      def attempt(system:, prompt:, schema:, images:)
         Dir.mktmpdir('koholint-claude') do |dir|
-          status, out, err = run(argv(system, schema, image), stdin_for(prompt, image), dir)
+          status, out, err = run(argv(system, schema, images), stdin_for(prompt, images), dir)
           return failure('cancelled') if @cancelled
 
-          interpret(status, out, schema, stream: !image.nil?, err:)
+          interpret(status, out, schema, stream: !images.empty?, err:)
         end
       rescue SystemCallError => e
         failure("transport: #{e.message}")

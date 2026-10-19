@@ -35,4 +35,18 @@ class DialogueShotTest < Minitest::Test
     end
     assert_operator rows.join.bytes.uniq.size, :>, 2
   end
+
+  def test_sheets_tile_up_to_eight_pages_vertically
+    page = ("\x20".b * (640 * 384 * 3))
+    nine = Koholint::Vision::DialogueShot.sheets(Array.new(9) { page })
+    assert_equal [[640, 384 * 8], [640, 384]], nine.map { |png| decode(png).first(2) }
+    assert_equal 5, Koholint::Vision::DialogueShot.sheets(Array.new(40) { page }).size
+    assert_empty Koholint::Vision::DialogueShot.sheets([])
+  end
+
+  def test_sheets_keep_the_page_order
+    pages = [1, 2, 3].map { |v| v.chr.b * (640 * 384 * 3) }
+    _, _, rows = decode(Koholint::Vision::DialogueShot.sheets(pages).first)
+    assert_equal [1, 2, 3], [0, 384, 768].map { |y| rows[y].getbyte(0) }
+  end
 end

@@ -25,8 +25,8 @@ module DelegatedHelpers
       @calls = []
     end
 
-    def call(system:, prompt:, schema:, image: nil)
-      @calls << { system:, prompt:, schema:, image: }
+    def call(system:, prompt:, schema:, image: nil, images: nil)
+      @calls << { system:, prompt:, schema:, image:, images: }
       queue = system.include?('choose the next objective') ? @objective : @skill
       step = queue.empty? ? @default : queue.shift
       raise step if step.is_a?(Exception)
@@ -114,7 +114,8 @@ class DelegatedPolicyTest < Minitest::Test
     assert_equal client.calls.first[:prompt], first[:prompt]
     assert_nil first[:image]
     second = decide_with_shot(p, state(dialog_state: 130))
-    assert_equal [client.calls.last[:prompt], SHOT], second.values_at(:prompt, :image)
+    assert_equal [nil, nil, nil], second.values_at(:prompt, :image, :images)
+    assert_equal 1, client.calls.size
   end
 
   def test_leave_place_is_achieved_at_the_first_loaded_observation_without_a_client_call
@@ -329,47 +330,115 @@ class DelegatedPolicyTest < Minitest::Test
     policy.decide(policy.decision_point_for(state), state, { grid:, dialogue_shot: -> { SHOT } })
   end
 
-  def test_the_crop_is_sent_only_in_the_dialogue_phase_with_a_skill_choice
-    client = ScriptedClient.new(objective: objective, skill: [walk, walk, walk])
-    p = policy(client)
-    decide_with_shot(p, state(dialog_state: 130))
-    decide_with_shot(p, state)
-    decide_with_shot(p, state(dialog_state: 130))
-    decide_with_shot(p, state(game_submode: 3, dialog_state: 130))
-    assert_equal [nil, nil, SHOT, nil], client.calls.map { |c| c[:image] }
+  PAGE = ("\x10".b * (640 * 384 * 3)).freeze
+  OPEN = { dialog_state: 130 }.freeze
+
+  def decide_with_shot(policy, state)
+    policy.decide(policy.decision_point_for(state), state, { grid:, dialogue_shot: -> { SHOT }, dialogue_rgb: -> { PAGE } })
   end
 
-  def test_a_transcription_is_returned_with_the_page_counted_since_the_dialogue_opened
-    client = ScriptedClient.new(objective: objective, skill: [talk('Hello'), talk(' '), talk('Next'), talk('Again')])
+  def advance(policy, result, state, frame = 1)
+    policy.after_action(choice: result[:choice], outcome: { stopped_by: 'done' }, state:, frame:)
+  end
+
+  def pages(policy, count, from: 100)
+    count.times.map do |i|
+      at = state(frame: from + (i * 30), **OPEN)
+      result = decide_with_shot(policy, at)
+      advance(policy, result, at, at.frame + 30)
+      result
+    end
+  end
+
+  def test_a_dialogue_advances_by_itself_and_is_read_once_when_it_closes
+    client = ScriptedClient.new(objective: objective, skill: [ok('skill' => 'wait', 'params' => { 'frames' => 3 }, 'transcription' => "One\n\nTwo\n\nThree"), ok('skill' => 'wait', 'params' => { 'frames' => 3 })])
     p = policy(client)
     decide_with_shot(p, state)
-    open = state(dialog_state: 130)
-    first = decide_with_shot(p, open)
-    assert_equal({ text: 'Hello', page: 0 }, first[:transcription])
-    p.after_action(choice: first[:choice], outcome: { stopped_by: 'done' }, state: open, frame: 1)
-    assert_nil decide_with_shot(p, open)[:transcription]
-    p.after_action(choice: first[:choice], outcome: { stopped_by: 'done' }, state: open, frame: 2)
-    assert_equal({ text: 'Next', page: 2 }, decide_with_shot(p, open)[:transcription])
-    p.after_action(choice: first[:choice], outcome: { stopped_by: 'done' }, state: state, frame: 3)
-    assert_equal({ text: 'Again', page: 0 }, decide_with_shot(p, open)[:transcription])
+    results = pages(p, 3)
+    assert_equal 1, client.calls.size
+    results.each do |r|
+      assert_equal [{ skill: 'advance_dialogue', params: {} }, 'automatic dialogue advance', 'delegated', 0.0, false, nil, nil],
+                   r.values_at(:choice, :justification, :agent, :cost_usd, :fallback, :prompt, :image)
+    end
+    result = decide_with_shot(p, state(frame: 300))
+    assert_equal 2, client.calls.size
+    assert_nil client.calls.last[:image]
+    assert_equal 1, client.calls.last[:images].size
+    assert client.calls.last[:images].first.start_with?("\x89PNG".b)
+    assert_equal [{ text: 'One', page: 1 }, { text: 'Two', page: 2 }, { text: 'Three', page: 3 }], result[:transcription]
+    assert_equal 1, result[:images].size
+    assert_nil decide_with_shot(p, state(frame: 301))[:transcription]
+  end
+
+  def test_automatic_pages_never_run_the_hemmed_or_attempt_logic
+    p = policy(ScriptedClient.new(objective: objective, skill: walk))
+    decide_with_shot(p, state)
+    hemmed(p)
+    pages(p, 2)
+    assert_equal 0, @objectives.attempts_for_prompt.to_s.scan('advance_dialogue').size
+  end
+
+  def test_a_dialogue_that_reopens_counts_as_the_same_sequence
+    client = ScriptedClient.new(objective: objective, skill: ok('skill' => 'wait', 'params' => { 'frames' => 3 }, 'transcription' => "A\n\nB\n\nC\n\nD"))
+    p = policy(client)
+    decide_with_shot(p, state)
+    pages(p, 2)
+    mid = state(frame: 200)
+    advance(p, { choice: { skill: 'advance_dialogue', params: {} } }, mid, 200)
+    pages(p, 2, from: 230)
+    result = decide_with_shot(p, state(frame: 400))
+    assert_equal 2, client.calls.size
+    assert_equal (1..4).to_a, result[:transcription].map { |t| t[:page] }
+  end
+
+  def test_the_page_cap_asks_once_then_the_agent_drives_until_the_dialogue_closes
+    client = ScriptedClient.new(objective: objective, skill: [ok('skill' => 'advance_dialogue', 'params' => {}, 'transcription' => 'Early'),
+                                                              ok('skill' => 'advance_dialogue', 'params' => {}, 'transcription' => 'Driven'),
+                                                              ok('skill' => 'wait', 'params' => { 'frames' => 3 })])
+    p = policy(client)
+    decide_with_shot(p, state)
+    pages(p, 40, from: 100)
+    assert_equal 1, client.calls.size
+    capped = decide_with_shot(p, state(frame: 1299, **OPEN))
+    assert_equal 5, capped[:images].size
+    assert_equal 40, capped[:images].size * 8 - 0 - (capped[:images].size * 8 - 40)
+    assert_equal 'Early', capped[:transcription].first[:text]
+    advance(p, capped, state(frame: 1300, **OPEN), 1300)
+    driven = decide_with_shot(p, state(frame: 1330, **OPEN))
+    assert_equal SHOT, client.calls.last[:image]
+    assert_equal 'agent', driven[:justification] == 'because' ? 'agent' : driven[:agent]
+    advance(p, driven, state(frame: 1360), 1360)
+    decide_with_shot(p, state(frame: 1361))
+    again = decide_with_shot(p, state(frame: 1400, **OPEN))
+    assert_equal 'automatic dialogue advance', again[:justification]
+  end
+
+  def test_the_frame_guard_also_asks_the_model
+    client = ScriptedClient.new(objective: objective, skill: ok('skill' => 'wait', 'params' => { 'frames' => 3 }))
+    p = policy(client)
+    decide_with_shot(p, state)
+    decide_with_shot(p, state(frame: 100, **OPEN))
+    result = decide_with_shot(p, state(frame: 1900, **OPEN))
+    assert_equal 'wait', result[:choice][:skill]
+    assert_equal 2, client.calls.size
+  end
+
+  def test_a_transcription_is_ignored_when_no_text_comes_back
+    client = ScriptedClient.new(objective: objective, skill: ok('skill' => 'wait', 'params' => { 'frames' => 3 }, 'transcription' => ' '))
+    p = policy(client)
+    decide_with_shot(p, state)
+    pages(p, 1)
+    assert_nil decide_with_shot(p, state(frame: 200))[:transcription]
   end
 
   def test_the_transcription_is_capped_and_stripped_of_control_characters
     long = "A\u0000B\a\nC#{'x' * 600}"
     p = policy(ScriptedClient.new(objective: objective, skill: talk(long)))
     decide_with_shot(p, state)
-    text = decide_with_shot(p, state(dialog_state: 130))[:transcription][:text]
+    pages(p, 1)
+    text = decide_with_shot(p, state(frame: 200))[:transcription].first[:text]
     assert_equal 500, text.length
     assert text.start_with?("AB\nCxxx")
-  end
-
-  def test_closing_with_advance_dialogue_resets_the_page_count
-    p = policy(ScriptedClient.new(objective: objective, skill: [talk('one'), talk('two')]))
-    decide_with_shot(p, state)
-    open = state(dialog_state: 130)
-    first = decide_with_shot(p, open)
-    p.after_action(choice: first[:choice], outcome: { dialog_after: false }, state: state, frame: 1)
-    assert_equal 0, decide_with_shot(p, open)[:transcription][:page]
   end
 
   def test_a_transcription_outside_the_dialogue_phase_is_ignored
@@ -381,7 +450,8 @@ class DelegatedPolicyTest < Minitest::Test
   def test_a_failing_image_call_falls_back_to_wait
     p = policy(ScriptedClient.new(objective: objective, skill: failing('claude error: image')))
     decide_with_shot(p, state)
-    result = decide_with_shot(p, state(dialog_state: 130))
+    pages(p, 2)
+    result = decide_with_shot(p, state(frame: 200))
     assert result[:fallback]
     assert_equal 'wait', result[:choice][:skill]
     assert_nil result[:transcription]
@@ -507,12 +577,13 @@ class DelegatedEngineTest < Minitest::Test
       client = ScriptedClient.new(objective: leave_house, skill: talk)
       eng = agent_engine(run, client, emulator:)
       assert_equal :stopped, eng.run
-      image = client.calls.find { |c| c[:image] }[:image]
+      image = client.calls.find { |c| c[:images] }[:images].first
       assert image.start_with?("\x89PNG".b)
+      assert_operator events(run, :decision).count { |d| d['justification'] == 'automatic dialogue advance' }, :>=, 1
       event = events(run, :dialogue).first
       assert_equal 'Ah! Enfin...', event['text']
       assert_equal 'agent', event['source']
-      assert_equal 0, event['page']
+      assert_equal 1, event['page']
       assert_equal 2, event['place'].size
       refute_includes File.read(File.join(run.dir, 'trace.jsonl')), 'PNG'
     end
@@ -532,14 +603,20 @@ class DelegatedEngineTest < Minitest::Test
       eng.run
       agent = events(run, :decision).select { |d| d['agent'] == 'claude' }
       assert_equal [false, true], agent.map { |d| d['image'] }
+      auto = events(run, :decision).select { |d| d['agent'] == 'delegated' && d['justification'] == 'automatic dialogue advance' }
+      assert_operator auto.size, :>=, 1
+      auto.each { |d| assert_nil d['prompt_sha'] }
       agent.zip(client.calls).each do |event, call|
         base = "#{event['frame']}-#{event['decision_point']}"
         assert_equal call[:prompt], File.read(File.join(run.dir, 'prompts', "#{base}.txt"))
         assert_equal Digest::SHA256.hexdigest(call[:prompt]), event['prompt_sha']
       end
       png = Dir.glob(File.join(run.dir, 'prompts', '*.png'))
-      assert_equal 1, png.size
+      assert_operator png.size, :>=, 1
+      assert_operator png.size, :<=, 5
+      png.each { |f| assert_match(/-choose_skill-\d\.png\z/, f) }
       assert File.binread(png.first).start_with?("\x89PNG".b)
+      refute_includes File.read(File.join(run.dir, 'trace.jsonl')), 'PNG'
       assert_equal [], Koholint::Replay.verify(run, every: 600).reject(&:last)
     end
   end
