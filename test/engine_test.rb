@@ -196,7 +196,7 @@ class EngineTest < Minitest::Test
 
     def normalize(_params) = {}
 
-    def start(state, _params) = Koholint::Skills::Wait::Run.new(skill: name, params: {}, state:, duration: 10_000)
+    def start(state, _params, _context = {}) = Koholint::Skills::Wait::Run.new(skill: name, params: {}, state:, duration: 10_000)
   end
 
   def test_budget_exhausted_mid_execution_is_reported
@@ -225,6 +225,32 @@ class EngineTest < Minitest::Test
       assert_equal 400, outcome['frames']
       assert_equal 'frame_cap', outcome['stopped_by']
       assert_equal 1, flushes
+    end
+  end
+
+  class ContextProbe
+    attr_reader :seen
+
+    def name = 'probe'
+
+    def normalize(_params) = {}
+
+    def start(state, _params, context = {})
+      @seen = context
+      Koholint::Skills::Wait::Run.new(skill: name, params: {}, state:, duration: 1)
+    end
+  end
+
+  def test_the_policy_context_reaches_the_skill
+    skip_without_rom!
+    with_run do |_dir, run|
+      probe = ContextProbe.new
+      registry = Koholint::Skills::Registry.new([probe])
+      policy = ScriptedPolicy.new([{ skill: 'probe', params: {} }], registry)
+      eng = Koholint::Engine.new(run:, policy:, budget: Koholint::Budget.new, keyframe_every: 100_000, grid: true)
+      eng.send(:iterate)
+      assert_kind_of Koholint::Vision::Grid, probe.seen[:grid]
+      assert probe.seen[:dialogue_shot].respond_to?(:call)
     end
   end
 end
