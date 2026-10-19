@@ -30,9 +30,11 @@ class ObjectivesTest < Minitest::Test
     assert Koholint::Objectives.valid_predicate?({ 'kind' => 'reach_cell', 'place' => [1, 2], 'row' => 1, 'col' => 2 })
     assert Koholint::Objectives.valid_predicate?({ kind: 'dialogue_closed' })
     refute Koholint::Objectives.valid_predicate?({ kind: 'reach_cell', place: [1, 2] })
+    assert Koholint::Objectives.valid_predicate?({ kind: 'new_place' })
+    refute Koholint::Objectives.valid_predicate?({ kind: 'new_place', place: [1, 2] })
     refute Koholint::Objectives.valid_predicate?({ kind: 'nope' })
     refute Koholint::Objectives.valid_predicate?('x')
-    assert_equal %w[dialogue_closed leave_place reach_cell reach_place], Koholint::Objectives::PREDICATES.keys.sort
+    assert_equal %w[dialogue_closed leave_place new_place reach_cell reach_place], Koholint::Objectives::PREDICATES.keys.sort
   end
 
   def test_malformed_predicates_are_rejected
@@ -189,5 +191,113 @@ class ObjectivesTest < Minitest::Test
 
   def test_update_without_current_is_nil
     assert_nil @objectives.update(state, frame: 1)
+  end
+
+  def blocked(row: 3, col: 4, direction: 'up') = { row:, col:, direction: }
+
+  def test_new_place_not_achieved_in_starting_place
+    start({ kind: 'new_place' })
+    assert_nil @objectives.update(state(frame: 1), frame: 1)
+    assert_nil @objectives.update(state(frame: 2, x: 50), frame: 2)
+    assert_equal [[1, 2]], @objectives.visited
+  end
+
+  def test_new_place_achieved_in_another_place_and_never_by_loading
+    start({ kind: 'new_place' })
+    @objectives.update(state, frame: 1)
+    assert_nil @objectives.update(state(room: 9, game_submode: 5), frame: 2)
+    assert_equal [[1, 2]], @objectives.visited
+    assert_equal :achieved, @objectives.update(state(room: 9), frame: 3)
+    assert_equal ['started', 'achieved'], events.map { |e| e['status'] }
+  end
+
+  def test_new_place_not_achieved_when_returning_to_visited_place
+    start({ kind: 'new_place' })
+    @objectives.update(state, frame: 1)
+    @objectives.update(state(room: 9), frame: 2)
+    start({ kind: 'new_place' }, frame: 3)
+    assert_nil @objectives.update(state(room: 1), frame: 4)
+    assert_equal :achieved, @objectives.update(state(room: 5), frame: 5)
+  end
+
+  def test_visited_seeding_on_resume
+    objectives = Koholint::Objectives.new(trace: @trace, visited: [[9, 2]])
+    objectives.start(frame: 0, title: 't', predicate: { kind: 'new_place' })
+    assert_nil objectives.update(state(room: 9), frame: 1)
+    assert_equal :achieved, objectives.update(state(room: 1), frame: 2)
+  end
+
+  def test_six_same_pair_blocks_abandon_reach_cell
+    target = { kind: 'reach_cell', place: [1, 2], row: 0, col: 0 }
+    start(target)
+    5.times { assert_nil @objectives.note_blocked(blocked_at: blocked, target:) }
+    assert_equal :abandoned, @objectives.note_blocked(blocked_at: blocked, target:)
+    done = events.last
+    assert_equal ['abandoned', 'unreachable'], [done['status'], done['reason']]
+    assert_equal 2, events.size
+  end
+
+  def test_mixed_blocks_total_eight_abandons_any_kind
+    target = { kind: 'leave_place', place: [1, 2] }
+    start(target)
+    7.times { |i| assert_nil @objectives.note_blocked(blocked_at: blocked(col: i), target:) }
+    assert_equal :abandoned, @objectives.note_blocked(blocked_at: blocked(col: 8), target:)
+    assert_equal 'unreachable', events.last['reason']
+    assert_nil @objectives.note_blocked(blocked_at: blocked, target:)
+    assert_equal 2, events.size
+  end
+
+  def test_mixed_blocks_on_reach_cell_do_not_trip_pairs
+    target = { kind: 'reach_cell', place: [1, 2], row: 0, col: 0 }
+    start(target)
+    7.times { |i| assert_nil @objectives.note_blocked(blocked_at: blocked(col: i % 2), target:) }
+  end
+
+  def test_same_pair_only_counts_for_reach_cell
+    target = { kind: 'leave_place', place: [1, 2] }
+    start(target)
+    7.times { assert_nil @objectives.note_blocked(blocked_at: blocked, target:) }
+  end
+
+  def test_block_counters_reset_on_new_objective
+    target = { kind: 'reach_cell', place: [1, 2], row: 0, col: 0 }
+    start(target)
+    5.times { @objectives.note_blocked(blocked_at: blocked, target:) }
+    start(target, frame: 1)
+    5.times { assert_nil @objectives.note_blocked(blocked_at: blocked, target:) }
+  end
+
+  def test_unreachable_event_carries_the_passed_frame
+    target = { kind: 'leave_place', place: [1, 2] }
+    start(target)
+    7.times { @objectives.note_blocked(blocked_at: blocked, target:, frame: 50) }
+    @objectives.note_blocked(blocked_at: blocked, target:, frame: 77)
+    assert_equal 77, events.last['frame']
+  end
+
+  def test_note_blocked_accepts_string_keys_and_directions
+    target = { 'kind' => 'reach_cell', 'place' => [1, 2], 'row' => 0, 'col' => 0 }
+    start(target)
+    3.times { @objectives.note_blocked(blocked_at: { 'row' => 3, 'col' => 4, 'direction' => 'up' }, target:) }
+    2.times { @objectives.note_blocked(blocked_at: { row: 3, col: 4, direction: :up }, target:) }
+    assert_equal :abandoned, @objectives.note_blocked(blocked_at: { 'row' => 3, 'col' => 4, 'direction' => :up }, target:)
+    assert_equal 'unreachable', events.last['reason']
+  end
+
+  def test_reach_cell_abandons_at_eight_mixed_blocks
+    target = { kind: 'reach_cell', place: [1, 2], row: 0, col: 0 }
+    start(target)
+    7.times { |i| assert_nil @objectives.note_blocked(blocked_at: blocked(col: i), target:) }
+    assert_equal :abandoned, @objectives.note_blocked(blocked_at: blocked(col: 7), target:)
+  end
+
+  def test_visits_are_recorded_without_an_active_objective
+    start({ kind: 'new_place' })
+    @objectives.update(state, frame: 1)
+    @objectives.abandon(frame: 2, reason: 'x')
+    @objectives.update(state(room: 9), frame: 3)
+    start({ kind: 'new_place' }, frame: 4)
+    assert_nil @objectives.update(state(room: 9), frame: 5)
+    assert_equal :achieved, @objectives.update(state(room: 5), frame: 6)
   end
 end

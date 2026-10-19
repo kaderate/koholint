@@ -6,10 +6,13 @@ module Koholint
       'leave_place' => %i[place],
       'reach_place' => %i[place],
       'reach_cell' => %i[place row col],
-      'dialogue_closed' => %i[]
+      'dialogue_closed' => %i[],
+      'new_place' => %i[]
     }.freeze
 
     ATTEMPT_LIMIT = 10
+    UNREACHABLE_PAIRS = 6
+    UNREACHABLE_TOTAL = 8
 
     def self.normalize(predicate)
       predicate.to_h.transform_keys(&:to_sym)
@@ -38,7 +41,7 @@ module Koholint
 
     TERMINAL = %w[achieved failed abandoned].freeze
 
-    attr_reader :current, :history
+    attr_reader :current, :history, :visited
 
     def self.resume(trace:, events:, frame:, **options)
       started = events.select { |e| e['type'] == 'objective' && e['status'] == 'started' }
@@ -48,13 +51,15 @@ module Koholint
       objectives
     end
 
-    def initialize(trace:, stall_frames: 1800, loop_window: 12, counter: 0)
+    def initialize(trace:, stall_frames: 1800, loop_window: 12, counter: 0, visited: [])
       @trace = trace
       @stall_frames = stall_frames
       @loop_window = loop_window
       @history = []
       @counter = counter
       @current = nil
+      @visited = visited.map { |place| place.to_a.dup }
+      @last_frame = 0
     end
 
     def start(frame:, title:, predicate:)
@@ -70,6 +75,9 @@ module Koholint
       @repeat = 0
       @last_key = nil
       @last_state_part = nil
+      @last_frame = frame
+      @blocked_total = 0
+      @blocked_pairs = Hash.new(0)
       @trace.emit(:objective, frame:, id:, status: 'started', title:, predicate: @current[:predicate])
       id
     end
@@ -86,10 +94,14 @@ module Koholint
     end
 
     def update(state, frame:)
-      return nil unless @current
       return nil if state.loading?
 
       place = [state.room_id, state.map_id]
+      first_visit = @visited.any? && !@visited.include?(place)
+      @visited << place unless @visited.include?(place)
+      return nil unless @current
+
+      @last_frame = frame
       cell = state.cell
       position = cell || [:px, state.x, state.y]
       @last_state_part = [place, position, state.dialog_open?]
@@ -103,9 +115,22 @@ module Koholint
       @dialogue_seen ||= state.dialog_open?
 
       return finish(:failed, frame:) if died?(state)
-      return finish(:achieved, frame:) if achieved?(state, place, cell)
+      return finish(:achieved, frame:) if achieved?(state, place, cell, first_visit)
       return finish(:abandoned, frame:, reason: 'loop') if @repeat >= @loop_window
       return finish(:abandoned, frame:, reason: 'stall') if frame - @last_change_frame >= @stall_frames
+
+      nil
+    end
+
+    def note_blocked(blocked_at:, target:, frame: @last_frame)
+      return nil unless @current
+
+      cell = self.class.normalize(blocked_at)
+      pair = [cell[:row], cell[:col], cell[:direction].to_s]
+      @blocked_total += 1
+      @blocked_pairs[pair] += 1
+      pairs = self.class.normalize(target)[:kind].to_s == 'reach_cell' && @blocked_pairs[pair] >= UNREACHABLE_PAIRS
+      return finish(:abandoned, frame:, reason: 'unreachable') if pairs || @blocked_total >= UNREACHABLE_TOTAL
 
       nil
     end
@@ -136,7 +161,7 @@ module Koholint
       @seen_alive && !alive && state.hp == 0
     end
 
-    def achieved?(state, place, cell)
+    def achieved?(state, place, cell, first_visit)
       predicate = @current[:predicate]
       target = predicate[:place]
       case predicate[:kind].to_s
@@ -144,6 +169,7 @@ module Koholint
       when 'reach_place' then place == target
       when 'reach_cell' then place == target && cell == [predicate[:row], predicate[:col]]
       when 'dialogue_closed' then @dialogue_seen && !state.dialog_open?
+      when 'new_place' then first_visit
       end
     end
 
