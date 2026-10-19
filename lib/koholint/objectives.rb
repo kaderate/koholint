@@ -14,6 +14,7 @@ module Koholint
     UNREACHABLE_PAIRS = 6
     UNREACHABLE_TOTAL = 8
     UNREACHABLE_NO_PATH = 3
+    UNREACHABLE_NO_PATH_SEARCH = 6
 
     def self.normalize(predicate)
       predicate.to_h.transform_keys(&:to_sym)
@@ -134,8 +135,8 @@ module Koholint
       pair = [cell[:row], cell[:col], cell[:direction].to_s]
       @blocked_total += 1
       @blocked_pairs[pair] += 1
-      pairs = self.class.normalize(target)[:kind].to_s == 'reach_cell' && @blocked_pairs[pair] >= UNREACHABLE_PAIRS
-      return finish(:abandoned, frame:, reason: 'unreachable') if pairs || @blocked_total >= UNREACHABLE_TOTAL
+      return nil unless self.class.normalize(target)[:kind].to_s == 'reach_cell'
+      return finish(:abandoned, frame:, reason: 'unreachable') if @blocked_pairs[pair] >= UNREACHABLE_PAIRS || @blocked_total >= UNREACHABLE_TOTAL
 
       nil
     end
@@ -144,7 +145,8 @@ module Koholint
       return nil unless @current
 
       @no_path += 1
-      return finish(:abandoned, frame:, reason: 'unreachable') if @no_path >= UNREACHABLE_NO_PATH
+      limit = @current[:predicate][:kind].to_s == 'reach_cell' ? UNREACHABLE_NO_PATH : UNREACHABLE_NO_PATH_SEARCH
+      return finish(:abandoned, frame:, reason: 'unreachable') if @no_path >= limit
 
       nil
     end

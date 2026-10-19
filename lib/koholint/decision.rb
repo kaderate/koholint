@@ -52,7 +52,7 @@ module Koholint
                                            confidence: { type: 'number', minimum: 0, maximum: 1 },
                                            transcription: { type: 'string' },
                                            plan: PLAN_SCHEMA),
-        required: %w[skill params justification confidence], additionalProperties: false }
+        required: %w[skill params justification confidence plan], additionalProperties: false }
     end
 
     private
@@ -73,7 +73,7 @@ module Koholint
         properties: { title: { type: 'string', minLength: 1, maxLength: TITLE_MAX }, predicate: { oneOf: predicates },
                       justification: { type: 'string' }, confidence: { type: 'number', minimum: 0, maximum: 1 },
                       plan: PLAN_SCHEMA },
-        required: %w[title predicate justification confidence], additionalProperties: false }
+        required: %w[title predicate justification confidence plan], additionalProperties: false }
     end
 
     def validate_objective(choice)

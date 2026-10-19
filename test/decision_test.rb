@@ -89,11 +89,11 @@ class DecisionTest < Minitest::Test
     assert_equal 80, point.json_schema[:properties][:title][:maxLength]
   end
 
-  def test_plan_is_an_optional_capped_string_in_both_schemas
+  def test_plan_is_a_required_capped_string_for_the_model_but_validation_accepts_its_absence
     registry = Koholint::Skills::Registry.default
     [objective_point.json_schema, Koholint::DecisionPoint.choose_skill(registry).json_schema].each do |schema|
       assert_equal({ type: 'string', maxLength: 200 }, schema[:properties][:plan])
-      refute_includes schema[:required], 'plan'
+      assert_includes schema[:required], 'plan'
     end
     point = objective_point
     point.validate({ title: 'x', predicate: { kind: 'dialogue_closed' }, plan: 'talk first' })
@@ -103,7 +103,7 @@ class DecisionTest < Minitest::Test
   def test_choose_objective_json_schema
     schema = objective_point.json_schema
     assert_equal 'object', schema[:type]
-    assert_equal %w[title predicate justification confidence], schema[:required]
+    assert_equal %w[title predicate justification confidence plan], schema[:required]
     kinds = schema[:properties][:predicate][:oneOf].map { |p| p[:properties][:kind][:enum] }
     assert_equal [%w[leave_place], %w[reach_place], %w[reach_cell], %w[dialogue_closed], %w[new_place]], kinds
     reach_cell = schema[:properties][:predicate][:oneOf][2]

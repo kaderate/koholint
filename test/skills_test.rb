@@ -481,7 +481,7 @@ class SkillsTest < Minitest::Test
     schema = point.json_schema
     assert_equal registry.names, schema[:properties][:skill][:enum]
     assert_equal registry.names, schema[:properties][:params][:anyOf].map { |s| s[:title] }
-    assert_equal %w[skill params justification confidence], schema[:required]
+    assert_equal %w[skill params justification confidence plan], schema[:required]
     assert JSON.parse(JSON.generate(schema))
   end
 

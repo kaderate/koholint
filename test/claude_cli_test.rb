@@ -124,6 +124,18 @@ class ClaudeCliTest < Minitest::Test
     assert_operator reply.error.length, :<=, 'transport: exit 2: '.length + 200
   end
 
+  def test_a_missing_lenient_field_is_accepted_and_a_missing_required_one_is_not
+    schema = SCHEMA.merge(properties: { answer: { type: 'string' }, plan: { type: 'string', maxLength: 200 } }, required: %w[answer plan])
+    ENV['FAKE_CLAUDE_LOG'] = @log
+    lenient = Koholint::Agents::ClaudeCli.new(command: FAKE, lenient: %w[plan]).call(system: 's', prompt: 'p', schema:)
+    strict = Koholint::Agents::ClaudeCli.new(command: FAKE).call(system: 's', prompt: 'p', schema:)
+    assert_equal({ 'answer' => 'ok' }, lenient.output)
+    assert_nil lenient.error
+    assert_match(/missing plan/, strict.error)
+  ensure
+    ENV.delete('FAKE_CLAUDE_LOG')
+  end
+
   def test_schema_violation_is_not_retried
     run_call('schema_invalid', retries: 2)
     assert_equal 1, events.size
