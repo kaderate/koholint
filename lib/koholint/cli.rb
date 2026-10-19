@@ -6,6 +6,8 @@ require 'koholint/engine'
 require 'koholint/agents/claude_cli'
 require 'koholint/game_state'
 require 'koholint/ledger'
+require 'koholint/talk_log'
+require 'koholint/triggers'
 require 'koholint/objectives'
 require 'koholint/policies/delegated'
 require 'koholint/skills/registry'
@@ -105,7 +107,7 @@ module Koholint
       client = Agents::ClaudeCli.new(model: options.fetch(:model, DEFAULT_MODEL), command:)
       manual = manual_text
       lambda do |run|
-        delegated = Policies::Delegated.new(client:, registry: Skills::Registry.default, objectives: objectives_for(run), ledger: ledger_for(run), manual:, on_step: budget.method(:step_done))
+        delegated = Policies::Delegated.new(client:, registry: Skills::Registry.default, objectives: objectives_for(run), ledger: ledger_for(run), triggers: Triggers.from_events(events_for(run)), talk_log: TalkLog.from_events(events_for(run)), manual:, on_step: budget.method(:step_done))
         Policies::StartGame.new(delegated, ready: ->(state) { %i[playing dialogue].include?(state.phase) })
       end
     end
@@ -115,7 +117,9 @@ module Koholint
       Objectives.resume(trace: run.trace, events:, frame: run.inputs.frames, visited: visited_places(events))
     end
 
-    def ledger_for(run) = Ledger.from_events(Trace.read(File.join(run.dir, 'trace.jsonl')))
+    def events_for(run) = Trace.read(File.join(run.dir, 'trace.jsonl'))
+
+    def ledger_for(run) = Ledger.from_events(events_for(run))
 
     def visited_places(events)
       events.filter_map do |event|

@@ -5,6 +5,8 @@ require 'koholint/vision/beliefs'
 require 'koholint/vision/capabilities'
 require 'koholint/agents/context'
 require 'koholint/ledger'
+require 'koholint/talk_log'
+require 'koholint/triggers'
 
 class AgentsContextTest < Minitest::Test
   Context = Koholint::Agents::Context
@@ -46,6 +48,33 @@ class AgentsContextTest < Minitest::Test
   def build(**over)
     Context.build(state: state, grid: grid, objective: nil, history: [], attempts: [], manual: 'Use A to talk.',
                   last_results: [], **over)
+  end
+
+  def test_without_triggers_and_talk_log_the_output_is_unchanged
+    base = build
+    assert_equal base, build(triggers: Koholint::Triggers.new, talk_log: nil)
+    refute_includes build(triggers: Koholint::Triggers.new, talk_log: nil), 'opened by itself'
+    refute_includes base, 'Things on screen'
+  end
+
+  def test_the_trigger_line_needs_two_openings_on_the_current_cell
+    triggers = Koholint::Triggers.new
+    link = state.cell
+    triggers.record(place: [163, 16], cell: link, skill: 'walk', direction: 'up')
+    refute_includes build(triggers:), 'opened by itself'
+    triggers.record(place: [163, 16], cell: link, skill: 'goto')
+    text = build(triggers:)
+    assert_includes text, "Health: 3 of 3 hearts\nA dialogue opened by itself 2 times while Link was on this cell (the game triggers it; repeating the same action here does not change that).\n\nGrid"
+    other = Koholint::Triggers.new
+    2.times { other.record(place: [163, 16], cell: [0, 0], skill: 'walk') }
+    refute_includes build(triggers: other), 'opened by itself'
+  end
+
+  def test_the_things_section_lists_static_objects_with_their_counts
+    log = Koholint::TalkLog.new
+    assert_includes build(talk_log: log), "Things on screen you can interact with:\n- at (1,2): never tried\n\nCurrent objective"
+    log.record(place: [163, 16], row: 1, col: 2, talked: true)
+    assert_includes build(talk_log: log), '- at (1,2): talked to 1 time (dialogue opened 1)'
   end
 
   def test_step_result_shows_pixels

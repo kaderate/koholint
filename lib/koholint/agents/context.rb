@@ -15,12 +15,14 @@ module Koholint
       KEEP_RESULTS = 3
       KEEP_FINISHED = 5
       KEEP_REFUSALS = 3
+      TRIGGER_AT = 2
 
-      def self.build(state:, grid:, objective:, history:, attempts:, manual:, last_results:, max_chars: 9000, ledger: nil, refusals: [], plan: nil)
+      def self.build(state:, grid:, objective:, history:, attempts:, manual:, last_results:, max_chars: 9000, ledger: nil, refusals: [], plan: nil, triggers: nil, talk_log: nil)
         link = state.cell
         place = [state.room_id, state.map_id]
         results = last_results.last(RESULT_LIMIT).map { |r| r.transform_keys(&:to_sym) }
-        fixed = [header(state, link), grid_block(grid, link, ledger, place), neighbours(grid, link, results, ledger, place), objective_block(objective, attempts, plan)]
+        fixed = [header(state, link, triggers, place), grid_block(grid, link, ledger, place), neighbours(grid, link, results, ledger, place),
+                 *things_block(grid, talk_log, place), objective_block(objective, attempts, plan)]
         finished = history.map { |h| "- #{h[:id]} #{h[:outcome]}#{h[:reason] ? " (#{h[:reason]})" : ''}: #{h[:title]}" }
         refused = refusals.last(KEEP_REFUSALS).map { |r| "- #{r[:title]} #{r[:predicate].to_json}: #{r[:reason]}" }
         lines = results.map { |r| "- #{result_line(r)}" }
@@ -57,7 +59,7 @@ module Koholint
       end
       private_class_method :render
 
-      def self.header(state, link)
+      def self.header(state, link, triggers = nil, place = nil)
         where = link ? "row #{link[0]}, col #{link[1]}" : 'outside the grid (doorway or screen edge)'
         lines = ["Phase: #{state.phase}", "Place: room #{state.room_id}, map #{state.map_id}",
                  "Link: #{where} (pixel x=#{state.x}, y=#{state.y}), facing #{state.direction}"]
@@ -66,9 +68,19 @@ module Koholint
           lines << "Link offset from cell centre (positive = right of / below the centre): dx=#{dx}, dy=#{dy}"
         end
         lines << "Health: #{hearts(state.hp)} of #{hearts(state.max_hp)} hearts"
+        opened = link && triggers ? triggers.count(place, link) : 0
+        lines << "A dialogue opened by itself #{opened} times while Link was on this cell (the game triggers it; repeating the same action here does not change that)." if opened >= TRIGGER_AT
         lines.join("\n")
       end
       private_class_method :header
+
+      def self.things_block(grid, talk_log, place)
+        return [] unless talk_log
+
+        lines = talk_log.lines(grid, place)
+        lines.empty? ? [] : ["Things on screen you can interact with:\n#{lines.join("\n")}"]
+      end
+      private_class_method :things_block
 
       def self.hearts(hp) = (hp.to_f / Perception::HP_PER_HEART).to_s.delete_suffix('.0')
       private_class_method :hearts

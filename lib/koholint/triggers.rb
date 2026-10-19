@@ -1,0 +1,70 @@
+require 'koholint/ledger'
+
+module Koholint
+  class Triggers
+    PRESSING_SKILLS = %w[advance_dialogue talk_to].freeze
+
+    def self.from_events(events)
+      triggers = new
+      events.each do |event|
+        next unless Ledger.pick(event, :type).to_s == 'action'
+
+        result = Ledger.pick(event, :result)
+        next unless result.is_a?(Hash)
+
+        from = Ledger.place_of(Ledger.pick(result, :from))
+        to = Ledger.place_of(Ledger.pick(result, :to))
+        triggers.reset_unless(from) if from
+        skill = Ledger.pick(event, :skill)
+        params = Ledger.pick(event, :params)
+        if to && scripted?(skill:, params:, result:)
+          triggers.record(place: to, cell: cell_of(result), skill: skill.to_s, direction: direction_of(skill, params))
+        end
+        triggers.reset_unless(to) if to
+      end
+      triggers
+    end
+
+    def self.scripted?(skill:, params:, result:)
+      before = Ledger.pick(result, :dialog_before)
+      after = Ledger.pick(result, :dialog_after)
+      before == false && after == true && !pressing_a?(skill, params)
+    end
+
+    def self.pressing_a?(skill, params)
+      skill = skill.to_s
+      PRESSING_SKILLS.include?(skill) || (skill == 'press' && Ledger.pick(params, :button).to_s == 'a')
+    end
+
+    def self.cell_of(result)
+      to = Ledger.pick(result, :to)
+      row = Ledger.pick(to, :row)
+      col = Ledger.pick(to, :col)
+      row && col ? [row, col] : nil
+    end
+
+    def self.direction_of(skill, params)
+      skill.to_s == 'walk' ? Ledger.pick(params, :direction)&.to_s : nil
+    end
+
+    def initialize
+      @counts = Hash.new(0)
+    end
+
+    def record(place:, cell:, skill:, direction: nil)
+      return unless cell
+
+      @counts[[place, cell.to_a, direction&.to_s || skill.to_s]] += 1
+    end
+
+    def count(place, cell)
+      return 0 unless cell
+
+      @counts.sum { |(p, c, _), n| p == place && c == cell.to_a ? n : 0 }
+    end
+
+    def reset_unless(place)
+      @counts.select! { |key, _| key[0] == place }
+    end
+  end
+end
