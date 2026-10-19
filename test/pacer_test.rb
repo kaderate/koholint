@@ -27,10 +27,22 @@ class PacerTest < Minitest::Test
     fake = FakeClock.new
     pacer = Koholint::Pacer.new(fps: 60, clock: fake.clock, sleeper: fake.sleeper)
     pacer.pace(60)
-    fake.now += 5
+    fake.now += 1.9
     fake.slept.clear
     pacer.pace(60)
     assert_empty fake.slept
+  end
+
+  def test_reanchors_after_a_long_stall
+    fake = FakeClock.new
+    pacer = Koholint::Pacer.new(fps: 60, clock: fake.clock, sleeper: fake.sleeper)
+    pacer.pace(60)
+    fake.now += 30
+    fake.slept.clear
+    pacer.pace(60)
+    assert_in_delta 1.0, fake.slept.sum, 1e-9
+    pacer.pace(60)
+    assert_in_delta 2.0, fake.slept.sum, 1e-9
   end
 
   def test_realtime_does_not_change_journal_or_state

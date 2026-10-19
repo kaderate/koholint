@@ -9,6 +9,7 @@ module Koholint
 
     class ClaudeCli
       READER_GRACE = 1
+      STDERR_KEEP = 2048
 
       def initialize(model: 'sonnet', command: 'claude', timeout: 90, max_call_usd: 0.25, retries: 1)
         @model = model
@@ -44,8 +45,8 @@ module Koholint
 
       def attempt(system:, prompt:, schema:, image:)
         Dir.mktmpdir('koholint-claude') do |dir|
-          status, out = run(argv(system, schema, image), stdin_for(prompt, image), dir)
-          interpret(status, out, schema, stream: !image.nil?)
+          status, out, err = run(argv(system, schema, image), stdin_for(prompt, image), dir)
+          interpret(status, out, schema, stream: !image.nil?, err:)
         end
       rescue SystemCallError => e
         failure("transport: #{e.message}")
@@ -54,12 +55,23 @@ module Koholint
       def run(args, prompt, dir)
         in_r, in_w = IO.pipe
         out_r, out_w = IO.pipe
-        pid = Process.spawn(*args, chdir: dir, pgroup: true, in: in_r, out: out_w, err: File::NULL)
+        err_r, err_w = IO.pipe
+        pid = Process.spawn(*args, chdir: dir, pgroup: true, in: in_r, out: out_w, err: err_w)
         in_r.close
         out_w.close
+        err_w.close
         buffer = +''
         reader = Thread.new do
           loop { buffer << out_r.readpartial(65_536) }
+        rescue EOFError, IOError
+          nil
+        end
+        err_buffer = +''
+        err_reader = Thread.new do
+          loop do
+            err_buffer << err_r.readpartial(4096)
+            err_buffer.replace(err_buffer.byteslice(-STDERR_KEEP..)) if err_buffer.bytesize > STDERR_KEEP
+          end
         rescue EOFError, IOError
           nil
         end
@@ -73,16 +85,17 @@ module Koholint
         waiter = Process.detach(pid)
         if waiter.join(@timeout)
           writer.join
-          [waiter.value, drain(reader, buffer)]
+          [waiter.value, drain(reader, buffer), drain(err_reader, err_buffer)]
         else
           kill_group(pid)
           waiter.join
           writer.join
           drain(reader, buffer)
-          [:timeout, nil]
+          drain(err_reader, err_buffer)
+          [:timeout, nil, '']
         end
       ensure
-        [in_r, in_w, out_r, out_w].each { |io| io&.close unless io&.closed? }
+        [in_r, in_w, out_r, out_w, err_r, err_w].each { |io| io&.close unless io&.closed? }
       end
 
       def drain(reader, buffer)
@@ -96,12 +109,12 @@ module Koholint
         nil
       end
 
-      def interpret(status, out, schema, stream: false)
+      def interpret(status, out, schema, stream: false, err: '')
         return failure("timeout after #{@timeout}s") if status == :timeout
 
         data = stream ? result_line(out) : parse(out)
         unless data.is_a?(Hash)
-          return failure(status.success? ? 'invalid json' : "transport: exit #{status.exitstatus}")
+          return failure(status.success? ? 'invalid json' : "transport: exit #{status.exitstatus}#{stderr_hint(err)}")
         end
 
         cost = data['total_cost_usd']
@@ -117,6 +130,11 @@ module Koholint
         return reply.call("schema violation: #{problem}") if problem
 
         Reply.new(output, cost, latency, tokens, nil)
+      end
+
+      def stderr_hint(err)
+        line = err.to_s.scrub.lines.map(&:strip).reject(&:empty?).last
+        line ? ": #{line[0, 200]}" : ''
       end
 
       def result_line(out)

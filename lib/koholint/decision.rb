@@ -56,6 +56,7 @@ module Koholint
 
     private
 
+    TITLE_MAX = 80
     PLACE_SCHEMA = { type: 'array', items: { type: 'integer' }, minItems: 2, maxItems: 2 }.freeze
     FIELD_SCHEMAS = { place: PLACE_SCHEMA, row: { type: 'integer', minimum: 0, maximum: 7 },
                       col: { type: 'integer', minimum: 0, maximum: 9 } }.freeze
@@ -66,13 +67,16 @@ module Koholint
           required: ['kind', *fields.map(&:to_s)], additionalProperties: false }
       end
       { type: 'object',
-        properties: { title: { type: 'string', minLength: 1 }, predicate: { oneOf: predicates },
+        properties: { title: { type: 'string', minLength: 1, maxLength: TITLE_MAX }, predicate: { oneOf: predicates },
                       justification: { type: 'string' }, confidence: { type: 'number', minimum: 0, maximum: 1 } },
         required: %w[title predicate justification confidence], additionalProperties: false }
     end
 
     def validate_objective(choice)
-      raise Invalid, "#{name}: title must be a non-empty string" unless choice[:title].is_a?(String) && !choice[:title].strip.empty?
+      title = choice[:title]
+      raise Invalid, "#{name}: title must be a non-empty string" unless title.is_a?(String) && !title.strip.empty?
+      raise Invalid, "#{name}: title longer than #{TITLE_MAX}" if title.length > TITLE_MAX
+      raise Invalid, "#{name}: title has control characters" if title.match?(/[[:cntrl:]]/)
       raise Invalid, "#{name}: invalid predicate #{choice[:predicate].inspect}" unless Objectives.valid_predicate?(choice[:predicate])
 
       choice

@@ -17,6 +17,7 @@ when 'invalid_json' then puts 'not json {'
 when 'is_error' then puts JSON.generate(result.merge(is_error: true, structured_output: nil, result: 'boom'))
 when 'no_structured' then puts JSON.generate(result.reject { |k, _| k == :structured_output })
 when 'schema_invalid' then puts JSON.generate(result.merge(structured_output: { 'answer' => 42 }))
+when 'stderr_exit2' then warn "first\n" + ('x' * 5000) + "\nauth failed: bad token\n"; exit 2
 when 'exit1' then warn 'transport down'; exit 1
 when 'detached'
   grandchild = fork { Process.setsid; sleep 30 }

@@ -114,6 +114,16 @@ class ClaudeCliTest < Minitest::Test
     assert_equal 2, events.size
   end
 
+  def test_stderr_last_line_is_in_the_error
+    reply = run_call('stderr_exit2', retries: 0)
+    assert_equal 'transport: exit 2: auth failed: bad token', reply.error
+  end
+
+  def test_stderr_line_is_capped
+    reply = run_call('stderr_exit2', retries: 0)
+    assert_operator reply.error.length, :<=, 'transport: exit 2: '.length + 200
+  end
+
   def test_schema_violation_is_not_retried
     run_call('schema_invalid', retries: 2)
     assert_equal 1, events.size

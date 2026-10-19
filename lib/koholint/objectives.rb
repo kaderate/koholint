@@ -91,8 +91,9 @@ module Koholint
 
       place = [state.room_id, state.map_id]
       cell = state.cell
-      @last_state_part = [place, cell, state.dialog_state]
-      signature = [place, cell, state.dialog_state, state.hp]
+      position = cell || [state.x, state.y]
+      @last_state_part = [place, position, state.dialog_open?]
+      signature = [place, position, state.dialog_open?, state.hp]
       if signature != @signature
         @signature = signature
         @last_change_frame = frame
