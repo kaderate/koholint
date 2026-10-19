@@ -88,7 +88,7 @@ class AgentsContextTest < Minitest::Test
       Last skill results:
       - walk {"direction":"up","cells":2}: stopped_by blocked, 40 frames, moved 1 cell, room_changed false, hp_delta 0, dialogue open before false, after false
 
-      Manual notes:
+      Game manual:
       Use A to talk.
     TEXT
     assert_equal expected, text
@@ -106,15 +106,62 @@ class AgentsContextTest < Minitest::Test
     history = (1..30).map { |i| { id: "obj-#{i}", title: "old goal #{i}", outcome: :achieved, reason: nil } }
     results = (1..6).map { |i| result(frames: i) }
     full = build(objective:, history:, last_results: results, manual: 'm' * 500)
-    capped = build(objective:, history:, last_results: results, manual: 'm' * 500, max_chars: 2800)
-    assert_operator capped.size, :<=, 2800
-    assert_operator full.size, :>, 2800
+    capped = build(objective:, history:, last_results: results, manual: 'm' * 500, max_chars: 2200)
+    assert_operator capped.size, :<=, 2200
+    assert_operator full.size, :>, 2200
     %w[Grid Legend: Neighbours Current\ objective Predicate:].each { |part| assert_includes capped, part }
     assert_includes capped, 'old goal 30'
     refute_match(/old goal 1$/, capped)
     tiny = build(objective:, history:, last_results: results, max_chars: 100)
     %w[Grid Legend: Current\ objective].each { |part| assert_includes tiny, part }
     assert_operator tiny.size, :>, 100
+  end
+
+  def test_real_manual_keeps_history_and_results_within_the_cap
+    manual = File.read(File.expand_path('../docs/AGENT_MANUAL.md', __dir__))
+    objective = { id: 'obj-9', title: 'Current goal', predicate: { kind: 'dialogue_closed' } }
+    history = (1..8).map { |i| { id: "obj-#{i}", title: "old goal #{i}", outcome: :achieved, reason: nil } }
+    attempts = (1..10).map { |i| "walk {\"direction\":\"up\",\"cells\":#{i}} -> blocked" }
+    text = build(objective:, attempts:, history:, manual:, last_results: (1..6).map { |i| result(frames: i) })
+    assert_operator text.size, :<=, 9000
+    assert_includes text, 'Finished objectives:'
+    assert_includes text, 'Last skill results:'
+    assert_includes text, 'old goal 8'
+    assert_includes text, 'Current goal'
+  end
+
+  def test_manual_is_cut_first_at_a_line_boundary
+    manual = (1..400).map { |i| "rule number #{i} ends here." }.join("\n")
+    text = build(manual:)
+    notes = text.split("Game manual:\n").last
+    assert_operator notes.size, :<=, Context::MANUAL_LIMIT
+    assert notes.end_with?('ends here.')
+  end
+
+  def test_floor_keeps_five_finished_and_three_results_when_the_cap_is_tiny
+    history = (1..12).map { |i| { id: "obj-#{i}", title: "old goal #{i}", outcome: :achieved, reason: nil } }
+    text = build(history:, manual: 'm' * 500, last_results: (1..6).map { |i| result(frames: i) }, max_chars: 100)
+    assert_equal 5, text.scan('old goal').size
+    assert_includes text, 'old goal 12'
+    assert_equal 3, text.scan('stopped_by blocked').size
+    refute_includes text, 'Game manual:'
+  end
+
+  def test_link_above_the_grid_has_no_marker_and_no_neighbours
+    text = Context.build(state: state(x: 68, y: 4), grid:, objective: nil, history: [], attempts: [], manual: '', last_results: [])
+    refute_match(/^ \d  .*@/, text)
+    assert_includes text, 'outside the grid'
+    assert_includes text, 'Link is outside the 8x10 grid'
+    refute_includes text, '- up:'
+  end
+
+  def test_link_in_the_last_column_and_just_past_it
+    inside = Context.build(state: state(x: 159, y: 60), grid:, objective: nil, history: [], attempts: [], manual: '', last_results: [])
+    assert_includes inside, 'col 9'
+    assert_includes inside, '- right: edge of the screen'
+    past = Context.build(state: state(x: 160, y: 60), grid:, objective: nil, history: [], attempts: [], manual: '', last_results: [])
+    refute_match(/^ \d  .*@/, past)
+    assert_includes past, 'outside the grid'
   end
 
   def test_results_limited_to_last_six

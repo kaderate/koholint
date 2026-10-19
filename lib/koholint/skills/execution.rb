@@ -43,12 +43,14 @@ module Koholint
 
       def room(state) = [state.room_id, state.map_id]
 
-      def cell(state) = [(state.y.to_i - 8) / 16, state.x.to_i / 16]
-
-      def moved_cells(state) = cell(@start).zip(cell(state)).sum { |a, b| (a - b).abs }
+      def moved_cells(state)
+        from = @start.cell
+        to = state.cell
+        from && to ? from.zip(to).sum { |a, b| (a - b).abs } : 0
+      end
 
       def place(state)
-        row, col = cell(state)
+        row, col = state.cell
         { room: state.room_id, map: state.map_id, x: state.x, y: state.y, row:, col: }
       end
     end

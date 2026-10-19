@@ -23,7 +23,7 @@
 - `game_submode` != 7 in mode 0x0B means loading/fade-in (grid snapshots are overlays then).
 - Link: two 8x16 sprites; his cell is row (y-8)/16, col x/16 on the 8x10 grid; about 1 px per frame while a direction is held; a 2-frame tap moves ~1 px. The grid builder (`run --grid`) gives `context[:grid]` (`Vision::Grid`) and records beliefs by probes on emulator copies (~0.65 s each); real walking teaches nothing by itself.
 - `claude -p --output-format json` returns `structured_output` (when `--json-schema` is given), `total_cost_usd`, `usage` (tokens), `duration_api_ms`, `num_turns`, `is_error`. A haiku call with a 3-line system prompt cost about 0.0003 USD and took about 2 s; the base prompt overhead is ~1.2k tokens. Emulation runs at ~100 frames per second with YJIT.
-- The manual digest available now is `docs/GAME_MANUAL_NOTES.md` (committed paraphrase); `manual/notice.txt` (gitignored full text) is appended when present.
+- The manual digest available now is `docs/AGENT_MANUAL.md` (committed, manual-level content only; `docs/GAME_MANUAL_NOTES.md` stays developer commentary); `manual/notice.txt` (gitignored full text) is appended when present.
 
 ## Vocabulary (fixed by this plan; the code and the traces use these words)
 

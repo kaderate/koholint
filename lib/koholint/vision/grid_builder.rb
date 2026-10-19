@@ -1,4 +1,5 @@
 require 'koholint/calibration/walk_probe'
+require 'koholint/game_state'
 require 'koholint/vision/beliefs'
 require 'koholint/vision/capabilities'
 require 'koholint/vision/grid'
@@ -24,11 +25,7 @@ module Koholint
       end
 
       # Link's sprites cover x - 8...x + 8 and y - 16...y on screen; walls stop his center out of their cell.
-      def self.link_cell(x, y)
-        row = (y - 8) / 16
-        col = x / 16
-        [row, col] if row.between?(0, Grid::ROWS - 1) && col.between?(0, Grid::COLS - 1)
-      end
+      def self.link_cell(x, y) = GameState.cell_at(x, y)
 
       def initialize(trace:, capabilities: Capabilities.new, beliefs: Beliefs.new, prober: Calibration::WalkProbe)
         @trace = trace
