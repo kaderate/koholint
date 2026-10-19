@@ -3,6 +3,8 @@ require 'koholint/vision/grid'
 
 module Koholint
   class TalkLog
+    MAX_ROWS = 2
+    MAX_COLS = 2
     def self.from_events(events)
       log = new
       events.each do |event|
@@ -38,8 +40,20 @@ module Koholint
             queue << near
           end
         end
-        cells.sort
-      end.sort
+        split(cells.sort)
+      end.flatten(1).sort
+    end
+
+    def self.split(cells)
+      left = cells.dup
+      blocks = []
+      until left.empty?
+        row, col = left.first
+        block = left.select { |r, c| r.between?(row, row + MAX_ROWS - 1) && c.between?(col, col + MAX_COLS - 1) }
+        left -= block
+        blocks << block
+      end
+      blocks
     end
 
     def initialize
@@ -52,19 +66,42 @@ module Koholint
       @talked[[place, [row, col]]] += 1 if talked
     end
 
+    def lines(grid, place, limit: nil)
+      objects = self.class.objects(grid)
+      stats = objects.to_h { |cells| [cells, [0, 0]] }
+      @attempts.each do |(where, cell), tried|
+        next unless where == place
+
+        owner = owner_of(objects, cell) or next
+        stats[owner][0] += tried
+        stats[owner][1] += @talked[[where, cell]]
+      end
+      shown = limit && objects.size > limit ? kept(objects, stats, limit) : objects
+      out = shown.map { |cells| "- at #{label(cells)}: #{describe(*stats[cells])}" }
+      out << "... #{objects.size - shown.size} more objects" if shown.size < objects.size
+      out
+    end
+
     def attempts(place, cells) = cells.sum { |cell| @attempts[[place, cell]] }
 
     def talked(place, cells) = cells.sum { |cell| @talked[[place, cell]] }
 
-    def lines(grid, place)
-      self.class.objects(grid).map do |cells|
-        tried = attempts(place, cells)
-        what = tried.zero? ? 'never tried' : "talked to #{tried} #{tried == 1 ? 'time' : 'times'} (dialogue opened #{talked(place, cells)})"
-        "- at #{label(cells)}: #{what}"
-      end
+    private
+
+    def owner_of(objects, cell)
+      objects.find { |cells| cells.include?(cell) } ||
+        objects.select { |cells| cells.any? { |r, c| (r - cell[0]).abs <= 1 && (c - cell[1]).abs <= 1 } }
+               .min_by { |cells| cells.map { |r, c| (r - cell[0]).abs + (c - cell[1]).abs }.min }
     end
 
-    private
+    def kept(objects, stats, limit)
+      tried, untried = objects.partition { |cells| stats[cells][0].positive? }
+      (tried + untried).first(limit).sort
+    end
+
+    def describe(tried, talked)
+      tried.zero? ? 'never tried' : "talked to #{tried} #{tried == 1 ? 'time' : 'times'} (dialogue opened #{talked})"
+    end
 
     def label(cells)
       return "(#{cells[0][0]},#{cells[0][1]})" if cells.size == 1

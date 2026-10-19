@@ -46,4 +46,30 @@ class TalkLogTest < Minitest::Test
     assert_equal 2, log.attempts(PLACE, [[4, 7]])
     assert_equal 1, log.talked(PLACE, [[4, 7]])
   end
+
+  def test_adjacent_people_are_split_into_one_footprint_each
+    two = [sprite(2, 4), sprite(2, 5), sprite(2, 6), sprite(2, 7)]
+    assert_equal [[[2, 4], [2, 5]], [[2, 6], [2, 7]]], Koholint::TalkLog.objects(grid(two))
+    square = [sprite(2, 4, height: 32), sprite(2, 5, height: 32)]
+    assert_equal [[[2, 4], [2, 5], [3, 4], [3, 5]]], Koholint::TalkLog.objects(grid(square))
+    row = (0..4).map { |c| sprite(1, c) }
+    assert_equal [2, 2, 1], Koholint::TalkLog.objects(grid(row)).map(&:size)
+  end
+
+  def test_a_stale_cell_goes_to_the_nearest_object_within_one_cell_else_is_dropped
+    log = Koholint::TalkLog.new
+    log.record(place: PLACE, row: 4, col: 8, talked: true)
+    log.record(place: PLACE, row: 7, col: 0, talked: true)
+    assert_equal ['- at (4,7): talked to 1 time (dialogue opened 1)'], log.lines(grid([sprite(4, 7)]), PLACE)
+  end
+
+  def test_the_list_is_bounded_with_tried_objects_first
+    sprites = [0, 2, 4, 6].flat_map { |r| [0, 2, 4, 6, 8].map { |c| sprite(r, c) } }
+    log = Koholint::TalkLog.new
+    log.record(place: PLACE, row: 6, col: 2, talked: false)
+    lines = log.lines(grid(sprites), PLACE, limit: 12)
+    assert_equal 13, lines.size
+    assert_includes lines, '- at (6,2): talked to 1 time (dialogue opened 0)'
+    assert_equal '... 8 more objects', lines.last
+  end
 end
