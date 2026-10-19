@@ -17,7 +17,7 @@ Only what is left to do. When something lands, delete it here (git is the histor
 ## Open decisions and loose ends
 - Addresses at `verified_count: 1` need a second independent check (`game_mode`, `game_submode`, `name_length`, `max_hearts`, `dialog_state`).
 - Ladder beyond shield and sword; whether a run may inherit a map from a previous run.
-- Viewer: Host-header check; per-macro fsync cost on long runs; pacer catch-up cap after long stalls; `verify` replays from boot (use keyframes).
+- Viewer: Host-header check; per-macro fsync cost on long runs; `verify` replays from boot (use keyframes).
 - Test runner: rspec vs minitest (not decided).
 - Vision deferred (not fixed): sprite flips are not in the sprite pattern; sprites at y 1..8 in 8x8 mode; tile bytes not memoised per snapshot; BG-disable not handled; dialogue CLOSE never sampled in the overlay test; window-overlap overlay rule only unit-tested.
 - Vision deferred: `World#add_screen` assumes event order and `places` dups shallowly; probe `moved` ignores `hp_delta`; control compares end positions only; the misaligned memo is keyed by pixel; left `:no` sits on the 4 px tolerance boundary; the 32-frame hold margin is unmeasured; no free-Link rule at one-way ledges.
