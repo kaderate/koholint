@@ -142,4 +142,49 @@ class EngineTest < Minitest::Test
       assert_equal 'stopped', JSON.parse(File.read(File.join(File.dirname(trace), 'manifest.json')))['status']
     end
   end
+
+  class ScriptedPolicy
+    def initialize(choices) = @choices = choices.dup
+
+    def decision_point_for(_state) = Koholint::DecisionPoint.choose_skill(Koholint::Skills::Registry.default)
+
+    def decide(_decision_point, _state, _context)
+      { choice: @choices.shift || { skill: 'wait', params: { frames: 1 } }, justification: 'script', confidence: 1.0, agent: 'scripted' }
+    end
+  end
+
+  SKILL_SCRIPT = [{ skill: 'wait', params: { frames: 20 } }, { skill: 'press', params: { button: :a, frames: 3 } },
+                  { skill: 'walk', params: { direction: :right, cells: 1 } }].freeze
+
+  def play_script(frames)
+    with_run do |_dir, run|
+      Koholint::Engine.new(run: run, policy: ScriptedPolicy.new(SKILL_SCRIPT), budget: Koholint::Budget.new(frames:)).run
+      yield run
+    end
+  end
+
+  def test_skill_choices_journal_frames_and_emit_results
+    skip_without_rom!
+    play_script(800) do |run|
+      actions = events(run, :action)
+      assert_equal %w[wait press walk], actions.first(3).map { |a| a['skill'] }
+      assert_equal 20, actions[0]['result']['frames']
+      assert_equal 13, actions[1]['result']['frames']
+      assert_equal({ 'button' => 'a', 'frames' => 3 }, actions[1]['params'])
+      assert_equal 'wait', events(run, :decision).first['choice']['skill']
+      assert_equal 'choose_skill', events(run, :decision).first['decision_point']
+      assert_equal 800, Koholint::InputLog.load(File.join(run.dir, 'inputs.log')).frames
+    end
+  end
+
+  def test_same_skill_choices_give_identical_journals_and_state_hashes
+    skip_without_rom!
+    runs = Array.new(2) do
+      play_script(600) do |run|
+        return_value = [File.binread(File.join(run.dir, 'inputs.log')), Koholint::Replay.to(run, 600).state_hash]
+        break return_value
+      end
+    end
+    assert_equal runs[0], runs[1]
+  end
 end

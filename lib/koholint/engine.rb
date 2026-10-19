@@ -7,6 +7,7 @@ require 'koholint/keyframes'
 require 'koholint/perception'
 require 'koholint/replay'
 require 'koholint/run'
+require 'koholint/skills/registry'
 require 'koholint/vision/grid_builder'
 
 module Koholint
@@ -20,7 +21,9 @@ module Koholint
       new(run: run, policy: policy, budget: budget, emulator: Replay.to(run, run.inputs.frames), **options)
     end
 
-    def initialize(run:, policy:, budget:, keyframe_every: 1800, decision_point: DecisionPoint.move, emulator: nil, pacer: nil, grid: false)
+    def initialize(run:, policy:, budget:, keyframe_every: 1800, decision_point: DecisionPoint.move, emulator: nil, pacer: nil, grid: false,
+                   registry: Skills::Registry.default)
+      @registry = registry
       @run = run
       @policy = policy
       @budget = budget
@@ -64,8 +67,13 @@ module Koholint
       @run.trace.emit(:decision, frame: state.frame, decision_point: decision_point.name.to_s, input: state.to_h, options: decision_point.options || [],
                                  choice: choice, justification: result[:justification], confidence: result[:confidence],
                                  agent: result[:agent], latency_ms: 0, cost_usd: 0.0, fallback: result[:fallback] || false)
-      frames = press(choice)
-      @run.trace.emit(:action, frame: @emulator.frame, skill: 'press', params: choice, result: { frames: frames })
+      if choice.key?(:skill)
+        result = execute(choice, state)
+        @run.trace.emit(:action, frame: @emulator.frame, skill: choice[:skill], params: choice[:params], result:)
+      else
+        frames = press(choice)
+        @run.trace.emit(:action, frame: @emulator.frame, skill: 'press', params: choice, result: { frames: frames })
+      end
     end
 
     def press(choice)
@@ -73,12 +81,34 @@ module Koholint
       choice[:frames].times do
         break if @budget.exhausted
 
-        @emulator.step(choice[:buttons])
-        @run.inputs.append(choice[:buttons])
-        @budget.tick(frames: 1)
+        step(choice[:buttons])
         done += 1
-        after_frame
       end
+      finish_frames(done)
+    end
+
+    def execute(choice, state)
+      execution = @registry.start(choice[:skill], state, choice[:params])
+      current = state
+      until @budget.exhausted
+        buttons = execution.next_input(current)
+        break unless buttons
+
+        step(buttons)
+        current = Perception.read(@emulator)
+      end
+      finish_frames(execution.frames)
+      execution.result(current)
+    end
+
+    def step(buttons)
+      @emulator.step(buttons)
+      @run.inputs.append(buttons)
+      @budget.tick(frames: 1)
+      after_frame
+    end
+
+    def finish_frames(done)
       @run.inputs.flush
       @pacer&.pace(done)
       done
