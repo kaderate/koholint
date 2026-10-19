@@ -21,8 +21,6 @@ module Koholint
 
         private
 
-        def blocked_direction = @direction
-
         def input_for(state)
           track(state) if @frames.positive?
           return finish(:room_change) if room(state) != room(@start)

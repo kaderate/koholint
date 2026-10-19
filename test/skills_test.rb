@@ -260,13 +260,16 @@ class SkillsTest < Minitest::Test
     result = execution.result(state)
     assert_equal :blocked, result[:stopped_by]
     assert_equal 0, result[:moved_px]
-    assert_equal :up, result[:blocked_at][:direction]
+    assert_nil result[:blocked_at]
   end
 
-  def test_step_stops_on_dialogue_and_frame_cap
+  def test_step_stops_on_dialogue
     execution = registry.start('step', state, { direction: :left, pixels: 3 })
     assert_equal [[:left]], drive(execution, [state, state(dialog_state: 1)])
     assert_equal :dialogue, execution.stopped_by
+  end
+
+  def test_step_stops_on_frame_cap
     execution = registry.start('step', state, { direction: :left, pixels: 16 })
     drive(execution, Array.new(200) { |i| state(x: 88 - (i / 7)) })
     assert_equal :frame_cap, execution.stopped_by

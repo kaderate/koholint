@@ -60,7 +60,7 @@ module Koholint
                  "Link: #{where} (pixel x=#{state.x}, y=#{state.y}), facing #{state.direction}"]
         if link
           dx, dy = Geometry.offset(state.x, state.y, link)
-          lines << "Link offset from cell centre: dx=#{dx}, dy=#{dy}"
+          lines << "Link offset from cell centre (positive = right of / below the centre): dx=#{dx}, dy=#{dy}"
         end
         lines << "Health: #{hearts(state.hp)} of #{hearts(state.max_hp)} hearts"
         lines.join("\n")
@@ -145,7 +145,7 @@ module Koholint
       private_class_method :objective_block
 
       def self.result_line(r)
-        "#{r[:skill]} #{r[:params].to_json}: stopped_by #{r[:stopped_by]}, #{r[:frames]} frames, moved #{cells(r[:moved_cells])}, " \
+        "#{r[:skill]} #{r[:params].to_json}: stopped_by #{r[:stopped_by]}, #{r[:frames]} frames, moved #{r[:moved_px] ? "#{r[:moved_px]} px" : cells(r[:moved_cells])}, " \
           "room_changed #{r[:room_changed]}, hp_delta #{r[:hp_delta]}, dialogue open before #{r[:dialog_before]}, after #{r[:dialog_after]}"
       end
       private_class_method :result_line
