@@ -8,6 +8,8 @@ require 'koholint/skills/registry'
 require 'koholint/vision/beliefs'
 require 'koholint/vision/capabilities'
 require 'koholint/vision/grid'
+require 'koholint/policies/walk_and_talk'
+require 'support/emulator_cache'
 
 module DelegatedHelpers
   Reply = Koholint::Agents::Reply
@@ -161,13 +163,40 @@ class DelegatedPolicyTest < Minitest::Test
   end
 
   def test_keeps_only_the_last_six_results
-    p = policy(ScriptedClient.new(objective: objective))
+    client = ScriptedClient.new(objective: objective, skill: walk)
+    p = policy(client)
     decide(p)
     8.times do |i|
       p.after_action(choice: { skill: 'wait', params: { frames: i + 1 } },
                      outcome: { skill: 'wait', params: { frames: i + 1 }, frames: i + 1, moved_cells: 0 }, state:, frame: 101 + i)
     end
-    assert_equal 6, p.instance_variable_get(:@last_results).size
+    decide(p)
+    prompt = client.calls.last[:prompt]
+    assert_equal 6, prompt.scan(/^- wait \{"frames":\d+\}: stopped_by/).size
+    refute_includes prompt, 'wait {"frames":2}: stopped_by'
+    assert_includes prompt, '{"frames":8}: stopped_by'
+  end
+
+  def test_programming_errors_propagate
+    p = policy(ScriptedClient.new(objective: -> { nil.missing }))
+    assert_raises(NoMethodError) { decide(p) }
+  end
+
+  def test_unexpected_errors_name_their_class
+    p = policy(ScriptedClient.new(objective: ArgumentError.new('odd')))
+    assert_equal 'ArgumentError: odd', decide(p).last[:justification]
+  end
+
+  def test_grid_is_dropped_when_the_room_changes
+    client = ScriptedClient.new(objective: [objective, objective])
+    p = policy(client)
+    cells = Array.new(8) { Array.new(10) { 'floor' } }
+    marked = Koholint::Vision::Grid.new(cells:, static_sprites: [{ 'x' => 36, 'y' => 24, 'pattern' => 'p' }],
+                                        beliefs: Koholint::Vision::Beliefs.new, capabilities: Koholint::Vision::Capabilities.new)
+    point = Koholint::DecisionPoint.choose_objective
+    p.decide(point, state, { grid: marked })
+    p.decide(point, state(room_id: 1), { grid: nil })
+    refute_equal client.calls.first[:prompt][/Grid.*Legend/m], client.calls.last[:prompt][/Grid.*Legend/m]
   end
 
   def test_boot_wrapper_forwards_after_boot_only
@@ -185,12 +214,13 @@ class DelegatedEngineTest < Minitest::Test
 
   def wait(frames = 30) = ok('skill' => 'wait', 'params' => { 'frames' => frames })
   def leave_unreachable = ok('title' => 'leave', 'predicate' => { 'kind' => 'leave_place', 'place' => [0, 0] })
+  def down = Reply.new(nil, 0.0, nil, nil, 'transport down')
 
-  def agent_engine(run, client, **limits)
+  def agent_engine(run, client, emulator: nil, **limits)
     delegated = Koholint::Policies::Delegated.new(client:, registry: Koholint::Skills::Registry.default,
                                                   objectives: Koholint::Objectives.new(trace: run.trace), manual: '')
     policy = Koholint::Policies::StartGame.new(delegated, ready: ->(s) { %i[playing dialogue].include?(s.phase) })
-    Koholint::Engine.new(run:, policy:, budget: Koholint::Budget.new(**limits), grid: true)
+    Koholint::Engine.new(run:, policy:, budget: Koholint::Budget.new(**limits), grid: true, emulator:)
   end
 
   def with_run
@@ -204,10 +234,10 @@ class DelegatedEngineTest < Minitest::Test
   def test_scripted_run_traces_cost_objectives_and_replays_bit_exact
     skip_without_rom!
     with_run do |run|
-      client = ScriptedClient.new(objective: [ok('title' => 'x'), leave_unreachable, leave_unreachable], default: wait)
+      client = ScriptedClient.new(objective: [ok('title' => 'x')] + [leave_unreachable] * 40, default: wait)
       assert_equal :frames, agent_engine(run, client, frames: 800).run
       agent = events(run, :decision).select { |d| d['agent'] == 'claude' }
-      assert_equal %w[choose_objective choose_objective choose_skill], agent.first(3).map { |d| d['decision_point'] }
+      assert_equal %w[choose_skill choose_objective choose_skill], agent.first(3).map { |d| d['decision_point'] }
       assert agent.first['fallback']
       assert_match(/title|predicate/, agent.first['justification'])
       assert_equal 'wait', agent.first['choice']['skill']
@@ -222,10 +252,73 @@ class DelegatedEngineTest < Minitest::Test
     skip_without_rom!
     with_run do |run|
       client = ScriptedClient.new(default: leave_unreachable)
-      assert_equal :dollars, agent_engine(run, client, dollars: 0.005).run
+      assert_equal :dollars, agent_engine(run, client, emulator: EmulatorCache.interactive, dollars: 0.005).run
       assert_equal 1, client.calls.size
       assert_equal ['dollars'], events(run, :budget_stop).map { |e| e['kind'] }
       assert_equal 1, events(run, :stop).size
+    end
+  end
+
+  def test_five_consecutive_failures_stop_the_run
+    skip_without_rom!
+    with_run do |run|
+      client = ScriptedClient.new(default: down)
+      assert_equal :agent_failures, agent_engine(run, client, emulator: EmulatorCache.interactive).run
+      assert_equal 5, client.calls.size
+      assert_equal ['agent_failures'], events(run, :budget_stop).map { |e| e['kind'] }
+      assert_equal 'agent_failures', events(run, :stop).last['reason']
+    end
+  end
+
+  def test_a_success_resets_the_failure_count
+    skip_without_rom!
+    with_run do |run|
+      script = [down] * 4 + [leave_unreachable, wait] + [down] * 4 + [wait]
+      client = ScriptedClient.new(objective: script.first(5), skill: script.drop(5), default: down)
+      eng = agent_engine(run, client, emulator: EmulatorCache.interactive)
+      Thread.new { sleep 0.2 until client.calls.size >= 10; eng.request_stop }
+      assert_equal :stopped, eng.run
+      assert_operator client.calls.size, :>=, 10
+    end
+  end
+
+  class TitledMacroPolicy
+    def decision_point_for(_state) = Koholint::DecisionPoint.macro(:test)
+
+    def decide(*)
+      { choice: { buttons: [:a], frames: 3, title: 'extra' }, justification: 'x', confidence: 1.0, agent: 'test' }
+    end
+  end
+
+  def test_a_macro_choice_with_a_title_key_still_presses
+    skip_without_rom!
+    with_run do |run|
+      eng = Koholint::Engine.new(run:, policy: TitledMacroPolicy.new, budget: Koholint::Budget.new(frames: 3), emulator: EmulatorCache.interactive)
+      eng.run
+      assert_equal 3, Koholint::InputLog.load(File.join(run.dir, 'inputs.log')).frames
+      assert_equal ['press'], events(run, :action).map { |a| a['skill'] }
+    end
+  end
+
+  def test_resume_abandons_dangling_objectives_and_does_not_reuse_ids
+    skip_without_rom!
+    with_run do |run|
+      Koholint::Engine.new(run:, policy: Koholint::Policies::WalkAndTalk.new, budget: Koholint::Budget.new(frames: 300)).run
+      predicate = { 'kind' => 'dialogue_closed' }
+      run.trace.emit(:objective, frame: 100, id: 'obj-1', status: 'started', title: 'a', predicate:)
+      run.trace.emit(:objective, frame: 120, id: 'obj-1', status: 'achieved', predicate:)
+      run.trace.emit(:objective, frame: 130, id: 'obj-2', status: 'started', title: 'b', predicate:)
+      run.trace.emit(:objective, frame: 9999, id: 'obj-3', status: 'started', title: 'c', predicate:)
+      made = nil
+      factory = lambda do |reopened|
+        made = Koholint::Objectives.resume(trace: reopened.trace, events: Koholint::Trace.read(File.join(reopened.dir, 'trace.jsonl')),
+                                           frame: reopened.inputs.frames)
+        Koholint::Policies::WalkAndTalk.new
+      end
+      Koholint::Engine.resume(run.dir, policy_factory: factory, budget: Koholint::Budget.new(frames: 30)).run
+      abandoned = events(run, :objective).select { |e| e['status'] == 'abandoned' }
+      assert_equal [['obj-2', 'resume']], abandoned.map { |e| [e['id'], e['reason']] }
+      assert_equal 'obj-3', made.start(frame: 330, title: 'n', predicate:)
     end
   end
 end

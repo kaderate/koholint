@@ -12,12 +12,13 @@ require 'koholint/vision/grid_builder'
 module Koholint
   class Engine
     SAVE_CHECK_EVERY = 60
+    AGENT_FAILURE_LIMIT = 5
 
-    def self.resume(run_path, policy:, budget:, flow_version: Koholint::FLOW_VERSION, **options)
+    def self.resume(run_path, budget:, policy: nil, policy_factory: nil, flow_version: Koholint::FLOW_VERSION, **options)
       run = Run.open(run_path, flow_version: flow_version)
       run.lock!
-      policy = policy.call(run) if policy.respond_to?(:call)
       run.truncate_trace!(run.inputs.frames)
+      policy = policy_factory.call(run) if policy_factory
       new(run: run, policy: policy, budget: budget, emulator: Replay.to(run, run.inputs.frames), **options)
     end
 
@@ -28,6 +29,7 @@ module Koholint
       @keyframe_every = keyframe_every
       @decision_point = decision_point
       @pacer = pacer
+      @fallbacks = 0
       @emulator = emulator || Emulator.boot
       @keyframes = Keyframes.new(File.join(run.dir, 'keyframes'))
       @builder = Vision::GridBuilder.new(trace: run.trace, beliefs: known_beliefs(run)) if grid
@@ -61,20 +63,26 @@ module Koholint
       grid = @builder&.observe(@emulator, state)
       decision_point = @policy.respond_to?(:decision_point_for) ? @policy.decision_point_for(state) : @decision_point
       result = @policy.decide(decision_point, state, @builder ? { grid: } : {})
-      chosen = result[:decision_point] || decision_point
-      choice = chosen.validate(result[:choice])
       @budget.tick(cost: result[:cost_usd].to_f)
-      @run.trace.emit(:decision, frame: state.frame, decision_point: decision_point.name.to_s, input: state.to_h, options: decision_point.options || [],
+      chosen = result[:fallback] && result[:decision_point] || decision_point
+      choice = chosen.validate(result[:choice])
+      note_fallback(result)
+      @run.trace.emit(:decision, frame: state.frame, decision_point: chosen.name.to_s, input: state.to_h, options: chosen.options || [],
                                  choice: choice, justification: result[:justification], confidence: result[:confidence],
                                  agent: result[:agent], latency_ms: result[:latency_ms].to_i, cost_usd: result[:cost_usd].to_f, fallback: result[:fallback] || false)
       if choice.key?(:skill)
         outcome = execute(choice, state, chosen.registry)
         @run.trace.emit(:action, frame: @emulator.frame, skill: choice[:skill], params: choice[:params], result: outcome)
         @policy.after_action(choice:, outcome:, state: Perception.read(@emulator), frame: @emulator.frame) if @policy.respond_to?(:after_action)
-      elsif !choice.key?(:title)
+      elsif chosen.name != :choose_objective
         frames = press(choice)
         @run.trace.emit(:action, frame: @emulator.frame, skill: 'press', params: choice, result: { frames: frames })
       end
+    end
+
+    def note_fallback(result)
+      @fallbacks = result[:fallback] ? @fallbacks + 1 : 0
+      @budget.stop!(:agent_failures) if @fallbacks >= AGENT_FAILURE_LIMIT
     end
 
     def press(choice)

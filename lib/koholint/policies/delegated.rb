@@ -9,6 +9,7 @@ module Koholint
   module Policies
     class Delegated
       RESULT_LIMIT = 6
+      Failure = Class.new(StandardError)
       FALLBACK_CHOICE = { skill: 'wait', params: { frames: 30 } }.freeze
 
       def initialize(client:, registry:, objectives:, manual: '')
@@ -24,13 +25,15 @@ module Koholint
 
       def decide(decision_point, state, context)
         reply = ask(decision_point, state, context)
-        raise reply.error if reply.error
+        raise Failure, reply.error if reply.error
 
         choice = decision_point.validate(reply.output).slice(*decision_point.output_schema)
         @objectives.start(frame: state.frame, title: choice[:title], predicate: choice[:predicate]) if decision_point.name == :choose_objective
         answer(choice, reply, reply.output)
+      rescue NameError, TypeError
+        raise
       rescue StandardError => e
-        { choice: FALLBACK_CHOICE, justification: e.message, confidence: 0.0, agent: 'claude', latency_ms: 0,
+        { choice: FALLBACK_CHOICE, justification: e.is_a?(Failure) ? e.message : "#{e.class}: #{e.message}", confidence: 0.0, agent: 'claude', latency_ms: 0,
           cost_usd: cost_of(reply), fallback: true, decision_point: @skill_point }
       end
 
@@ -46,12 +49,15 @@ module Koholint
       private
 
       def ask(decision_point, state, context)
-        prompt = Agents::Context.build(state:, grid: grid_for(context), objective: @objectives.current, history: @objectives.history,
+        prompt = Agents::Context.build(state:, grid: grid_for(state, context), objective: @objectives.current, history: @objectives.history,
                                        attempts: @objectives.attempts_for_prompt, manual: @manual, last_results: @last_results)
         @client.call(system: Agents::Prompts.system_for(decision_point), prompt:, schema: decision_point.json_schema)
       end
 
-      def grid_for(context)
+      def grid_for(state, context)
+        place = [state.room_id, state.map_id]
+        @last_grid = nil unless @last_place == place
+        @last_place = place
         @last_grid = context[:grid] if context[:grid]
         @last_grid ||= Vision::Grid.new(cells: Array.new(Vision::Grid::ROWS) { Array.new(Vision::Grid::COLS) }, static_sprites: [],
                                         beliefs: Vision::Beliefs.new, capabilities: Vision::Capabilities.new)

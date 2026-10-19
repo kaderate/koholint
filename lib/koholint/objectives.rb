@@ -36,14 +36,24 @@ module Koholint
     end
     private_class_method :valid_field?
 
+    TERMINAL = %w[achieved failed abandoned].freeze
+
     attr_reader :current, :history
 
-    def initialize(trace:, stall_frames: 1800, loop_window: 12)
+    def self.resume(trace:, events:, frame:, **options)
+      started = events.select { |e| e['type'] == 'objective' && e['status'] == 'started' }
+      finished = events.select { |e| e['type'] == 'objective' && TERMINAL.include?(e['status']) }.map { |e| e['id'] }
+      objectives = new(trace:, counter: started.size, **options)
+      started.reject { |e| finished.include?(e['id']) }.each { |e| objectives.orphan(e, frame:) }
+      objectives
+    end
+
+    def initialize(trace:, stall_frames: 1800, loop_window: 12, counter: 0)
       @trace = trace
       @stall_frames = stall_frames
       @loop_window = loop_window
       @history = []
-      @counter = 0
+      @counter = counter
       @current = nil
     end
 
@@ -103,6 +113,12 @@ module Koholint
       return nil unless @current
 
       finish(:abandoned, frame:, reason:)
+    end
+
+    def orphan(started, frame:)
+      @trace.emit(:objective, frame:, id: started['id'], status: 'abandoned', predicate: started['predicate'], reason: 'resume')
+      @history << { id: started['id'], title: started['title'], predicate: started['predicate'], outcome: :abandoned, reason: 'resume',
+                    started_frame: started['frame'], ended_frame: frame }
     end
 
     def attempts_for_prompt

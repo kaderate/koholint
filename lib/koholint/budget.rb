@@ -8,7 +8,7 @@ module Koholint
       @sleep_gap = sleep_gap
       @used = { frames: 0, steps: 0, time: 0.0, dollars: 0.0 }
       @last_tick = clock.call
-      @stopped = false
+      @stopped = nil
     end
 
     def unlimited? = @limits.values.all?(&:nil?)
@@ -25,10 +25,10 @@ module Koholint
 
     def step_done = @used[:steps] += 1
 
-    def stop! = @stopped = true
+    def stop!(reason = :stopped) = @stopped = reason
 
     def exhausted
-      return :stopped if @stopped
+      return @stopped if @stopped
 
       @limits.find { |kind, limit| limit && @used[kind] >= limit }&.first
     end

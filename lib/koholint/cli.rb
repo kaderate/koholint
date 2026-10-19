@@ -63,13 +63,13 @@ module Koholint
       limits = options.slice(:frames, :active_seconds, :dollars)
       case command
       when 'run'
-        policy = policy_for(options)
+        factory = policy_factory(options)
         run = Run.create(root: options.fetch(:root, 'runs'), flow_version: flow, budget: limits)
-        play(Engine.new(run: run, policy: policy.call(run), budget: Budget.new(**limits), **engine_options(options)), run, out)
+        play(Engine.new(run: run, policy: factory.call(run), budget: Budget.new(**limits), **engine_options(options)), run, out)
       when 'resume'
-        policy = policy_for(options)
+        factory = policy_factory(options)
         run = Run.open(run_dir(args), flow_version: flow)
-        engine = Engine.resume(run.dir, policy: policy, budget: Budget.new(**limits), flow_version: flow, **engine_options(options))
+        engine = Engine.resume(run.dir, policy_factory: factory, budget: Budget.new(**limits), flow_version: flow, **engine_options(options))
         play(engine, run, out)
       when 'fork'
         at_frame = options.fetch(:at_frame) { raise OptionParser::MissingArgument, '--at-frame' }
@@ -91,7 +91,7 @@ module Koholint
 
     def run_dir(args) = args.first || raise(OptionParser::MissingArgument, 'run_dir')
 
-    def policy_for(options)
+    def policy_factory(options)
       return ->(_run) { Policies::StartGame.new(Policies::WalkAndTalk.new) } unless options[:agent]
 
       command = options.fetch(:claude_command, 'claude')
@@ -101,9 +101,14 @@ module Koholint
       client = Agents::ClaudeCli.new(model: options.fetch(:model, DEFAULT_MODEL), command:)
       manual = manual_text
       lambda do |run|
-        delegated = Policies::Delegated.new(client:, registry: Skills::Registry.default, objectives: Objectives.new(trace: run.trace), manual:)
+        delegated = Policies::Delegated.new(client:, registry: Skills::Registry.default, objectives: objectives_for(run), manual:)
         Policies::StartGame.new(delegated, ready: ->(state) { %i[playing dialogue].include?(state.phase) })
       end
+    end
+
+    def objectives_for(run)
+      events = Trace.read(File.join(run.dir, 'trace.jsonl'))
+      Objectives.resume(trace: run.trace, events:, frame: run.inputs.frames)
     end
 
     def executable?(command)
