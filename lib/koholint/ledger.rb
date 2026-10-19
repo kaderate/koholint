@@ -5,31 +5,46 @@ module Koholint
     def self.from_events(events)
       ledger = new
       events.each do |event|
-        next unless (event[:type] || event['type']).to_s == 'action'
+        next unless Ledger.pick(event, :type).to_s == 'action'
 
-        result = pick(event, :result)
+        result = Ledger.pick(event, :result)
         next unless result.is_a?(Hash)
 
-        blocked_at = pick(result, :blocked_at)
-        from = pick(result, :from)
-        next unless blocked_at && from
-
-        place = [pick(from, :room), pick(from, :map)]
-        ledger.reset_unless(place)
-        ledger.record(place:, blocked_at:)
+        from = Ledger.place_of(Ledger.pick(result, :from))
+        to = Ledger.place_of(Ledger.pick(result, :to))
+        ledger.reset_unless(from) if from
+        blocked_at = Ledger.pick(result, :blocked_at)
+        if from && blocked_at && Ledger.pick(result, :stopped_by).to_s == 'blocked'
+          ledger.record(place: from, blocked_at:)
+        end
+        ledger.reset_unless(to) if to
       end
       ledger
     end
 
-    def self.pick(hash, key) = hash.key?(key) ? hash[key] : hash[key.to_s]
-    private_class_method :pick
+    def self.pick(hash, key)
+      return nil unless hash.is_a?(Hash)
+
+      hash.key?(key) ? hash[key] : hash[key.to_s]
+    end
+
+    def self.place_of(hash)
+      room = pick(hash, :room)
+      map = pick(hash, :map)
+      room && map ? [room, map] : nil
+    end
 
     def initialize
       @counts = Hash.new(0)
     end
 
     def record(place:, blocked_at:)
-      @counts[edge(place, [pick(blocked_at, :row), pick(blocked_at, :col)], pick(blocked_at, :direction))] += 1
+      row = Ledger.pick(blocked_at, :row)
+      col = Ledger.pick(blocked_at, :col)
+      direction = Ledger.pick(blocked_at, :direction)
+      return unless row && col && direction.respond_to?(:to_sym)
+
+      @counts[edge(place, [row, col], direction)] += 1
     end
 
     def entered(place:, cell:, direction:) = @counts.delete(edge(place, cell, direction))
@@ -45,7 +60,5 @@ module Koholint
     private
 
     def edge(place, cell, direction) = [place, cell, direction.to_sym]
-
-    def pick(hash, key) = self.class.send(:pick, hash, key)
   end
 end

@@ -106,6 +106,18 @@ class AgentsContextTest < Minitest::Test
     assert_equal build, build(ledger: Koholint::Ledger.new)
   end
 
+  def test_doubt_needs_a_free_belief_and_keeps_objects_visible
+    ledger = Koholint::Ledger.new
+    2.times { ledger.record(place: [163, 16], blocked_at: { row: 3, col: 4, direction: :right }) }
+    text = build(ledger:)
+    assert_includes text, "- right: cell (3,5) '#', belief no, last walk: none, blocked 2 times"
+    assert_includes text, " 3  . . . . @ # . . . ."
+    2.times { ledger.record(place: [163, 16], blocked_at: { row: 1, col: 3, direction: :left }) }
+    text = build(state: state(x: 52, y: 28), ledger:)
+    assert_includes text, "- left: cell (1,2) 'o'"
+    assert_includes text, 'blocked 2 times'
+  end
+
   def test_no_objective_and_edge_neighbours
     text = Context.build(state: state(x: 0, y: 8), grid:, objective: nil, history: [], attempts: [], manual: '', last_results: [])
     assert_includes text, 'Current objective: none'

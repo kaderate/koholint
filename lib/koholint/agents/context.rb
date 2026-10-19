@@ -68,9 +68,9 @@ module Koholint
       private_class_method :cells
 
       def self.grid_block(grid, link, ledger, place)
-        doubt = doubtful_cells(ledger, place, link)
+        doubt = doubtful_cells(grid, ledger, place, link)
         rows = (0...Vision::Grid::ROWS).map do |row|
-          cells = (0...Vision::Grid::COLS).map { |col| [row, col] == link ? '@' : (doubt.include?([row, col]) ? '!' : symbol(grid, row, col)) }
+          cells = (0...Vision::Grid::COLS).map { |col| [row, col] == link ? '@' : symbol(grid, row, col, doubt) }
           format(' %d  %s', row, cells.join(' '))
         end
         ["Grid (rows 0-7 top to bottom, cols 0-9 left to right):", "    #{(0...Vision::Grid::COLS).to_a.join(' ')}", *rows,
@@ -80,8 +80,9 @@ module Koholint
 
       def self.beliefs_of(grid, row, col) = DIRECTIONS.map { |d| grid.passable(row, col, d) }
 
-      def self.symbol(grid, row, col)
+      def self.symbol(grid, row, col, doubt = [])
         return 'o' if grid.static_sprite(row, col)
+        return '!' if doubt.include?([row, col])
 
         found = beliefs_of(grid, row, col).uniq
         if found.include?(:yes) && found.include?(:no) then '~'
@@ -93,10 +94,10 @@ module Koholint
       end
       private_class_method :symbol
 
-      def self.doubtful_cells(ledger, place, link)
+      def self.doubtful_cells(grid, ledger, place, link)
         return [] unless ledger && link
 
-        DIRECTIONS.select { |d| ledger.doubtful?(place, link, d) }.map { |d| [link[0] + DELTAS[d][0], link[1] + DELTAS[d][1]] }
+        DIRECTIONS.select { |d| ledger.doubtful?(place, link, d) && grid.passable(link[0] + DELTAS[d][0], link[1] + DELTAS[d][1], d) == :yes }.map { |d| [link[0] + DELTAS[d][0], link[1] + DELTAS[d][1]] }
       end
       private_class_method :doubtful_cells
 
@@ -110,7 +111,7 @@ module Koholint
             next "- #{direction}: edge of the screen"
           end
 
-          shown = ledger&.doubtful?(place, link, direction) ? '!' : symbol(grid, row, col)
+          shown = symbol(grid, row, col, doubtful_cells(grid, ledger, place, link))
           times = ledger ? ledger.count(place, link, direction) : 0
           blocked = times.positive? ? ", blocked #{times} #{times == 1 ? 'time' : 'times'}" : ''
           "- #{direction}: cell (#{row},#{col}) '#{shown}', belief #{grid.passable(row, col, direction)}, " \
