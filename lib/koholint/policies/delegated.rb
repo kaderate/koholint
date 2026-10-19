@@ -3,6 +3,8 @@ require 'koholint/agents/prompts'
 require 'koholint/decision'
 require 'koholint/ledger'
 require 'koholint/navigation/planner'
+require 'koholint/talk_log'
+require 'koholint/triggers'
 require 'koholint/vision/beliefs'
 require 'koholint/vision/capabilities'
 require 'koholint/vision/dialogue_shot'
@@ -28,8 +30,10 @@ module Koholint
       HEMMED_DIRECTIONS = 4
       HEMMED_WAIT_LIMIT = 1800 / HEMMED_WAIT[:params][:frames]
 
-      def initialize(client:, registry:, objectives:, manual: '', on_step: nil, ledger: nil)
+      def initialize(client:, registry:, objectives:, manual: '', on_step: nil, ledger: nil, triggers: nil, talk_log: nil)
         @ledger = hook_doubt(ledger || Ledger.new)
+        @triggers = triggers || Triggers.new
+        @talk_log = talk_log || TalkLog.new
         @refusals = []
         @plan = nil
         @frame = 0
@@ -50,7 +54,10 @@ module Koholint
       def decision_point_for(_state) = @objectives.current ? @skill_point : DecisionPoint.choose_objective
 
       def observe(state, frame:)
-        @ledger.reset_unless([state.room_id, state.map_id]) unless state.loading?
+        unless state.loading?
+          @ledger.reset_unless([state.room_id, state.map_id])
+          @triggers.reset_unless([state.room_id, state.map_id])
+        end
         release_hemmed(state)
         track { @objectives.update(state, frame:) }
       end
@@ -107,6 +114,8 @@ module Koholint
         @last_results.shift while @last_results.size > RESULT_LIMIT
         note_walk(choice, outcome, state)
         feed_ledger(choice, outcome, state, frame)
+        feed_triggers(choice, outcome, state)
+        feed_talk_log(choice, outcome, state)
         note_no_path(choice, outcome, frame)
         unless @waiting
           @objectives.record_attempt(skill: choice[:skill], params: choice[:params], result_summary: summary(outcome))
@@ -230,6 +239,27 @@ module Koholint
         @ledger.reset_unless([state.room_id, state.map_id]) unless state.loading?
       end
 
+      def place_of(outcome, key, state)
+        from = outcome[key].is_a?(Hash) ? outcome[key] : {}
+        from[:room] && from[:map] ? [from[:room], from[:map]] : [state.room_id, state.map_id]
+      end
+
+      def feed_triggers(choice, outcome, state)
+        @interrupted = nil
+        return unless Triggers.scripted?(skill: choice[:skill], params: choice[:params], result: outcome)
+
+        cell = Triggers.cell_of(outcome)
+        @triggers.record(place: place_of(outcome, :to, state), cell:, skill: choice[:skill], direction: Triggers.direction_of(choice[:skill], choice[:params]))
+        @interrupted = cell && @triggers.count(place_of(outcome, :to, state), cell)
+      end
+
+      def feed_talk_log(choice, outcome, state)
+        return unless choice[:skill] == 'talk_to'
+
+        params = choice[:params]
+        @talk_log.record(place: place_of(outcome, :from, state), row: params[:row] || params['row'], col: params[:col] || params['col'], talked: outcome[:talked] == true)
+      end
+
       def note_entered(choice, outcome, place)
         from = outcome[:from]
         to = outcome[:to]
@@ -311,7 +341,8 @@ module Koholint
 
       def ask(decision_point, state, context)
         @prompt = Agents::Context.build(state:, grid: grid_for(state, context), objective: @objectives.current, history: @objectives.history,
-                                       attempts: @objectives.attempts_for_prompt, manual: @manual, last_results: @last_results, ledger: @ledger, refusals: @refusals, plan: @plan)
+                                       attempts: @objectives.attempts_for_prompt, manual: @manual, last_results: @last_results, ledger: @ledger, refusals: @refusals, plan: @plan,
+                                       triggers: @triggers, talk_log: @talk_log)
         if decision_point.name == :choose_skill && @sequence
           @pages_read = @sequence[:pages].size
           @images = Vision::DialogueShot.sheets(@sequence[:pages], per_sheet: SHEET_PAGES)
@@ -370,6 +401,10 @@ module Koholint
         text += ", blocked_at (#{blocked[:row]},#{blocked[:col]}) #{blocked[:direction]}" if blocked.is_a?(Hash)
         text += ", cause #{outcome[:cause]}" if outcome[:cause]
         text += ", talked #{outcome[:talked]}" unless outcome[:talked].nil?
+        if @interrupted
+          text += ", dialogue opened by itself x#{@interrupted}"
+          @interrupted = nil
+        end
         standing = outcome[:standing_cell]
         text += ", standing_cell (#{standing[:row]},#{standing[:col]})" if standing.is_a?(Hash)
         text
