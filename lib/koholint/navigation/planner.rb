@@ -16,7 +16,7 @@ module Koholint
         @place = place
       end
 
-      def path(from:, to:, mode: :explore)
+      def path(from:, to:, mode: :explore, doubt: true)
         return nil unless inside?(from) && inside?(to)
         return [from] if from == to
 
@@ -31,7 +31,7 @@ module Koholint
 
           DELTAS.each_key do |direction|
             target = step(cell, direction)
-            next unless target && walkable?(cell, target, direction, allowed)
+            next unless target && walkable?(cell, target, direction, allowed, doubt)
 
             cost = [steps + 1, turns + (heading && heading != direction ? 1 : 0)]
             key = [target, direction]
@@ -46,6 +46,22 @@ module Koholint
         nil
       end
 
+      def why_not(from:, to:)
+        return 'no current cell' unless inside?(from) && inside?(to)
+        return 'target is current cell' if from == to
+        return 'target covered by an object' if @grid.static_sprite(*to)
+        return 'target believed blocked' if DELTAS.each_key.all? { |direction| @grid.passable(*to, direction) == :no }
+
+        free = path(from:, to:, doubt: false)
+        return 'no route over known cells' unless free
+
+        edges = free.each_cons(2).filter_map do |a, b|
+          direction = self.class.direction_between(a, b)
+          "(#{a[0]},#{a[1]}) #{direction}" if @ledger&.doubtful?(@place, a, direction) && @grid.passable(*b, direction) == :yes
+        end
+        "no route: doubtful edges #{edges.join(', ')}"
+      end
+
       private
 
       def inside?(cell) = cell.is_a?(Array) && cell[0].between?(0, Geometry::ROWS - 1) && cell[1].between?(0, Geometry::COLS - 1)
@@ -56,11 +72,13 @@ module Koholint
         target if inside?(target)
       end
 
-      def walkable?(cell, target, direction, allowed)
+      def walkable?(cell, target, direction, allowed, doubt)
         return false if @grid.static_sprite(*target)
-        return false if @ledger&.doubtful?(@place, cell, direction)
 
-        allowed.include?(@grid.passable(*target, direction))
+        belief = @grid.passable(*target, direction)
+        return false if doubt && belief == :yes && @ledger&.doubtful?(@place, cell, direction)
+
+        allowed.include?(belief)
       end
 
       def rebuild(parents, key)
