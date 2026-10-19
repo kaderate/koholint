@@ -104,7 +104,7 @@ module Koholint
       command = File.expand_path(command) if command.include?(File::SEPARATOR)
       raise Koholint::Error, "claude executable not found: #{command}" unless executable?(command)
 
-      client = Agents::ClaudeCli.new(model: options.fetch(:model, DEFAULT_MODEL), command:)
+      client = Agents::ClaudeCli.new(model: options.fetch(:model, DEFAULT_MODEL), command:, lenient: %w[plan])
       manual = manual_text
       lambda do |run|
         events = events_for(run)

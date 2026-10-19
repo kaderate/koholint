@@ -11,7 +11,8 @@ module Koholint
       READER_GRACE = 1
       STDERR_KEEP = 2048
 
-      def initialize(model: 'sonnet', command: 'claude', timeout: 90, max_call_usd: 0.25, retries: 1)
+      def initialize(model: 'sonnet', command: 'claude', timeout: 90, max_call_usd: 0.25, retries: 1, lenient: [])
+        @lenient = lenient.map(&:to_s)
         @model = model
         @command = command
         @timeout = timeout
@@ -142,10 +143,17 @@ module Koholint
         output = data['structured_output']
         return reply.call('missing structured_output') unless output.is_a?(Hash)
 
-        problem = violation(output, schema)
+        problem = violation(output, relaxed(schema))
         return reply.call("schema violation: #{problem}") if problem
 
         Reply.new(output, cost, latency, tokens, nil)
+      end
+
+      def relaxed(schema)
+        schema = schema.transform_keys(&:to_s)
+        return schema if @lenient.empty? || !schema['required']
+
+        schema.merge('required' => Array(schema['required']).map(&:to_s) - @lenient)
       end
 
       def stderr_hint(err)

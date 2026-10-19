@@ -30,6 +30,14 @@ class PromptsTest < Minitest::Test
     assert_includes text, 'one of five kinds: leave_place (place), reach_place (place), reach_cell (place, row, col), dialogue_closed or new_place (no fields).'
   end
 
+  def test_the_plan_line_is_mandatory
+    points.each do |point|
+      text = Koholint::Agents::Prompts.system_for(point)
+      assert_includes text, 'The plan field is mandatory on every call'
+      refute_match(/optional(ly)? (short )?plan|and plan\b.*optionally/i, text)
+    end
+  end
+
   def test_no_game_facts
     points.each do |point|
       text = Koholint::Agents::Prompts.system_for(point).downcase

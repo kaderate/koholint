@@ -147,6 +147,17 @@ class DelegatedPolicyTest < Minitest::Test
     assert_includes client.calls[2][:prompt], first[:plan]
   end
 
+  def test_an_answer_without_a_plan_is_accepted_and_keeps_the_previous_plan
+    client = ScriptedClient.new(objective: with_plan(objective, 'first'), skill: [walk, walk])
+    p = policy(client)
+    decide(p)
+    _point, answer = decide(p)
+    refute answer[:fallback]
+    refute answer.key?(:plan)
+    decide(p)
+    assert_includes client.calls[2][:prompt], 'follow it unless the situation changed): first'
+  end
+
   def test_a_new_plan_replaces_the_old_one_and_a_fallback_keeps_it
     client = ScriptedClient.new(objective: with_plan(objective, 'first'), skill: [with_plan(walk, 'second'), failing('boom'), walk])
     p = policy(client)
