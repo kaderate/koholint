@@ -14,6 +14,7 @@ module Koholint
       FALLBACK_CHOICE = { skill: 'wait', params: { frames: 30 } }.freeze
       HEMMED_WAIT = { skill: 'wait', params: { frames: 120 } }.freeze
       HEMMED_DIRECTIONS = 4
+      HEMMED_WAIT_LIMIT = 1800 / HEMMED_WAIT[:params][:frames]
 
       def initialize(client:, registry:, objectives:, manual: '', on_step: nil)
         @client = client
@@ -39,7 +40,11 @@ module Koholint
 
       def decide(decision_point, state, context)
         @prompt = @image = nil
-        return hemmed_wait if decision_point.name == :choose_skill && hemmed?(state)
+        if decision_point.name == :choose_skill && hemmed?(state)
+          return hemmed_wait if @hemmed[:waits] < HEMMED_WAIT_LIMIT
+
+          clear_hemmed
+        end
 
         reply = ask(decision_point, state, context)
         raise Failure, reply.error if reply.error
@@ -84,19 +89,19 @@ module Koholint
           raise Failure, "leave_place must name the current place #{place.inspect}, not #{predicate[:place].inspect}"
         end
         raise Failure, 'predicate is already true in the current state' if satisfied?(predicate, state, place)
+        raise Failure, 'dialogue_closed needs an open dialogue' if predicate[:kind].to_s == 'dialogue_closed' && !state.dialog_open?
 
+        clear_hemmed
         @objectives.start(frame: state.frame, title: choice[:title], predicate: choice[:predicate])
       end
 
       def satisfied?(predicate, state, place)
         case predicate[:kind].to_s
         when 'reach_place' then predicate[:place] == place
-        when 'reach_cell' then predicate[:place] == place && cell_of(state) == [predicate[:row], predicate[:col]]
+        when 'reach_cell' then predicate[:place] == place && state.cell == [predicate[:row], predicate[:col]]
         else false
         end
       end
-
-      def cell_of(state) = state.x && state.y ? [(state.y - 8) / 16, state.x / 16] : nil
 
       def note_walk(choice, outcome, state)
         @walks << (choice[:skill] == 'walk' ? { direction: choice[:params][:direction] || choice[:params]['direction'], stopped_by: outcome[:stopped_by].to_s,
@@ -110,7 +115,7 @@ module Koholint
         return unless @walks.map { |w| w[:direction].to_s }.uniq.size == HEMMED_DIRECTIONS
         return unless @walks.all? { |w| w[:stopped_by] == 'blocked' && w[:moved].zero? && w[:pos] == @walks.first[:pos] }
 
-        @hemmed = { pos: @walks.first[:pos], place: [state.room_id, state.map_id] }
+        @hemmed = { pos: @walks.first[:pos], place: [state.room_id, state.map_id], waits: 0 }
       end
 
       def hemmed?(state) = !!@hemmed && !state.dialog_open? && [state.x, state.y] == @hemmed[:pos] && [state.room_id, state.map_id] == @hemmed[:place]
@@ -118,12 +123,17 @@ module Koholint
       def release_hemmed(state)
         return unless @hemmed && !state.loading?
 
-        @hemmed = nil unless hemmed?(state)
-        @walks.clear unless @hemmed
+        clear_hemmed unless hemmed?(state)
+      end
+
+      def clear_hemmed
+        @hemmed = nil
+        @walks.clear
       end
 
       def hemmed_wait
         @waiting = true
+        @hemmed[:waits] += 1
         { choice: HEMMED_WAIT, justification: 'deterministic hemmed-in wait: four directions blocked without movement at the same position',
           confidence: 1.0, agent: 'delegated', latency_ms: 0, cost_usd: 0.0, fallback: false, prompt: nil, image: nil }
       end

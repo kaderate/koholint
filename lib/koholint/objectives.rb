@@ -91,7 +91,7 @@ module Koholint
 
       place = [state.room_id, state.map_id]
       cell = state.cell
-      position = cell || [state.x, state.y]
+      position = cell || [:px, state.x, state.y]
       @last_state_part = [place, position, state.dialog_open?]
       signature = [place, position, state.dialog_open?, state.hp]
       if signature != @signature

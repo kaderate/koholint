@@ -67,7 +67,7 @@ module Koholint
       when 'run'
         factory = policy_factory(options, budget)
         run = Run.create(root: options.fetch(:root, 'runs'), flow_version: flow, budget: limits)
-        play(Engine.new(run: run, policy: factory.call(run), budget:, **engine_options(options)), run, out)
+        play(Engine.new(run:, policy: factory.call(run), budget:, **engine_options(options)), run, out)
       when 'resume'
         factory = policy_factory(options, budget)
         run = Run.open(run_dir(args), flow_version: flow)

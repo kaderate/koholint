@@ -4,16 +4,21 @@ require 'koholint/decision'
 module Koholint
   module Policies
     class StartGame
+      READY_TICK_LIMIT = 24
+
       def initialize(after, ready: nil)
         @after = after
         @settle = !ready.nil?
         @ready = ready || :controllable?.to_proc
         @handed = !@settle
         @position = nil
+        @ready_ticks = 0
       end
 
       def observe(state, frame:)
-        @handed ||= ready_state?(state) && @position == [state.x, state.y]
+        ready = ready_state?(state)
+        @ready_ticks += 1 if ready
+        @handed ||= ready && (@position == [state.x, state.y] || @ready_ticks >= READY_TICK_LIMIT)
         @position = [state.x, state.y]
         @after.observe(state, frame:) if @after.respond_to?(:observe)
       end

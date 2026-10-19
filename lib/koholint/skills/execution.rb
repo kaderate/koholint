@@ -46,7 +46,10 @@ module Koholint
       def moved_cells(state)
         from = @start.cell
         to = state.cell
-        from && to ? from.zip(to).sum { |a, b| (a - b).abs } : 0
+        return from.zip(to).sum { |a, b| (a - b).abs } if from && to
+        return 0 unless @start.x && @start.y && state.x && state.y
+
+        ((@start.x - state.x).abs + (@start.y - state.y).abs + 8) / 16
       end
 
       def place(state)

@@ -55,6 +55,14 @@ class StartGameTest < Minitest::Test
     assert_equal({ buttons: [], frames: 5 }, wrapper.decide(Koholint::DecisionPoint.macro(:boot), state(mode: 1), {})[:choice])
   end
 
+  def test_ready_policy_hands_over_anyway_after_24_ready_ticks_of_a_moving_link
+    wrapper = Koholint::Policies::StartGame.new(Koholint::Policies::WalkAndTalk.new, ready: ->(s) { s.game_mode == 0x0B })
+    23.times { |i| wrapper.observe(state(frame: i, hp: 24, x: 80 + i, mode: 0x0B), frame: i) }
+    assert_equal :boot, wrapper.decision_point_for(state(hp: 24, x: 200, mode: 0x0B)).name
+    wrapper.observe(state(frame: 24, hp: 24, x: 150, mode: 0x0B), frame: 24)
+    assert_equal :move, wrapper.decision_point_for(state(hp: 24, x: 150, mode: 0x0B)).name
+  end
+
   def test_engine_run_from_a_cold_boot_reaches_a_playable_state_quickly
     skip_without_rom!
     Dir.mktmpdir do |dir|

@@ -20,6 +20,7 @@ module Koholint
       run = Run.open(run_path, flow_version: flow_version)
       run.lock!
       run.truncate_trace!(run.inputs.frames)
+      run.truncate_prompts!(run.inputs.frames)
       policy = policy_factory.call(run) if policy_factory
       new(run: run, policy: policy, budget: budget, emulator: Replay.to(run, run.inputs.frames), **options)
     end
@@ -115,6 +116,8 @@ module Koholint
     end
 
     def note_fallback(result)
+      return if @budget.exhausted
+
       @fallbacks = result[:fallback] ? @fallbacks + 1 : 0
       @budget.stop!(:agent_failures) if @fallbacks >= AGENT_FAILURE_LIMIT
     end

@@ -109,6 +109,12 @@ module Koholint
       rewrite_trace(path, kept)
     end
 
+    def truncate_prompts!(frames)
+      Dir.glob(File.join(dir, 'prompts', '*')).each do |path|
+        File.delete(path) if File.basename(path).to_i >= frames
+      end
+    end
+
     def write_manifest
       tmp = File.join(dir, 'manifest.json.tmp')
       File.write(tmp, JSON.pretty_generate(@manifest))

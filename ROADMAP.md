@@ -12,7 +12,6 @@ Only what is left to do. When something lands, delete it here (git is the histor
 5. **Combat** — open question: micro-decisions; settle by spike (Jev macros vs deterministic vs hybrid) after the first agent loop.
 6. **Navigation spike** — A* on the known grid vs Jev macros vs hybrid, measured on success, frames, cost, latency.
 7. **Live view, layout C** — clickable timeline of notable events and agent calls, fork from the UI, pause/stop.
-8. **Budgets in practice** — dollar budgets from `claude -p` usage fields, step budgets once objectives exist.
 
 ## Open decisions and loose ends
 - Addresses at `verified_count: 1` need a second independent check (`game_mode`, `game_submode`, `name_length`, `max_hearts`, `dialog_state`).
@@ -22,3 +21,5 @@ Only what is left to do. When something lands, delete it here (git is the histor
 - Vision deferred (not fixed): sprite flips are not in the sprite pattern; sprites at y 1..8 in 8x8 mode; tile bytes not memoised per snapshot; BG-disable not handled; dialogue CLOSE never sampled in the overlay test; window-overlap overlay rule only unit-tested.
 - Vision deferred: `World#add_screen` assumes event order and `places` dups shallowly; probe `moved` ignores `hp_delta`; control compares end positions only; the misaligned memo is keyed by pixel; left `:no` sits on the 4 px tolerance boundary; the 32-frame hold margin is unmeasured; no free-Link rule at one-way ledges.
 - Vision deferred: policies receive the live `Beliefs` (could call `record`); the contradiction check judges with today's evidence and ignores knockback; `--grid` CLI test is weak and the replay test mostly covers the intro; grid colour-map test does not pin colours; the suite takes about 2 min; `Engine.resume` re-emits one `screen` event because the last emitted screen is not seeded from the trace.
+- Agent loop deferred: `resume` without `--agent` on an agent run silently continues with WalkAndTalk (record the policy in the manifest or refuse); timed-out or cancelled client calls are counted as $0 and a call longer than the sleep gap is dropped from active time; the claude subprocess inherits HOME, so the model sees the user's email and the temp dir path (accepted; `--bare` needs an API key).
+- Agent loop deferred: no controls section in `docs/AGENT_MANUAL.md`; add one only from the printed booklet (`manual/notice.txt`, absent locally) and mind the 3000-char sub-cap; `Run#fork` copies decision events carrying `prompt_sha` but not their prompt files, and a failed choose_objective prompt is stored as `<frame>-choose_skill.txt`; the `objective started` event is emitted before the `decision` that chose it (viewer ordering).

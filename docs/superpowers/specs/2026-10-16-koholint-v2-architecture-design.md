@@ -35,7 +35,7 @@ attached to a run, hand-built reports, video capture changing RNG timing.
 ## Non-goals / anti-goals
 
 - No walkthrough knowledge. The agent knows the **game manual** (in repo, see D14 and
-  `docs/GAME_MANUAL_NOTES.md`) and is assumed familiar with the genre (not a first video game).
+  `docs/AGENT_MANUAL.md`; `docs/GAME_MANUAL_NOTES.md` is developer notes) and is assumed familiar with the genre (not a first video game).
   Where items are, who NPCs are, how puzzles resolve: discovered during the run.
 - No hand-written morning report. Reports are views over the trace.
 - No role ceremony (Explorer/Builder/Reviewer/MetaPlanner sessions) inside the game loop.

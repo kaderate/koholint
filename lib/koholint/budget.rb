@@ -25,7 +25,7 @@ module Koholint
 
     def step_done = @used[:steps] += 1
 
-    def stop!(reason = :stopped) = @stopped = reason
+    def stop!(reason = :stopped) = @stopped ||= reason
 
     def exhausted
       return @stopped if @stopped

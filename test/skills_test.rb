@@ -147,6 +147,13 @@ class SkillsTest < Minitest::Test
     assert_equal 2, result[:moved_cells]
   end
 
+  def test_moved_cells_off_the_grid_uses_the_pixel_distance
+    execution = registry.start('walk', state(y: 3), { direction: :up, cells: 1 })
+    assert_nil Koholint::GameState.cell_at(80, 3)
+    assert_equal 1, execution.result(state(y: 19))[:moved_cells]
+    assert_equal 0, execution.result(state(y: 10))[:moved_cells]
+  end
+
   def test_walk_bounce_across_a_boundary_is_not_progress
     execution = registry.start('walk', state(y: 72), { direction: :up, cells: 2 })
     ys = [72, 71, 72, 71, 72, 71, 72] + [71] * 10

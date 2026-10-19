@@ -158,6 +158,34 @@ class DelegatedPolicyTest < Minitest::Test
     assert_equal 4, @objectives.current[:attempts].size
   end
 
+  def test_hemmed_in_waits_are_capped_to_one_stall_window_then_the_agent_is_called
+    client = ScriptedClient.new(objective: objective(kind: 'reach_place', place: [1, 2]), skill: walk)
+    p = policy(client)
+    hemmed(p)
+    15.times { assert_equal 'delegated', decide(p).last[:agent] }
+    assert_equal 'claude', decide(p).last[:agent]
+  end
+
+  def test_a_new_objective_clears_the_hemmed_latch
+    client = ScriptedClient.new(objective: [objective(kind: 'reach_place', place: [1, 2])] * 2, skill: [walk] * 2)
+    p = policy(client)
+    hemmed(p)
+    @objectives.abandon(frame: 200, reason: 'stall')
+    _point, result = decide(p)
+    assert_equal 'claude', result[:agent]
+    assert @objectives.current
+    assert_equal 'claude', decide(p).last[:agent]
+  end
+
+  def test_dialogue_closed_is_rejected_while_no_dialogue_is_open
+    closed = ok('title' => 'close', 'predicate' => { 'kind' => 'dialogue_closed' })
+    p = policy(ScriptedClient.new(objective: closed))
+    result = decide(p).last
+    assert result[:fallback]
+    assert_match(/needs an open dialogue/, result[:justification])
+    refute decide(policy(ScriptedClient.new(objective: closed)), state(dialog_state: 3)).last[:fallback]
+  end
+
   def test_hemmed_in_releases_when_the_position_the_dialogue_or_the_place_changes
     [state(x: 69), state(room_id: 4), state(dialog_state: 3)].each do |moved|
       client = ScriptedClient.new(objective: objective(kind: 'reach_place', place: [1, 2]), skill: walk)
@@ -427,6 +455,21 @@ class DelegatedEngineTest < Minitest::Test
       assert_equal 1, client.calls.size
       assert_equal ['dollars'], events(run, :budget_stop).map { |e| e['kind'] }
       assert_equal 1, events(run, :stop).size
+    end
+  end
+
+  def test_a_cancel_after_four_failures_keeps_the_stopped_reason
+    skip_without_rom!
+    with_run do |run|
+      engine = nil
+      client = ScriptedClient.new(default: down)
+      client.define_singleton_method(:call) do |**kw|
+        engine.request_stop if calls.size == 4
+        super(**kw)
+      end
+      engine = agent_engine(run, client, emulator: EmulatorCache.interactive)
+      assert_equal :stopped, engine.run
+      assert_equal 5, client.calls.size
     end
   end
 

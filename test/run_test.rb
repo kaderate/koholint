@@ -24,6 +24,16 @@ class RunTest < Minitest::Test
     end
   end
 
+  def test_truncate_prompts_drops_prompt_files_from_the_truncation_frame_on
+    with_env do |dir, rom|
+      run = Koholint::Run.create(root: dir, flow_version: 'f1', budget: {}, rom_path: rom)
+      FileUtils.mkdir_p(File.join(run.dir, 'prompts'))
+      %w[90-choose_skill.txt 100-choose_skill.txt 100-choose_skill.png 150-choose_objective.txt].each { |n| File.write(File.join(run.dir, 'prompts', n), 'x') }
+      run.truncate_prompts!(100)
+      assert_equal ['90-choose_skill.txt'], Dir.children(File.join(run.dir, 'prompts'))
+    end
+  end
+
   def test_open_with_other_flow_version_raises
     with_env do |dir, rom|
       run = Koholint::Run.create(root: dir, flow_version: 'f1', budget: {}, rom_path: rom)
