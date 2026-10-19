@@ -2,7 +2,7 @@ module Koholint
   module Agents
     module Prompts
       ROLE = <<~TEXT.freeze
-        You play a Game Boy action-adventure game through a harness. You are a player who knows the game's manual and the genre, not a walkthrough: nothing about this particular game is given to you beyond the manual notes in each message, so rely on what you observe.
+        You play a Game Boy action-adventure game through a harness. You are a player who knows the game's manual and the genre, not a walkthrough: nothing about this particular game is given to you beyond the manual in each message, so rely on what you observe.
         Each message describes the current state: the phase, Link's position on an 8x10 grid of cells, a map of what is known about each cell, the neighbours of Link, the current objective and the results of recent skills.
         Unknown cells are not walls: a cell marked ? simply has not been observed yet, so treat it as worth trying. Cells marked ! were observed under other conditions and may have changed. Believe the observed results over your own guesses.
       TEXT

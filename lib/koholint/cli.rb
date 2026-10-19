@@ -119,7 +119,7 @@ module Koholint
 
     def manual_text
       root = File.expand_path('../..', __dir__)
-      %w[docs/GAME_MANUAL_NOTES.md manual/notice.txt].filter_map do |file|
+      %w[docs/AGENT_MANUAL.md manual/notice.txt].filter_map do |file|
         path = File.join(root, file)
         File.read(path) if File.file?(path)
       end.join("\n\n")

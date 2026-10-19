@@ -1,4 +1,5 @@
 require 'json'
+require 'koholint/game_state'
 require 'koholint/perception'
 require 'koholint/vision/grid'
 
@@ -9,39 +10,52 @@ module Koholint
       DIRECTIONS = %i[up right down left].freeze
       DELTAS = { up: [-1, 0], right: [0, 1], down: [1, 0], left: [0, -1] }.freeze
       RESULT_LIMIT = 6
+      MANUAL_LIMIT = 3000
+      KEEP_RESULTS = 3
+      KEEP_FINISHED = 5
 
-      def self.build(state:, grid:, objective:, history:, attempts:, manual:, last_results:, max_chars: 6000)
-        link = [(state.y - 8) / 16, state.x / 16]
+      def self.build(state:, grid:, objective:, history:, attempts:, manual:, last_results:, max_chars: 9000)
+        link = state.cell
         results = last_results.last(RESULT_LIMIT).map { |r| r.transform_keys(&:to_sym) }
-        head = header(state, link)
-        fixed = [head, grid_block(grid, link), neighbours(grid, link, results), objective_block(objective, attempts)]
+        fixed = [header(state, link), grid_block(grid, link), neighbours(grid, link, results), objective_block(objective, attempts)]
         finished = history.map { |h| "- #{h[:id]} #{h[:outcome]}#{h[:reason] ? " (#{h[:reason]})" : ''}: #{h[:title]}" }
         lines = results.map { |r| "- #{result_line(r)}" }
-        notes = manual.to_s
+        notes = trim_manual(manual.to_s)
         loop do
           text = render(fixed, finished, lines, notes)
           return text if text.size <= max_chars
 
-          if finished.any? then finished.shift
-          elsif lines.any? then lines.shift
-          elsif !notes.empty? then notes = notes[0, [notes.size - (text.size - max_chars), 0].max]
+          if !notes.empty? then notes = trim_lines(notes, text.size - max_chars)
+          elsif finished.size > KEEP_FINISHED then finished.shift
+          elsif lines.size > KEEP_RESULTS then lines.shift
           else return text
           end
         end
       end
 
+      def self.trim_manual(notes) = notes.size <= MANUAL_LIMIT ? notes : trim_lines(notes, notes.size - MANUAL_LIMIT)
+      private_class_method :trim_manual
+
+      def self.trim_lines(notes, excess)
+        keep = notes[0, [notes.size - excess, 0].max]
+        cut = keep.rindex("\n")
+        cut ? keep[0, cut] : ''
+      end
+      private_class_method :trim_lines
+
       def self.render(fixed, finished, lines, notes)
         sections = fixed.dup
         sections << "Finished objectives:\n#{finished.join("\n")}" if finished.any?
         sections << "Last skill results:\n#{lines.join("\n")}" if lines.any?
-        sections << "Manual notes:\n#{notes}" unless notes.empty?
+        sections << "Game manual:\n#{notes}" unless notes.empty?
         sections.join("\n\n")
       end
       private_class_method :render
 
       def self.header(state, link)
+        where = link ? "row #{link[0]}, col #{link[1]}" : 'outside the grid (doorway or screen edge)'
         ["Phase: #{state.phase}", "Place: room #{state.room_id}, map #{state.map_id}",
-         "Link: row #{link[0]}, col #{link[1]} (pixel x=#{state.x}, y=#{state.y}), facing #{state.direction}",
+         "Link: #{where} (pixel x=#{state.x}, y=#{state.y}), facing #{state.direction}",
          "Health: #{hearts(state.hp)} of #{hearts(state.max_hp)} hearts"].join("\n")
       end
       private_class_method :header
@@ -78,6 +92,8 @@ module Koholint
       private_class_method :symbol
 
       def self.neighbours(grid, link, results)
+        return "Neighbours of Link:\n- Link is outside the 8x10 grid (doorway or screen edge): no neighbour cells" unless link
+
         rows = DIRECTIONS.map do |direction|
           row = link[0] + DELTAS[direction][0]
           col = link[1] + DELTAS[direction][1]
