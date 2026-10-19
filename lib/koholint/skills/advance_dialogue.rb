@@ -5,17 +5,15 @@ module Koholint
     class AdvanceDialogue
       PRESS_FRAMES = 3
       CYCLE_FRAMES = 30
-      MAX_FRAMES = 90
 
       class Run < Execution
         private
 
         def input_for(state)
-          return finish(:done) if @frames.positive? && (@frames % CYCLE_FRAMES).zero? && state.dialog_state != @start.dialog_state
           return finish(:done) if @frames.positive? && !state.dialog_open?
-          return finish(:frame_cap) if @frames >= MAX_FRAMES
+          return finish(:done) if @frames >= CYCLE_FRAMES
 
-          @frames % CYCLE_FRAMES < PRESS_FRAMES ? [:a] : []
+          @frames < PRESS_FRAMES ? [:a] : []
         end
       end
 

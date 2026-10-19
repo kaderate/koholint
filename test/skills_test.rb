@@ -97,29 +97,46 @@ class SkillsTest < Minitest::Test
     end
   end
 
-  def test_advance_dialogue_cycle_and_stop_on_change
+  def test_advance_dialogue_runs_one_cycle_while_open
     open = state(dialog_state: 129)
     execution = registry.start('advance_dialogue', open, {})
-    inputs = drive(execution, Array.new(31) { state(dialog_state: 130) })
+    inputs = drive(execution, Array.new(60) { state(dialog_state: 135) })
     assert_equal [[:a]] * 3 + [[]] * 27, inputs
-    assert_equal 30, inputs.size
+    result = execution.result(open)
+    assert_equal :done, result[:stopped_by]
+    assert_equal 30, result[:frames]
+    assert result[:dialog_before]
+    assert result[:dialog_after]
+  end
+
+  def test_advance_dialogue_stops_the_frame_it_closes
+    open = state(dialog_state: 129)
+    execution = registry.start('advance_dialogue', open, {})
+    assert_equal 5, drive(execution, Array.new(5) { open } + [state(dialog_state: 0)] * 5).size
     result = execution.result(state)
     assert_equal :done, result[:stopped_by]
-    assert result[:dialog_before]
+    assert_equal 5, result[:frames]
     refute result[:dialog_after]
   end
 
-  def test_advance_dialogue_stops_when_closed
-    open = state(dialog_state: 129)
-    execution = registry.start('advance_dialogue', open, {})
-    assert_equal 5, drive(execution, Array.new(5) { open } + [state(dialog_state: 0)]).size
+  def test_walk_counts_net_cells
+    execution = registry.start('walk', state(y: 72), { direction: :up, cells: 2 })
+    ys = [72, 71, 70, 56, 40, 39]
+    inputs = drive(execution, ys.map { |y| state(y:) })
+    assert_equal 4, inputs.size
+    result = execution.result(state(y: 40))
+    assert_equal :done, result[:stopped_by]
+    assert_equal 2, result[:moved_cells]
   end
 
-  def test_advance_dialogue_capped_at_ninety
-    open = state(dialog_state: 129)
-    execution = registry.start('advance_dialogue', open, {})
-    assert_equal 90, drive(execution, Array.new(200) { open }).size
-    assert_equal :frame_cap, execution.result(open)[:stopped_by]
+  def test_walk_bounce_across_a_boundary_is_not_progress
+    execution = registry.start('walk', state(y: 72), { direction: :up, cells: 2 })
+    ys = [72, 71, 72, 71, 72, 71, 72] + [71] * 10
+    inputs = drive(execution, ys.map { |y| state(y:) })
+    result = execution.result(state(y: 71))
+    assert_equal :blocked, result[:stopped_by]
+    assert_operator inputs.size, :<, ys.size
+    assert_operator result[:moved_cells], :<=, 1
   end
 
   def test_hard_cap
@@ -182,12 +199,13 @@ class SkillsTest < Minitest::Test
     assert_equal 13, journal.size
   end
 
-  def test_rom_advance_dialogue_progresses
+  def test_rom_advance_dialogue_runs_one_cycle_or_closes
     skip_without_rom!
     emulator = fresh(EmulatorCache.at(700))
     emulator.step until Koholint::Perception.read(emulator).dialog_open? || emulator.frame > 1200
-    before = Koholint::Perception.read(emulator).dialog_state
-    result, = run_skill(emulator, 'advance_dialogue', {})
-    assert(!result[:dialog_after] || Koholint::Perception.read(emulator).dialog_state != before)
+    assert Koholint::Perception.read(emulator).dialog_open?
+    result, journal = run_skill(emulator, 'advance_dialogue', {})
+    assert_equal result[:frames], journal.size
+    assert(result[:frames] == 30 || (result[:frames] < 30 && !result[:dialog_after]))
   end
 end

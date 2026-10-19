@@ -144,9 +144,12 @@ class EngineTest < Minitest::Test
   end
 
   class ScriptedPolicy
-    def initialize(choices) = @choices = choices.dup
+    def initialize(choices, registry = Koholint::Skills::Registry.default)
+      @choices = choices.dup
+      @registry = registry
+    end
 
-    def decision_point_for(_state) = Koholint::DecisionPoint.choose_skill(Koholint::Skills::Registry.default)
+    def decision_point_for(_state) = Koholint::DecisionPoint.choose_skill(@registry)
 
     def decide(_decision_point, _state, _context)
       { choice: @choices.shift || { skill: 'wait', params: { frames: 1 } }, justification: 'script', confidence: 1.0, agent: 'scripted' }
@@ -181,10 +184,47 @@ class EngineTest < Minitest::Test
     skip_without_rom!
     runs = Array.new(2) do
       play_script(600) do |run|
-        return_value = [File.binread(File.join(run.dir, 'inputs.log')), Koholint::Replay.to(run, 600).state_hash]
-        break return_value
+        break [File.binread(File.join(run.dir, 'inputs.log')), Koholint::Replay.to(run, 600).state_hash]
       end
     end
+    refute_empty runs[0][0]
     assert_equal runs[0], runs[1]
+  end
+
+  class Endless
+    def name = 'endless'
+
+    def normalize(_params) = {}
+
+    def start(state, _params) = Koholint::Skills::Wait::Run.new(skill: name, params: {}, state:, duration: 10_000)
+  end
+
+  def test_budget_exhausted_mid_execution_is_reported
+    skip_without_rom!
+    with_run do |_dir, run|
+      policy = ScriptedPolicy.new([{ skill: 'wait', params: { frames: 100 } }])
+      Koholint::Engine.new(run: run, policy:, budget: Koholint::Budget.new(frames: 40)).run
+      action = events(run, :action).first
+      assert_equal 'budget', action['result']['stopped_by']
+      assert_equal 40, action['result']['frames']
+      assert_equal 40, Koholint::InputLog.load(File.join(run.dir, 'inputs.log')).frames
+    end
+  end
+
+  def test_hard_cap_and_single_flush_per_execution
+    skip_without_rom!
+    with_run do |_dir, run|
+      flushes = 0
+      inputs = run.inputs
+      inputs.define_singleton_method(:flush) { |*args| (flushes += 1) && super(*args) }
+      registry = Koholint::Skills::Registry.new([Endless.new])
+      policy = ScriptedPolicy.new([{ skill: 'endless', params: {} }], registry)
+      eng = Koholint::Engine.new(run: run, policy:, budget: Koholint::Budget.new, keyframe_every: 100_000)
+      eng.send(:iterate)
+      outcome = events(run, :action).first['result']
+      assert_equal 400, outcome['frames']
+      assert_equal 'frame_cap', outcome['stopped_by']
+      assert_equal 1, flushes
+    end
   end
 end

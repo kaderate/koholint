@@ -23,10 +23,15 @@ module Koholint
         buttons
       end
 
+      def abort(reason)
+        @frames -= 1
+        @stopped_by = reason
+      end
+
       def result(state = @last)
         { skill: @skill, params: @params, frames: @frames, from: place(@start), to: place(state),
           moved_cells: moved_cells(state), room_changed: room(@start) != room(state), hp_delta: state.hp.to_i - @start.hp.to_i,
-          dialog_before: @start.dialog_open?, dialog_after: state.dialog_open?, stopped_by: @stopped_by || :frame_cap }
+          dialog_before: @start.dialog_open?, dialog_after: state.dialog_open?, stopped_by: @stopped_by }
       end
 
       private

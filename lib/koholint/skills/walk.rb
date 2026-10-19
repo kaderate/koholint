@@ -13,8 +13,6 @@ module Koholint
           super(**rest)
           @direction = direction
           @cells = cells
-          @cell = cell(@start)
-          @changes = 0
           @position = [@start.x, @start.y]
           @still = 0
         end
@@ -26,7 +24,7 @@ module Koholint
           return finish(:room_change) if room(state) != room(@start)
           return finish(:damage) if state.hp.to_i < @start.hp.to_i
           return finish(:dialogue) if state.dialog_open? && !@start.dialog_open?
-          return finish(:done) if @changes >= @cells
+          return finish(:done) if moved_cells(state) >= @cells
           return finish(:blocked) if @still >= STILL_FRAMES
           return finish(:frame_cap) if @frames >= FRAMES_PER_CELL * @cells
 
@@ -34,8 +32,6 @@ module Koholint
         end
 
         def track(state)
-          @changes += 1 if cell(state) != @cell
-          @cell = cell(state)
           position = [state.x, state.y]
           @still = position == @position ? @still + 1 : 0
           @position = position

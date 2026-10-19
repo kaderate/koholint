@@ -9,7 +9,7 @@ module Koholint
     BUTTONS = %i[up down left right a b start select].freeze
     MAX_MACRO_FRAMES = 300
 
-    attr_reader :name, :options, :output_schema
+    attr_reader :name, :options, :output_schema, :registry
 
     def self.move
       options = DIRECTIONS.map { |direction| { buttons: [direction], frames: 30 } } + [{ buttons: [:a], frames: 2 }]
@@ -30,7 +30,7 @@ module Koholint
     def validate(choice)
       missing = choice.is_a?(Hash) ? output_schema - choice.keys : output_schema
       raise Invalid, "#{name}: choice missing #{missing.join(', ')}" unless missing.empty?
-      return validate_skill(choice) if @registry
+      return validate_skill(choice) if registry
       return validate_macro(choice) if options.nil?
       raise Invalid, "#{name}: #{choice.inspect} is not an allowed option" unless options.include?(choice)
 
@@ -38,10 +38,10 @@ module Koholint
     end
 
     def json_schema
-      raise Invalid, "#{name}: no skill registry" unless @registry
+      raise Invalid, "#{name}: no skill registry" unless registry
 
       { type: 'object',
-        properties: @registry.schema.merge(justification: { type: 'string' },
+        properties: registry.schema.merge(justification: { type: 'string' },
                                            confidence: { type: 'number', minimum: 0, maximum: 1 },
                                            transcription: { type: 'string' }),
         required: %w[skill params justification confidence], additionalProperties: false }
@@ -50,7 +50,7 @@ module Koholint
     private
 
     def validate_skill(choice)
-      @registry.validate(choice[:skill], choice[:params])
+      registry.validate(choice[:skill], choice[:params])
       choice
     rescue ArgumentError => e
       raise Invalid, "#{name}: #{e.message}"

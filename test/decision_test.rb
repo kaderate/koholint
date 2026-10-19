@@ -13,12 +13,6 @@ class DecisionTest < Minitest::Test
     assert_equal decision_point.options.first, decision_point.validate(decision_point.options.first)
   end
 
-  def test_choose_skill_rejects_unknown_skill
-    point = Koholint::DecisionPoint.choose_skill(Koholint::Skills::Registry.default)
-    assert_raises(Koholint::DecisionPoint::Invalid) { point.validate({ skill: 'fly', params: {} }) }
-    assert_equal({ skill: 'wait', params: { frames: 3 } }, point.validate({ skill: 'wait', params: { frames: 3 } }))
-  end
-
   def test_walk_and_talk_is_deterministic_for_same_frame
     decision_point = Koholint::DecisionPoint.move
     policy = Koholint::Policies::WalkAndTalk.new

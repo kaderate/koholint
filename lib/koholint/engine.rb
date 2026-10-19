@@ -7,7 +7,6 @@ require 'koholint/keyframes'
 require 'koholint/perception'
 require 'koholint/replay'
 require 'koholint/run'
-require 'koholint/skills/registry'
 require 'koholint/vision/grid_builder'
 
 module Koholint
@@ -21,9 +20,7 @@ module Koholint
       new(run: run, policy: policy, budget: budget, emulator: Replay.to(run, run.inputs.frames), **options)
     end
 
-    def initialize(run:, policy:, budget:, keyframe_every: 1800, decision_point: DecisionPoint.move, emulator: nil, pacer: nil, grid: false,
-                   registry: Skills::Registry.default)
-      @registry = registry
+    def initialize(run:, policy:, budget:, keyframe_every: 1800, decision_point: DecisionPoint.move, emulator: nil, pacer: nil, grid: false)
       @run = run
       @policy = policy
       @budget = budget
@@ -68,8 +65,8 @@ module Koholint
                                  choice: choice, justification: result[:justification], confidence: result[:confidence],
                                  agent: result[:agent], latency_ms: 0, cost_usd: 0.0, fallback: result[:fallback] || false)
       if choice.key?(:skill)
-        result = execute(choice, state)
-        @run.trace.emit(:action, frame: @emulator.frame, skill: choice[:skill], params: choice[:params], result:)
+        outcome = execute(choice, state, decision_point.registry)
+        @run.trace.emit(:action, frame: @emulator.frame, skill: choice[:skill], params: choice[:params], result: outcome)
       else
         frames = press(choice)
         @run.trace.emit(:action, frame: @emulator.frame, skill: 'press', params: choice, result: { frames: frames })
@@ -87,12 +84,17 @@ module Koholint
       finish_frames(done)
     end
 
-    def execute(choice, state)
-      execution = @registry.start(choice[:skill], state, choice[:params])
+    def execute(choice, state, registry)
+      execution = registry.start(choice[:skill], state, choice[:params])
       current = state
-      until @budget.exhausted
+      loop do
         buttons = execution.next_input(current)
         break unless buttons
+
+        if @budget.exhausted
+          execution.abort(:budget)
+          break
+        end
 
         step(buttons)
         current = Perception.read(@emulator)
