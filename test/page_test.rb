@@ -42,6 +42,14 @@ class PageTest < Minitest::Test
     assert_equal 600, evaluate("formatReason({type: 'decision', justification: 'a'.repeat(900)}).length")
   end
 
+  def test_a_decision_shows_its_plan_as_visible_text
+    event = { frame: 9, type: 'decision', plan: '  talk to <b>him</b> ' }
+    assert_equal 'plan: talk to <b>him</b>', evaluate("formatPlan(#{JSON.generate(event)})")
+    assert_equal '', evaluate("formatPlan({type: 'action', plan: 'x'})")
+    assert_equal '', evaluate("formatPlan({type: 'decision'})")
+    assert_equal '', evaluate("formatPlan({type: 'decision', plan: 5})")
+  end
+
   def test_unknown_event_types_still_get_a_line
     assert_equal 'f1 · budget_stop', evaluate("formatEventPretty({frame: 1, type: 'budget_stop'})")
   end

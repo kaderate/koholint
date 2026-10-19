@@ -22,7 +22,8 @@ module Koholint
       dialogue: %i[place text source page]
     }.freeze
     ALLOWED = { dialogue: { source: %w[agent] } }.freeze
-    OPTIONAL = { decision: { prompt_sha: ->(v) { v.is_a?(String) && v.match?(/\A\h{64}\z/) }, image: ->(v) { [true, false].include?(v) } } }.freeze
+    OPTIONAL = { decision: { prompt_sha: ->(v) { v.is_a?(String) && v.match?(/\A\h{64}\z/) }, image: ->(v) { [true, false].include?(v) },
+                              plan: ->(v) { v.is_a?(String) && v.length <= 200 && !v.match?(/[[:cntrl:]]/) } } }.freeze
 
     def self.read(path)
       return [] unless File.exist?(path)
