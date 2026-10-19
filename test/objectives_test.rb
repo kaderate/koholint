@@ -266,4 +266,38 @@ class ObjectivesTest < Minitest::Test
     start(target, frame: 1)
     5.times { assert_nil @objectives.note_blocked(blocked_at: blocked, target:) }
   end
+
+  def test_unreachable_event_carries_the_passed_frame
+    target = { kind: 'leave_place', place: [1, 2] }
+    start(target)
+    7.times { @objectives.note_blocked(blocked_at: blocked, target:, frame: 50) }
+    @objectives.note_blocked(blocked_at: blocked, target:, frame: 77)
+    assert_equal 77, events.last['frame']
+  end
+
+  def test_note_blocked_accepts_string_keys_and_directions
+    target = { 'kind' => 'reach_cell', 'place' => [1, 2], 'row' => 0, 'col' => 0 }
+    start(target)
+    3.times { @objectives.note_blocked(blocked_at: { 'row' => 3, 'col' => 4, 'direction' => 'up' }, target:) }
+    2.times { @objectives.note_blocked(blocked_at: { row: 3, col: 4, direction: :up }, target:) }
+    assert_equal :abandoned, @objectives.note_blocked(blocked_at: { 'row' => 3, 'col' => 4, 'direction' => :up }, target:)
+    assert_equal 'unreachable', events.last['reason']
+  end
+
+  def test_reach_cell_abandons_at_eight_mixed_blocks
+    target = { kind: 'reach_cell', place: [1, 2], row: 0, col: 0 }
+    start(target)
+    7.times { |i| assert_nil @objectives.note_blocked(blocked_at: blocked(col: i), target:) }
+    assert_equal :abandoned, @objectives.note_blocked(blocked_at: blocked(col: 7), target:)
+  end
+
+  def test_visits_are_recorded_without_an_active_objective
+    start({ kind: 'new_place' })
+    @objectives.update(state, frame: 1)
+    @objectives.abandon(frame: 2, reason: 'x')
+    @objectives.update(state(room: 9), frame: 3)
+    start({ kind: 'new_place' }, frame: 4)
+    assert_nil @objectives.update(state(room: 9), frame: 5)
+    assert_equal :achieved, @objectives.update(state(room: 5), frame: 6)
+  end
 end

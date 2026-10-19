@@ -122,14 +122,15 @@ module Koholint
       nil
     end
 
-    def note_blocked(blocked_at:, target:)
+    def note_blocked(blocked_at:, target:, frame: @last_frame)
       return nil unless @current
 
-      pair = blocked_at.values_at(:row, :col, :direction)
+      cell = self.class.normalize(blocked_at)
+      pair = [cell[:row], cell[:col], cell[:direction].to_s]
       @blocked_total += 1
       @blocked_pairs[pair] += 1
-      pairs = target.to_h[:kind].to_s == 'reach_cell' && @blocked_pairs[pair] >= UNREACHABLE_PAIRS
-      return finish(:abandoned, frame: @last_frame, reason: 'unreachable') if pairs || @blocked_total >= UNREACHABLE_TOTAL
+      pairs = self.class.normalize(target)[:kind].to_s == 'reach_cell' && @blocked_pairs[pair] >= UNREACHABLE_PAIRS
+      return finish(:abandoned, frame:, reason: 'unreachable') if pairs || @blocked_total >= UNREACHABLE_TOTAL
 
       nil
     end
