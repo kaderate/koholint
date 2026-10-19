@@ -82,6 +82,17 @@ class FeedTest < Minitest::Test
     end
   end
 
+  def test_free_delegated_decisions_are_not_counted_as_calls
+    with_dir do |dir, trace|
+      emit = ->(frame, **extra) { trace.emit(:decision, frame:, decision_point: 'move', input: {}, options: [], choice: {}, justification: 'j', confidence: 1.0, agent: 'delegated', latency_ms: 0, **extra) }
+      emit.call(1, cost_usd: 0.0)
+      emit.call(2, cost_usd: 0.0)
+      emit.call(3, cost_usd: 0.05)
+      emit.call(4, cost_usd: 0.0, prompt_sha: 'a' * 64, image: false)
+      assert_equal 2, Koholint::Viewer::Feed.for(dir, FOLLOWER)[:status][:calls]
+    end
+  end
+
   def test_events_are_capped_to_the_latest_in_order
     with_dir do |dir, trace|
       5.times { |i| decision(trace, i) }

@@ -45,8 +45,10 @@ module Koholint
       end
 
       def calls(trace)
-        trace.count { |e| e['type'] == 'decision' && !DETERMINISTIC_AGENTS.include?(e['agent']) }
+        trace.count { |e| e['type'] == 'decision' && !DETERMINISTIC_AGENTS.include?(e['agent']) && !free_delegated?(e) }
       end
+
+      def free_delegated?(event) = event['agent'] == 'delegated' && !event['prompt_sha'] && event['cost_usd'].to_f.zero?
 
       def objective_title(trace, id)
         return nil unless id

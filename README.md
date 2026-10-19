@@ -28,3 +28,9 @@ toggle that overlays the believed passability on the video.
 Budgets: `run`/`resume` accept `--frames N`, `--minutes N`, `--dollars X` and `--steps N` (objectives that reach a terminal outcome;
 only meaningful with `--agent`). With `--agent`, the engine also writes what the agent saw to `runs/<id>/prompts/<frame>-<decision_point>.txt`
 (and `.png` when an image was sent; gitignored, not part of replay); the `decision` trace event carries its `prompt_sha`. Ctrl-C cancels an in-flight agent call.
+
+Agent skills: `goto row col` walks to a cell of the known grid with an A* path (stops `done`, `blocked`, `no_path`, ...; a result carries
+`blocked_at` when a move hit a wall), and `step direction pixels` moves a few pixels. A ledger counts blocked edges per place; an edge
+blocked twice is marked doubtful in the context, and an objective that keeps failing is abandoned as `unreachable`. Dialogue pages are
+advanced automatically (one `decision` with agent `delegated` and cost 0 per page) and read once from the page sheets. `--steps N` counts
+finished objectives. `resume` rebuilds the ledger and the visited places from the trace; the flow version is `flow-2`.

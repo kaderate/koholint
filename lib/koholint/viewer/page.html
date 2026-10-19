@@ -62,8 +62,19 @@
 
   function formatParam(v) { return v !== null && typeof v === 'object' ? JSON.stringify(v) : String(v); }
 
+  function formatCell(p) { return '(' + p.row + ', ' + p.col + ')'; }
+
+  function formatSkillCall(skill, p) {
+    p = p && typeof p === 'object' ? p : {};
+    if (skill === 'goto' && Number.isInteger(p.row) && Number.isInteger(p.col)) return 'goto ' + formatCell(p);
+    if (skill === 'step' && typeof p.direction === 'string' && Number.isInteger(p.pixels)) return 'step ' + p.direction + ' ' + p.pixels + ' px';
+    return null;
+  }
+
   function formatSkillChoice(choice) {
     var p = choice.params && typeof choice.params === 'object' ? choice.params : {};
+    var named = formatSkillCall(choice.skill, p);
+    if (named) return named;
     var keyed = choice.skill !== 'walk' && Object.keys(p).length > 1;
     var params = Object.keys(p).map(function (k) { return keyed ? k + '=' + formatParam(p[k]) : formatParam(p[k]); });
     return [choice.skill].concat(params).join(' ');
@@ -77,14 +88,24 @@
 
   var PAST = { walk: 'walked' };
 
+  function formatBlocked(b) {
+    if (!b || typeof b !== 'object' || !Number.isInteger(b.row) || !Number.isInteger(b.col)) return '';
+    return ', blocked at (' + b.row + ',' + b.col + ')' + (typeof b.direction === 'string' ? ' ' + b.direction : '');
+  }
+
   function formatResult(e) {
     var r = e.result;
+    var named = formatSkillCall(e.skill, e.params);
+    var plain = named === null || e.skill === 'walk';
     var verb = PAST[e.skill] || e.skill;
-    var line = typeof r.moved_cells === 'number' ? verb + ' ' + plural(r.moved_cells, 'cell') : verb;
-    if (r.stopped_by) line += r.stopped_by === 'done' ? ', done' : ', stopped: ' + r.stopped_by;
+    var line;
+    if (e.skill === 'step' && typeof r.moved_px === 'number') line = 'moved ' + r.moved_px + ' px';
+    else line = typeof r.moved_cells === 'number' ? (named ? 'walked' : verb) + ' ' + plural(r.moved_cells, 'cell') : verb;
+    if (r.stopped_by) line += r.stopped_by === 'done' && plain ? ', done' : ', stopped: ' + r.stopped_by;
+    line += formatBlocked(r.blocked_at);
     if (r.room_changed) line += ', room changed';
     if (typeof r.hp_delta === 'number' && r.hp_delta !== 0) line += ', hp ' + (r.hp_delta > 0 ? '+' : '') + r.hp_delta;
-    return line;
+    return named ? named + ' · ' + line : line;
   }
 
   function truncate(value, max) {
@@ -105,6 +126,7 @@
   function formatEventPretty(e) {
     var head = 'f' + e.frame + ' · ';
     if (e.type === 'decision') {
+      if (e.agent === 'delegated' && e.justification === 'automatic dialogue advance') return head + 'automatic dialogue advance';
       var line = head + (e.agent || '?') + ' decides';
       var choice = formatDecisionChoice(e.choice);
       if (choice) line += ' ' + choice;
@@ -113,7 +135,7 @@
       return line;
     }
     if (e.type === 'action') {
-      if (e.result && (e.result.stopped_by || typeof e.result.moved_cells === 'number')) return head + formatResult(e);
+      if (e.result && (e.result.stopped_by || typeof e.result.moved_cells === 'number' || typeof e.result.moved_px === 'number')) return head + formatResult(e);
       return head + e.skill + ' ' + formatChoice(e.params);
     }
     if (e.type === 'objective') {

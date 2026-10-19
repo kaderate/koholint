@@ -140,6 +140,30 @@ class PageTest < Minitest::Test
     assert_equal 'f9 · walked 0 cells, stopped: damage', fmt({ frame: 9, type: 'action', skill: 'walk', result: { moved_cells: 0, stopped_by: 'damage' } })
   end
 
+  def test_goto_and_step_read_as_what_was_asked_and_what_happened
+    decision = { frame: 1, type: 'decision', agent: 'delegated', choice: { skill: 'goto', params: { row: 3, col: 4 } } }
+    assert_equal 'f1 · delegated decides goto (3, 4)', fmt(decision)
+    assert_equal 'f1 · delegated decides step up 8 px', fmt(decision.merge(choice: { skill: 'step', params: { direction: 'up', pixels: 8 } }))
+    done = { skill: 'goto', params: { row: 3, col: 4 }, result: { moved_cells: 3, stopped_by: 'done' } }
+    assert_equal 'f2 · goto (3, 4) · walked 3 cells, stopped: done', fmt({ frame: 2, type: 'action' }.merge(done))
+    one = { skill: 'goto', params: { row: 3, col: 4 }, result: { moved_cells: 1, stopped_by: 'no_path' } }
+    assert_equal 'f2 · goto (3, 4) · walked 1 cell, stopped: no_path', fmt({ frame: 2, type: 'action' }.merge(one))
+    blocked = { skill: 'goto', params: { row: 3, col: 4 },
+                result: { moved_cells: 2, stopped_by: 'blocked', blocked_at: { row: 2, col: 5, direction: 'up' } } }
+    assert_equal 'f2 · goto (3, 4) · walked 2 cells, stopped: blocked, blocked at (2,5) up', fmt({ frame: 2, type: 'action' }.merge(blocked))
+    step = { skill: 'step', params: { direction: 'up', pixels: 8 }, result: { moved_px: 6, stopped_by: 'blocked' } }
+    assert_equal 'f3 · step up 8 px · moved 6 px, stopped: blocked', fmt({ frame: 3, type: 'action' }.merge(step))
+  end
+
+  def test_automatic_dialogue_advance_and_new_place_objectives
+    event = { frame: 4, type: 'decision', agent: 'delegated', justification: 'automatic dialogue advance', choice: { buttons: %w[a], frames: 3 } }
+    assert_equal 'f4 · automatic dialogue advance', fmt(event)
+    started = { frame: 5, type: 'objective', id: 'obj-1', status: 'started', predicate: { kind: 'new_place' } }
+    assert_equal 'f5 · objective: new_place started', fmt(started)
+    abandoned = started.merge(status: 'abandoned', reason: 'unreachable')
+    assert_equal 'f5 · objective: new_place abandoned (unreachable)', fmt(abandoned)
+  end
+
   def test_objective_events_read_with_status_and_reason
     event = { frame: 5, type: 'objective', id: 'o1', status: 'started', predicate: { kind: 'leave_place', place: [163, 16] } }
     assert_equal 'f5 · objective: leave_place [163,16] started', fmt(event)
