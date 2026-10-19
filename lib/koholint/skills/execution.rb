@@ -1,7 +1,10 @@
+require 'koholint/geometry'
+
 module Koholint
   module Skills
     class Execution
       HARD_CAP = 400
+      CENTRING_FRAMES = 16
 
       attr_reader :frames, :stopped_by
 
@@ -12,13 +15,18 @@ module Koholint
         @last = state
         @frames = 0
         @stopped_by = nil
+        @centring = nil
+        @blocked_at = nil
       end
 
       def next_input(state)
         @last = state
         return nil if @stopped_by
 
-        buttons = @frames >= HARD_CAP ? finish(:frame_cap) : input_for(state)
+        buttons = if @frames >= HARD_CAP then finish(:frame_cap)
+                  elsif @centring then centre(state)
+                  else input_for(state)
+                  end
         @frames += 1 if buttons
         buttons
       end
@@ -29,16 +37,71 @@ module Koholint
       end
 
       def result(state = @last)
+        aligned, offset = alignment(state)
         { skill: @skill, params: @params, frames: @frames, from: place(@start), to: place(state),
           moved_cells: moved_cells(state), room_changed: room(@start) != room(state), hp_delta: state.hp.to_i - @start.hp.to_i,
-          dialog_before: @start.dialog_open?, dialog_after: state.dialog_open?, stopped_by: @stopped_by }
+          dialog_before: @start.dialog_open?, dialog_after: state.dialog_open?, stopped_by: @stopped_by,
+          aligned:, offset:, blocked_at: @blocked_at }
       end
 
       private
 
       def finish(reason)
+        @blocked_at = blocked_at_for(@last) if reason == :blocked
+        return centre_after(reason) if centres? && %i[done blocked].include?(reason)
+
         @stopped_by = reason
         nil
+      end
+
+      def centres? = false
+
+      def blocked_direction = nil
+
+      def blocked_at_for(state)
+        row, col = state.cell
+        return nil unless row && blocked_direction
+
+        { row:, col:, direction: blocked_direction }
+      end
+
+      def centre_after(reason)
+        @centring = { reason:, frames: 0 }
+        centre(@last)
+      end
+
+      def centre(state)
+        reason = @centring[:reason]
+        event = if room(state) != room(@start) then :room_change
+                elsif state.hp.to_i < @start.hp.to_i then :damage
+                elsif state.dialog_open? && !@start.dialog_open? then :dialogue
+                end
+        buttons = toward_centre(state, avoid: (blocked_direction if reason == :blocked)) unless event || @centring[:frames] >= CENTRING_FRAMES
+        @centring[:frames] += 1 if buttons
+        return buttons if buttons
+
+        @centring = nil
+        @stopped_by = event || reason
+        nil
+      end
+
+      def toward_centre(state, avoid:)
+        return nil unless state.cell
+
+        dx, dy = Geometry.offset(state.x, state.y, state.cell)
+        wanted = []
+        wanted << (dx.positive? ? :left : :right) if dx.abs > Geometry::ALIGN_TOLERANCE
+        wanted << (dy.positive? ? :up : :down) if dy.abs > Geometry::ALIGN_TOLERANCE
+        direction = wanted.find { |d| d != avoid }
+        [direction] if direction
+      end
+
+      def alignment(state)
+        cell = state.cell
+        return [false, { dx: nil, dy: nil }] unless cell
+
+        dx, dy = Geometry.offset(state.x, state.y, cell)
+        [Geometry.aligned?(state.x, state.y, cell), { dx:, dy: }]
       end
 
       def room(state) = [state.room_id, state.map_id]
