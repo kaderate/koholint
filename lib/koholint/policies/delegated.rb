@@ -1,6 +1,8 @@
 require 'koholint/agents/context'
 require 'koholint/agents/prompts'
 require 'koholint/decision'
+require 'koholint/ledger'
+require 'koholint/navigation/planner'
 require 'koholint/vision/beliefs'
 require 'koholint/vision/capabilities'
 require 'koholint/vision/grid'
@@ -16,7 +18,8 @@ module Koholint
       HEMMED_DIRECTIONS = 4
       HEMMED_WAIT_LIMIT = 1800 / HEMMED_WAIT[:params][:frames]
 
-      def initialize(client:, registry:, objectives:, manual: '', on_step: nil)
+      def initialize(client:, registry:, objectives:, manual: '', on_step: nil, ledger: Ledger.new)
+        @ledger = ledger
         @client = client
         @registry = registry
         @objectives = objectives
@@ -32,6 +35,7 @@ module Koholint
       def decision_point_for(_state) = @objectives.current ? @skill_point : DecisionPoint.choose_objective
 
       def observe(state, frame:)
+        @ledger.reset_unless([state.room_id, state.map_id]) unless state.loading?
         release_hemmed(state)
         track { @objectives.update(state, frame:) }
       end
@@ -40,6 +44,7 @@ module Koholint
 
       def decide(decision_point, state, context)
         @prompt = @image = nil
+        context[:ledger] = @ledger
         if decision_point.name == :choose_skill && hemmed?(state)
           return hemmed_wait if @hemmed[:waits] < HEMMED_WAIT_LIMIT
 
@@ -50,7 +55,7 @@ module Koholint
         raise Failure, reply.error if reply.error
 
         choice = decision_point.validate(reply.output).slice(*decision_point.output_schema)
-        start_objective(choice, state) if decision_point.name == :choose_objective
+        start_objective(choice, state, context) if decision_point.name == :choose_objective
         answer(choice, reply, reply.output).merge(transcription_for(reply.output, state, decision_point))
       rescue NameError, TypeError
         raise
@@ -67,6 +72,7 @@ module Koholint
         @last_results << outcome
         @last_results.shift while @last_results.size > RESULT_LIMIT
         note_walk(choice, outcome, state)
+        feed_ledger(choice, outcome, state, frame)
         unless @waiting
           @objectives.record_attempt(skill: choice[:skill], params: choice[:params], result_summary: summary(outcome))
         end
@@ -82,13 +88,14 @@ module Koholint
         @on_step&.call if @objectives.history.size > before
       end
 
-      def start_objective(choice, state)
+      def start_objective(choice, state, context)
         predicate = Objectives.normalize(choice[:predicate])
         place = [state.room_id, state.map_id]
         if predicate[:kind].to_s == 'leave_place' && predicate[:place] != place
           raise Failure, "leave_place must name the current place #{place.inspect}, not #{predicate[:place].inspect}"
         end
         raise Failure, 'predicate is already true in the current state' if satisfied?(predicate, state, place)
+        raise Failure, 'reach_cell target is already reachable over cells observed free; choose a goal that needs exploration' if trivial?(predicate, state, place, context)
         raise Failure, 'dialogue_closed needs an open dialogue' if predicate[:kind].to_s == 'dialogue_closed' && !state.dialog_open?
 
         clear_hemmed
@@ -100,6 +107,48 @@ module Koholint
         when 'reach_place' then predicate[:place] == place
         when 'reach_cell' then predicate[:place] == place && state.cell == [predicate[:row], predicate[:col]]
         else false
+        end
+      end
+
+      def trivial?(predicate, state, place, context)
+        return false unless predicate[:kind].to_s == 'reach_cell' && predicate[:place] == place
+
+        grid = context[:grid]
+        return false unless grid && state.cell
+
+        Navigation::Planner.new(grid:, ledger: @ledger, place:).path(from: state.cell, to: [predicate[:row], predicate[:col]], mode: :free_only) != nil
+      end
+
+      def feed_ledger(choice, outcome, state, frame)
+        from = outcome[:from].is_a?(Hash) ? outcome[:from] : {}
+        place = from[:room] && from[:map] ? [from[:room], from[:map]] : [state.room_id, state.map_id]
+        blocked_at = outcome[:blocked_at]
+        if blocked_at
+          @ledger.record(place:, blocked_at:)
+          track { @objectives.note_blocked(blocked_at:, target: @objectives.current&.dig(:predicate), frame:) } if @objectives.current
+        end
+        note_entered(choice, outcome, place)
+        @ledger.reset_unless([state.room_id, state.map_id]) unless state.loading?
+      end
+
+      def note_entered(choice, outcome, place)
+        from = outcome[:from]
+        to = outcome[:to]
+        return unless from.is_a?(Hash) && to.is_a?(Hash) && from[:row] && to[:row] && [from[:row], from[:col]] != [to[:row], to[:col]]
+        return unless [from[:room], from[:map]] == [to[:room], to[:map]]
+
+        if choice[:skill] == 'walk'
+          direction = (choice[:params][:direction] || choice[:params]['direction'])&.to_sym
+          delta = Navigation::Planner::DELTAS[direction] or return
+          cell = [from[:row], from[:col]]
+          outcome[:moved_cells].to_i.times do
+            @ledger.entered(place:, cell:, direction:)
+            cell = [cell[0] + delta[0], cell[1] + delta[1]]
+          end
+        elsif choice[:skill] == 'goto'
+          Navigation::Planner::DELTAS.each do |direction, (dr, dc)|
+            @ledger.entered(place:, cell: [to[:row] - dr, to[:col] - dc], direction:)
+          end
         end
       end
 
@@ -140,7 +189,7 @@ module Koholint
 
       def ask(decision_point, state, context)
         @prompt = Agents::Context.build(state:, grid: grid_for(state, context), objective: @objectives.current, history: @objectives.history,
-                                       attempts: @objectives.attempts_for_prompt, manual: @manual, last_results: @last_results)
+                                       attempts: @objectives.attempts_for_prompt, manual: @manual, last_results: @last_results, ledger: @ledger)
         @image = context[:dialogue_shot]&.call if state.phase == :dialogue && decision_point.name == :choose_skill
         @client.call(system: Agents::Prompts.system_for(decision_point), prompt: @prompt, schema: decision_point.json_schema, image: @image)
       end

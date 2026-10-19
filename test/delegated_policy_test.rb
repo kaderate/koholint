@@ -637,3 +637,136 @@ class DelegatedEngineTest < Minitest::Test
     end
   end
 end
+
+class DelegatedLedgerTest < Minitest::Test
+  include DelegatedHelpers
+
+  PLACE = [163, 16].freeze
+
+  def free_grid(cells: nil)
+    beliefs = Koholint::Vision::Beliefs.new
+    %i[up down left right].each do |d|
+      beliefs.record(appearance: 'floor', action: :walk, direction: d, result: :yes, method: 'test', context: Koholint::Vision::Capabilities.new, frame: 1, source: 'test')
+    end
+    cells ||= Array.new(8) { Array.new(10) { 'floor' } }
+    Koholint::Vision::Grid.new(cells:, static_sprites: {}, beliefs:, capabilities: Koholint::Vision::Capabilities.new)
+  end
+
+  def reach_cell(row, col) = ok('title' => 'go', 'predicate' => { 'kind' => 'reach_cell', 'place' => PLACE, 'row' => row, 'col' => col })
+
+  def block(p, direction: 'up', frame: 101, state: self.state)
+    place = { room: 163, map: 16, row: 3, col: 4 }
+    outcome = { skill: 'walk', params: { direction:, cells: 1 }, frames: 8, moved_cells: 0, room_changed: false, hp_delta: 0, stopped_by: 'blocked',
+                from: place, to: place, blocked_at: { row: 3, col: 4, direction: direction.to_sym } }
+    p.after_action(choice: { skill: 'walk', params: outcome[:params] }, outcome:, state:, frame:)
+  end
+
+  def neighbour_line(client, direction) = client.calls.last[:prompt].lines.find { |l| l =~ /\b#{direction}\b/ && l =~ /blocked|free|unknown/ }
+
+  def test_reach_cell_on_a_known_free_reachable_cell_is_rejected_and_unknown_is_accepted
+    p = policy(ScriptedClient.new(objective: reach_cell(3, 6)))
+    result = p.decide(p.decision_point_for(state), state, { grid: free_grid })
+    assert result[:fallback]
+    assert_match(/already reachable/, result[:justification])
+    assert_equal 'wait', result[:choice][:skill]
+    assert_nil @objectives.current
+
+    cells = Array.new(8) { Array.new(10) { 'floor' } }
+    cells[3][6] = 'mystery'
+    p = policy(ScriptedClient.new(objective: reach_cell(3, 6)))
+    refute p.decide(p.decision_point_for(state), state, { grid: free_grid(cells:) })[:fallback]
+    assert @objectives.current
+  end
+
+  def test_reach_cell_is_not_judged_without_a_grid
+    p = policy(ScriptedClient.new(objective: reach_cell(3, 6)))
+    refute p.decide(p.decision_point_for(state), state, {})[:fallback]
+  end
+
+  def test_reach_cell_behind_a_doubtful_edge_stays_valid
+    cells = Array.new(8) { Array.new(10) { 'floor' } }
+    ledger = Koholint::Ledger.new
+    2.times { ledger.record(place: PLACE, blocked_at: { row: 3, col: 4, direction: :right }) }
+    cells[2][4] = cells[4][4] = cells[3][3] = 'mystery'
+    p = Koholint::Policies::Delegated.new(client: ScriptedClient.new(objective: reach_cell(3, 5)), registry: Koholint::Skills::Registry.default,
+                                          objectives: Koholint::Objectives.new(trace:), ledger:)
+    refute p.decide(p.decision_point_for(state), state, { grid: free_grid(cells:) })[:fallback]
+  end
+
+  def test_blocked_walks_feed_the_next_context_and_become_doubtful
+    client = ScriptedClient.new(objective: objective(kind: 'reach_place', place: [1, 2]), skill: walk, default: walk)
+    p = policy(client)
+    context = { grid: free_grid }
+    p.decide(p.decision_point_for(state), state, context)
+    block(p)
+    p.decide(p.decision_point_for(state), state, context)
+    assert_includes client.calls.last[:prompt], 'blocked 1 time'
+    refute_includes client.calls.last[:prompt], 'blocked 1 times'
+    block(p, frame: 102)
+    p.decide(p.decision_point_for(state), state, context)
+    assert_includes client.calls.last[:prompt], 'blocked 2 times'
+    assert_includes client.calls.last[:prompt], '!'
+  end
+
+  def test_the_policy_hands_its_ledger_to_the_skills_through_the_context
+    p = policy(ScriptedClient.new(objective: objective(kind: 'reach_place', place: [1, 2]), skill: walk))
+    context = { grid: free_grid }
+    decide_with = ->(c) { p.decide(p.decision_point_for(state), state, c) }
+    decide_with.call(context)
+    assert_instance_of Koholint::Ledger, context[:ledger]
+    2.times { block(p, direction: 'right') }
+    run = Koholint::Skills::Registry.default.start('goto', state, { row: 3, col: 5 }, context)
+    refute_equal [:right], run.next_input(state)
+  end
+
+  def test_unreachable_abandons_the_objective_and_the_next_tour_asks_for_an_objective
+    cell = reach_cell(1, 4)
+    p = policy(ScriptedClient.new(objective: cell, skill: walk, default: walk))
+    context = { grid: free_grid(cells: Array.new(8) { Array.new(10) { 'mystery' } }) }
+    p.decide(p.decision_point_for(state), state, context)
+    assert @objectives.current
+    Koholint::Objectives::UNREACHABLE_PAIRS.times { |i| block(p, frame: 101 + i) }
+    assert_nil @objectives.current
+    assert_equal 'unreachable', @objectives.history.last[:reason]
+    assert_equal :choose_objective, p.decision_point_for(state).name
+  end
+
+  def test_a_place_change_clears_the_ledger
+    p = policy(ScriptedClient.new(objective: objective(kind: 'reach_place', place: [1, 2]), skill: walk, default: walk))
+    ledger = p.instance_variable_get(:@ledger)
+    p.decide(p.decision_point_for(state), state, { grid: free_grid })
+    2.times { |i| block(p, frame: 101 + i) }
+    assert ledger.doubtful?(PLACE, [3, 4], :up)
+    p.observe(state(room_id: 9), frame: 200)
+    assert_equal 0, ledger.count(PLACE, [3, 4], :up)
+  end
+
+  def test_a_walk_entering_a_cell_undoubts_the_edge
+    p = policy(ScriptedClient.new(objective: objective(kind: 'reach_place', place: [1, 2]), skill: walk))
+    ledger = p.instance_variable_get(:@ledger)
+    p.decide(p.decision_point_for(state), state, { grid: free_grid })
+    2.times { |i| block(p, frame: 101 + i) }
+    moved = { skill: 'walk', params: { direction: 'up', cells: 1 }, moved_cells: 1, stopped_by: 'done',
+              from: { room: 163, map: 16, row: 3, col: 4 }, to: { room: 163, map: 16, row: 2, col: 4 }, blocked_at: nil }
+    p.after_action(choice: { skill: 'walk', params: moved[:params] }, outcome: moved, state: state(y: 44), frame: 110)
+    refute ledger.doubtful?(PLACE, [3, 4], :up)
+  end
+
+  def test_new_place_starts_and_is_achieved_on_a_first_visit
+    p = policy(ScriptedClient.new(objective: ok('title' => 'discover', 'predicate' => { 'kind' => 'new_place' }), skill: walk), visited: [PLACE])
+    refute decide(p).last[:fallback]
+    assert @objectives.current
+    p.observe(state(room_id: 9), frame: 200)
+    assert_nil @objectives.current
+    assert_equal :achieved, @objectives.history.last[:outcome]
+  end
+
+  def test_the_system_prompts_state_the_vocabulary
+    objective_system = Koholint::Agents::Prompts.system_for(Koholint::DecisionPoint.choose_objective)
+    skill_system = Koholint::Agents::Prompts.system_for(Koholint::DecisionPoint.choose_skill(Koholint::Skills::Registry.default))
+    assert_match(/leave_place means finding a way out/, objective_system)
+    assert_match(/new_place .*not yet visited/, objective_system)
+    assert_match(/goto walks several cells/, skill_system)
+    assert_match(/!.*doubtful.*goto avoids/, skill_system)
+  end
+end
