@@ -237,13 +237,38 @@ class ObjectivesTest < Minitest::Test
     assert_equal 2, events.size
   end
 
-  def test_mixed_blocks_total_eight_abandons_any_kind
-    target = { kind: 'leave_place', place: [1, 2] }
+  def test_mixed_blocks_total_eight_abandons_reach_cell_with_one_terminal_event
+    target = { kind: 'reach_cell', place: [1, 2], row: 0, col: 0 }
     start(target)
     7.times { |i| assert_nil @objectives.note_blocked(blocked_at: blocked(col: i), target:) }
     assert_equal :abandoned, @objectives.note_blocked(blocked_at: blocked(col: 8), target:)
     assert_equal 'unreachable', events.last['reason']
     assert_nil @objectives.note_blocked(blocked_at: blocked, target:)
+    assert_equal 2, events.size
+  end
+
+  def test_other_kinds_survive_any_number_of_blocked_results
+    [{ kind: 'leave_place', place: [1, 2] }, { kind: 'reach_place', place: [1, 2] }, { kind: 'new_place' }, { kind: 'dialogue_closed' }].each do |target|
+      start(target)
+      20.times { |i| assert_nil @objectives.note_blocked(blocked_at: blocked(col: i % 3), target:) }
+      assert @objectives.current
+      @objectives.abandon(frame: 1, reason: 'x')
+    end
+  end
+
+  def test_leave_place_abandons_after_six_no_path_with_one_terminal_event
+    start({ kind: 'leave_place', place: [1, 2] })
+    5.times { |i| assert_nil @objectives.note_no_path(frame: i) }
+    assert_equal :abandoned, @objectives.note_no_path(frame: 6)
+    assert_equal 'unreachable', events.last['reason']
+    assert_nil @objectives.note_no_path(frame: 7)
+    assert_equal 2, events.size
+  end
+
+  def test_reach_cell_abandons_after_three_no_path
+    start({ kind: 'reach_cell', place: [1, 2], row: 0, col: 0 })
+    2.times { |i| assert_nil @objectives.note_no_path(frame: i) }
+    assert_equal :abandoned, @objectives.note_no_path(frame: 3)
     assert_equal 2, events.size
   end
 
@@ -268,10 +293,10 @@ class ObjectivesTest < Minitest::Test
   end
 
   def test_unreachable_event_carries_the_passed_frame
-    target = { kind: 'leave_place', place: [1, 2] }
+    target = { kind: 'reach_cell', place: [1, 2], row: 0, col: 0 }
     start(target)
-    7.times { @objectives.note_blocked(blocked_at: blocked, target:, frame: 50) }
-    @objectives.note_blocked(blocked_at: blocked, target:, frame: 77)
+    7.times { |i| @objectives.note_blocked(blocked_at: blocked(col: i), target:, frame: 50) }
+    @objectives.note_blocked(blocked_at: blocked(col: 8), target:, frame: 77)
     assert_equal 77, events.last['frame']
   end
 
@@ -301,13 +326,12 @@ class ObjectivesTest < Minitest::Test
     assert_equal :achieved, @objectives.update(state(room: 5), frame: 6)
   end
 
-  def test_no_path_abandons_as_unreachable_at_the_third
+  def test_no_path_abandons_as_unreachable_at_the_sixth
     start({ kind: 'reach_place', place: [7, 8] })
-    assert_nil @objectives.note_no_path(frame: 1)
-    assert_nil @objectives.note_no_path(frame: 2)
-    assert_equal :abandoned, @objectives.note_no_path(frame: 3)
+    5.times { |i| assert_nil @objectives.note_no_path(frame: i) }
+    assert_equal :abandoned, @objectives.note_no_path(frame: 6)
     assert_equal 'unreachable', events.last['reason']
-    assert_nil @objectives.note_no_path(frame: 4)
+    assert_nil @objectives.note_no_path(frame: 7)
     assert_equal 1, events.count { |e| e['status'] == 'abandoned' }
   end
 
