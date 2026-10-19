@@ -16,6 +16,7 @@ Success: a rerun with the same defaults (Sonnet, 1 USD) reaches further than the
 4. **Failure memory**: blocked walks are counted per cell and direction, shown to the agent, and make a hopeless objective end.
 5. **Beliefs versus reality**: when the grid says free and the game blocks twice, the cell is shown as doubtful and the contradiction is traced.
 6. **Controls** in the agent's manual digest.
+7. **Room survey and alignment**: a mapped room the agent can trust, and walks that end aligned on a cell (see "Room survey and alignment").
 
 ## Non-goals and anti-goals
 
@@ -23,6 +24,7 @@ Success: a rerun with the same defaults (Sonnet, 1 USD) reaches further than the
 - No Jev wiring here. The owner suggests Jev for the frequent calls later; `choose_skill` stays the seam, and `goto` makes it rarer. Not a per-frame model either way: latency makes it impossible, and the engine keeps executing macros and skills itself.
 - No snapshot/restore outside `Calibration`; the path planner reads the grid only (no lookahead on the emulator). No RAM writes to gameplay state.
 - Not a navigation system across screens, no combat, no inventory perception, no dialogue-to-leads (all in `ROADMAP.md`).
+- No vision model for passability in this iteration (the spike showed it is not the bottleneck).
 - A failure the agent cannot see is worse than a costly one: nothing here may hide information from the trace.
 
 ## Design
@@ -55,6 +57,21 @@ Add a controls section to `docs/AGENT_MANUAL.md` (it counts against the 3000-cha
 - A talks to NPCs, reads signs, advances dialogues page by page, and interacts with the world.
 - B cancels dialogues when it can.
 - An item can be assigned to each of A and B. Contextual actions win over the assigned item: facing an NPC, A talks even if a sword is assigned to it.
+
+### Room survey and alignment (goal 7)
+Measured by a throwaway spike on the first run's starting house (report: `.superpowers/sdd/2026-10-18-first-agent-loop/spike-map-report.md`, scripts were in /tmp/spike-map, nothing committed). Findings that shape this block:
+- The probe-based grid was mostly right: of the starting house, 30 cells agreed free, 25 agreed blocked, **0 false walls**, 2 wrong, 22 unknown (walls, unreachable cells, the two door cells). Terrain alone is constant per appearance (21 distinct appearances); the only mixed-truth classes come from NPC sprites standing on a floor appearance.
+- The 25-call failure at cell (1,1) was **alignment, not belief**: the belief "free" was true (Link can stand there at y=32), but the agent stopped a `walk up 3` at y=39. `GameState#cell` calls y=39 row 1, yet the collision band of row 1 is y 26..38, so at y=39 Link overlaps row 2 (the beds), and left/right walks stop against them. The builder had correctly discarded its own probe at y=39 as `misaligned`.
+- The two wrong cells, (2,4) and (2,5), are believed free but blocked by an NPC whose 8x16 sprites cover rows 2 and 3: `Grid` maps a static sprite to one cell only.
+- A survey costs about 0.8 s per probe: one representative per appearance is about 17 s per room, all four directions of the 31 reachable cells about 99 s. A vision model is **not needed for passability**; I drop the vision-model labelling idea for now (it stays a possible helper for the meaning of cells: exit, chest, sign).
+- Unresolved: the two doorway cells (7,4) and (7,5) look free yet Link stops at y=121 with no room change; the cause was not found. Leaving the house depends on it.
+
+Changes:
+- **Aligned stops.** `walk` and `goto` end each segment with a deterministic centring step: after the movement stops, nudge Link along the other axis until his position is within the cell's collision band centre (a few frames, state-based, no sleeps), and report `aligned: true/false` plus the pixel offset in the result. The context shows when Link is not aligned.
+- **One cell function.** Fix `GameState#cell` (and its users) so a pixel position maps to the cell whose collision band contains it, with the band and the tolerance expressed once as named constants next to it; the builder's alignment tolerance uses the same constants.
+- **Sprites on every cell they cover.** `Grid` maps a static sprite to all the cells its box overlaps (8x16 sprites cover two rows).
+- **Room survey.** On first entry to a place (and after a long idle), a survey probes one representative cell per appearance not yet decided, starting from an aligned Link, on emulator copies, through the existing grid builder and `Calibration` (the only module allowed to snapshot). It adds evidence to the same `Beliefs`; nothing else changes. Survey time is wall time only (no game frames), traced as `notable survey` with probe count and seconds. Doorway cells: the builder investigates the exit behaviour (see the unresolved point) and records the facts in the trace and in `data/addresses.json` only if they are verified twice.
+- The agent's context shows, for every neighbour, belief, ledger count and an `aligned` hint, so "blocked because misaligned" is distinguishable from "blocked by a wall".
 
 ## Constraints that carry over
 
