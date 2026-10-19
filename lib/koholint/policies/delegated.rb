@@ -13,6 +13,7 @@ module Koholint
     class Delegated
       RESULT_LIMIT = 6
       TRANSCRIPTION_LIMIT = 500
+      PLAN_LIMIT = DecisionPoint::PLAN_MAX
       DIALOGUE_PAGE_LIMIT = 40
       DIALOGUE_FRAME_LIMIT = 1800
       SHEET_PAGES = 8
@@ -30,6 +31,7 @@ module Koholint
       def initialize(client:, registry:, objectives:, manual: '', on_step: nil, ledger: nil)
         @ledger = hook_doubt(ledger || Ledger.new)
         @refusals = []
+        @plan = nil
         @frame = 0
         @client = client
         @registry = registry
@@ -77,7 +79,8 @@ module Koholint
 
         choice = decision_point.validate(reply.output).slice(*decision_point.output_schema)
         start_objective(choice, state, context) if decision_point.name == :choose_objective
-        answer(choice, reply, reply.output).merge(transcription_for(reply.output, state, decision_point))
+        plan = remember_plan(reply.output)
+        answer(choice, reply, reply.output).merge(plan ? { plan: } : {}).merge(transcription_for(reply.output, state, decision_point))
       rescue NameError, TypeError
         raise
       rescue StandardError => e
@@ -175,7 +178,10 @@ module Koholint
       def track
         before = @objectives.history.size
         yield
-        @on_step&.call if @objectives.history.size > before
+        return unless @objectives.history.size > before
+
+        @plan = nil
+        @on_step&.call
       end
 
       def start_objective(choice, state, context)
@@ -305,7 +311,7 @@ module Koholint
 
       def ask(decision_point, state, context)
         @prompt = Agents::Context.build(state:, grid: grid_for(state, context), objective: @objectives.current, history: @objectives.history,
-                                       attempts: @objectives.attempts_for_prompt, manual: @manual, last_results: @last_results, ledger: @ledger, refusals: @refusals)
+                                       attempts: @objectives.attempts_for_prompt, manual: @manual, last_results: @last_results, ledger: @ledger, refusals: @refusals, plan: @plan)
         if decision_point.name == :choose_skill && @sequence
           @pages_read = @sequence[:pages].size
           @images = Vision::DialogueShot.sheets(@sequence[:pages], per_sheet: SHEET_PAGES)
@@ -319,6 +325,14 @@ module Koholint
         end
         pictures = @images ? { images: @images } : { image: @image }
         @client.call(system: Agents::Prompts.system_for(decision_point, sheets: !@images.nil?), prompt: @prompt, schema: decision_point.json_schema, **pictures)
+      end
+
+      def remember_plan(output)
+        text = output['plan']
+        plan = text.is_a?(String) ? clean(text.tr("\n", ' '), cap: PLAN_LIMIT) : ''
+        return if plan.empty?
+
+        @plan = plan
       end
 
       def clean(text, cap: TRANSCRIPTION_LIMIT) = text.gsub(/[^\P{Cntrl}\n]/, '').strip.then { |t| cap ? t[0, cap] : t }

@@ -16,11 +16,11 @@ module Koholint
       KEEP_FINISHED = 5
       KEEP_REFUSALS = 3
 
-      def self.build(state:, grid:, objective:, history:, attempts:, manual:, last_results:, max_chars: 9000, ledger: nil, refusals: [])
+      def self.build(state:, grid:, objective:, history:, attempts:, manual:, last_results:, max_chars: 9000, ledger: nil, refusals: [], plan: nil)
         link = state.cell
         place = [state.room_id, state.map_id]
         results = last_results.last(RESULT_LIMIT).map { |r| r.transform_keys(&:to_sym) }
-        fixed = [header(state, link), grid_block(grid, link, ledger, place), neighbours(grid, link, results, ledger, place), objective_block(objective, attempts)]
+        fixed = [header(state, link), grid_block(grid, link, ledger, place), neighbours(grid, link, results, ledger, place), objective_block(objective, attempts, plan)]
         finished = history.map { |h| "- #{h[:id]} #{h[:outcome]}#{h[:reason] ? " (#{h[:reason]})" : ''}: #{h[:title]}" }
         refused = refusals.last(KEEP_REFUSALS).map { |r| "- #{r[:title]} #{r[:predicate].to_json}: #{r[:reason]}" }
         lines = results.map { |r| "- #{result_line(r)}" }
@@ -148,10 +148,11 @@ module Koholint
       def self.blocked_at(r) = r[:blocked_at].is_a?(Hash) ? r[:blocked_at].transform_keys(&:to_sym) : nil
       private_class_method :blocked_at
 
-      def self.objective_block(objective, attempts)
-        return 'Current objective: none' unless objective
+      def self.objective_block(objective, attempts, plan = nil)
+        lines = objective ? ["Current objective: #{objective[:title]}", "Predicate: #{objective[:predicate].to_json}"] : ['Current objective: none']
+        lines << "Your plan from your last call (written by you; follow it unless the situation changed): #{plan}" if plan
+        return lines.join("\n") unless objective
 
-        lines = ["Current objective: #{objective[:title]}", "Predicate: #{objective[:predicate].to_json}"]
         lines << "Attempts on this objective:\n#{attempts.map { |a| "- #{a}" }.join("\n")}" if attempts.any?
         lines.join("\n")
       end

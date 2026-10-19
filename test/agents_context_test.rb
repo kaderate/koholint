@@ -76,6 +76,15 @@ class AgentsContextTest < Minitest::Test
     refute_includes build, 'Refused objectives'
   end
 
+  def test_plan_is_shown_after_the_objective_and_before_the_attempts
+    objective = { id: 'obj-2', title: 'Leave the room', predicate: { kind: 'new_place' } }
+    text = build(objective:, attempts: ['walk -> blocked'], plan: 'talk to the NPC first')
+    line = 'Your plan from your last call (written by you; follow it unless the situation changed): talk to the NPC first'
+    assert_includes text, "Predicate: {\"kind\":\"new_place\"}\n#{line}\nAttempts on this objective:"
+    refute_includes build(objective:, attempts: ['walk -> blocked']), 'Your plan'
+    assert_includes build(plan: 'x'), "Current objective: none\nYour plan from your last call"
+  end
+
   def test_snapshot
     objective = { id: 'obj-2', title: 'Leave the room', predicate: { kind: 'leave_place', place: [163, 16] } }
     text = build(objective:, attempts: ['walk {"direction":"up","cells":2} -> blocked'],
