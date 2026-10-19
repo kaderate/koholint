@@ -57,6 +57,7 @@ class AgentsContextTest < Minitest::Test
       Phase: playing
       Place: room 163, map 16
       Link: row 3, col 4 (pixel x=68, y=60), facing up
+      Link offset from cell centre: dx=-4, dy=-4
       Health: 3 of 3 hearts
 
       Grid (rows 0-7 top to bottom, cols 0-9 left to right):

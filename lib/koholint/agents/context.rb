@@ -1,5 +1,6 @@
 require 'json'
 require 'koholint/game_state'
+require 'koholint/geometry'
 require 'koholint/perception'
 require 'koholint/vision/grid'
 
@@ -55,9 +56,14 @@ module Koholint
 
       def self.header(state, link)
         where = link ? "row #{link[0]}, col #{link[1]}" : 'outside the grid (doorway or screen edge)'
-        ["Phase: #{state.phase}", "Place: room #{state.room_id}, map #{state.map_id}",
-         "Link: #{where} (pixel x=#{state.x}, y=#{state.y}), facing #{state.direction}",
-         "Health: #{hearts(state.hp)} of #{hearts(state.max_hp)} hearts"].join("\n")
+        lines = ["Phase: #{state.phase}", "Place: room #{state.room_id}, map #{state.map_id}",
+                 "Link: #{where} (pixel x=#{state.x}, y=#{state.y}), facing #{state.direction}"]
+        if link
+          dx, dy = Geometry.offset(state.x, state.y, link)
+          lines << "Link offset from cell centre: dx=#{dx}, dy=#{dy}"
+        end
+        lines << "Health: #{hearts(state.hp)} of #{hearts(state.max_hp)} hearts"
+        lines.join("\n")
       end
       private_class_method :header
 
