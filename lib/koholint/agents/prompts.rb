@@ -14,8 +14,8 @@ module Koholint
 
       OBJECTIVE = <<~TEXT.freeze
         Decision: choose the next objective.
-        An objective is a short goal with a title and a predicate that the harness can check from memory. The predicate is one of four kinds: leave_place (place), reach_place (place), reach_cell (place, row, col) or dialogue_closed. A place is [room, map] as integers, row is 0-7 and col is 0-9.
-        leave_place means finding a way out of the current place. new_place (no fields) means reaching a place not yet visited in this run. reach_cell targets that are already reachable over cells observed free are refused: choose goals that need exploration.
+        An objective is a short goal with a title and a predicate that the harness can check from memory. The predicate is one of five kinds: leave_place (place), reach_place (place), reach_cell (place, row, col), dialogue_closed or new_place (no fields). A place is [room, map] as integers, row is 0-7 and col is 0-9.
+        leave_place means finding a way out of the current place. new_place means reaching a place not yet visited in this run. reach_cell targets that are already reachable over cells observed free are refused: choose goals that need exploration.
         Pick an objective that is achievable from the current state and different from objectives that already failed or were abandoned. Give the exact fields of the chosen kind and no others.
         Output fields: title, predicate, justification, confidence.
       TEXT

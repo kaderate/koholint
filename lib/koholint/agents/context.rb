@@ -14,17 +14,19 @@ module Koholint
       MANUAL_LIMIT = 3000
       KEEP_RESULTS = 3
       KEEP_FINISHED = 5
+      KEEP_REFUSALS = 3
 
-      def self.build(state:, grid:, objective:, history:, attempts:, manual:, last_results:, max_chars: 9000, ledger: nil)
+      def self.build(state:, grid:, objective:, history:, attempts:, manual:, last_results:, max_chars: 9000, ledger: nil, refusals: [])
         link = state.cell
         place = [state.room_id, state.map_id]
         results = last_results.last(RESULT_LIMIT).map { |r| r.transform_keys(&:to_sym) }
         fixed = [header(state, link), grid_block(grid, link, ledger, place), neighbours(grid, link, results, ledger, place), objective_block(objective, attempts)]
         finished = history.map { |h| "- #{h[:id]} #{h[:outcome]}#{h[:reason] ? " (#{h[:reason]})" : ''}: #{h[:title]}" }
+        refused = refusals.last(KEEP_REFUSALS).map { |r| "- #{r[:title]} #{r[:predicate].to_json}: #{r[:reason]}" }
         lines = results.map { |r| "- #{result_line(r)}" }
         notes = trim_manual(manual.to_s)
         loop do
-          text = render(fixed, finished, lines, notes)
+          text = render(fixed, finished, refused, lines, notes)
           return text if text.size <= max_chars
 
           if !notes.empty? then notes = trim_lines(notes, text.size - max_chars)
@@ -45,9 +47,10 @@ module Koholint
       end
       private_class_method :trim_lines
 
-      def self.render(fixed, finished, lines, notes)
+      def self.render(fixed, finished, refused, lines, notes)
         sections = fixed.dup
         sections << "Finished objectives:\n#{finished.join("\n")}" if finished.any?
+        sections << "Refused objectives:\n#{refused.join("\n")}" if refused.any?
         sections << "Last skill results:\n#{lines.join("\n")}" if lines.any?
         sections << "Game manual:\n#{notes}" unless notes.empty?
         sections.join("\n\n")
@@ -128,12 +131,22 @@ module Koholint
       private_class_method :neighbours
 
       def self.last_walk(results, direction)
-        found = results.reverse.find { |r| r[:skill].to_s == 'walk' && r[:params].to_h.transform_keys(&:to_sym)[:direction].to_s == direction.to_s }
+        found = results.reverse.find { |r| walked?(r, direction) || blocked_going?(r, direction) }
         return 'none' unless found
+        return 'blocked' unless walked?(found, direction)
 
         "#{found[:stopped_by]} after #{cells(found[:moved_cells])}"
       end
       private_class_method :last_walk
+
+      def self.walked?(r, direction) = r[:skill].to_s == 'walk' && r[:params].to_h.transform_keys(&:to_sym)[:direction].to_s == direction.to_s
+      private_class_method :walked?
+
+      def self.blocked_going?(r, direction) = blocked_at(r)&.dig(:direction).to_s == direction.to_s
+      private_class_method :blocked_going?
+
+      def self.blocked_at(r) = r[:blocked_at].is_a?(Hash) ? r[:blocked_at].transform_keys(&:to_sym) : nil
+      private_class_method :blocked_at
 
       def self.objective_block(objective, attempts)
         return 'Current objective: none' unless objective
@@ -145,8 +158,13 @@ module Koholint
       private_class_method :objective_block
 
       def self.result_line(r)
-        "#{r[:skill]} #{r[:params].to_json}: stopped_by #{r[:stopped_by]}, #{r[:frames]} frames, moved #{r[:moved_px] ? "#{r[:moved_px]} px" : cells(r[:moved_cells])}, " \
-          "room_changed #{r[:room_changed]}, hp_delta #{r[:hp_delta]}, dialogue open before #{r[:dialog_before]}, after #{r[:dialog_after]}"
+        cause = r[:cause] ? " (cause: #{r[:cause]})" : ''
+        line = "#{r[:skill]} #{r[:params].to_json}: stopped_by #{r[:stopped_by]}#{cause}, #{r[:frames]} frames, " \
+               "moved #{r[:moved_px] ? "#{r[:moved_px]} px" : cells(r[:moved_cells])}, " \
+               "room_changed #{r[:room_changed]}, hp_delta #{r[:hp_delta]}, dialogue open before #{r[:dialog_before]}, after #{r[:dialog_after]}"
+        line += ", path #{r[:path_length]}, steps #{r[:steps_done]}, aligned #{r[:aligned]}" if r[:skill].to_s == 'goto'
+        block = blocked_at(r)
+        block ? "#{line}, blocked at (#{block[:row]},#{block[:col]}) #{block[:direction]}" : line
       end
       private_class_method :result_line
     end

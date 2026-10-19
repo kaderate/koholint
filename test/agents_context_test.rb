@@ -53,6 +53,29 @@ class AgentsContextTest < Minitest::Test
     assert_includes text, 'step {"direction":"up","pixels":5}: stopped_by done, 40 frames, moved 5 px, room_changed'
   end
 
+  def test_goto_results_show_the_path_the_block_and_the_cause
+    goto = result(skill: 'goto', params: { row: 1, col: 9 }, stopped_by: 'no_path', cause: 'target is sealed', moved_cells: 0, path_length: 6,
+                  steps_done: 2, aligned: false, blocked_at: { row: 3, col: 5, direction: :right })
+    text = build(last_results: [goto])
+    assert_includes text, 'goto {"row":1,"col":9}: stopped_by no_path (cause: target is sealed), 40 frames, moved 0 cells, room_changed false, ' \
+                          'hp_delta 0, dialogue open before false, after false, path 6, steps 2, aligned false, blocked at (3,5) right'
+    assert_includes text, "- right: cell (3,5) '#', belief no, last walk: blocked\n"
+  end
+
+  def test_a_later_walk_overrides_a_goto_block_for_that_direction
+    goto = result(skill: 'goto', params: { row: 1, col: 9 }, stopped_by: 'blocked', path_length: 6, steps_done: 2, aligned: true,
+                  blocked_at: { 'row' => 3, 'col' => 5, 'direction' => 'right' })
+    walk = result(params: { direction: 'right', cells: 1 }, moved_cells: 1, stopped_by: 'done')
+    assert_includes build(last_results: [goto, walk]), 'last walk: done after 1 cell'
+  end
+
+  def test_refused_objectives_are_listed
+    refusals = [{ title: 'go', predicate: { kind: 'leave_place', place: [1, 2] }, reason: 'wrong place' }]
+    text = build(refusals:)
+    assert_includes text, "Refused objectives:\n- go {\"kind\":\"leave_place\",\"place\":[1,2]}: wrong place"
+    refute_includes build, 'Refused objectives'
+  end
+
   def test_snapshot
     objective = { id: 'obj-2', title: 'Leave the room', predicate: { kind: 'leave_place', place: [163, 16] } }
     text = build(objective:, attempts: ['walk {"direction":"up","cells":2} -> blocked'],

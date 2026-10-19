@@ -346,6 +346,13 @@ class DelegatedPolicyTest < Minitest::Test
     end
   end
 
+  def flush(policy, frame)
+    waited = decide_with_shot(policy, state(frame:))
+    assert_equal [{ skill: 'wait', params: { frames: 10 } }, 'delegated', 0.0, false], waited.values_at(:choice, :agent, :cost_usd, :fallback)
+    advance(policy, waited, state(frame: frame + 10), frame + 10)
+    decide_with_shot(policy, state(frame: frame + 10))
+  end
+
   def test_a_dialogue_advances_by_itself_and_is_read_once_when_it_closes
     client = ScriptedClient.new(objective: objective, skill: [ok('skill' => 'wait', 'params' => { 'frames' => 3 }, 'transcription' => "One\n\nTwo\n\nThree"), ok('skill' => 'wait', 'params' => { 'frames' => 3 })])
     p = policy(client)
@@ -356,7 +363,7 @@ class DelegatedPolicyTest < Minitest::Test
       assert_equal [{ skill: 'advance_dialogue', params: {} }, 'automatic dialogue advance', 'delegated', 0.0, false, nil, nil],
                    r.values_at(:choice, :justification, :agent, :cost_usd, :fallback, :prompt, :image)
     end
-    result = decide_with_shot(p, state(frame: 300))
+    result = flush(p, 300)
     assert_equal 2, client.calls.size
     assert_nil client.calls.last[:image]
     assert_equal 1, client.calls.last[:images].size
@@ -364,7 +371,7 @@ class DelegatedPolicyTest < Minitest::Test
     assert_equal [{ text: 'One', page: 1, frame: 100, place: [163, 16] }, { text: 'Two', page: 2, frame: 100, place: [163, 16] },
                   { text: 'Three', page: 3, frame: 100, place: [163, 16] }], result[:transcription]
     assert_equal 1, result[:images].size
-    assert_nil decide_with_shot(p, state(frame: 301))[:transcription]
+    assert_nil decide_with_shot(p, state(frame: 320))[:transcription]
   end
 
   def test_automatic_pages_never_run_the_hemmed_or_attempt_logic
@@ -380,10 +387,13 @@ class DelegatedPolicyTest < Minitest::Test
     p = policy(client)
     decide_with_shot(p, state)
     pages(p, 2)
-    mid = state(frame: 200)
-    advance(p, { choice: { skill: 'advance_dialogue', params: {} } }, mid, 200)
-    pages(p, 2, from: 230)
-    result = decide_with_shot(p, state(frame: 400))
+    waited = decide_with_shot(p, state(frame: 200))
+    assert_equal [{ skill: 'wait', params: { frames: 10 } }, 'automatic dialogue advance: waiting for the dialogue to reopen', 'delegated', 0.0, false, nil],
+                 waited.values_at(:choice, :justification, :agent, :cost_usd, :fallback, :prompt)
+    advance(p, waited, state(frame: 210), 210)
+    assert_equal 1, client.calls.size
+    pages(p, 2, from: 215)
+    result = flush(p, 400)
     assert_equal 2, client.calls.size
     assert_equal (1..4).to_a, result[:transcription].map { |t| t[:page] }
   end
@@ -432,17 +442,31 @@ class DelegatedPolicyTest < Minitest::Test
     assert_nil @objectives.current
   end
 
-  def test_pages_pending_at_an_objective_tour_are_dropped
-    client = ScriptedClient.new(objective: [objective, objective], skill: ok('skill' => 'wait', 'params' => { 'frames' => 3 }, 'transcription' => 'Fresh'))
+  def test_pages_pending_at_an_objective_tour_are_kept_for_the_next_skill_tour
+    client = ScriptedClient.new(objective: [objective, objective], skill: ok('skill' => 'wait', 'params' => { 'frames' => 3 }, 'transcription' => "One\n\nTwo\n\nFresh"))
     p = policy(client)
     decide_with_shot(p, state)
     pages(p, 2)
-    p.instance_variable_get(:@objectives).instance_variable_set(:@current, nil)
+    @objectives.instance_variable_set(:@current, nil)
     decide_with_shot(p, state(frame: 200))
+    assert_equal 2, client.calls.size
+    p.decide(Koholint::DecisionPoint.choose_skill(Koholint::Skills::Registry.default), state(frame: 210), { grid: })
     pages(p, 1, from: 300)
-    result = decide_with_shot(p, state(frame: 400))
-    assert_includes client.calls.last[:prompt], '1 pages'
-    assert_equal [{ text: 'Fresh', page: 1, frame: 300, place: [163, 16] }], result[:transcription]
+    result = flush(p, 400)
+    assert_includes client.calls.last[:prompt], '3 pages'
+    assert_equal %w[One Two Fresh], result[:transcription].map { |t| t[:text] }
+  end
+
+  def test_a_stale_sequence_or_one_from_another_place_is_dropped
+    reply = ok('skill' => 'wait', 'params' => { 'frames' => 3 }, 'transcription' => 'Fresh')
+    p = policy(ScriptedClient.new(objective: objective, skill: reply, default: reply))
+    decide_with_shot(p, state)
+    pages(p, 2)
+    decide_with_shot(p, state(frame: 131 + 601))
+    assert_nil p.instance_variable_get(:@sequence)
+    pages(p, 1, from: 800)
+    decide_with_shot(p, state(frame: 850, room_id: 5))
+    assert_nil p.instance_variable_get(:@sequence)
   end
 
   def test_the_transcription_keeps_every_paragraph_and_splits_long_blocks
@@ -452,11 +476,11 @@ class DelegatedPolicyTest < Minitest::Test
     p = policy(client)
     decide_with_shot(p, state)
     pages(p, 1)
-    result = decide_with_shot(p, state(frame: 200))
+    result = flush(p, 200)
     assert_equal [500, 500, 100], result[:transcription].map { |t| t[:text].length }
     assert_equal [1, 2, 3], result[:transcription].map { |t| t[:page] }
     pages(p, 1, from: 300)
-    assert_equal %w[a b c], decide_with_shot(p, state(frame: 400))[:transcription].map { |t| t[:text] }
+    assert_equal %w[a b c], flush(p, 400)[:transcription].map { |t| t[:text] }
   end
 
   def test_the_frame_guard_also_asks_the_model
@@ -474,7 +498,7 @@ class DelegatedPolicyTest < Minitest::Test
     p = policy(client)
     decide_with_shot(p, state)
     pages(p, 1)
-    assert_nil decide_with_shot(p, state(frame: 200))[:transcription]
+    assert_nil flush(p, 200)[:transcription]
   end
 
   def test_the_transcription_is_capped_and_stripped_of_control_characters
@@ -482,7 +506,7 @@ class DelegatedPolicyTest < Minitest::Test
     p = policy(ScriptedClient.new(objective: objective, skill: talk(long)))
     decide_with_shot(p, state)
     pages(p, 1)
-    text = decide_with_shot(p, state(frame: 200))[:transcription].first[:text]
+    text = flush(p, 200)[:transcription].first[:text]
     assert_equal 500, text.length
     assert text.start_with?("AB\nCxxx")
   end
@@ -497,7 +521,7 @@ class DelegatedPolicyTest < Minitest::Test
     p = policy(ScriptedClient.new(objective: objective, skill: failing('claude error: image'), default: failing('again')))
     decide_with_shot(p, state)
     pages(p, 2)
-    result = decide_with_shot(p, state(frame: 200))
+    result = flush(p, 200)
     assert result[:fallback]
     assert_equal 'wait', result[:choice][:skill]
     assert_nil result[:transcription]
@@ -740,6 +764,40 @@ class DelegatedEngineTest < Minitest::Test
     end
   end
 
+  class RefusingPolicy
+    def initialize(script) = (@script = script.dup; @point = Koholint::DecisionPoint.choose_skill(Koholint::Skills::Registry.default))
+    def decision_point_for(_state) = @point
+
+    def decide(_point, _state, _context)
+      refused = @script.shift
+      { choice: { skill: 'wait', params: { frames: 1 } }, justification: 'x', confidence: 0.0, agent: 'claude', latency_ms: 0, cost_usd: 0.0,
+        fallback: refused != :ok, decision_point: @point, **(refused == :refused ? { refused: true } : {}) }
+    end
+  end
+
+  def refusal_run(script, limit_calls: nil)
+    skip_without_rom!
+    with_run do |run|
+      policy = RefusingPolicy.new(script)
+      engine = Koholint::Engine.new(run:, policy:, budget: Koholint::Budget.new(frames: 400), emulator: EmulatorCache.interactive)
+      yield engine.run, run
+    end
+  end
+
+  def test_ten_consecutive_refusals_stop_the_run_five_do_not
+    refusal_run([:refused] * 5 + [:ok] * 400) { |reason, _| assert_equal :frames, reason }
+    refusal_run([:refused] * 10 + [:ok] * 400) do |reason, run|
+      assert_equal :agent_refusals, reason
+      assert_equal ['agent_refusals'], events(run, :budget_stop).map { |e| e['kind'] }
+      assert_equal 10, events(run, :decision).size
+    end
+  end
+
+  def test_refusals_neither_reset_nor_count_as_failures_and_a_success_resets_them
+    refusal_run([:failed] * 4 + [:refused] * 9 + [:ok] + [:refused] * 9 + [:ok] * 400) { |reason, _| assert_equal :frames, reason }
+    refusal_run([:failed] * 4 + [:refused] * 9 + [:failed] + [:ok] * 400) { |reason, _| assert_equal :agent_failures, reason }
+  end
+
   def test_resume_abandons_dangling_objectives_and_does_not_reuse_ids
     skip_without_rom!
     with_run do |run|
@@ -775,6 +833,12 @@ class DelegatedLedgerTest < Minitest::Test
     end
     cells ||= Array.new(8) { Array.new(10) { 'floor' } }
     Koholint::Vision::Grid.new(cells:, static_sprites: {}, beliefs:, capabilities: Koholint::Vision::Capabilities.new)
+  end
+
+  def unknown_grid
+    cells = Array.new(8) { Array.new(10) { 'floor' } }
+    cells[1][9] = 'mystery'
+    free_grid(cells:)
   end
 
   def reach_cell(row, col) = ok('title' => 'go', 'predicate' => { 'kind' => 'reach_cell', 'place' => PLACE, 'row' => row, 'col' => col })
@@ -902,6 +966,99 @@ class DelegatedLedgerTest < Minitest::Test
     p.observe(state(room_id: 9), frame: 200)
     assert_nil @objectives.current
     assert_equal :achieved, @objectives.history.last[:outcome]
+  end
+
+  def test_refused_objectives_are_flagged_remembered_three_deep_and_shown_then_cleared
+    trivial = reach_cell(3, 6)
+    elsewhere = objective(kind: 'leave_place', place: [1, 2])
+    good = objective(kind: 'reach_place', place: [1, 2])
+    client = ScriptedClient.new(objective: [trivial, elsewhere, trivial, elsewhere, trivial, good], skill: walk)
+    p = policy(client)
+    results = 5.times.map { p.decide(p.decision_point_for(state), state, { grid: free_grid }) }
+    assert(results.all? { |r| r[:refused] && r[:fallback] })
+    prompt = client.calls.last[:prompt]
+    assert_includes prompt, <<~TEXT.chomp
+      Refused objectives:
+      - go {"kind":"leave_place","place":[1,2]}: leave_place must name the current place [163, 16], not [1, 2]
+      - go {"kind":"reach_cell","place":[163,16],"row":3,"col":6}: reach_cell target is already reachable over cells observed free; choose a goal that needs exploration
+      - go {"kind":"leave_place","place":[1,2]}: leave_place must name the current place [163, 16], not [1, 2]
+    TEXT
+    refute_includes client.calls.first[:prompt], 'Refused objectives'
+    refute p.decide(p.decision_point_for(state), state, { grid: free_grid })[:refused]
+    p.decide(p.decision_point_for(state), state, { grid: free_grid })
+    refute_includes client.calls.last[:prompt], 'Refused objectives'
+  end
+
+  def test_an_agent_failure_is_not_a_refusal
+    p = policy(ScriptedClient.new(objective: failing('down')))
+    result = p.decide(p.decision_point_for(state), state, { grid: free_grid })
+    assert result[:fallback]
+    refute result.key?(:refused)
+  end
+
+  def test_a_goto_chosen_on_an_overlay_frame_still_plans
+    goto = ok('skill' => 'goto', 'params' => { 'row' => 3, 'col' => 6 })
+    p = policy(ScriptedClient.new(objective: reach_cell(1, 9), skill: goto))
+    p.decide(p.decision_point_for(state), state, { grid: unknown_grid })
+    context = { grid: nil }
+    result = p.decide(p.decision_point_for(state), state, context)
+    assert_same context[:grid], p.instance_variable_get(:@last_grid)
+    run = Koholint::Skills::Registry.default.start('goto', state, result[:choice][:params], context)
+    refute_empty run.next_input(state)
+  end
+
+  def test_no_grid_is_invented_for_a_new_place
+    p = policy(ScriptedClient.new(objective: reach_cell(1, 9), skill: walk))
+    p.decide(p.decision_point_for(state), state, { grid: unknown_grid })
+    context = {}
+    p.decide(p.decision_point_for(state(room_id: 9)), state(room_id: 9), context)
+    assert_nil context[:grid]
+  end
+
+  class NoPathObjectives < Koholint::Objectives
+    attr_reader :no_paths
+
+    def note_no_path(frame:) = (@no_paths = [*@no_paths, frame]).then { nil }
+  end
+
+  def test_no_path_results_are_reported_to_the_objectives_and_summarised_with_their_cause
+    @objectives = NoPathObjectives.new(trace:)
+    p = Koholint::Policies::Delegated.new(client: ScriptedClient.new(objective: reach_cell(1, 9), skill: walk), registry: Koholint::Skills::Registry.default,
+                                          objectives: @objectives)
+    p.decide(p.decision_point_for(state), state, { grid: unknown_grid })
+    outcome = { skill: 'goto', params: { row: 1, col: 9 }, stopped_by: 'no_path', cause: 'target is sealed', moved_cells: 0,
+                blocked_at: { row: 3, col: 5, direction: :right } }
+    p.after_action(choice: { skill: 'goto', params: outcome[:params] }, outcome:, state:, frame: 140)
+    assert_equal [140], @objectives.no_paths
+    attempt = @objectives.attempts_for_prompt.last
+    assert_includes attempt, 'blocked_at (3,5) right'
+    assert_includes attempt, 'cause target is sealed'
+    walked = { skill: 'walk', params: { direction: 'up', cells: 1 }, stopped_by: 'done', moved_cells: 1 }
+    p.after_action(choice: { skill: 'walk', params: walked[:params] }, outcome: walked, state:, frame: 150)
+    assert_equal [140], @objectives.no_paths
+  end
+
+  class DoubtLedger < Koholint::Ledger
+    def initialize(on_doubt: nil) = (super(); @on_doubt = on_doubt)
+
+    def record(place:, blocked_at:)
+      super
+      count = count(place, [blocked_at[:row], blocked_at[:col]], blocked_at[:direction])
+      @on_doubt&.call(place:, cell: [blocked_at[:row], blocked_at[:col]], direction: blocked_at[:direction].to_sym, count:) if count == DOUBT_AT
+    end
+  end
+
+  def test_a_doubtful_edge_emits_a_grid_contradiction_once_per_crossing
+    sink = trace
+    @objectives = Koholint::Objectives.new(trace: sink)
+    @objectives.define_singleton_method(:trace) { sink }
+    p = Koholint::Policies::Delegated.new(client: ScriptedClient.new(objective: objective(kind: 'reach_place', place: [1, 2]), skill: walk),
+                                          registry: Koholint::Skills::Registry.default, objectives: @objectives, ledger: DoubtLedger.new)
+    p.decide(p.decision_point_for(state), state, { grid: unknown_grid })
+    3.times { |i| block(p, frame: 101 + i) }
+    events = Koholint::Trace.read(File.join(@dir, 'trace.jsonl')).select { |e| e['type'] == 'grid_contradiction' }
+    assert_equal 1, events.size
+    assert_equal [102, [163, 16], 3, 4, 'up', 'yes', 'blocked x2'], events.first.values_at('frame', 'place', 'row', 'col', 'direction', 'believed', 'observed')
   end
 
   def test_the_system_prompts_state_the_vocabulary
