@@ -388,8 +388,8 @@ class SkillsTest < Minitest::Test
     [execution.result(state(x:, y:, hp:)), inputs]
   end
 
-  def goto(row, col, start: [88, 80], grid: OpenGrid.new, ledger: nil, **walls)
-    execution = registry.start('goto', state(x: start[0], y: start[1]), { row:, col: }, { grid:, ledger: }.compact)
+  def goto(row, col, start: [88, 80], grid: OpenGrid.new, ledger: nil, triggers: nil, **walls)
+    execution = registry.start('goto', state(x: start[0], y: start[1]), { row:, col: }, { grid:, ledger:, triggers: }.compact)
     simulate(execution, start, **walls)
   end
 
@@ -446,6 +446,14 @@ class SkillsTest < Minitest::Test
     2.times { ledger.record(place:, blocked_at: { row: 4, col: 5, direction: :right }) }
     result, = goto(4, 6, ledger:, grid: OpenGrid.new(walls: [[3, 5], [5, 5], [3, 6], [5, 6], [4, 4]]))
     assert_equal 'no route: doubtful edges (4,5) right', result[:cause]
+  end
+
+  def test_goto_no_path_cause_names_forbidden_trigger_edges
+    triggers = Koholint::Triggers.new
+    triggers.record(place: [state.room_id, state.map_id], cell: [4, 5], skill: 'walk', input: :right)
+    result, = goto(4, 6, triggers:, grid: OpenGrid.new(walls: [[3, 5], [5, 5], [3, 6], [5, 6], [4, 4]]))
+    assert_equal :no_path, result[:stopped_by]
+    assert_equal 'no route: edges where the game opens a dialogue by itself: (4,5) right; walk or step there explicitly if passing is the goal', result[:cause]
   end
 
   def test_goto_without_a_grid_is_no_path

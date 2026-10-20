@@ -18,11 +18,11 @@ module Koholint
       TRIGGER_AT = 2
       THINGS_LIMIT = 12
 
-      def self.build(state:, grid:, objective:, history:, attempts:, manual:, last_results:, max_chars: 9000, ledger: nil, refusals: [], plan: nil, triggers: nil, talk_log: nil)
+      def self.build(state:, grid:, objective:, history:, attempts:, manual:, last_results:, max_chars: 9000, ledger: nil, refusals: [], plan: nil, triggers: nil, talk_log: nil, locked: nil)
         link = state.cell
         place = [state.room_id, state.map_id]
         results = last_results.last(RESULT_LIMIT).map { |r| r.transform_keys(&:to_sym) }
-        fixed = [header(state, link, triggers, place), grid_block(grid, link, ledger, place), neighbours(grid, link, results, ledger, place),
+        fixed = [header(state, link, triggers, place, locked), grid_block(grid, link, ledger, place), neighbours(grid, link, results, ledger, place),
                  *things_block(grid, talk_log, place), objective_block(objective, attempts, plan)]
         finished = history.map { |h| "- #{h[:id]} #{h[:outcome]}#{h[:reason] ? " (#{h[:reason]})" : ''}: #{h[:title]}" }
         refused = refusals.last(KEEP_REFUSALS).map { |r| "- #{r[:title]} #{r[:predicate].to_json}: #{r[:reason]}" }
@@ -60,7 +60,7 @@ module Koholint
       end
       private_class_method :render
 
-      def self.header(state, link, triggers = nil, place = nil)
+      def self.header(state, link, triggers = nil, place = nil, locked = nil)
         where = link ? "row #{link[0]}, col #{link[1]}" : 'outside the grid (doorway or screen edge)'
         lines = ["Phase: #{state.phase}", "Place: room #{state.room_id}, map #{state.map_id}",
                  "Link: #{where} (pixel x=#{state.x}, y=#{state.y}), facing #{state.direction}"]
@@ -71,10 +71,13 @@ module Koholint
         lines << "Health: #{hearts(state.hp)} of #{hearts(state.max_hp)} hearts"
         known = link && triggers ? triggers.forbidden(place, link) : []
         known.each do |input|
-          lines << "Pressing #{input} while Link was on this cell opened a dialogue by itself #{triggers.input_count(place, link, input)} times (the game triggers it; other inputs did not)."
+          times = triggers.input_count(place, link, input)
+          lines << "Pressing #{input} while Link was on this cell opened a dialogue by itself #{times} #{times == 1 ? 'time' : 'times'} (the game triggers it; other inputs did not; " \
+                   'goto and talk_to routes avoid it, an explicit walk, step or press is not filtered).'
         end
         opened = link && triggers && known.empty? ? triggers.count(place, link) : 0
         lines << "A dialogue opened by itself #{opened} times while Link was on this cell (the game triggers it; repeating the same action here does not change that)." if opened >= TRIGGER_AT
+        lines << "Link has not moved in the last #{locked} attempts in different directions and no dialogue is open: movement may be locked by an animation or an event; waiting a few seconds is usually enough before trying again." if locked
         lines.join("\n")
       end
       private_class_method :header

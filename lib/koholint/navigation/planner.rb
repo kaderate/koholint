@@ -22,7 +22,7 @@ module Koholint
         @avoided << [cell, direction]
       end
 
-      def path(from:, to:, mode: :explore, doubt: true)
+      def path(from:, to:, mode: :explore, doubt: true, forbid: true)
         return nil unless inside?(from) && inside?(to)
         return [from] if from == to
 
@@ -37,7 +37,7 @@ module Koholint
 
           DELTAS.each_key do |direction|
             target = step(cell, direction)
-            next unless target && walkable?(cell, target, direction, allowed, doubt)
+            next unless target && walkable?(cell, target, direction, allowed, doubt, forbid)
 
             cost = [steps + 1, turns + (heading && heading != direction ? 1 : 0)]
             key = [target, direction]
@@ -58,14 +58,21 @@ module Koholint
         return 'target covered by an object' if @grid.static_sprite(*to)
         return 'target believed blocked' if DELTAS.each_key.all? { |direction| @grid.passable(*to, direction) == :no }
 
-        free = path(from:, to:, doubt: false)
+        free = path(from:, to:, doubt: false) || path(from:, to:, doubt: false, forbid: false)
         return 'no route over known cells' unless free
 
-        edges = free.each_cons(2).filter_map do |a, b|
+        doubtful = []
+        triggered = []
+        free.each_cons(2) do |a, b|
           direction = self.class.direction_between(a, b)
-          "(#{a[0]},#{a[1]}) #{direction}" if @ledger&.doubtful?(@place, a, direction) && @grid.passable(*b, direction) == :yes
+          label = "(#{a[0]},#{a[1]}) #{direction}"
+          doubtful << label if @ledger&.doubtful?(@place, a, direction) && @grid.passable(*b, direction) == :yes
+          triggered << label if @triggers&.forbidden(@place, a)&.include?(direction)
         end
-        "no route: doubtful edges #{edges.join(', ')}"
+        parts = []
+        parts << "doubtful edges #{doubtful.join(', ')}" if doubtful.any? || triggered.empty?
+        parts << "edges where the game opens a dialogue by itself: #{triggered.join(', ')}; walk or step there explicitly if passing is the goal" if triggered.any?
+        "no route: #{parts.join('; ')}"
       end
 
       private
@@ -78,10 +85,10 @@ module Koholint
         target if inside?(target)
       end
 
-      def walkable?(cell, target, direction, allowed, doubt)
+      def walkable?(cell, target, direction, allowed, doubt, forbid)
         return false if @grid.static_sprite(*target)
         return false if @avoided.include?([cell, direction])
-        return false if @triggers&.forbidden(@place, cell)&.include?(direction)
+        return false if forbid && @triggers&.forbidden(@place, cell)&.include?(direction)
 
         belief = @grid.passable(*target, direction)
         return false if doubt && belief == :yes && @ledger&.doubtful?(@place, cell, direction)

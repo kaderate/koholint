@@ -15,6 +15,8 @@ module Koholint
         from = Ledger.place_of(Ledger.pick(result, :from))
         to = Ledger.place_of(Ledger.pick(result, :to))
         triggers.reset_unless(from) if from
+        clearing = clearing(skill: Ledger.pick(event, :skill), params: Ledger.pick(event, :params), result:)
+        triggers.clear(**clearing) if clearing && from
         skill = Ledger.pick(event, :skill)
         params = Ledger.pick(event, :params)
         if to && scripted?(skill:, params:, result:)
@@ -30,6 +32,22 @@ module Koholint
       before = Ledger.pick(result, :dialog_before)
       after = Ledger.pick(result, :dialog_after)
       before == false && after == true && !pressing_a?(skill, params)
+    end
+
+    def self.clearing(skill:, params:, result:)
+      return unless %w[walk step].include?(skill.to_s)
+      return unless Ledger.pick(result, :stopped_by).to_s == 'done'
+      return unless Ledger.pick(result, :dialog_before) == false && Ledger.pick(result, :dialog_after) == false
+      return if Array(Ledger.pick(result, :trigger_input)).any?
+      return unless Ledger.pick(result, :moved_cells).to_i.positive? || Ledger.pick(result, :moved_px).to_i.positive? || Ledger.pick(result, :frames).to_i >= 4
+
+      input = Ledger.pick(params, :direction)&.to_s
+      from = Ledger.pick(result, :from)
+      row = Ledger.pick(from, :row)
+      col = Ledger.pick(from, :col)
+      return unless %w[up right down left].include?(input) && row && col
+
+      { place: Ledger.place_of(from), cell: [row, col], input: }
     end
 
     def self.pressing_a?(skill, params)
@@ -64,6 +82,10 @@ module Koholint
       return [] unless cell
 
       @inputs.filter_map { |(p, c, input), _| input if p == place && c == cell.to_a }
+    end
+
+    def clear(place:, cell:, input:)
+      @inputs.delete([place, cell.to_a, input.to_sym])
     end
 
     def input_count(place, cell, input)

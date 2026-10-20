@@ -62,8 +62,15 @@ class AgentsContextTest < Minitest::Test
     link = grid && state.cell
     triggers.record(place: [163, 16], cell: link, skill: 'walk', direction: 'right', input: 'down')
     text = build(triggers:)
-    assert_includes text, 'Pressing down while Link was on this cell opened a dialogue by itself 1 times (the game triggers it; other inputs did not).'
+    assert_includes text, 'Pressing down while Link was on this cell opened a dialogue by itself 1 time (the game triggers it; other inputs did not; goto and talk_to routes avoid it, an explicit walk, step or press is not filtered).'
+    triggers.record(place: [163, 16], cell: link, skill: 'walk', input: 'down')
+    assert_includes build(triggers:), 'by itself 2 times'
     refute_includes text, 'A dialogue opened by itself'
+  end
+
+  def test_the_movement_lock_line_appears_only_when_locked
+    refute_includes build, 'Link has not moved'
+    assert_includes build(locked: 3), "Link has not moved in the last 3 attempts in different directions and no dialogue is open: movement may be locked by an animation or an event; waiting a few seconds is usually enough before trying again."
   end
 
   def test_the_trigger_line_needs_two_openings_on_the_current_cell

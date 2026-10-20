@@ -28,6 +28,9 @@ module Koholint
       HEMMED_WAIT = { skill: 'wait', params: { frames: 120 } }.freeze
       ADVANCE = { skill: 'advance_dialogue', params: {} }.freeze
       HEMMED_DIRECTIONS = 4
+      HEMMED_ATTEMPTS = 4
+      LOCK_BUFFER = 8
+      LOCK_SKILLS = %w[walk step goto talk_to].freeze
       HEMMED_WAIT_LIMIT = 1800 / HEMMED_WAIT[:params][:frames]
 
       def initialize(client:, registry:, objectives:, manual: '', on_step: nil, on_activity: nil, ledger: nil, triggers: nil, talk_log: nil)
@@ -44,7 +47,7 @@ module Koholint
         @on_step = on_step
         @on_activity = on_activity
         @last_results = []
-        @walks = []
+        @locks = []
         @hemmed = nil
         @page = 0
         @sequence = nil
@@ -80,7 +83,7 @@ module Koholint
         if decision_point.name == :choose_skill && !@sequence && hemmed?(state)
           return hemmed_wait if @hemmed[:waits] < HEMMED_WAIT_LIMIT
 
-          clear_hemmed
+          @locks.clear
         end
 
         reply = ask(decision_point, state, context)
@@ -114,7 +117,7 @@ module Koholint
         end
         @last_results << outcome
         @last_results.shift while @last_results.size > RESULT_LIMIT
-        note_walk(choice, outcome, state)
+        note_lock(choice, outcome, state)
         feed_ledger(choice, outcome, state, frame)
         opened = feed_triggers(choice, outcome, state)
         feed_talk_log(choice, outcome, state)
@@ -247,6 +250,8 @@ module Koholint
       end
 
       def feed_triggers(choice, outcome, state)
+        clearing = Triggers.clearing(skill: choice[:skill], params: choice[:params], result: outcome)
+        @triggers.clear(**clearing) if clearing
         return unless Triggers.scripted?(skill: choice[:skill], params: choice[:params], result: outcome)
 
         cell = Triggers.cell_of(outcome)
@@ -281,19 +286,29 @@ module Koholint
         end
       end
 
-      def note_walk(choice, outcome, state)
-        @walks << (choice[:skill] == 'walk' ? { direction: choice[:params][:direction] || choice[:params]['direction'], stopped_by: outcome[:stopped_by].to_s,
-                                                 moved: outcome[:moved_cells].to_i, pos: [state.x, state.y] } : nil)
-        @walks.shift while @walks.size > HEMMED_DIRECTIONS
+      def note_lock(choice, outcome, state)
+        pos = [state.x, state.y]
+        @locks.clear if state.dialog_open? || (@locks.any? && @locks.last[:pos] != pos)
+        skill = choice[:skill]
+        if LOCK_SKILLS.include?(skill)
+          stopped = outcome[:stopped_by].to_s
+          if stopped == 'blocked' && outcome[:moved_cells].to_i.zero? && outcome[:moved_px].to_i.zero?
+            params = choice[:params] || {}
+            direction = skill == 'goto' || skill == 'talk_to' ? nil : (params[:direction] || params['direction']).to_s
+            @locks << { direction:, pos: }
+            @locks.shift while @locks.size > LOCK_BUFFER
+          elsif stopped != 'no_path'
+            @locks.clear
+          end
+        end
         latch_hemmed(state)
       end
 
       def latch_hemmed(state)
-        return if state.dialog_open? || @walks.size < HEMMED_DIRECTIONS || @walks.any?(&:nil?)
-        return unless @walks.map { |w| w[:direction].to_s }.uniq.size == HEMMED_DIRECTIONS
-        return unless @walks.all? { |w| w[:stopped_by] == 'blocked' && w[:moved].zero? && w[:pos] == @walks.first[:pos] }
+        return if @hemmed && @hemmed[:waits] < HEMMED_WAIT_LIMIT && hemmed?(state)
+        return if state.dialog_open? || @locks.size < HEMMED_ATTEMPTS || @locks.filter_map { |l| l[:direction] }.uniq.size < HEMMED_DIRECTIONS
 
-        @hemmed = { pos: @walks.first[:pos], place: [state.room_id, state.map_id], waits: 0 }
+        @hemmed = { pos: @locks.first[:pos], place: [state.room_id, state.map_id], waits: 0, attempts: @locks.count { |l| l[:direction] } }
       end
 
       def hemmed?(state) = !!@hemmed && !state.dialog_open? && [state.x, state.y] == @hemmed[:pos] && [state.room_id, state.map_id] == @hemmed[:place]
@@ -306,7 +321,7 @@ module Koholint
 
       def clear_hemmed
         @hemmed = nil
-        @walks.clear
+        @locks.clear
       end
 
       def automatic_advance(decision_point, state, context)
@@ -338,14 +353,15 @@ module Koholint
       def hemmed_wait
         @waiting = true
         @hemmed[:waits] += 1
-        { choice: HEMMED_WAIT, justification: 'deterministic hemmed-in wait: four directions blocked without movement at the same position',
+        @locks.clear if @hemmed[:waits] >= HEMMED_WAIT_LIMIT
+        { choice: HEMMED_WAIT, justification: 'deterministic hemmed-in wait: blocked in several directions without movement at the same position',
           confidence: 1.0, agent: 'delegated', latency_ms: 0, cost_usd: 0.0, fallback: false, prompt: nil, image: nil }
       end
 
       def ask(decision_point, state, context)
         @prompt = Agents::Context.build(state:, grid: grid_for(state, context), objective: @objectives.current, history: @objectives.history,
                                        attempts: @objectives.attempts_for_prompt, manual: @manual, last_results: @last_results, ledger: @ledger, refusals: @refusals, plan: @plan,
-                                       triggers: @triggers, talk_log: @talk_log)
+                                       triggers: @triggers, talk_log: @talk_log, locked: (@hemmed[:attempts] if @hemmed && hemmed?(state)))
         if decision_point.name == :choose_skill && @sequence
           @pages_read = @sequence[:pages].size
           @images = Vision::DialogueShot.sheets(@sequence[:pages], per_sheet: SHEET_PAGES)
