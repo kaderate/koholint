@@ -103,9 +103,9 @@ class DecisionTest < Minitest::Test
   def test_choose_objective_json_schema
     schema = objective_point.json_schema
     assert_equal 'object', schema[:type]
-    assert_equal %w[title predicate justification confidence plan], schema[:required]
+    assert_equal %w[title predicate justification confidence plan goal], schema[:required]
     kinds = schema[:properties][:predicate][:oneOf].map { |p| p[:properties][:kind][:enum] }
-    assert_equal [%w[leave_place], %w[reach_place], %w[reach_cell], %w[dialogue_closed], %w[new_place]], kinds
+    assert_equal [%w[leave_place], %w[reach_place], %w[reach_cell], %w[dialogue_closed], %w[new_place], %w[new_text]], kinds
     reach_cell = schema[:properties][:predicate][:oneOf][2]
     assert_equal %w[kind place row col], reach_cell[:required]
     assert_equal false, reach_cell[:additionalProperties]
