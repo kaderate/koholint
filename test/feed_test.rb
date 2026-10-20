@@ -40,6 +40,17 @@ class FeedTest < Minitest::Test
     end
   end
 
+  def test_upto_shows_the_run_as_it_was_at_the_follower_frame
+    with_dir do |dir, trace|
+      decision(trace, 2)
+      decision(trace, 50)
+      doc = Koholint::Viewer::Feed.for(dir, FOLLOWER, upto: 10)
+      assert_equal [2], doc[:events].map { |e| e[:frame] }
+      assert_equal [1, 0.1], doc[:budget].values_at(:calls, :spent)
+      assert_equal 2, Koholint::Viewer::Feed.for(dir, FOLLOWER)[:events].size
+    end
+  end
+
   def test_objective_calls_and_dollars_come_from_the_trace
     with_dir do |dir, trace|
       trace.emit(:decision, frame: 1, decision_point: 'boot', input: {}, options: [], choice: {}, justification: 'boot script', confidence: 1.0,
