@@ -115,4 +115,43 @@ class RunTest < Minitest::Test
       run.write_activity(kind: 'stopped', label: 'x', frame: 1, detail: {})
     end
   end
+
+  def test_manifest_records_tag_model_and_versions
+    with_env do |dir, rom|
+      run = Koholint::Run.create(root: dir, flow_version: 'f1', budget: {}, rom_path: rom, tag: 'exp', model: 'sonnet')
+      assert_equal %w[exp sonnet], run.manifest.values_at('tag', 'model')
+      assert_match(/\A\h{40}\z/, run.manifest['harness_sha'])
+      assert_equal Koholint::Agents::Prompts.digest, run.manifest['prompts_sha']
+      assert_match(/\A\h{64}\z/, run.manifest['prompts_sha'])
+      child = run.fork(at_frame: 0, flow_version: 'f1', rom_path: rom)
+      assert_equal %w[exp sonnet], child.manifest.values_at('tag', 'model')
+    end
+  end
+
+  def test_an_older_manifest_without_the_new_keys_still_opens_and_forks
+    with_env do |dir, rom|
+      run = Koholint::Run.create(root: dir, flow_version: 'f1', budget: {}, rom_path: rom)
+      path = File.join(run.dir, 'manifest.json')
+      File.write(path, JSON.generate(JSON.parse(File.read(path)).except('tag', 'harness_sha', 'prompts_sha', 'model')))
+      child = Koholint::Run.open(run.dir, flow_version: 'f1', rom_path: rom).fork(at_frame: 0, flow_version: 'f1', rom_path: rom)
+      assert_nil child.manifest['tag']
+    end
+  end
+
+  def test_an_archived_trace_is_decompressed_before_it_is_written_again
+    with_env do |dir, rom|
+      run = Koholint::Run.create(root: dir, flow_version: 'f1', budget: {}, rom_path: rom)
+      run.trace.emit(:stop, frame: 5, reason: 'frames')
+      path = File.join(run.dir, 'trace.jsonl')
+      Koholint::Trace.compress(path)
+      File.delete(path)
+      reopened = Koholint::Run.open(run.dir, flow_version: 'f1', rom_path: rom)
+      child = reopened.fork(at_frame: 0, flow_version: 'f1', rom_path: rom)
+      assert File.file?(File.join(child.dir, 'trace.jsonl'))
+      reopened.truncate_trace!(5)
+      reopened.trace.emit(:stop, frame: 9, reason: 'frames')
+      refute File.exist?("#{path}.gz")
+      assert_equal [5, 9], Koholint::Trace.read(path).map { |e| e['frame'] }
+    end
+  end
 end
