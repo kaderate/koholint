@@ -9,6 +9,7 @@ module Koholint
       PROBE_OFF_AXIS_TOLERANCE = 2
       PROBE_MIN_PIXELS = 2
       PROBE_MAX_PIXELS = 16
+      LOCKED_WAIT = { buttons: [], frames: 30 }.freeze
       PROBE_AXES = { up: [:y, -1], down: [:y, 1], left: [:x, -1], right: [:x, 1] }.freeze
 
       def initialize(after, ready: nil, probe: false)
@@ -28,7 +29,7 @@ module Koholint
       def observe(state, frame:)
         return observe_probing(state, frame:) if @probe && !@handed
 
-        ready = ready_state?(state)
+        ready = ready_state?(state) && !locked_wait?(state)
         @ready_ticks += 1 if ready
         @handed ||= ready && (@position == [state.x, state.y] || @ready_ticks >= READY_TICK_LIMIT)
         @position = [state.x, state.y]
@@ -76,6 +77,8 @@ module Koholint
       end
 
       def boot_choice(state)
+        return LOCKED_WAIT if locked_wait?(state)
+
         return BootScript.macro_for(state) unless @probe && state.phase == :playing && @stable
 
         choice = BootScript.probe_free(@probe_step)
@@ -86,7 +89,9 @@ module Koholint
 
       def ready_state?(state) = @ready.call(state)
 
-      def ready?(state) = @handed && ready_state?(state)
+      def locked_wait?(state) = @settle && state.phase == :locked
+
+      def ready?(state) = @handed && (ready_state?(state) || locked_wait?(state))
     end
   end
 end

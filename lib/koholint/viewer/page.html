@@ -168,6 +168,7 @@
     var head = 'f' + e.frame + ' · ';
     if (e.type === 'decision') {
       if (e.agent === 'delegated' && e.justification === 'automatic dialogue advance') return head + 'automatic dialogue advance';
+      if (e.agent === 'delegated' && e.justification === 'locked: waiting for Link to be free') return head + 'locked: waiting for Link to be free';
       var line = head + (e.agent || '?') + ' decides';
       var choice = formatDecisionChoice(e.choice);
       if (choice) line += ' ' + choice;

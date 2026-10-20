@@ -18,11 +18,11 @@ module Koholint
       TRIGGER_AT = 2
       THINGS_LIMIT = 12
 
-      def self.build(state:, grid:, objective:, history:, attempts:, manual:, last_results:, max_chars: 9000, ledger: nil, refusals: [], plan: nil, triggers: nil, talk_log: nil, locked: nil)
+      def self.build(state:, grid:, objective:, history:, attempts:, manual:, last_results:, max_chars: 9000, ledger: nil, refusals: [], plan: nil, triggers: nil, talk_log: nil, locked: nil, locked_frames: nil)
         link = state.cell
         place = [state.room_id, state.map_id]
         results = last_results.last(RESULT_LIMIT).map { |r| r.transform_keys(&:to_sym) }
-        fixed = [header(state, link, triggers, place, locked), grid_block(grid, link, ledger, place), neighbours(grid, link, results, ledger, place),
+        fixed = [header(state, link, triggers, place, locked, locked_frames), grid_block(grid, link, ledger, place), neighbours(grid, link, results, ledger, place),
                  *things_block(grid, talk_log, place), objective_block(objective, attempts, plan)]
         finished = history.map { |h| "- #{h[:id]} #{h[:outcome]}#{h[:reason] ? " (#{h[:reason]})" : ''}: #{h[:title]}" }
         refused = refusals.last(KEEP_REFUSALS).map { |r| "- #{r[:title]} #{r[:predicate].to_json}: #{r[:reason]}" }
@@ -60,10 +60,11 @@ module Koholint
       end
       private_class_method :render
 
-      def self.header(state, link, triggers = nil, place = nil, locked = nil)
+      def self.header(state, link, triggers = nil, place = nil, locked = nil, locked_frames = nil)
         where = link ? "row #{link[0]}, col #{link[1]}" : 'outside the grid (doorway or screen edge)'
         lines = ["Phase: #{state.phase}", "Place: room #{state.room_id}, map #{state.map_id}",
                  "Link: #{where} (pixel x=#{state.x}, y=#{state.y}), facing #{state.direction}"]
+        lines << "Link has been locked for #{locked_frames} frames (cause unknown)" if locked_frames
         if link
           dx, dy = Geometry.offset(state.x, state.y, link)
           lines << "Link offset from cell centre (positive = right of / below the centre): dx=#{dx}, dy=#{dy}"
