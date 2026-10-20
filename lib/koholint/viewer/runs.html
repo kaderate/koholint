@@ -37,7 +37,8 @@
   var COLUMNS = [
     { key: 'starred', label: '★' }, { key: 'run_id', label: 'run' }, { key: 'tag', label: 'tag' }, { key: 'flow_version', label: 'flow' },
     { key: 'frames', label: 'frames', num: true }, { key: 'dollars', label: 'dollars', num: true }, { key: 'calls', label: 'calls', num: true },
-    { key: 'usd_per_1000f', label: 'usd/1000f', num: true }, { key: 'highest_milestone', label: 'milestone' },
+    { key: 'usd_per_1000f', label: 'usd/1000f', num: true }, { key: 'usd_per_call', label: '$/call', num: true },
+    { key: 'free_decisions', label: 'free', num: true }, { key: 'highest_milestone', label: 'milestone' },
     { key: 'places_seen', label: 'places', num: true }, { key: 'stop_reason', label: 'stop' }, { key: 'why', label: 'why' }
   ];
 
@@ -81,7 +82,7 @@
     var value = run[column.key];
     if (column.key === 'starred') return value ? '★' : '';
     if (value === null || value === undefined) return '';
-    if (column.key === 'dollars' || column.key === 'usd_per_1000f') return typeof value === 'number' ? value.toFixed(4) : String(value);
+    if (column.key === 'dollars' || column.key === 'usd_per_1000f' || column.key === 'usd_per_call') return typeof value === 'number' ? value.toFixed(4) : String(value);
     return String(value);
   }
 

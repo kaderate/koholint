@@ -12,6 +12,8 @@ module Koholint
     TERMINAL = %w[achieved abandoned failed].freeze
     DETERMINISTIC_AGENTS = %w[start_game walk_and_talk].freeze
     FILE = 'summary.json'.freeze
+    VERSION = 2
+    LEAD_TIERS = %w[high normal low].freeze
     MANIFEST_KEYS = %w[flow_version tag harness_sha prompts_sha model].freeze
 
     module_function
@@ -49,15 +51,47 @@ module Koholint
       latencies = latencies(events)
       objectives = events.select { |e| e['type'] == 'objective' }
       {
-        run_id: File.basename(dir), **MANIFEST_KEYS.to_h { |key| [key.to_sym, manifest[key]] },
+        v: VERSION, run_id: File.basename(dir), **MANIFEST_KEYS.to_h { |key| [key.to_sym, manifest[key]] },
         frames:, dollars: base[:cost_usd].round(6), calls: calls.size,
         calls_per_1000f: per_1000(calls.size, frames), usd_per_1000f: per_1000(base[:cost_usd], frames),
         latency_ms: { median: percentile(latencies, 0.5), p90: percentile(latencies, 0.9) },
         highest_milestone: base[:highest_milestone], places_seen: visited_places(events).size,
         objectives: { count: objectives.map { |e| e['id'] }.uniq.size, achieved: objectives.select { |e| e['status'] == 'achieved' }.map { |e| e['id'] }.uniq.size },
         stop_reason: events.reverse_each.find { |e| e['type'] == 'stop' }&.fetch('reason'),
-        symptoms: [], starred: File.exist?(File.join(dir, 'star.json'))
+        symptoms: [], starred: File.exist?(File.join(dir, 'star.json')),
+        cost_by_skill: cost_by_skill(calls), decisions_by_agent: events.select { |e| e['type'] == 'decision' }.map { |e| e['agent'] }.tally,
+        usage: usage(events)
       }
+    end
+
+    def cost_by_skill(calls)
+      calls.group_by { |e| skill_of(e) }.sort.to_h { |skill, group| [skill, { calls: group.size, usd: group.sum { |e| e['cost_usd'].to_f }.round(6) }] }
+    end
+
+    def skill_of(decision)
+      choice = decision['choice']
+      skill = choice['skill'] if choice.is_a?(Hash) && decision['decision_point'] != 'choose_objective'
+      (skill || decision['decision_point']).to_s
+    end
+
+    def usage(events)
+      started = events.select { |e| e['type'] == 'objective' && e['status'] == 'started' }
+      leads = events.select { |e| e['type'] == 'lead' }.map { |e| e['importance'] }.tally
+      talks = events.select { |e| e['type'] == 'action' && e['skill'] == 'talk_to' }
+      seen = {}
+      { goal_changes: [events.count { |e| e['type'] == 'goal' } - 1, 0].max,
+        leads: LEAD_TIERS.to_h { |tier| [tier.to_sym, leads[tier] || 0] },
+        lead_rejected: events.count { |e| e['type'] == 'notable' && e['kind'] == 'lead_rejected' },
+        objectives_by_kind: started.map { |e| (e['predicate']['kind'] if e['predicate'].is_a?(Hash)) || 'unknown' }.tally,
+        because_used: started.count { |e| e['because'] },
+        talks: talks.size,
+        talks_to_known: talks.count { |e| seen.key?(target = [talk_place(e), e['params']&.values_at('row', 'col')]) || !(seen[target] = true) },
+        dialogues: events.select { |e| e['type'] == 'dialogue' }.map { |e| [e['frame'], e['place']] }.uniq.size }
+    end
+
+    def talk_place(action)
+      from = action['result'].is_a?(Hash) ? action['result']['from'] : nil
+      from.is_a?(Hash) ? from.values_at('room', 'map') : nil
     end
 
     def visited_places(events) = events.filter_map { |event| perceived_place(event) }.uniq

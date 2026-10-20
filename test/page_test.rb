@@ -458,6 +458,7 @@ class PageTest < Minitest::Test
 
   def test_run_cells_are_plain_text
     assert_equal '0.5000', runs_eval("cellText(runs[0], {key: 'dollars'})")
+    assert_equal '0.0123', evaluate("cellText({usd_per_call: 0.01234}, {key: 'usd_per_call'})", page: RUNS)
     assert_equal '★', runs_eval("cellText(runs[1], {key: 'starred'})")
     assert_equal '', runs_eval("cellText(runs[1], {key: 'tag'})")
     assert_equal '<b>x</b>', evaluate("cellText({tag: '<b>x</b>'}, {key: 'tag'})", page: RUNS)
@@ -469,6 +470,14 @@ class PageTest < Minitest::Test
     data = { a: { summary: { tag: 'x', frames: 1 } }, b: { summary: { tag: 'x', frames: 2 } }, differences: ['frames'] }
     assert_equal [{ 'field' => 'tag', 'a' => 'x', 'b' => 'x', 'diff' => false }, { 'field' => 'frames', 'a' => '1', 'b' => '2', 'diff' => true }],
                  evaluate("summaryRows(#{JSON.generate(data)})", page: COMPARE)
+    usage = { a: { talks: 2, leads: { high: 1 } }, b: { talks: 3, dialogues: 1 }, differences: %w[talks leads dialogues] }
+    assert_equal [{ 'field' => 'talks', 'a' => '2', 'b' => '3', 'diff' => true }, { 'field' => 'leads', 'a' => '{"high":1}', 'b' => '-', 'diff' => true },
+                  { 'field' => 'dialogues', 'a' => '-', 'b' => '1', 'diff' => true }],
+                 evaluate("sectionRows(#{JSON.generate(usage)})", page: COMPARE)
+    cost = { a: { walk: { calls: 3, usd: 0.25 } }, b: { walk: { calls: 3, usd: 0.25 } }, differences: [] }
+    assert_equal [{ 'field' => 'walk', 'a' => '3 calls, $0.2500', 'b' => '3 calls, $0.2500', 'diff' => false }],
+                 evaluate("sectionRows(#{JSON.generate(cost)}, costText)", page: COMPARE)
+    assert_equal [], evaluate('sectionRows(undefined)', page: COMPARE)
     assert_equal 'never', evaluate('frameText(null)', page: COMPARE)
     assert_equal '[3,1]', evaluate('placeText([3, 1])', page: COMPARE)
   end

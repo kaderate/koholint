@@ -22,7 +22,7 @@ module Koholint
       bundles = runs(from).filter_map do |source|
         dest = File.join(root, File.basename(source))
         in_place = File.expand_path(source) == File.expand_path(dest)
-        next dest if in_place && sealed?(dest)
+        next dest if in_place && sealed?(dest) && current?(dest)
 
         reason = unfinished(source)
         next out.puts("skip #{File.basename(source)}: #{reason}") if reason
@@ -85,15 +85,17 @@ module Koholint
 
     def import(source, dest, full:)
       FileUtils.mkdir_p(dest)
-      changed = (LIGHT - ["#{TRACE}.gz"]).select { |name| refresh(File.join(source, name), File.join(dest, name)) }
+      fresh = current?(source)
+      changed = (LIGHT - ["#{TRACE}.gz", *(Summary::FILE unless fresh)]).select { |name| refresh(File.join(source, name), File.join(dest, name)) }
       trace = Trace.raw(File.join(source, TRACE))
       unless trace == archived_trace(dest)
         Trace.write_archive(trace, File.join(dest, "#{TRACE}.gz"))
         changed << TRACE
       end
       changed.concat(prompts(source, dest)) if full
-      Summary.write(dest) if !File.file?(File.join(source, Summary::FILE)) && (changed.any? || !File.file?(File.join(dest, Summary::FILE)))
-      changed.any?
+      stale = !fresh && (changed.any? || !current?(dest))
+      Summary.write(dest) if stale
+      changed.any? || stale
     end
 
     def refresh(from, to)
@@ -125,10 +127,13 @@ module Koholint
         Trace.compress(plain)
         File.delete(plain)
       end
-      changed |= !File.file?(File.join(dir, Summary::FILE))
-      Summary.write(dir) unless File.file?(File.join(dir, Summary::FILE))
-      changed
+      return changed if current?(dir)
+
+      Summary.write(dir)
+      true
     end
+
+    def current?(dir) = Summary.read_json(File.join(dir, Summary::FILE))['v'].to_i >= Summary::VERSION
 
     def index_path(root)
       top, _err, status = Open3.capture3('git', 'rev-parse', '--show-toplevel', chdir: root)
