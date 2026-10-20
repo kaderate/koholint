@@ -32,7 +32,7 @@ class FeedTest < Minitest::Test
       assert_equal File.basename(dir), doc[:status][:run_id]
       assert_equal({ flow_version: 'f', manifest_status: 'running', budget: { 'frames' => 9 }, health: 'unknown',
                      hearts: 2.0, max_hearts: 3.0, objective: nil, last_notable: nil, highest_milestone: 'none',
-                     frames: 3, cost_usd: 0.1, calls: 1, objective_title: nil, objective_predicate: nil, objective_attempts: nil, run_id: File.basename(dir) }, doc[:status])
+                     frames: 3, cost_usd: 0.1, calls: 1, objective_title: nil, objective_predicate: nil, objective_attempts: nil, goal: nil, leads: [], run_id: File.basename(dir) }, doc[:status])
       assert_equal({ frame: 90, journal_frames: 100, lag: 10, sync: :in_sync }, doc[:replay])
       assert_equal [{ frame: 2, type: 'decision', decision_point: 'move', agent: 'a', choice: { 'to' => 2 }, confidence: 0.5,
                       justification: 'j' },
@@ -48,6 +48,23 @@ class FeedTest < Minitest::Test
       assert_equal [2], doc[:events].map { |e| e[:frame] }
       assert_equal [1, 0.1], doc[:budget].values_at(:calls, :spent)
       assert_equal 2, Koholint::Viewer::Feed.for(dir, FOLLOWER)[:events].size
+    end
+  end
+
+  def test_goal_and_leads_follow_the_shown_frame_and_skip_low_leads
+    with_dir do |dir, trace|
+      lead = ->(frame, id, importance) { trace.emit(:lead, frame:, id:, place: [1, 2], source: nil, quote: 'q', claim: "c #{id}", importance:) }
+      trace.emit(:goal, frame: 5, text: 'first')
+      lead.call(5, 'lead-1', 'high')
+      lead.call(6, 'lead-2', 'low')
+      lead.call(7, 'lead-3', 'normal')
+      trace.emit(:goal, frame: 20, text: 'second')
+      lead.call(20, 'lead-4', 'high')
+      early = Koholint::Viewer::Feed.for(dir, FOLLOWER, upto: 10)[:status]
+      assert_equal 'first', early[:goal]
+      assert_equal [{ id: 'lead-3', importance: 'normal', claim: 'c lead-3' }, { id: 'lead-1', importance: 'high', claim: 'c lead-1' }], early[:leads]
+      late = Koholint::Viewer::Feed.for(dir, FOLLOWER)[:status]
+      assert_equal ['second', %w[lead-4 lead-3 lead-1]], [late[:goal], late[:leads].map { |l| l[:id] }]
     end
   end
 

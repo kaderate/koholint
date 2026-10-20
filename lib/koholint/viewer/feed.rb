@@ -38,7 +38,7 @@ module Koholint
         {
           status: summary.merge(run_id: File.basename(run_dir), flow_version: manifest['flow_version'],
                                 manifest_status: manifest['status'], budget: manifest['budget'], calls: calls(trace),
-                                objective_title: objective_title(trace, summary[:objective])).merge(objective_view(trace, summary[:objective])),
+                                objective_title: objective_title(trace, summary[:objective])).merge(objective_view(trace, summary[:objective]), memory(trace)),
           replay: { frame: follower.frame, journal_frames: follower.journal_frames, lag: follower.lag, sync: follower.sync },
           events: events(trace, limit),
           grid: grid(run_dir, full, follower.frame),
@@ -73,6 +73,14 @@ module Koholint
 
         started = trace.reverse_each.find { |e| e['type'] == 'objective' && e['id'] == id && e['status'] == 'started' }
         started && (started['title'] || id)
+      end
+
+      LEADS_SHOWN = 8
+
+      def memory(trace)
+        goal = trace.reverse_each.find { |e| e['type'] == 'goal' }
+        leads = trace.select { |e| e['type'] == 'lead' && e['importance'] != 'low' }.last(LEADS_SHOWN).reverse
+        { goal: goal && goal['text'], leads: leads.map { |e| e.slice('id', 'importance', 'claim').transform_keys(&:to_sym) } }
       end
 
       AUTOMATIC = ['automatic dialogue advance', 'deterministic hemmed-in', 'locked: waiting'].freeze
