@@ -5,8 +5,9 @@ module Koholint
   module Policies
     class StartGame
       READY_TICK_LIMIT = 24
-      PROBE_TICK_LIMIT = 120
-      PROBE_MOVE_PIXELS = 2
+      PROBE_PLAYING_TICK_LIMIT = 120
+      PROBE_OFF_AXIS_TOLERANCE = 2
+      PROBE_MIN_PIXELS = 2
       PROBE_MAX_PIXELS = 16
       PROBE_AXES = { up: [:y, -1], down: [:y, 1], left: [:x, -1], right: [:x, 1] }.freeze
 
@@ -58,7 +59,7 @@ module Koholint
         @pending = nil
         if state.phase == :playing
           @probe_ticks += 1
-          @handed = true if @probe_ticks > PROBE_TICK_LIMIT
+          @handed = true if @probe_ticks > PROBE_PLAYING_TICK_LIMIT
         end
         @stable = @position == position
         @position = position
@@ -71,7 +72,7 @@ module Koholint
         axis, sign = PROBE_AXES.fetch(@pending[:direction])
         other = axis == :x ? :y : :x
         along = (state[axis] - @pending[:start][axis]) * sign
-        along.between?(PROBE_MOVE_PIXELS, PROBE_MAX_PIXELS) && (state[other] - @pending[:start][other]).abs <= PROBE_MOVE_PIXELS
+        along.between?(PROBE_MIN_PIXELS, PROBE_MAX_PIXELS) && (state[other] - @pending[:start][other]).abs <= PROBE_OFF_AXIS_TOLERANCE
       end
 
       def boot_choice(state)

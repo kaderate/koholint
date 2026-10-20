@@ -69,7 +69,7 @@ module Koholint
       budget = Budget.new(**limits)
       case command
       when 'run'
-        factory = policy_factory(options, budget)
+        factory = policy_factory(options, budget, probe: true)
         run = Run.create(root: options.fetch(:root, 'runs'), flow_version: flow, budget: limits)
         play(Engine.new(run:, policy: factory.call(run), budget:, **engine_options(options)), run, out)
       when 'resume'
@@ -97,7 +97,7 @@ module Koholint
 
     def run_dir(args) = args.first || raise(OptionParser::MissingArgument, 'run_dir')
 
-    def policy_factory(options, budget)
+    def policy_factory(options, budget, probe: false)
       return ->(_run) { Policies::StartGame.new(Policies::WalkAndTalk.new) } unless options[:agent]
 
       command = options.fetch(:claude_command, 'claude')
@@ -111,7 +111,7 @@ module Koholint
         delegated = Policies::Delegated.new(client:, registry: Skills::Registry.default, objectives: objectives_for(run, events), ledger: ledger_for(run, events),
                                             triggers: Triggers.from_events(events), talk_log: TalkLog.from_events(events), manual:, on_step: budget.method(:step_done),
                                             on_activity: run.method(:write_activity))
-        Policies::StartGame.new(delegated, ready: ->(state) { %i[playing dialogue].include?(state.phase) }, probe: true)
+        Policies::StartGame.new(delegated, ready: ->(state) { %i[playing dialogue].include?(state.phase) }, probe:)
       end
     end
 

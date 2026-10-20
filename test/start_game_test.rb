@@ -102,9 +102,40 @@ class StartGameTest < Minitest::Test
     assert_equal :boot, step(wrapper, play(y: 70)).first
   end
 
+  def armed(wrapper = probing)
+    step(wrapper, play)
+    step(wrapper, play)
+    wrapper
+  end
+
+  def test_a_game_teleport_on_both_axes_does_not_count
+    assert_equal :boot, step(armed, play(x: 56, y: 52)).first
+  end
+
+  def test_a_one_pixel_partial_block_does_not_hand_over
+    assert_equal :boot, step(armed, play(y: 59)).first
+  end
+
+  def test_delta_bounds_are_two_to_sixteen_pixels
+    { 59 => :boot, 58 => :handed, 44 => :handed, 43 => :boot }.each do |y, expected|
+      assert_equal expected, step(armed, play(y:)).first, "up to y=#{y}"
+    end
+  end
+
+  def test_a_blocked_first_direction_then_a_moving_one_hands_over
+    wrapper = armed
+    assert_equal [:right], step(wrapper, play)[1][:buttons]
+    assert_equal :handed, step(wrapper, play(x: 90)).first
+  end
+
+  def test_a_dialogue_hands_over_even_when_nothing_moved
+    wrapper = armed
+    assert_equal :handed, step(wrapper, play(dialog: 3)).first
+  end
+
   def test_the_probe_tick_limit_hands_over_anyway
     wrapper = probing
-    Koholint::Policies::StartGame::PROBE_TICK_LIMIT.times { assert_equal :boot, step(wrapper, play).first }
+    Koholint::Policies::StartGame::PROBE_PLAYING_TICK_LIMIT.times { assert_equal :boot, step(wrapper, play).first }
     assert_equal :handed, step(wrapper, play).first
   end
 
@@ -136,7 +167,6 @@ class StartGameTest < Minitest::Test
       assert opened, 'no dialogue opened'
       refute_empty inner.frames
       assert_operator inner.frames.first, :>=, opened['frame']
-      puts "hand-over frame #{inner.frames.first}, dialogue opened at #{opened['frame']}"
       assert_equal [], Koholint::Replay.verify(run, every: 300).reject(&:last)
     end
   end
