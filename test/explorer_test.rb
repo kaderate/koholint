@@ -37,7 +37,8 @@ class ExplorerTest < Minitest::Test
   def with_root
     Dir.mktmpdir do |root|
       make_run(root, A, summary: { 'tag' => XSS, 'dollars' => 0.5 }, star: { 'starred' => true, 'why' => 'first <b>exit</b>' })
-      make_run(root, B, summary: { 'tag' => 'agent', 'dollars' => 1.1 }, milestone: 'shield')
+      make_run(root, B, summary: { 'tag' => 'agent', 'dollars' => 1.1, 'calls' => 4, 'decisions_by_agent' => { 'claude' => 4, 'delegated' => 5, 'start_game' => 2 },
+                                   'usage' => { 'talks' => 1 }, 'cost_by_skill' => { 'walk' => { 'calls' => 4, 'usd' => 1.1 } } }, milestone: 'shield')
       yield root
     end
   end
@@ -92,8 +93,9 @@ class ExplorerTest < Minitest::Test
         assert_equal [false, true], runs.map { |run| run['starred'] }
         assert_equal [nil, 'first <b>exit</b>'], runs.map { |run| run['why'] }
         assert_equal XSS, runs.last['tag']
-        assert_equal %w[run_id tag flow_version frames dollars calls usd_per_1000f highest_milestone places_seen stop_reason milestone_rank starred why],
-                     runs.first.keys
+        assert_equal %w[run_id tag flow_version frames dollars calls usd_per_1000f highest_milestone places_seen stop_reason usd_per_call free_decisions
+                        milestone_rank starred why], runs.first.keys
+        assert_equal [[0.275, 7], [nil, nil]], runs.map { |run| run.values_at('usd_per_call', 'free_decisions') }
       end
     end
   end
@@ -182,7 +184,9 @@ class ExplorerTest < Minitest::Test
       with_server(root) do |port, _|
         data = JSON.parse(get(port, "/compare.json?a=#{A}&b=#{B}").body)
         assert_equal [A, B], [data.dig('a', 'run_id'), data.dig('b', 'run_id')]
-        assert_equal %w[tag dollars highest_milestone], data['differences']
+        assert_equal %w[tag dollars calls highest_milestone], data['differences']
+        assert_equal({ 'a' => {}, 'b' => { 'talks' => 1 }, 'differences' => %w[talks] }, data['usage'])
+        assert_equal %w[walk], data.dig('cost_by_skill', 'differences')
         assert_equal [{ 'milestone' => 'shield', 'a' => nil, 'b' => 40 }], data['milestones']
         assert_equal [[3, 1], [4, 1]], data['places'].map { |place| place['place'] }
         assert_equal '400', get(port, "/compare.json?a=#{A}").code

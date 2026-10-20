@@ -97,7 +97,11 @@ module Koholint
 
         star = Summary.read_json(File.join(dir, 'star.json'))
         milestone = summary['highest_milestone']
+        calls = summary['calls']
+        agents = summary['decisions_by_agent']
         FIELDS.to_h { |key| [key, summary[key]] }.merge(
+          'usd_per_call' => calls.is_a?(Integer) && calls.positive? && summary['dollars'].is_a?(Numeric) ? (summary['dollars'] / calls).round(6) : nil,
+          'free_decisions' => agents.is_a?(Hash) ? agents.except('claude').values.grep(Integer).sum : nil,
           'run_id' => File.basename(dir), 'milestone_rank' => Perception::MILESTONES.index(milestone.to_s.to_sym),
           'starred' => !star.empty? || summary['starred'] == true, 'why' => star['why']
         )
