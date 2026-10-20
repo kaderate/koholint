@@ -80,6 +80,7 @@ module Koholint
         @prompt = @image = @images = nil
         context[:ledger] = @ledger
         context[:triggers] = @triggers
+        context[:talk_log] = @talk_log
         remember_grid(state, context)
         drop_stale_sequence(state)
         automatic = automatic_advance(decision_point, state, context)
@@ -274,7 +275,8 @@ module Koholint
         return unless choice[:skill] == 'talk_to' && TalkLog.attempt?(outcome)
 
         params = choice[:params]
-        @talk_log.record(place: place_of(outcome, :from, state), row: params[:row] || params['row'], col: params[:col] || params['col'], talked: outcome[:talked] == true)
+        @talk_log.record(place: place_of(outcome, :from, state), row: params[:row] || params['row'], col: params[:col] || params['col'], talked: outcome[:talked] == true,
+                         standing: TalkLog.standing_of(outcome))
       end
 
       def note_entered(choice, outcome, place)

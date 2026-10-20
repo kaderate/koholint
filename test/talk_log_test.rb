@@ -47,6 +47,26 @@ class TalkLogTest < Minitest::Test
     assert_equal 1, log.talked(PLACE, [[4, 7]])
   end
 
+  def test_failed_sides_are_recorded_and_a_success_clears_them
+    log = Koholint::TalkLog.new
+    log.record(place: PLACE, row: 4, col: 7, talked: false, standing: [[[5, 7], true]])
+    log.record(place: PLACE, row: 4, col: 7, talked: false, standing: [[[5, 7], true], [[3, 7], true]])
+    assert_equal [[5, 7], [3, 7]], log.failed_sides(PLACE, [4, 7])
+    assert_equal [], log.failed_sides([1, 2], [4, 7])
+    assert_equal ['- at (4,7): talked to 2 times (dialogue opened 0); no response from (5,7), (3,7)'], log.lines(grid([sprite(4, 7)]), PLACE)
+    log.record(place: PLACE, row: 4, col: 7, talked: true, standing: [[[5, 7], false]])
+    assert_equal [[3, 7]], log.failed_sides(PLACE, [4, 7])
+  end
+
+  def test_from_events_rebuilds_the_failed_sides
+    spot = { 'room' => 163, 'map' => 16, 'row' => 3, 'col' => 4 }
+    event = ->(result) { { 'type' => 'action', 'skill' => 'talk_to', 'params' => { 'row' => 4, 'col' => 7 }, 'result' => { 'from' => spot }.merge(result) } }
+    tried = [{ 'row' => 5, 'col' => 7, 'outcome' => 'no_response' }, { 'row' => 3, 'col' => 7, 'outcome' => 'done' }]
+    log = Koholint::TalkLog.from_events([event.call('stopped_by' => 'done', 'talked' => true, 'standing_cells_tried' => tried),
+                                         event.call('stopped_by' => 'no_response', 'talked' => false, 'standing_cell' => { 'row' => 4, 'col' => 6 })])
+    assert_equal [[5, 7], [4, 6]], log.failed_sides(PLACE, [4, 7])
+  end
+
   def test_only_a_reached_talk_is_an_attempt
     assert Koholint::TalkLog.attempt?({ talked: true })
     assert Koholint::TalkLog.attempt?({ stopped_by: :no_response })

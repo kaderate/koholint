@@ -1415,6 +1415,20 @@ class DelegatedTriggersTest < Minitest::Test
     assert_includes tour(p, client), '- at (1,2): talked to 2 times (dialogue opened 1)'
   end
 
+  def test_a_second_talk_to_on_the_same_object_excludes_the_side_that_gave_no_response
+    p, client = setup_policy
+    tour(p, client)
+    context = { grid: sprite_grid }
+    p.decide(p.decision_point_for(state), state, context)
+    assert_equal [], context[:talk_log].failed_sides(SPOT.values_at(:room, :map), [1, 2])
+    finish(p, 'talk_to', { row: 1, col: 2 }, 101, talked: false, stopped_by: 'no_response', standing_cell: { row: 2, col: 2 },
+                                                  standing_cells_tried: [{ row: 2, col: 2, outcome: 'no_response' }])
+    context = { grid: sprite_grid }
+    p.decide(p.decision_point_for(state), state, context)
+    assert_equal [[2, 2]], context[:talk_log].failed_sides(SPOT.values_at(:room, :map), [1, 2])
+    assert_includes client.calls.last[:prompt], '- at (1,2): talked to 1 time (dialogue opened 0); no response from (2,2)'
+  end
+
   def test_the_summary_and_the_live_prompt_show_scripted_openings_on_one_cell
     p, client = setup_policy
     tour(p, client)

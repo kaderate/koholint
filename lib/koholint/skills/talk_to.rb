@@ -9,11 +9,15 @@ module Koholint
       PRESS_FRAMES = 3
       RESPONSE_FRAMES = 30
       TALK_REPLANS = 3
+      TALK_STANDING_CELLS = 3
       FREE_CAUSE = 'target cell was walkable: it may not hold a person any more'.freeze
 
       class Run < Goto::Run
-        def initialize(person:, **rest)
+        def initialize(person:, context: {}, **rest)
           @person = person
+          @tried = []
+          @blocked_replans = 0
+          @excluded = excluded_cells(context, rest[:state], person)
           @phase = :walk
           @standing = nil
           @grid = nil
@@ -26,7 +30,7 @@ module Koholint
           @response_frames = 0
           @replans = 0
           @failed = []
-          super(target: nil, **rest)
+          super(target: nil, context:, **rest)
           @facing = Navigation::Planner.direction_between(@standing, @person) if @standing
         end
 
@@ -42,7 +46,7 @@ module Koholint
         end
 
         def result(state = @last)
-          merged = super.merge(talked: @talked, standing_cell: (@standing && { row: @standing[0], col: @standing[1] }), facing: @facing, replans: @replans)
+          merged = super.merge(talked: @talked, standing_cell: (@standing && { row: @standing[0], col: @standing[1] }), facing: @facing, replans: @replans, standing_cells_tried: @tried.map(&:dup))
           merged[:cause] = FREE_CAUSE if @stopped_by == :target_free
           merged
         end
@@ -68,9 +72,9 @@ module Koholint
         def choose(from)
           options = neighbours.reject { |cell| @failed.include?(cell) }.filter_map do |cell|
             path = @planner.path(from:, to: cell)
-            [path.size, turns(path), cell] if path
+            [@excluded.include?(cell) ? 1 : 0, path.size, turns(path), cell] if path
           end
-          best = options.min_by { |size, turns, _| [size, turns] }
+          best = options.min_by { |known, size, turns, _| [known, size, turns] }
           unless best
             @cause = no_standing_cause(from)
             @initial_length ||= 0
@@ -82,11 +86,12 @@ module Koholint
         end
 
         def replan(state)
-          return false if @replans >= TALK_REPLANS || !@planner || !@blocked_at
+          return false if @blocked_replans >= TALK_REPLANS || !@planner || !@blocked_at
 
           @planner.avoid([@blocked_at[:row], @blocked_at[:col]], @blocked_at[:direction])
           @failed << @standing
           @replans += 1
+          @blocked_replans += 1
           @path = choose(state.cell || @blocked_at.values_at(:row, :col))
           @index = 0
           @arrived_by = nil
@@ -97,6 +102,32 @@ module Koholint
           @facing = Navigation::Planner.direction_between(@standing, @person) if @path
           @stopped_by = @path ? nil : :no_path
           true
+        end
+
+        def excluded_cells(context, start, person)
+          log = context[:talk_log]
+          return [] unless log && start
+
+          log.failed_sides([start.room_id, start.map_id], person)
+        end
+
+        def retarget(state)
+          return nil if @tried.size >= TALK_STANDING_CELLS || !state.cell
+
+          chosen = choose(state.cell) or return nil
+          @replans += 1
+          @path = chosen
+          @phase = :walk
+          @index = 0
+          @arrived_by = nil
+          @settle = 0
+          @still = 0
+          @heading = nil
+          @position = [state.x, state.y]
+          @face_frames = @face_still = @press_frames = @response_frames = 0
+          @face_origin = @face_last = nil
+          @facing = Navigation::Planner.direction_between(@standing, @person)
+          input_for(state)
         end
 
         def neighbours
@@ -152,6 +183,8 @@ module Koholint
           [@facing]
         end
 
+        def note_tried(outcome) = @tried << { row: @standing[0], col: @standing[1], outcome: }
+
         def believed_free?
           @grid && !@grid.static_sprite(*@person) && @grid.passable(*@person, @facing) == :yes
         end
@@ -164,13 +197,18 @@ module Koholint
         def talk(state)
           if state.dialog_open? && !@start.dialog_open?
             @talked = true
+            note_tried(:done)
             return finish(:done)
           end
           if @press_frames < PRESS_FRAMES
             @press_frames += 1
             return [:a]
           end
-          return finish(:no_response) if @response_frames >= RESPONSE_FRAMES
+          if @response_frames >= RESPONSE_FRAMES
+            note_tried(:no_response)
+            @failed << @standing
+            return retarget(state) || finish(:no_response)
+          end
 
           @response_frames += 1
           []

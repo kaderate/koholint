@@ -98,6 +98,12 @@ class AgentsContextTest < Minitest::Test
     assert_includes build(talk_log: log), '- at (1,2): talked to 1 time (dialogue opened 1)'
   end
 
+  def test_the_things_section_lists_the_sides_without_response
+    log = Koholint::TalkLog.new
+    log.record(place: [163, 16], row: 1, col: 2, talked: false, standing: [[[2, 2], true], [[0, 2], true]])
+    assert_includes build(talk_log: log), '- at (1,2): talked to 1 time (dialogue opened 0); no response from (2,2), (0,2)'
+  end
+
   def test_the_things_section_is_bounded
     sprites = [0, 2, 4, 6].flat_map { |r| [0, 2, 4, 6, 8].map { |c| { 'x' => c * 16 + 8, 'y' => r * 16 + 16, 'pattern' => "s#{r}#{c}" } } }
     big = Koholint::Vision::Grid.new(cells: Array.new(8) { Array.new(10) { 'floor' } }, static_sprites: sprites, beliefs: Koholint::Vision::Beliefs.new,
