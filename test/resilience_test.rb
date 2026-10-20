@@ -2,6 +2,7 @@ require_relative 'test_helper'
 require 'stringio'
 require 'tmpdir'
 require 'json'
+require 'digest'
 require 'koholint/cli'
 require 'koholint/engine'
 require 'koholint/policies/walk_and_talk'
@@ -134,6 +135,36 @@ class ResilienceTest < Minitest::Test
         assert File.file?(File.join(child.dir, 'save', save['path'])), "save #{save['path']} missing in the fork"
       end
       assert_equal 'progressing', Koholint::Summary.for(child)[:health]
+    end
+  end
+
+  def test_an_archived_clone_without_saves_or_keyframes_resumes_and_forks
+    skip_without_rom!
+    with_run do |_dir, run|
+      new_engine(run, budget: Koholint::Budget.new(frames: 300), keyframe_every: 120).run
+      Koholint::Engine.resume(run.dir, policy: Koholint::Policies::WalkAndTalk.new, budget: Koholint::Budget.new(frames: 120)).run
+      %w[save keyframes].each { |name| FileUtils.rm_rf(File.join(run.dir, name)) }
+      path = File.join(run.dir, 'trace.jsonl')
+      Koholint::Trace.compress(path)
+      File.delete(path)
+      child = Koholint::Run.open(run.dir, flow_version: FLOW).fork(at_frame: 400, flow_version: FLOW)
+      saves = Koholint::Trace.read(File.join(child.dir, 'trace.jsonl')).select { |e| e['type'] == 'save' }
+      refute_empty saves
+      saves.each { |save| assert_equal save['sav_sha256'], Digest::SHA256.file(File.join(child.dir, 'save', save['path'])).hexdigest }
+      Koholint::Engine.resume(run.dir, policy: Koholint::Policies::WalkAndTalk.new, budget: Koholint::Budget.new(frames: 30)).run
+      assert_equal 450, Koholint::Run.open(run.dir, flow_version: FLOW).inputs.frames
+      assert_equal 0, cli('verify', run.dir)[0]
+    end
+  end
+
+  def test_fork_fails_clearly_when_a_missing_save_does_not_replay
+    skip_without_rom!
+    with_run do |_dir, run|
+      new_engine(run, budget: Koholint::Budget.new(frames: 120)).run
+      FileUtils.rm_rf(File.join(run.dir, 'save'))
+      run.trace.emit(:save, frame: 60, path: '000000060.sav', sav_sha256: '0' * 64, source: 'game')
+      error = assert_raises(Koholint::Error) { run.fork(at_frame: 120, flow_version: FLOW) }
+      assert_match(/cannot be rebuilt by replay/, error.message)
     end
   end
 end

@@ -93,9 +93,7 @@ module Koholint
         event['frame'] < at_frame && !%w[stop budget_stop].include?(event['type'])
       end
       rewrite_trace(File.join(child.dir, 'trace.jsonl'), events)
-      events.select { |event| event['type'] == 'save' }.each do |event|
-        FileUtils.cp(File.join(dir, 'save', event['path']), File.join(child.dir, 'save'))
-      end
+      events.select { |event| event['type'] == 'save' }.each { |event| copy_save(event, File.join(child.dir, 'save')) }
       Dir.glob(File.join(dir, 'keyframes', 'kf-*.zlib')).each do |path|
         FileUtils.cp(path, File.join(child.dir, 'keyframes')) if File.basename(path)[/\d+/].to_i <= at_frame
       end
@@ -156,6 +154,17 @@ module Koholint
     end
 
     private
+
+    def copy_save(event, into)
+      path = File.join(dir, 'save', event['path'])
+      return FileUtils.cp(path, into) if File.file?(path)
+
+      require 'koholint/replay'
+      ram = Replay.to(self, event['frame']).cartridge_ram
+      raise Error, "save #{event['path']} of run #{id} cannot be rebuilt by replay" unless Digest::SHA256.hexdigest(ram) == event['sav_sha256']
+
+      File.binwrite(File.join(into, event['path']), ram)
+    end
 
     def wall_clock = Time.now.to_f
 
