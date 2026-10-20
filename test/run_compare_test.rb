@@ -53,4 +53,14 @@ class RunCompareTest < Minitest::Test
       assert_equal [{ place: [3, 1], a: 5, b: 5 }], result[:places]
     end
   end
+
+  def test_compare_diffs_usage_and_cost_by_skill
+    Dir.mktmpdir do |root|
+      a = make_run(root, 'a', [perception(5)], { 'usage' => { 'talks' => 2, 'dialogues' => 1 }, 'cost_by_skill' => { 'walk' => { 'calls' => 3, 'usd' => 0.1 } } })
+      b = make_run(root, 'b', [perception(5)], { 'usage' => { 'talks' => 2, 'dialogues' => 3 } })
+      result = Koholint::RunCompare.compare(a, b)
+      assert_equal({ a: { 'talks' => 2, 'dialogues' => 1 }, b: { 'talks' => 2, 'dialogues' => 3 }, differences: %w[dialogues] }, result[:usage])
+      assert_equal({ a: { 'walk' => { 'calls' => 3, 'usd' => 0.1 } }, b: {}, differences: %w[walk] }, result[:cost_by_skill])
+    end
+  end
 end

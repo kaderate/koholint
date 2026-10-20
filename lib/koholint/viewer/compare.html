@@ -21,6 +21,10 @@
 <div id="error"></div>
 <h2>Summary</h2>
 <table><thead><tr><th>field</th><th id="head-a"></th><th id="head-b"></th></tr></thead><tbody id="summary"></tbody></table>
+<h2>Usage</h2>
+<table><thead><tr><th>field</th><th>a</th><th>b</th></tr></thead><tbody id="usage"></tbody></table>
+<h2>Cost by skill</h2>
+<table><thead><tr><th>skill</th><th>a</th><th>b</th></tr></thead><tbody id="cost"></tbody></table>
 <h2>Milestones (first frame)</h2>
 <table><thead><tr><th>milestone</th><th>a</th><th>b</th></tr></thead><tbody id="milestones"></tbody></table>
 <h2>Places visited (first frame)</h2>
@@ -39,13 +43,25 @@
     return typeof value === 'object' ? JSON.stringify(value) : String(value);
   }
 
-  function summaryRows(data) {
-    var a = (data.a && data.a.summary) || {}, b = (data.b && data.b.summary) || {};
-    var differences = data.differences || [];
-    return Object.keys(a).map(function (field) {
-      return { field: field, a: valueText(a[field]), b: valueText(b[field]), diff: differences.indexOf(field) >= 0 };
+  function fieldRows(a, b, differences, text) {
+    a = a || {};
+    b = b || {};
+    differences = differences || [];
+    text = text || valueText;
+    var fields = Object.keys(a).concat(Object.keys(b).filter(function (field) { return !(field in a); }));
+    return fields.map(function (field) {
+      return { field: field, a: text(a[field]), b: text(b[field]), diff: differences.indexOf(field) >= 0 };
     });
   }
+
+  function summaryRows(data) { return fieldRows(data.a && data.a.summary, data.b && data.b.summary, data.differences); }
+
+  function costText(cost) {
+    if (!cost || typeof cost !== 'object') return '-';
+    return cost.calls + ' calls, $' + (typeof cost.usd === 'number' ? cost.usd.toFixed(4) : valueText(cost.usd));
+  }
+
+  function sectionRows(section, text) { section = section || {}; return fieldRows(section.a, section.b, section.differences, text); }
 
   function frameText(frame) { return typeof frame === 'number' ? 'f' + frame : 'never'; }
 
@@ -91,6 +107,8 @@
     heading('head-a', data.a.run_id);
     heading('head-b', data.b.run_id);
     fill('summary', summaryRows(data).map(function (row) { return { label: row.field, a: row.a, b: row.b, diff: row.diff }; }));
+    fill('usage', sectionRows(data.usage).map(function (row) { return { label: row.field, a: row.a, b: row.b, diff: row.diff }; }));
+    fill('cost', sectionRows(data.cost_by_skill, costText).map(function (row) { return { label: row.field, a: row.a, b: row.b, diff: row.diff }; }));
     fill('milestones', timelineRows(data.milestones, function (entry) { return valueText(entry.milestone); }));
     fill('places', timelineRows(data.places, function (entry) { return placeText(entry.place); }));
   }
