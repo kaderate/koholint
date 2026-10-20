@@ -60,3 +60,20 @@ The trigger-input fix (record the input that opened a dialogue by itself, never 
 - About 300 frames of "blocked in every direction" after the dialogue cost 7 calls: the agent should be told that movement can be locked by an animation (no cause is visible) and that waiting is the answer; an `animation locked` signal from perception would help.
 - The forbidden-input memory never expires within a place; a one-off cutscene input could block a `goto` edge (review follow-up): clear the entry when the same input is pressed explicitly later without any dialogue.
 - `Planner#why_not` does not name a forbidden edge as the cause of `no_path`.
+
+## Runs 12 and 13 (boot probes, locked phase, shield milestone, talk_to side retries)
+
+| Measure | Run 12 (`20261020-081957-3aa4`) | Run 13 (`20261020-085011-8330`, cap 1.50) |
+|---|---|---|
+| Frames / dollars | 5619 / 1.002 | 5913 / 1.120 (stopped by the Claude subscription session limit: `agent_failures`) |
+| Model calls | 65 | 87 (5 fallbacks, all the session limit) |
+| Calls per 1000 frames / dollars per 1000 frames | 11.6 / 0.178 | 14.7 / 0.189 |
+| First model call | frame 800 (the intro dialogue; none before) | frame 800 |
+| Left the starting house | no | **yes** (first room change after the shield, 28 calls and 0.43 USD in at frame 3747) |
+| Shield milestone | no | **yes**, frame 3193, 18 calls, 0.28 USD (`highest_milestone: shield` from RAM 0xDB44) |
+| Places seen | 1 | 5 (house, then `162/0`, `161/0`, `160/0`, `144/0`) |
+| Objectives | `dialogue_closed`, then `new_place` (not achieved) | `dialogue_closed`, then five `new_place` objectives, all achieved |
+
+- Run 12 failed to talk to the person: `talk_to (4,7)` was tried from the cell below three times and got `no_response`. Run 13 (with the side retry) talked to the person from the cell above on the first call (`tried: [(3,7) done]`) and obtained the shield at frame 3193.
+- The only objective the agent ever chose after the intro was "Explore to a new place": it is achieved at each room change, which says nothing about progress. Long-term planning is now the limiting piece.
+- Both 1.0 and 1.5 USD runs end in the 12th to 14th calls per 1000 frames range; `agent_failures` stopped runs 8 and 13 cleanly when the subscription session limit was hit.
