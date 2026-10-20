@@ -64,7 +64,7 @@ module Koholint
       @last_frame = 0
     end
 
-    def start(frame:, title:, predicate:)
+    def start(frame:, title:, predicate:, because: nil)
       raise ArgumentError, "invalid predicate #{predicate.inspect}" unless self.class.valid_predicate?(predicate)
 
       @counter += 1
@@ -81,7 +81,7 @@ module Koholint
       @blocked_total = 0
       @no_path = 0
       @blocked_pairs = Hash.new(0)
-      @trace.emit(:objective, frame:, id:, status: 'started', title:, predicate: @current[:predicate])
+      @trace.emit(:objective, frame:, id:, status: 'started', title:, predicate: @current[:predicate], **(because ? { because: } : {}))
       id
     end
 

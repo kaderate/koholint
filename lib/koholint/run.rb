@@ -120,7 +120,7 @@ module Koholint
       restore_trace!
       path = trace_path
       kept = Trace.read(path).reject do |event|
-        event['frame'] > frames || (%w[perception decision].include?(event['type']) && event['frame'] >= frames)
+        event['frame'] > frames || (event['frame'] == frames && decided_at_resume?(event))
       end
       rewrite_trace(path, kept)
     end
@@ -154,6 +154,8 @@ module Koholint
     end
 
     private
+
+    def decided_at_resume?(event) = %w[perception decision lead goal].include?(event['type']) || (event['type'] == 'notable' && event['kind'] == 'lead_rejected')
 
     def copy_save(event, into)
       path = File.join(dir, 'save', event['path'])

@@ -93,7 +93,7 @@ class AgentsContextTest < Minitest::Test
 
   def test_the_things_section_lists_static_objects_with_their_counts
     log = Koholint::TalkLog.new
-    assert_includes build(talk_log: log), "Things on screen you can interact with:\n- at (1,2): never tried\n\nCurrent objective"
+    assert_includes build(talk_log: log), "Things on screen you can interact with:\n- at (1,2): never tried\n\nGoal: none set yet"
     log.record(place: [163, 16], row: 1, col: 2, talked: true)
     assert_includes build(talk_log: log), '- at (1,2): talked to 1 time (dialogue opened 1)'
   end
@@ -189,6 +189,7 @@ class AgentsContextTest < Minitest::Test
       - down: cell (4,4) '.', belief yes, last walk: none
       - left: cell (3,3) '.', belief yes, last walk: none
 
+      Goal: none set yet — set one in goal when you have a reason (a lead, an observation).
       Current objective: Leave the room
       Predicate: {"kind":"leave_place","place":[163,16]}
       Attempts on this objective:
@@ -317,5 +318,38 @@ class AgentsContextTest < Minitest::Test
     text = Context.build(state: frozen_state, grid:, objective: { id: 'x', title: 't', predicate: { kind: 'dialogue_closed' }.freeze }.freeze,
                          history: [].freeze, attempts: [].freeze, manual: 'm'.freeze, last_results: [result.freeze].freeze)
     assert_instance_of String, text
+  end
+
+  def lead(id, importance, place: [163, 16], quote: 'some words', claim: "claim #{id}")
+    { id: "lead-#{id}", place:, source: nil, quote:, claim:, importance: }
+  end
+
+  def test_the_goal_line_says_when_none_is_set_and_shows_the_agent_goal
+    assert_includes build, "Goal: none set yet — set one in goal when you have a reason"
+    assert_includes build(goal: 'find the beach'), "Goal (yours, long-term): find the beach\nCurrent objective: none"
+  end
+
+  def test_leads_show_every_high_one_normal_ones_of_this_place_and_never_low_ones
+    leads = [lead(1, 'high', place: [1, 1]), lead(2, 'normal'), lead(3, 'normal', place: [1, 1]), lead(4, 'low'), lead(5, 'high', quote: 'q' * 100)]
+    text = build(leads:)
+    section = text[/Leads from texts.*?(?=\n\n|\z)/m]
+    assert_equal ["- [lead-5 high] claim 5 — \"#{'q' * 77}...\"", '- [lead-1 high] claim 1 — "some words"', '- [lead-2 normal] claim 2 — "some words"'],
+                 section.lines.drop(1).map(&:chomp)
+    refute_includes text, 'lead-3'
+    refute_includes text, 'lead-4'
+    refute_includes build(leads: [lead(1, 'low')]), 'Leads from texts'
+  end
+
+  def test_leads_are_capped_newest_first
+    leads = (1..10).map { |i| lead(i, 'high') } + (11..17).map { |i| lead(i, 'normal') }
+    shown = build(leads:).scan(/\[(lead-\d+)/).flatten
+    assert_equal (3..10).to_a.reverse.map { |i| "lead-#{i}" } + (13..17).to_a.reverse.map { |i| "lead-#{i}" }, shown
+  end
+
+  def test_the_budget_trims_the_manual_before_the_goal_and_the_leads
+    text = build(manual: "line\n" * 2000, goal: 'g', leads: [lead(1, 'high')], max_chars: 2500)
+    assert_includes text, 'Goal (yours, long-term): g'
+    assert_includes text, '[lead-1 high]'
+    assert_operator text.size, :<, 2500 + 100
   end
 end

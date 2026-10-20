@@ -5,6 +5,7 @@ require 'koholint/archive'
 require 'koholint/budget'
 require 'koholint/engine'
 require 'koholint/agents/claude_cli'
+require 'koholint/leads'
 require 'koholint/ledger'
 require 'koholint/talk_log'
 require 'koholint/triggers'
@@ -130,7 +131,7 @@ module Koholint
       lambda do |run|
         events = events_for(run)
         delegated = Policies::Delegated.new(client:, registry: Skills::Registry.default, objectives: objectives_for(run, events), ledger: ledger_for(run, events),
-                                            triggers: Triggers.from_events(events), talk_log: TalkLog.from_events(events), manual:, on_step: budget.method(:step_done),
+                                            triggers: Triggers.from_events(events), talk_log: TalkLog.from_events(events), leads: Leads.from_events(events), manual:, on_step: budget.method(:step_done),
                                             on_activity: run.method(:write_activity))
         Policies::StartGame.new(delegated, ready: ->(state) { %i[playing dialogue].include?(state.phase) }, probe:)
       end

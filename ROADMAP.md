@@ -6,20 +6,20 @@ Only what is left to do. When something lands, delete it here (git is the histor
 
 ## Next, in order
 1. **Make the starting-house run reliable and cheaper.** Runs 10 and 13 left the house (about 1 USD each, `docs/runs/2026-10-second-agent-run.md`); it is two successes, not a rate. Needed: repeated runs to measure a success rate and the cost spread; a per-objective call cap; `no_path` should name a forbidden edge; `target_free` should trigger a `talk_to` retry.
-2. **Long-term objectives and memory.** After the intro the agent only picks "explore to a new place", which gives no progress signal and `world.json` stays empty. Needs a small richer objective vocabulary and a long-term memory so planning heads toward the sword. Jev wiring after that.
-3. **Analysis loop.** `koholint analyze <run>` (standard report, comparison with previous runs), symptom detectors writing `suggestions.md` and filling `summary.json` `symptoms`, scenario runs forked from keyframes, recorded agent answers replayed by a fake client, owner annotations from the viewer. Open question: how much of the harness the agent may amend itself during a run (Continual Harness, arXiv 2605.09998) versus code-versioned changes.
-4. **Plan 4b: finer navigation** — tile lattice and tile-level beliefs, per-appearance room survey, exits that straddle two cells, Jev routing for `choose_skill`.
-5. **Perception gaps** — inventory/items and Link's capabilities (find addresses by tracing), the sword milestone (find its address by RAM diff like `shield_level`), deterministic dialogue text decoding (dialogue is read as an image), `notable` events (so `last_notable` stops being empty).
-6. **Dialogue to leads** — texts and leads (claims extracted by the agent, with status open/tested/refuted and evidence); Claude interprets NPC and sign dialogue.
-7. **Interactions beyond walking** — push, dive/swim, item use; capabilities feed the beliefs of the vision plan.
-8. **Combat** — open question: micro-decisions; settle by spike (Jev macros vs deterministic vs hybrid) after the first agent loop.
-9. **Navigation spike** — A* on the known grid vs Jev macros vs hybrid, measured on success, frames, cost, latency.
-10. **Live view, layout C** — clickable timeline of notable events and agent calls, fork from the UI, pause/stop.
-11. **Real-time play** — the emulator stays paused between decisions; an optional `--live-clock` with pause-on-danger and a reflex layer (Jev or deterministic) is undecided.
+2. **Analysis loop.** `koholint analyze <run>` (standard report, comparison with previous runs), symptom detectors writing `suggestions.md` and filling `summary.json` `symptoms`, scenario runs forked from keyframes, recorded agent answers replayed by a fake client, owner annotations from the viewer. Open question: how much of the harness the agent may amend itself during a run (Continual Harness, arXiv 2605.09998) versus code-versioned changes.
+3. **Plan 4b: finer navigation** — tile lattice and tile-level beliefs, per-appearance room survey, exits that straddle two cells, Jev routing for `choose_skill`.
+4. **Perception gaps** — inventory/items and Link's capabilities (find addresses by tracing), the sword milestone (find its address by RAM diff like `shield_level`), deterministic dialogue text decoding (dialogue is read as an image), `notable` events (so `last_notable` stops being empty).
+5. **Lead statuses** — leads are only open claims today: add a status open/tested/refuted with evidence, and measure whether goal and leads give the agent a progress signal (Jev wiring after that).
+6. **Interactions beyond walking** — push, dive/swim, item use; capabilities feed the beliefs of the vision plan.
+7. **Combat** — open question: micro-decisions; settle by spike (Jev macros vs deterministic vs hybrid) after the first agent loop.
+8. **Navigation spike** — A* on the known grid vs Jev macros vs hybrid, measured on success, frames, cost, latency.
+9. **Live view, layout C** — clickable timeline of notable events and agent calls, fork from the UI, pause/stop.
+10. **Real-time play** — the emulator stays paused between decisions; an optional `--live-clock` with pause-on-danger and a reflex layer (Jev or deterministic) is undecided.
 
 ## Open decisions and loose ends
 - Addresses at `verified_count: 1` need a second independent check (`game_mode`, `game_submode`, `name_length`, `max_hearts`, `dialog_state`).
-- Ladder beyond shield and sword; whether a run may inherit a map from a previous run.
+- Ladder beyond shield and sword; whether a run may inherit a map, a goal or leads from a previous run.
+- Leads: sheets are attached only to `choose_skill`, so an objective chosen right after a dialogue cannot cite its leads yet; the lead `source` is the last `talk_to` target cell, null for texts that opened by themselves.
 - Viewer: Host-header check on GET routes (only `POST /star` checks it); per-macro fsync cost on long runs; `verify` replays from boot (use keyframes).
 - Test runner: rspec vs minitest (not decided).
 - Vision deferred (not fixed): sprite flips are not in the sprite pattern; sprites at y 1..8 in 8x8 mode; tile bytes not memoised per snapshot; BG-disable not handled; dialogue CLOSE never sampled in the overlay test; window-overlap overlay rule only unit-tested.

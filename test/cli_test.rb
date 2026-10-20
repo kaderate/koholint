@@ -192,13 +192,14 @@ class CliTest < Minitest::Test
     end
   end
 
-  def test_resume_refuses_a_flow_1_run
+  def test_the_flow_is_4_and_resume_refuses_a_flow_3_run
     skip_without_rom!
+    assert_equal 'flow-4', Koholint::FLOW_VERSION
     Dir.mktmpdir do |dir|
-      run = Koholint::Run.create(root: dir, flow_version: 'flow-1', budget: {})
+      run = Koholint::Run.create(root: dir, flow_version: 'flow-3', budget: {})
       code, _out, err = cli('resume', run.dir)
       assert_equal 1, code
-      assert_match(/flow-1/, err)
+      assert_match(/flow-3/, err)
     end
   end
 

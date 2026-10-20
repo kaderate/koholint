@@ -17,13 +17,16 @@ module Koholint
       KEEP_REFUSALS = 3
       TRIGGER_AT = 2
       THINGS_LIMIT = 12
+      HIGH_LEADS = 8
+      NORMAL_LEADS = 5
+      QUOTE_LIMIT = 80
 
-      def self.build(state:, grid:, objective:, history:, attempts:, manual:, last_results:, max_chars: 9000, ledger: nil, refusals: [], plan: nil, triggers: nil, talk_log: nil, locked: nil, locked_frames: nil)
+      def self.build(state:, grid:, objective:, history:, attempts:, manual:, last_results:, max_chars: 9000, ledger: nil, refusals: [], plan: nil, triggers: nil, talk_log: nil, locked: nil, locked_frames: nil, goal: nil, leads: [])
         link = state.cell
         place = [state.room_id, state.map_id]
         results = last_results.last(RESULT_LIMIT).map { |r| r.transform_keys(&:to_sym) }
         fixed = [header(state, link, triggers, place, locked, locked_frames), grid_block(grid, link, ledger, place), neighbours(grid, link, results, ledger, place),
-                 *things_block(grid, talk_log, place), objective_block(objective, attempts, plan)]
+                 *things_block(grid, talk_log, place), objective_block(objective, attempts, plan, goal), *leads_block(leads, place)]
         finished = history.map { |h| "- #{h[:id]} #{h[:outcome]}#{h[:reason] ? " (#{h[:reason]})" : ''}: #{h[:title]}" }
         refused = refusals.last(KEEP_REFUSALS).map { |r| "- #{r[:title]} #{r[:predicate].to_json}: #{r[:reason]}" }
         lines = results.map { |r| "- #{result_line(r)}" }
@@ -169,8 +172,21 @@ module Koholint
       def self.blocked_at(r) = r[:blocked_at].is_a?(Hash) ? r[:blocked_at].transform_keys(&:to_sym) : nil
       private_class_method :blocked_at
 
-      def self.objective_block(objective, attempts, plan = nil)
-        lines = objective ? ["Current objective: #{objective[:title]}", "Predicate: #{objective[:predicate].to_json}"] : ['Current objective: none']
+      def self.leads_block(leads, place)
+        newest = leads.reverse
+        high = newest.select { |lead| lead[:importance] == 'high' }.first(HIGH_LEADS)
+        normal = newest.select { |lead| lead[:importance] == 'normal' && lead[:place] == place }.first(NORMAL_LEADS)
+        lines = (high + normal).map do |lead|
+          quote = lead[:quote].size > QUOTE_LIMIT ? "#{lead[:quote][0, QUOTE_LIMIT - 3]}..." : lead[:quote]
+          "- [#{lead[:id]} #{lead[:importance]}] #{lead[:claim]} — \"#{quote}\""
+        end
+        lines.empty? ? [] : ["Leads from texts you read (all high ones, normal ones of this place):\n#{lines.join("\n")}"]
+      end
+      private_class_method :leads_block
+
+      def self.objective_block(objective, attempts, plan = nil, goal = nil)
+        lines = [goal ? "Goal (yours, long-term): #{goal}" : 'Goal: none set yet — set one in goal when you have a reason (a lead, an observation).']
+        lines += objective ? ["Current objective: #{objective[:title]}", "Predicate: #{objective[:predicate].to_json}"] : ['Current objective: none']
         lines << "Your plan from your last call (written by you; follow it unless the situation changed): #{plan}" if plan
         return lines.join("\n") unless objective
 

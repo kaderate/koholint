@@ -46,6 +46,8 @@
   #reasoning-head, #reasoning-plan, #objective-predicate, #objective-attempts, #budget-line { color: #9ab; }
   #reasoning-plan { margin-top: 6px; color: #dfe; }
   #objective-title { font-size: 1.15em; color: #fd8; }
+  #goal { margin-top: 6px; color: #dfe; }
+  #leads { margin: 2px 0 0; padding-left: 16px; color: #9cf; }
   #meter { height: 6px; background: #333; margin: 4px 0; }
   #meter-fill { height: 100%; width: 0; background: #2c4; }
   #meter-fill.high { background: #e83; }
@@ -82,7 +84,7 @@
   <div id="left">
   <div id="stage"><img id="frame" alt="game frame"><div id="overlay"></div></div>
     <div class="panel" id="reasoning"><h2>Reasoning</h2><div id="reasoning-head"></div><div id="reasoning-text"></div><div id="reasoning-plan"></div></div>
-    <div class="panel" id="objective"><h2>Objective</h2><div id="objective-title"></div><div id="objective-predicate"></div><div id="objective-attempts"></div></div>
+    <div class="panel" id="objective"><h2>Objective</h2><div id="objective-title"></div><div id="objective-predicate"></div><div id="objective-attempts"></div><div id="goal"></div><ul id="leads"></ul></div>
     <div class="panel" id="budget"><h2>Budget</h2><div id="meter"><div id="meter-fill"></div></div><div id="budget-line"></div></div>
   </div>
   <div id="side">
@@ -337,6 +339,17 @@
     if (!status.objective) return null;
     var attempts = Number.isInteger(status.objective_attempts) ? status.objective_attempts : null;
     return { title: status.objective_title || status.objective, predicate: predicateInWords(status.objective_predicate), attempts: attempts };
+  }
+
+  function memoryView(status) {
+    status = status || {};
+    var leads = Array.isArray(status.leads) ? status.leads : [];
+    return {
+      goal: 'goal: ' + (typeof status.goal === 'string' && status.goal ? status.goal : 'none yet'),
+      leads: leads.filter(function (l) { return l && typeof l.claim === 'string'; }).map(function (l) {
+        return '[' + String(l.importance || '?') + '] ' + truncate(l.claim, 160);
+      })
+    };
   }
 
   function effectiveActivity(a, manifestStatus) {
@@ -650,6 +663,15 @@
     document.getElementById('objective-title').textContent = objective ? objective.title : 'none';
     document.getElementById('objective-predicate').textContent = objective ? objective.predicate : '';
     document.getElementById('objective-attempts').textContent = objective ? (objective.attempts === null ? '' : plural(objective.attempts, 'skill call') + ' so far') : '';
+    var memory = memoryView(state.status);
+    document.getElementById('goal').textContent = memory.goal;
+    var leadsEl = document.getElementById('leads');
+    leadsEl.replaceChildren();
+    memory.leads.forEach(function (text) {
+      var item = document.createElement('li');
+      item.textContent = text;
+      leadsEl.appendChild(item);
+    });
     var budget = state.budget || {};
     var percent = meterPercent(budget.spent, budget.cap);
     document.getElementById('meter').style.display = percent === null ? 'none' : 'block';

@@ -52,6 +52,16 @@ class PageTest < Minitest::Test
     assert_equal 600, evaluate("formatReason({type: 'decision', justification: 'a'.repeat(900)}).length")
   end
 
+  def test_the_goal_and_the_leads_are_shown_as_plain_lines
+    status = { goal: 'find <b>it</b>', leads: [{ id: 'lead-2', importance: 'high', claim: 'x' * 200 }, { id: 'lead-1', importance: 'normal', claim: 'go up' }, { id: 'bad' }] }
+    view = evaluate("memoryView(#{JSON.generate(status)})")
+    assert_equal 'goal: find <b>it</b>', view['goal']
+    assert_equal ["[high] #{'x' * 159}…", '[normal] go up'], view['leads']
+    assert_equal({ 'goal' => 'goal: none yet', 'leads' => [] }, evaluate('memoryView({})'))
+    assert_includes PAGE, '<div id="goal"></div><ul id="leads"></ul>'
+    assert_includes PAGE, 'item.textContent = text;'
+  end
+
   def test_a_decision_shows_its_plan_as_visible_text
     event = { frame: 9, type: 'decision', plan: '  talk to <b>him</b> ' }
     assert_equal 'plan: talk to <b>him</b>', evaluate("formatPlan(#{JSON.generate(event)})")
