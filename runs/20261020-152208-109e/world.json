@@ -1,0 +1,58 @@
+{
+  "goal": "Go to the beach to recover the other item, then find the first dungeon",
+  "leads": [
+    {
+      "id": "lead-1",
+      "place": [
+        163,
+        16
+      ],
+      "source": null,
+      "quote": "Tu es sur l'île Cocolint!",
+      "claim": "The island is called Cocolint (Koholint).",
+      "importance": "normal"
+    },
+    {
+      "id": "lead-2",
+      "place": [
+        163,
+        16
+      ],
+      "source": {
+        "row": 4,
+        "col": 7
+      },
+      "quote": "Utilisez-le pour repousser vos ennemis!",
+      "claim": "Link got his shield back from Tarkin and can use it to repel enemies",
+      "importance": "normal"
+    },
+    {
+      "id": "lead-3",
+      "place": [
+        163,
+        16
+      ],
+      "source": {
+        "row": 4,
+        "col": 7
+      },
+      "quote": "un autre bidule qui est resté sur la plage",
+      "claim": "Another item of Link's was left on the beach",
+      "importance": "high"
+    },
+    {
+      "id": "lead-4",
+      "place": [
+        163,
+        16
+      ],
+      "source": {
+        "row": 4,
+        "col": 7
+      },
+      "quote": "fais attention aux monstres",
+      "claim": "Monsters are on the beach, so be careful",
+      "importance": "normal"
+    }
+  ]
+}

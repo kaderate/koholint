@@ -1,0 +1,26 @@
+{
+  "run_id": "20261020-152208-109e",
+  "flow_version": "flow-5",
+  "tag": "npc-dialogues",
+  "harness_sha": "500ec36d18b941a503b3a70873b8df7a5580139e",
+  "prompts_sha": "25729ddc41b19a4033783db4c40557982640b345c1f916f72f7a355cd4082c23",
+  "model": "sonnet",
+  "frames": 5462,
+  "dollars": 0.750266,
+  "calls": 48,
+  "calls_per_1000f": 8.78799,
+  "usd_per_1000f": 0.137361,
+  "latency_ms": {
+    "median": 5301,
+    "p90": 8194
+  },
+  "highest_milestone": "shield",
+  "places_seen": 1,
+  "objectives": {
+    "count": 2,
+    "achieved": 1
+  },
+  "stop_reason": "agent_failures",
+  "symptoms": [],
+  "starred": false
+}
