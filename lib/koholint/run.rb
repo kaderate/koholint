@@ -122,7 +122,8 @@ module Koholint
       kept = Trace.read(path).reject do |event|
         event['frame'] > frames || (event['frame'] == frames && decided_at_resume?(event))
       end
-      rewrite_trace(path, kept)
+      decided = kept.rindex { |event| event['type'] == 'decision' } || -1
+      rewrite_trace(path, kept.reject.with_index { |event, index| event['type'] == 'dialogue' && index > decided })
     end
 
     def truncate_prompts!(frames)

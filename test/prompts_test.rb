@@ -25,9 +25,10 @@ class PromptsTest < Minitest::Test
     assert_includes skill, 'skill'
   end
 
-  def test_the_objective_prompt_lists_all_five_kinds
+  def test_the_objective_prompt_lists_all_six_kinds
     text = Koholint::Agents::Prompts.system_for(Koholint::DecisionPoint.choose_objective)
-    assert_includes text, 'one of five kinds: leave_place (place), reach_place (place), reach_cell (place, row, col), dialogue_closed or new_place (no fields).'
+    assert_includes text, 'one of six kinds: leave_place (place), reach_place (place), reach_cell (place, row, col), dialogue_closed, new_place or new_text (no fields).'
+    assert_includes text, 'new_text means reading a text you have not read yet in this run: talk to a person, read a sign'
   end
 
   def test_the_plan_line_is_mandatory
@@ -47,7 +48,12 @@ class PromptsTest < Minitest::Test
 
   def test_goal_and_leads_are_offered_with_a_generic_rubric
     objective, skill = points.map { |p| Koholint::Agents::Prompts.system_for(p) }
-    [objective, skill].each { |text| assert_includes text, 'revise it only when new information changes it, omit it to keep it' }
+    assert_includes skill, 'revise it only when new information changes it, omit it to keep it'
+    assert_includes objective, 'Review it at every objective: re-read the leads'
+    assert_includes skill, 'talk to the same person again while each talk gives a new text, and stop when the listing says exhausted'
+    assert_includes objective, 'which ones are worth retrying and which are exhausted'
+    assert_includes points.first.json_schema[:required], 'goal'
+    refute_includes points.last.json_schema[:required], 'goal'
     assert_includes objective, 'give its id in because'
     assert_includes skill, 'signs or objects you read'
     assert_includes skill, 'high: it states a goal, a destination, an item to obtain, a condition or obstacle, or a danger.'

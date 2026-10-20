@@ -43,7 +43,12 @@ with the fewest turns over known cells), `skills/` (`walk`, `goto`, `step`, `tal
 `advance_dialogue`, `wait`) behind `skills/registry.rb`. A skill is a bounded, deterministic action with
 validated parameters; it reports how it stopped (`done`, `blocked`, `no_path`, `no_response`…). `ledger.rb`
 counts blocked edges per place (doubtful edges), `triggers.rb` forbids inputs that re-fire a scripted event,
-`talk_log.rb` remembers which sides of a person gave no response.
+`talk_log.rb` remembers which sides of a person gave no response and, per person (the last `talk_to` target), the key (letters
+and digits only, as for `new_text`) of each stitched text read and a world stamp (milestone, places visited, leads): the context says whether the last talk gave
+new text, how many talks in a row gave nothing new, and `worth retrying` (the stamp changed or the last talk was new) or
+`exhausted` (the last two talks repeated under the same stamp).
+`dialogues.rb` groups `dialogue` events (same frame and place) into one dialogue and stitches the overlapping pages of a
+scrolling text box into the full text without losing a word; the stored events stay raw.
 
 **Decision points and policies** — `decision.rb` defines the points (`choose_objective`, `choose_skill`,
 `move`, macros) with their output schema and validation. A policy answers them: `policies/delegated.rb`
@@ -52,9 +57,11 @@ counts blocked edges per place (doubtful edges), `triggers.rb` forbids inputs th
 (an invalid answer falls back deterministically, 5 consecutive fallbacks stop the run).
 
 **Objectives** — `objectives.rb`: a short goal with a predicate the harness checks from memory
-(`leave_place`, `reach_place`, `reach_cell`, `dialogue_closed`, `new_place`); the engine emits started and
+(`leave_place`, `reach_place`, `reach_cell`, `dialogue_closed`, `new_place`, `new_text`: a text not read before in
+the run, compared whitespace-insensitively on the stitched text, the read texts rebuilt from `dialogue` events on resume); the engine emits started and
 achieved/abandoned/failed events; a `started` event may carry `because`, the id of the lead that motivated it. The
-long-term direction is the agent's own `goal` (a short text it sets and revises). `leads.rb` holds the leads: claims the
+long-term direction is the agent's own `goal` (a short text it restates or revises at every objective; the context shows
+when it was set). `leads.rb` holds the leads: claims the
 agent extracts from texts it read (dialogue, signs, objects), each with a verbatim `quote`, a `claim` and an importance
 (`high`, `normal`, `low`). A lead whose quote is not in the transcription of the same call is dropped (`notable`
 `lead_rejected`), duplicates are dropped by quote. Goal and leads are rebuilt from the `goal` and `lead` trace events on
@@ -74,7 +81,8 @@ heavy artifacts stay local. A run resumes only with the same `flow_version` and 
 play flow means a new `flow_version`.
 
 **Viewer** (`viewer.rb`, `viewer/`) — a small HTTP server. A `Follower` replays the journal of the watched
-run; `Feed` derives status, feed, reasoning, objectives, goal and leads from the trace up to the shown frame. `Explorer` and `Registry` serve
+run; `Feed` derives status, feed, reasoning, objectives, goal, leads and the stitched dialogue history (newest first,
+with the person talked to) from the trace up to the shown frame. `Explorer` and `Registry` serve
 past runs (list, read-only replays with pacing, comparison via `run_compare.rb`, star). It never writes game
 state.
 

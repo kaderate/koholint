@@ -1,6 +1,7 @@
 require 'koholint/agents/context'
 require 'koholint/agents/prompts'
 require 'koholint/decision'
+require 'koholint/dialogues'
 require 'koholint/leads'
 require 'koholint/ledger'
 require 'koholint/navigation/planner'
@@ -106,6 +107,7 @@ module Koholint
         start_objective(choice, state, context, reply.output['because']) if decision_point.name == :choose_objective
         plan = remember_plan(reply.output)
         transcription = transcription_for(reply.output, state, decision_point)
+        remember_text(transcription[:transcription], state)
         answer(choice, reply, reply.output).merge(plan ? { plan: } : {}).merge(transcription).merge(notes_for(reply.output, transcription[:transcription], state))
       rescue NameError, TypeError
         raise
@@ -410,7 +412,7 @@ module Koholint
         @prompt = Agents::Context.build(state:, grid: grid_for(state, context), objective: @objectives.current, history: @objectives.history,
                                        attempts: @objectives.attempts_for_prompt, manual: @manual, last_results: @last_results, ledger: @ledger, refusals: @refusals, plan: @plan,
                                        triggers: @triggers, talk_log: @talk_log, locked: (@hemmed[:attempts] if @hemmed && hemmed?(state)),
-                                       locked_frames: (locked_frames(state) if state.phase == :locked), goal: @leads.goal, leads: @leads.all)
+                                       locked_frames: (locked_frames(state) if state.phase == :locked), goal: goal_line, leads: @leads.all, stamp: stamp(state))
         if decision_point.name == :choose_skill && @sequence
           @pages_read = @sequence[:pages].size
           @images = Vision::DialogueShot.sheets(@sequence[:pages], per_sheet: SHEET_PAGES)
@@ -427,15 +429,37 @@ module Koholint
         @client.call(system: Agents::Prompts.system_for(decision_point, sheets: !@images.nil?), prompt: @prompt, schema: decision_point.json_schema, **pictures)
       end
 
+      def goal_line
+        return unless @leads.goal
+        return @leads.goal unless @leads.goal_frame && @leads.goal_objectives
+
+        ago = @objectives.finished - @leads.goal_objectives
+        "#{@leads.goal} (set at frame #{@leads.goal_frame}, #{ago} #{ago == 1 ? 'objective' : 'objectives'} ago)"
+      end
+
+      def remember_text(transcription, state)
+        pages = [transcription].flatten(1).compact.map { |page| page[:text] }
+        return if pages.empty?
+
+        text = Dialogues.text(pages)
+        @objectives.note_text(text)
+        source = @images ? @read_at[:source] : @talk_source
+        place = @images ? @read_at[:place] : [state.room_id, state.map_id]
+        @talk_log.remember(place:, cell: [source[:row], source[:col]], text:, stamp: stamp(state)) if source
+      end
+
+      def stamp(state) = Dialogues.stamp(milestone: state.milestone, places: @objectives.visited.size, leads: @leads.all.size)
+
       def notes_for(output, transcription, state)
-        goal = @leads.change_goal(output['goal'])
+        goal = @leads.change_goal(output['goal'], frame: state.frame, objectives: @objectives.finished)
         notes = goal ? { goal: } : {}
         return notes unless output.key?('leads')
 
         pages = [transcription].flatten(1).compact
         place = @read_at && @images ? @read_at[:place] : [state.room_id, state.map_id]
         source = @images ? @read_at[:source] : @talk_source
-        leads, rejected = @leads.absorb(output['leads'], transcription: pages.map { |page| page[:text] }.join(' '), place:, source:)
+        texts = pages.map { |page| page[:text] }
+        leads, rejected = @leads.absorb(output['leads'], transcription: [texts.join(' '), Dialogues.text(texts)], place:, source:)
         notes.merge(leads:, leads_rejected: rejected)
       end
 

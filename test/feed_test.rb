@@ -28,7 +28,7 @@ class FeedTest < Minitest::Test
       decision(trace, 2)
       trace.emit(:action, frame: 3, skill: 'walk', params: { 'dir' => 'up' }, result: {})
       doc = Koholint::Viewer::Feed.for(dir, FOLLOWER)
-      assert_equal %i[status replay events grid activity server_now latency budget], doc.keys
+      assert_equal %i[status replay events grid activity server_now latency budget dialogues], doc.keys
       assert_equal File.basename(dir), doc[:status][:run_id]
       assert_equal({ flow_version: 'f', manifest_status: 'running', budget: { 'frames' => 9 }, health: 'unknown',
                      hearts: 2.0, max_hearts: 3.0, objective: nil, last_notable: nil, highest_milestone: 'none',
@@ -65,6 +65,18 @@ class FeedTest < Minitest::Test
       assert_equal [{ id: 'lead-3', importance: 'normal', claim: 'c lead-3' }, { id: 'lead-1', importance: 'high', claim: 'c lead-1' }], early[:leads]
       late = Koholint::Viewer::Feed.for(dir, FOLLOWER)[:status]
       assert_equal ['second', %w[lead-4 lead-3 lead-1]], [late[:goal], late[:leads].map { |l| l[:id] }]
+    end
+  end
+
+  def test_dialogues_are_stitched_newest_first_and_follow_the_shown_frame
+    with_dir do |dir, trace|
+      trace.emit(:action, frame: 4, skill: 'talk_to', params: { 'row' => 2, 'col' => 3 }, result: { 'talked' => true })
+      ['Go to the', 'Go to the north cave'].each_with_index { |text, i| trace.emit(:dialogue, frame: 5, place: [1, 2], text:, source: 'agent', page: i + 1) }
+      trace.emit(:action, frame: 30, skill: 'walk', params: {}, result: {})
+      trace.emit(:dialogue, frame: 40, place: [1, 2], text: 'A sign <b>', source: 'agent', page: 1)
+      assert_equal [{ frame: 40, place: [1, 2], source: nil, text: 'A sign <b>' }, { frame: 5, place: [1, 2], source: { row: 2, col: 3 }, text: 'Go to the north cave' }],
+                   Koholint::Viewer::Feed.for(dir, FOLLOWER)[:dialogues]
+      assert_equal [5], Koholint::Viewer::Feed.for(dir, FOLLOWER, upto: 10)[:dialogues].map { |d| d[:frame] }
     end
   end
 

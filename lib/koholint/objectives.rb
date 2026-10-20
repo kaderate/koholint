@@ -1,4 +1,5 @@
 require 'koholint'
+require 'koholint/dialogues'
 
 module Koholint
   class Objectives
@@ -7,7 +8,8 @@ module Koholint
       'reach_place' => %i[place],
       'reach_cell' => %i[place row col],
       'dialogue_closed' => %i[],
-      'new_place' => %i[]
+      'new_place' => %i[],
+      'new_text' => %i[]
     }.freeze
 
     ATTEMPT_LIMIT = 10
@@ -48,12 +50,13 @@ module Koholint
     def self.resume(trace:, events:, frame:, **options)
       started = events.select { |e| e['type'] == 'objective' && e['status'] == 'started' }
       finished = events.select { |e| e['type'] == 'objective' && TERMINAL.include?(e['status']) }.map { |e| e['id'] }
-      objectives = new(trace:, counter: started.size, **options)
+      objectives = new(trace:, counter: started.size, texts: Dialogues.from_events(events).map { |dialogue| dialogue[:text] }, **options)
       started.reject { |e| finished.include?(e['id']) }.each { |e| objectives.orphan(e, frame:) }
       objectives
     end
 
-    def initialize(trace:, stall_frames: 1800, loop_window: 12, counter: 0, visited: [])
+    def initialize(trace:, stall_frames: 1800, loop_window: 12, counter: 0, visited: [], texts: [])
+      @texts = texts.map { |text| Dialogues.key(text) }
       @trace = trace
       @stall_frames = stall_frames
       @loop_window = loop_window
@@ -74,6 +77,7 @@ module Koholint
       @last_change_frame = frame
       @seen_alive = false
       @dialogue_seen = false
+      @new_text = false
       @repeat = 0
       @last_key = nil
       @last_state_part = nil
@@ -84,6 +88,17 @@ module Koholint
       @trace.emit(:objective, frame:, id:, status: 'started', title:, predicate: @current[:predicate], **(because ? { because: } : {}))
       id
     end
+
+    def note_text(text)
+      key = Dialogues.key(text)
+      return false if key.empty? || Dialogues.known?(key, @texts)
+
+      @texts << key
+      @new_text = true if @current
+      true
+    end
+
+    def finished = @counter - (@current ? 1 : 0)
 
     def record_attempt(skill:, params:, result_summary:)
       return unless @current
@@ -186,6 +201,7 @@ module Koholint
       when 'reach_cell' then place == target && cell == [predicate[:row], predicate[:col]]
       when 'dialogue_closed' then @dialogue_seen && !state.dialog_open?
       when 'new_place' then first_visit
+      when 'new_text' then @new_text
       end
     end
 

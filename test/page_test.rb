@@ -52,6 +52,14 @@ class PageTest < Minitest::Test
     assert_equal 600, evaluate("formatReason({type: 'decision', justification: 'a'.repeat(900)}).length")
   end
 
+  def test_dialogues_are_listed_with_frame_place_and_source_as_plain_text
+    list = [{ frame: 40, place: [1, 2], source: nil, text: 'A <b>sign</b>' }, { frame: 5, place: [1, 2], source: { row: 2, col: 3 }, text: 'Hi' }, { frame: 1 }]
+    assert_equal [{ 'head' => 'f40 · [1,2]', 'text' => 'A <b>sign</b>' }, { 'head' => 'f5 · [1,2] · from (2, 3)', 'text' => 'Hi' }],
+                 evaluate("dialoguesView(#{JSON.generate(list)})")
+    assert_equal [], evaluate('dialoguesView(undefined)')
+    assert_includes PAGE, '<details id="dialogues-panel"><summary>Dialogues</summary><ul id="dialogues"></ul></details>'
+  end
+
   def test_the_goal_and_the_leads_are_shown_as_plain_lines
     status = { goal: 'find <b>it</b>', leads: [{ id: 'lead-2', importance: 'high', claim: 'x' * 200 }, { id: 'lead-1', importance: 'normal', claim: 'go up' }, { id: 'bad' }] }
     view = evaluate("memoryView(#{JSON.generate(status)})")
@@ -301,6 +309,7 @@ class PageTest < Minitest::Test
     assert_equal 'reach cell (3, 4) in [1,2]', evaluate("predicateInWords({kind: 'reach_cell', row: 3, col: 4, place: [1, 2]})")
     assert_equal 'leave [1,2]', evaluate("predicateInWords({kind: 'leave_place', place: [1, 2]})")
     assert_equal 'close the open dialogue', evaluate("predicateInWords({kind: 'dialogue_closed'})")
+    assert_equal 'read a new text', evaluate("predicateInWords({kind: 'new_text'})")
     assert_equal 'find item', evaluate("predicateInWords({kind: 'find_item'})")
     assert_equal '', evaluate('predicateInWords(null)')
   end

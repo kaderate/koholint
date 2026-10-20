@@ -794,8 +794,38 @@ class DelegatedPolicyTest < Minitest::Test
     assert_equal [{ id: 'lead-1', place: [163, 16], source: { row: 2, col: 4 }, quote: 'find the KEY', claim: 'a key is needed', importance: 'high' }], result[:leads]
     assert_equal [1, 'find the key'], result.values_at(:leads_rejected, :goal)
     decide_with_shot(p, state(frame: 400))
-    assert_includes client.calls.last[:prompt], "Goal (yours, long-term): find the key\n"
+    assert_match(/Goal \(yours, long-term\): find the key \(set at frame \d+, 0 objectives ago\)\n/, client.calls.last[:prompt])
     assert_includes client.calls.last[:prompt], '- [lead-1 high] a key is needed — "find the KEY"'
+  end
+
+  def test_a_transcribed_text_not_read_before_achieves_new_text
+    sheet = ok('skill' => 'wait', 'params' => { 'frames' => 3 }, 'transcription' => "Go no\n\nGo north, then east.")
+    client = ScriptedClient.new(objective: ok('title' => 'read', 'predicate' => { 'kind' => 'new_text' }), skill: [sheet, walk])
+    p = policy(client)
+    decide_with_shot(p, state)
+    pages(p, 2)
+    result = flush(p, 300)
+    assert_equal 'obj-1', @objectives.current[:id]
+    p.after_action(choice: result[:choice], outcome: { stopped_by: 'done' }, state: state(frame: 320), frame: 320)
+    assert_equal :achieved, @objectives.history.last[:outcome]
+    refute @objectives.note_text('go north, then east.')
+  end
+
+  def test_a_person_talked_to_is_remembered_with_whether_the_talk_gave_new_text
+    sheet = ok('skill' => 'wait', 'params' => { 'frames' => 3 }, 'transcription' => 'Hello there.')
+    client = ScriptedClient.new(objective: objective, skill: [sheet, walk])
+    p = policy(client)
+    cells = Array.new(8) { Array.new(10) { 'floor' } }
+    person = Koholint::Vision::Grid.new(cells:, static_sprites: [{ 'x' => 72, 'y' => 48, 'pattern' => 'p', 'height' => 16 }],
+                                        beliefs: Koholint::Vision::Beliefs.new, capabilities: Koholint::Vision::Capabilities.new)
+    shot = ->(at) { p.decide(p.decision_point_for(at), at, { grid: person, dialogue_shot: -> { SHOT }, dialogue_rgb: -> { PAGE } }) }
+    shot.call(state)
+    p.after_action(choice: { skill: 'talk_to', params: { 'row' => 2, 'col' => 4 } }, outcome: { stopped_by: 'done', talked: true }, state: state, frame: 100)
+    2.times { |i| at = state(frame: 100 + (i * 30), **OPEN); advance(p, shot.call(at), at, at.frame + 30) }
+    shot.call(state(frame: 300))
+    shot.call(state(frame: 310))
+    shot.call(state(frame: 320))
+    assert_includes client.calls.last[:prompt], '- at (2,4): talked to 1 time (dialogue opened 1); 1 text read, last talk gave new text, worth retrying: yes'
   end
 
   def test_a_goal_is_reported_only_when_it_changes_and_leads_need_a_transcription
@@ -808,6 +838,20 @@ class DelegatedPolicyTest < Minitest::Test
     _, second = decide(p)
     refute second.key?(:goal)
     assert_equal [[], 1], second.values_at(:leads, :leads_rejected)
+  end
+
+  def test_the_goal_line_says_when_it_was_set_and_how_many_objectives_ago
+    keep = ok('title' => 'go', 'predicate' => { 'kind' => 'new_place' }, 'goal' => 'explore')
+    p = policy(ScriptedClient.new(objective: [keep, keep, keep]))
+    client = p.instance_variable_get(:@client)
+    decide(p)
+    2.times do |n|
+      @objectives.abandon(frame: 101 + n, reason: 'test')
+      decide(p, state(frame: 200 + n))
+    end
+    assert_includes client.calls.last[:prompt], 'Goal (yours, long-term): explore (set at frame 100, 2 objectives ago)'
+    leads = Koholint::Leads.from_events(Koholint::Trace.read(File.join(@dir, 'trace.jsonl')) + [{ 'type' => 'goal', 'frame' => 300, 'text' => 'new' }])
+    assert_equal ['new', 300, 2], [leads.goal, leads.goal_frame, leads.goal_objectives]
   end
 
   def test_because_is_kept_only_when_it_names_a_known_lead

@@ -102,4 +102,44 @@ class TalkLogTest < Minitest::Test
     assert_includes lines, '- at (6,2): talked to 1 time (dialogue opened 0)'
     assert_equal '... 8 more objects', lines.last
   end
+  def talk(log, text, stamp = ['none', 1, 0]) = log.remember(place: PLACE, cell: [4, 7], text:, stamp:)
+
+  def memory_line(log, stamp = ['none', 1, 0]) = log.lines(grid([sprite(4, 7)]), PLACE, stamp:).first.split('; ', 2).last
+
+  def test_people_are_exhausted_when_two_talks_repeat_under_an_unchanged_world
+    log = Koholint::TalkLog.new
+    log.record(place: PLACE, row: 4, col: 7, talked: true)
+    talk(log, 'Hello.')
+    assert_equal '1 text read, last talk gave new text, worth retrying: yes', memory_line(log)
+    talk(log, 'Go north.')
+    talk(log, 'hello .')
+    assert_equal '3 texts read, last talk gave nothing new (1 talk in a row with nothing new)', memory_line(log)
+    talk(log, 'Hello.')
+    assert_equal '4 texts read, last talk gave nothing new (2 talks in a row with nothing new), exhausted', memory_line(log)
+    assert_equal '4 texts read, last talk gave nothing new (2 talks in a row with nothing new), worth retrying: yes (something changed since the last talk)',
+                 memory_line(log, ['none', 2, 0])
+    talk(log, 'Hello.', ['none', 2, 0])
+    assert_equal '5 texts read, last talk gave nothing new (3 talks in a row with nothing new)', memory_line(log, ['none', 2, 0])
+  end
+
+  def test_the_memory_is_rebuilt_from_dialogue_events_and_the_last_talk_target
+    perception = { 'type' => 'perception', 'state' => { 'room_id' => 163, 'map_id' => 16, 'game_mode' => 0x0B, 'game_submode' => 7, 'milestone' => 'none' } }
+    talked = { 'type' => 'action', 'skill' => 'talk_to', 'params' => { 'row' => 4, 'col' => 7 },
+               'result' => { 'talked' => true, 'stopped_by' => 'done', 'from' => { 'room' => 163, 'map' => 16 } } }
+    said = ->(text) { { 'type' => 'dialogue', 'frame' => 9, 'place' => PLACE, 'text' => text } }
+    events = [perception, talked, said.call('Hi'), perception, talked, said.call('Hi'), { 'type' => 'action', 'skill' => 'walk', 'params' => {}, 'result' => {} },
+              said.call('A sign')]
+    log = Koholint::TalkLog.from_events(events)
+    assert_equal ['- at (4,7): talked to 2 times (dialogue opened 2); 2 texts read, last talk gave nothing new (1 talk in a row with nothing new), exhausted'],
+                 log.lines(grid([sprite(4, 7)]), PLACE, stamp: ['none', 1, 0])
+  end
+  def test_punctuation_or_a_re_read_contained_in_an_earlier_text_is_not_new
+    log = Koholint::TalkLog.new
+    log.record(place: PLACE, row: 4, col: 7, talked: true)
+    talk(log, 'Go north. Then, east!')
+    talk(log, 'go north')
+    assert_equal '2 texts read, last talk gave nothing new (1 talk in a row with nothing new), exhausted', memory_line(log)
+    talk(log, 'Go north... then east')
+    assert_equal '3 texts read, last talk gave nothing new (2 talks in a row with nothing new)', memory_line(log)
+  end
 end

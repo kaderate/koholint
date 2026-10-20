@@ -169,4 +169,19 @@ class RunTest < Minitest::Test
       assert_equal [[4, 'lead'], [4, 'goal'], [4, 'notable'], [5, 'notable']], kept
     end
   end
+  def test_truncation_drops_the_dialogue_of_the_discarded_decision_even_at_an_earlier_frame
+    with_env do |dir, rom|
+      run = Koholint::Run.create(root: dir, flow_version: 'f1', budget: {}, rom_path: rom)
+      said = ->(frame, text) { run.trace.emit(:dialogue, frame:, place: [1, 2], text:, source: 'agent', page: 1) }
+      decided = ->(frame) { run.trace.emit(:decision, frame:, decision_point: 'choose_skill', input: {}, options: [], choice: {}, justification: 'j', confidence: 1.0, agent: 'a', latency_ms: 0, cost_usd: 0.0) }
+      said.call(2, 'kept')
+      decided.call(3)
+      run.trace.emit(:action, frame: 4, skill: 'wait', params: {}, result: {})
+      said.call(4, 'read by the lost call')
+      decided.call(5)
+      run.truncate_trace!(5)
+      kept = Koholint::Trace.read(File.join(run.dir, 'trace.jsonl')).map { |e| [e['frame'], e['type'], e['text']].compact }
+      assert_equal [[2, 'dialogue', 'kept'], [3, 'decision'], [4, 'action']], kept
+    end
+  end
 end

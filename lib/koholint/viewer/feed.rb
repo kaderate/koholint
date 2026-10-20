@@ -1,6 +1,7 @@
 require 'json'
 require 'weakref'
 require 'koholint'
+require 'koholint/dialogues'
 require 'koholint/summary'
 require 'koholint/trace'
 require 'koholint/vision/capabilities'
@@ -45,7 +46,8 @@ module Koholint
           activity: activity(run_dir),
           server_now: Time.now.to_f,
           latency: latency(trace),
-          budget: budget(manifest, trace)
+          budget: budget(manifest, trace),
+          dialogues: dialogues(trace)
         }
       end
 
@@ -81,6 +83,14 @@ module Koholint
         goal = trace.reverse_each.find { |e| e['type'] == 'goal' }
         leads = trace.select { |e| e['type'] == 'lead' && e['importance'] != 'low' }.last(LEADS_SHOWN).reverse
         { goal: goal && goal['text'], leads: leads.map { |e| e.slice('id', 'importance', 'claim').transform_keys(&:to_sym) } }
+      end
+
+      DIALOGUES_SHOWN = 50
+      DIALOGUE_TYPES = %w[dialogue action].freeze
+
+      def dialogues(trace)
+        found = Dialogues.from_events(trace.select { |e| DIALOGUE_TYPES.include?(e['type']) })
+        found.last(DIALOGUES_SHOWN).reverse.map { |dialogue| dialogue.slice(:frame, :place, :source, :text) }
       end
 
       AUTOMATIC = ['automatic dialogue advance', 'deterministic hemmed-in', 'locked: waiting'].freeze
