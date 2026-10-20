@@ -49,12 +49,21 @@ module Koholint
 
     def self.located(path) = !File.exist?(path) && File.exist?(archived(path)) ? archived(path) : path
 
-    def self.compress(path, into: archived(path))
+    def self.compress(path, into: archived(path)) = write_archive(File.binread(path), into)
+
+    def self.write_archive(bytes, into)
       Zlib::GzipWriter.open("#{into}.tmp", Zlib::BEST_COMPRESSION) do |gz|
         gz.mtime = 1
-        gz.write(File.binread(path))
+        gz.write(bytes)
       end
       File.rename("#{into}.tmp", into)
+    end
+
+    def self.raw(path)
+      found = located(path)
+      return nil unless File.file?(found)
+
+      found == path ? File.binread(path) : Zlib::GzipReader.open(found, &:read)
     end
 
     def self.decompress(path)

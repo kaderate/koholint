@@ -13,10 +13,13 @@ class ArchiveTest < Minitest::Test
 
   def make_run(root, id, stop: true, tag: nil)
     dir = File.join(root, id)
-    %w[prompts keyframes save].each { |name| FileUtils.mkdir_p(File.join(dir, name)) }
+    %w[prompts keyframes save video].each { |name| FileUtils.mkdir_p(File.join(dir, name)) }
+    File.write(File.join(dir, 'video', 'clip.mp4'), 'video')
+    File.write(File.join(dir, 'run.lock'), '')
     File.write(File.join(dir, 'manifest.json'), JSON.generate('flow_version' => 'flow-3', 'status' => 'stopped', 'tag' => tag))
     File.binwrite(File.join(dir, 'inputs.log'), "\x02")
     File.write(File.join(dir, 'world.json'), '{}')
+    File.write(File.join(dir, 'suggestions.md'), '')
     File.write(File.join(dir, 'prompts', '10-choose_skill.txt'), 'prompt')
     File.write(File.join(dir, 'keyframes', 'kf-000000010.zlib'), 'kf')
     File.write(File.join(dir, 'save', 'game-10.sav'), 'sav')
@@ -41,19 +44,29 @@ class ArchiveTest < Minitest::Test
     output
   end
 
-  def with_repo
+  GIT_ENV = { 'GIT_CONFIG_GLOBAL' => '/dev/null', 'GIT_CONFIG_NOSYSTEM' => '1' }.freeze
+
+  def with_repo(runs: 'runs')
+    saved = GIT_ENV.keys.to_h { |key| [key, ENV.fetch(key, nil)] }
+    ENV.update(GIT_ENV)
     Dir.mktmpdir do |repo|
       Dir.mktmpdir do |live|
         sh(repo, 'git', 'init', '-q')
-        sh(repo, 'git', 'config', 'user.email', 'test@example.com')
-        sh(repo, 'git', 'config', 'user.name', 'Test')
+        { 'user.email' => 'test@example.com', 'user.name' => 'Test', 'commit.gpgsign' => 'false', 'core.hooksPath' => '/dev/null' }
+          .each { |key, value| sh(repo, 'git', 'config', key, value) }
         FileUtils.cp(GITIGNORE, File.join(repo, '.gitignore'))
         sh(repo, 'git', 'add', '.gitignore')
         sh(repo, 'git', 'commit', '-q', '-m', 'Start')
-        yield File.join(repo, 'runs'), live, repo
+        yield File.join(repo, runs), live, repo
       end
     end
+  ensure
+    ENV.update(saved)
   end
+
+  def committed(repo) = sh(repo, 'git', 'show', '--name-only', '--format=', 'HEAD').lines.map(&:strip).sort
+
+  def bundle(id) = %w[inputs.log manifest.json suggestions.md summary.json trace.jsonl.gz world.json].map { |name| "runs/#{id}/#{name}" }
 
   def test_import_copies_the_light_bundle_and_leaves_the_source_untouched
     Dir.mktmpdir do |base|
@@ -66,7 +79,7 @@ class ArchiveTest < Minitest::Test
       assert_match(/archived 20261020-000001-aaaa/, out)
       assert_equal before, Dir.glob('**/*', base: source).sort
       dest = File.join(root, '20261020-000001-aaaa')
-      assert_equal %w[inputs.log manifest.json summary.json trace.jsonl.gz world.json], Dir.children(dest).sort
+      assert_equal %w[inputs.log manifest.json suggestions.md summary.json trace.jsonl.gz world.json], Dir.children(dest).sort
       assert_equal 3, Koholint::Trace.read(File.join(dest, 'trace.jsonl')).size
       summary = JSON.parse(File.read(File.join(dest, 'summary.json')))
       assert_equal ['exp', 1, 500, 'frames', 1], summary.values_at('tag', 'calls', 'frames', 'stop_reason', 'places_seen')
@@ -114,11 +127,8 @@ class ArchiveTest < Minitest::Test
       _code, out = capture { |o| Koholint::Archive.archive(root:, from: live, commit: true, out: o) }
       assert_match(/committed: Archive runs 20261020-000001-aaaa..20261020-000002-bbbb/, out)
       assert_equal "Archive runs 20261020-000001-aaaa..20261020-000002-bbbb", sh(repo, 'git', 'log', '-1', '--format=%B').rstrip
-      files = sh(repo, 'git', 'show', '--name-only', '--format=', 'HEAD').lines.map(&:strip).sort
-      expected = %w[aaaa 000001 bbbb 000002].each_slice(2).flat_map do |suffix, n|
-        %w[inputs.log manifest.json summary.json trace.jsonl.gz world.json].map { |name| "runs/20261020-#{n}-#{suffix}/#{name}" }
-      end
-      assert_equal ['docs/runs/index.md', *expected].sort, files
+      expected = [*bundle('20261020-000001-aaaa'), *bundle('20261020-000002-bbbb')]
+      assert_equal ['docs/runs/index.md', *expected].sort, committed(repo)
       assert_match(/\?\? runs\/20261020-000003-cccc/, sh(repo, 'git', 'status', '--porcelain'))
       head = sh(repo, 'git', 'rev-parse', 'HEAD')
       _code, out = capture { |o| Koholint::Archive.archive(root:, from: live, commit: true, out: o) }
@@ -201,6 +211,83 @@ class ArchiveTest < Minitest::Test
       assert_equal 0, code
       assert_match(/would delete/, out)
       assert_equal 2, cli('prune-heavy', '--keep', '-1')[0]
+    end
+  end
+
+  def test_re_archiving_refreshes_the_bundle_after_the_source_was_resumed_and_starred
+    Dir.mktmpdir do |base|
+      root = File.join(base, 'runs')
+      source = make_run(File.join(base, 'live'), '20261020-000001-aaaa')
+      Koholint::Archive.archive(root:, from: File.dirname(source), out: StringIO.new)
+      trace = Koholint::Trace.new(File.join(source, 'trace.jsonl'))
+      trace.emit(:perception, frame: 600, state: PLAYING.merge('room_id' => 4), state_hash: 'h')
+      trace.emit(:stop, frame: 900, reason: 'dollars')
+      Koholint::Summary.write(source)
+      Koholint::Archive.star(source, 'left the house', out: StringIO.new)
+      _code, out = capture { |o| Koholint::Archive.archive(root:, from: File.dirname(source), out: o) }
+      assert_equal "archived 20261020-000001-aaaa\n", out
+      dest = File.join(root, '20261020-000001-aaaa')
+      assert_equal 'dollars', Koholint::Trace.read(File.join(dest, 'trace.jsonl')).last['reason']
+      summary = JSON.parse(File.read(File.join(dest, 'summary.json')))
+      assert_equal [900, 2, true], summary.values_at('frames', 'places_seen', 'starred')
+      assert_equal 'left the house', JSON.parse(File.read(File.join(dest, 'star.json')))['why']
+      assert_match(/\| 900 \|.*\| ★ \|/, File.read(File.join(base, 'docs', 'runs', 'index.md')))
+      _code, out = capture { |o| Koholint::Archive.archive(root:, from: File.dirname(source), out: o) }
+      assert_equal '', out
+    end
+  end
+
+  def test_the_index_lists_only_archived_runs
+    Dir.mktmpdir do |base|
+      root = File.join(base, 'runs')
+      make_run(root, '20261020-000001-aaaa')
+      unfinished = make_run(root, '20261020-000002-bbbb', stop: false)
+      Koholint::Summary.write(unfinished)
+      Koholint::Archive.archive(root:, out: StringIO.new)
+      index = File.read(File.join(base, 'docs', 'runs', 'index.md'))
+      assert_includes index, '20261020-000001-aaaa'
+      refute_includes index, '20261020-000002-bbbb'
+    end
+  end
+
+  def test_a_corrupt_archived_trace_is_skipped
+    Dir.mktmpdir do |base|
+      source = make_run(File.join(base, 'live'), '20261020-000001-aaaa')
+      Koholint::Trace.compress(File.join(source, 'trace.jsonl'))
+      File.delete(File.join(source, 'trace.jsonl'))
+      File.binwrite(File.join(source, 'trace.jsonl.gz'), File.binread(File.join(source, 'trace.jsonl.gz'))[0, 20])
+      _code, out = capture { |o| Koholint::Archive.archive(root: File.join(base, 'runs'), from: File.dirname(source), out: o) }
+      assert_equal "skip 20261020-000001-aaaa: corrupt trace\n", out
+    end
+  end
+
+  def test_the_index_goes_to_the_repository_root_of_a_nested_root
+    with_repo(runs: 'data/runs') do |root, live, repo|
+      make_run(live, '20261020-000001-aaaa')
+      Koholint::Archive.archive(root:, from: live, commit: true, out: StringIO.new)
+      assert_includes File.read(File.join(repo, 'docs', 'runs', 'index.md')), '(../../data/runs/20261020-000001-aaaa/)'
+      assert_includes committed(repo), 'docs/runs/index.md'
+    end
+  end
+
+  def test_in_place_commit_leaves_heavy_files_and_unrelated_staged_files_out
+    with_repo do |root, _live, repo|
+      make_run(root, '20261020-000001-aaaa')
+      File.write(File.join(repo, 'notes.txt'), 'wip')
+      sh(repo, 'git', 'add', 'notes.txt')
+      Koholint::Archive.archive(root:, commit: true, out: StringIO.new)
+      assert_equal ['docs/runs/index.md', *bundle('20261020-000001-aaaa')].sort, committed(repo)
+      assert_equal "A  notes.txt\n", sh(repo, 'git', 'status', '--porcelain')
+    end
+  end
+
+  def test_prune_heavy_with_keep_zero_deletes_every_unstarred_heavy_dir
+    Dir.mktmpdir do |root|
+      starred, plain = %w[20261020-000001-aaaa 20261020-000002-bbbb].map { |id| make_run(root, id) }
+      File.write(File.join(starred, 'star.json'), '{}')
+      Koholint::Archive.prune_heavy(root:, keep: 0, yes: true, out: StringIO.new)
+      assert_equal %w[activity.json inputs.log manifest.json run.lock save suggestions.md trace.jsonl video world.json], Dir.children(plain).sort
+      assert(%w[prompts keyframes].all? { |name| File.directory?(File.join(starred, name)) })
     end
   end
 end
