@@ -10,6 +10,10 @@ module Koholint
 
     def compact(text) = text.to_s.gsub(/\s+/, '').downcase
 
+    def key(text) = text.to_s.downcase.gsub(/[^\p{L}\p{N}]/, '')
+
+    def known?(key, seen) = seen.any? { |text| text.include?(key) }
+
     def stitch(pages)
       out = []
       kept = nil

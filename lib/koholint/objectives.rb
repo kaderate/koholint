@@ -56,7 +56,7 @@ module Koholint
     end
 
     def initialize(trace:, stall_frames: 1800, loop_window: 12, counter: 0, visited: [], texts: [])
-      @texts = texts.map { |text| Dialogues.compact(text) }
+      @texts = texts.map { |text| Dialogues.key(text) }
       @trace = trace
       @stall_frames = stall_frames
       @loop_window = loop_window
@@ -90,8 +90,8 @@ module Koholint
     end
 
     def note_text(text)
-      key = Dialogues.compact(text)
-      return false if key.empty? || @texts.any? { |seen| seen.include?(key) }
+      key = Dialogues.key(text)
+      return false if key.empty? || Dialogues.known?(key, @texts)
 
       @texts << key
       @new_text = true if @current

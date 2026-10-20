@@ -133,4 +133,13 @@ class TalkLogTest < Minitest::Test
     assert_equal ['- at (4,7): talked to 2 times (dialogue opened 2); 2 texts read, last talk gave nothing new (1 talk in a row with nothing new), exhausted'],
                  log.lines(grid([sprite(4, 7)]), PLACE, stamp: ['none', 1, 0])
   end
+  def test_punctuation_or_a_re_read_contained_in_an_earlier_text_is_not_new
+    log = Koholint::TalkLog.new
+    log.record(place: PLACE, row: 4, col: 7, talked: true)
+    talk(log, 'Go north. Then, east!')
+    talk(log, 'go north')
+    assert_equal '2 texts read, last talk gave nothing new (1 talk in a row with nothing new), exhausted', memory_line(log)
+    talk(log, 'Go north... then east')
+    assert_equal '3 texts read, last talk gave nothing new (2 talks in a row with nothing new)', memory_line(log)
+  end
 end

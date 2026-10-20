@@ -224,9 +224,11 @@ class ObjectivesTest < Minitest::Test
   def test_new_text_needs_a_text_not_read_before_in_the_run
     refute @objectives.note_text('   ')
     assert @objectives.note_text('Hello  there')
+    assert @objectives.note_text('Hélló there')
     start({ kind: 'new_text' })
     refute @objectives.note_text('hello there')
     refute @objectives.note_text('there')
+    refute @objectives.note_text('Hello, there!')
     assert_nil @objectives.update(state(frame: 1), frame: 1)
     assert @objectives.note_text('Go north')
     assert_equal :achieved, @objectives.update(state(frame: 2), frame: 2)

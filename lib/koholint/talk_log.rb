@@ -1,4 +1,3 @@
-require 'digest'
 require 'koholint/dialogues'
 require 'koholint/ledger'
 require 'koholint/vision/grid'
@@ -91,10 +90,10 @@ module Koholint
     end
 
     def remember(place:, cell:, text:, stamp:)
-      key = Dialogues.compact(text)
+      key = Dialogues.key(text)
       return if key.empty? || !cell.all?(Integer)
 
-      @texts << { place:, cell:, key: Digest::SHA256.hexdigest(key)[0, 16], stamp: }
+      @texts << { place:, cell:, key:, stamp: }
     end
 
     def record(place:, row:, col:, talked:, standing: [])
@@ -160,10 +159,10 @@ module Koholint
       return if talks.empty?
 
       keys = talks.map { |talk| talk[:key] }
-      fresh = keys.each_index.map { |i| !keys.first(i).include?(keys[i]) }
+      fresh = keys.each_index.map { |i| !Dialogues.known?(keys[i], keys.first(i)) }
       dry = fresh.reverse.take_while { |new| !new }.size
       changed = stamp && stamp != talks.last[:stamp]
-      exhausted = !changed && talks.size >= 2 && keys[-1] == keys[-2] && talks[-1][:stamp] == talks[-2][:stamp]
+      exhausted = !changed && talks.size >= 2 && !fresh.last && Dialogues.known?(keys[-1], [keys[-2]]) && talks[-1][:stamp] == talks[-2][:stamp]
       text = "#{talks.size} #{talks.size == 1 ? 'text' : 'texts'} read, last talk #{fresh.last ? 'gave new text' : 'gave nothing new'}"
       text += " (#{dry} #{dry == 1 ? 'talk' : 'talks'} in a row with nothing new)" if dry.positive?
       if changed then "#{text}, worth retrying: yes (something changed since the last talk)"
