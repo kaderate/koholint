@@ -271,6 +271,19 @@ class EngineTest < Minitest::Test
     end
   end
 
+  def test_a_failing_summary_write_still_ends_stopped_with_the_budget_reason
+    skip_without_rom!
+    with_run do |_dir, run|
+      FileUtils.mkdir_p(File.join(run.dir, 'summary.json', 'blocker'))
+      reason = nil
+      _out, err = capture_io { reason = engine(run, frames: 60).run }
+      assert_equal :frames, reason
+      assert_match(/summary.json not written/, err)
+      refute File.exist?(File.join(run.dir, 'summary.json.tmp'))
+      assert_equal 'stopped', JSON.parse(File.read(File.join(run.dir, 'activity.json')))['kind']
+    end
+  end
+
   def test_a_failing_activity_write_changes_neither_trace_nor_journal
     skip_without_rom!
     outputs = [false, true].map do |failing|

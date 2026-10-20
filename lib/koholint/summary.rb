@@ -1,3 +1,4 @@
+require 'fileutils'
 require 'json'
 require 'koholint/trace'
 require 'koholint/game_state'
@@ -34,6 +35,9 @@ module Koholint
       path = File.join(dir, FILE)
       File.write("#{path}.tmp", "#{JSON.pretty_generate(record(dir))}\n")
       File.rename("#{path}.tmp", path)
+    rescue StandardError
+      FileUtils.rm_f("#{path}.tmp")
+      raise
     end
 
     def record(dir)
@@ -50,7 +54,7 @@ module Koholint
         calls_per_1000f: per_1000(calls.size, frames), usd_per_1000f: per_1000(base[:cost_usd], frames),
         latency_ms: { median: percentile(latencies, 0.5), p90: percentile(latencies, 0.9) },
         highest_milestone: base[:highest_milestone], places_seen: visited_places(events).size,
-        objectives: { count: objectives.map { |e| e['id'] }.uniq.size, achieved: objectives.count { |e| e['status'] == 'achieved' } },
+        objectives: { count: objectives.map { |e| e['id'] }.uniq.size, achieved: objectives.select { |e| e['status'] == 'achieved' }.map { |e| e['id'] }.uniq.size },
         stop_reason: events.reverse_each.find { |e| e['type'] == 'stop' }&.fetch('reason'),
         symptoms: [], starred: File.exist?(File.join(dir, 'star.json'))
       }

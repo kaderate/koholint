@@ -125,6 +125,7 @@ class SummaryTest < Minitest::Test
       decide(t, 30, 'start_game', 0, 0.0)
       t.emit(:objective, frame: 40, id: 'obj-1', status: 'started', predicate: {})
       t.emit(:objective, frame: 50, id: 'obj-1', status: 'achieved', predicate: {})
+      t.emit(:objective, frame: 50, id: 'obj-1', status: 'achieved', predicate: {})
       t.emit(:objective, frame: 50, id: 'obj-2', status: 'started', predicate: {})
       t.emit(:perception, frame: 1000, state: PLAYING.merge('room_id' => 1, 'milestone' => 'shield'), state_hash: 'h')
       t.emit(:stop, frame: 2000, reason: 'dollars')
