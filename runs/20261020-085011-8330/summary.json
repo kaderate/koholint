@@ -22,5 +22,5 @@
   },
   "stop_reason": "agent_failures",
   "symptoms": [],
-  "starred": false
+  "starred": true
 }
