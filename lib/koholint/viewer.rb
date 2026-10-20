@@ -1,6 +1,8 @@
 require 'koholint'
 require 'koholint/viewer/feed'
+require 'koholint/viewer/explorer'
 require 'koholint/viewer/follower'
+require 'koholint/viewer/registry'
 require 'koholint/viewer/server'
 
 module Koholint
@@ -11,7 +13,8 @@ module Koholint
 
     module_function
 
-    def watch(run_dir, port: 0, host: '127.0.0.1', from: :live, speed: 1.0, out: $stdout, err: $stderr, clock: Process.method(:clock_gettime))
+    def watch(run_dir, port: 0, host: '127.0.0.1', from: :live, speed: 1.0, runs_root: nil, out: $stdout, err: $stderr,
+              clock: Process.method(:clock_gettime))
       stopping = false
       previous = %w[INT TERM].to_h { |sig| [sig, Signal.trap(sig) { stopping = true }] }
       server = Server.new(port:, host:)
@@ -19,11 +22,14 @@ module Koholint
       follower = Follower.new(run_dir, from: from)
       server.follower = follower
       server.feed = -> { Feed.for(run_dir, follower) }
+      registry = Registry.new(err:).start
+      server.explorer = Explorer.new(root: runs_root || Explorer.default_root(run_dir), registry:)
       out.puts announce(host, server.start)
       out.flush
       pump(follower, speed, -> { stopping }, clock, err:)
     ensure
       server&.stop
+      registry&.stop
       previous&.each { |sig, handler| Signal.trap(sig, handler) }
     end
 

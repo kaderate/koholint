@@ -1,0 +1,111 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Koholint compare</title>
+<style>
+  body { margin: 0; background: #111; color: #ddd; font: 13px/1.4 monospace; }
+  a { color: #8cf; }
+  #nav { display: flex; flex-wrap: wrap; gap: 6px 18px; padding: 8px 12px; background: #222; }
+  #error { display: none; padding: 8px 12px; background: #a60; color: #fff; }
+  h2 { margin: 16px 12px 4px; font-size: 0.85em; font-weight: normal; color: #888; text-transform: uppercase; letter-spacing: 0.08em; }
+  table { border-collapse: collapse; margin: 0 12px; }
+  th, td { padding: 3px 12px; border-bottom: 1px solid #2a2a2a; text-align: left; overflow-wrap: anywhere; }
+  th { color: #888; font-weight: normal; }
+  tr.diff td { background: #3a2a10; color: #fd8; }
+  td.missing { color: #666; }
+</style>
+</head>
+<body>
+<div id="nav"><b>Compare</b><a href="/runs">Runs</a><a href="/">back to live</a></div>
+<div id="error"></div>
+<h2>Summary</h2>
+<table><thead><tr><th>field</th><th id="head-a"></th><th id="head-b"></th></tr></thead><tbody id="summary"></tbody></table>
+<h2>Milestones (first frame)</h2>
+<table><thead><tr><th>milestone</th><th>a</th><th>b</th></tr></thead><tbody id="milestones"></tbody></table>
+<h2>Places visited (first frame)</h2>
+<table><thead><tr><th>place</th><th>a</th><th>b</th></tr></thead><tbody id="places"></tbody></table>
+<script>
+(function () {
+  // pure:begin
+  function idsFromPath(pathname) {
+    var match = /^\/compare\/([^\/]+)\/([^\/]+)$/.exec(pathname || '');
+    if (!match) return null;
+    try { return [decodeURIComponent(match[1]), decodeURIComponent(match[2])]; } catch (e) { return null; }
+  }
+
+  function valueText(value) {
+    if (value === null || value === undefined) return '-';
+    return typeof value === 'object' ? JSON.stringify(value) : String(value);
+  }
+
+  function summaryRows(data) {
+    var a = (data.a && data.a.summary) || {}, b = (data.b && data.b.summary) || {};
+    var differences = data.differences || [];
+    return Object.keys(a).map(function (field) {
+      return { field: field, a: valueText(a[field]), b: valueText(b[field]), diff: differences.indexOf(field) >= 0 };
+    });
+  }
+
+  function frameText(frame) { return typeof frame === 'number' ? 'f' + frame : 'never'; }
+
+  function placeText(place) { return Array.isArray(place) ? '[' + place.join(',') + ']' : valueText(place); }
+  // pure:end
+
+  var errorEl = document.getElementById('error');
+
+  function cell(text, className) {
+    var td = document.createElement('td');
+    td.textContent = text;
+    if (className) td.className = className;
+    return td;
+  }
+
+  function fill(id, rows) {
+    var body = document.getElementById(id);
+    body.textContent = '';
+    rows.forEach(function (row) {
+      var tr = document.createElement('tr');
+      if (row.diff) tr.className = 'diff';
+      tr.append(cell(row.label), cell(row.a, row.a === 'never' ? 'missing' : ''), cell(row.b, row.b === 'never' ? 'missing' : ''));
+      body.appendChild(tr);
+    });
+  }
+
+  function heading(id, runId) {
+    var th = document.getElementById(id);
+    th.textContent = '';
+    var link = document.createElement('a');
+    link.href = '/run/' + encodeURIComponent(runId);
+    link.textContent = runId;
+    th.appendChild(link);
+  }
+
+  function timelineRows(list, labelOf) {
+    return (list || []).map(function (entry) {
+      return { label: labelOf(entry), a: frameText(entry.a), b: frameText(entry.b), diff: entry.a !== entry.b };
+    });
+  }
+
+  function render(data) {
+    heading('head-a', data.a.run_id);
+    heading('head-b', data.b.run_id);
+    fill('summary', summaryRows(data).map(function (row) { return { label: row.field, a: row.a, b: row.b, diff: row.diff }; }));
+    fill('milestones', timelineRows(data.milestones, function (entry) { return valueText(entry.milestone); }));
+    fill('places', timelineRows(data.places, function (entry) { return placeText(entry.place); }));
+  }
+
+  var ids = idsFromPath(window.location.pathname);
+  if (!ids) {
+    errorEl.style.display = 'block';
+    errorEl.textContent = 'Expected /compare/<run>/<run>.';
+  } else {
+    fetch('/compare.json?a=' + encodeURIComponent(ids[0]) + '&b=' + encodeURIComponent(ids[1]), { cache: 'no-store' })
+      .then(function (r) { if (!r.ok) throw new Error('cannot compare (' + r.status + ')'); return r.json(); })
+      .then(render)
+      .catch(function (e) { errorEl.style.display = 'block'; errorEl.textContent = e.message; });
+  }
+})();
+</script>
+</body>
+</html>
