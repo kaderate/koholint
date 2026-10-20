@@ -63,6 +63,84 @@ class StartGameTest < Minitest::Test
     assert_equal :move, wrapper.decision_point_for(state(hp: 24, x: 150, mode: 0x0B)).name
   end
 
+  def play(frame: 0, x: 80, y: 60, dialog: 0) = Koholint::GameState.new(frame:, hp: 24, x:, y:, game_mode: 0x0B, game_submode: 7, dialog_state: dialog, milestone: :none)
+
+  def probing(inner = Koholint::Policies::WalkAndTalk.new)
+    Koholint::Policies::StartGame.new(inner, ready: ->(s) { %i[playing dialogue].include?(s.phase) }, probe: true)
+  end
+
+  def step(wrapper, s)
+    wrapper.observe(s, frame: s.frame)
+    return [:handed, nil] if wrapper.decision_point_for(s).name != :boot
+
+    [:boot, wrapper.decide(wrapper.decision_point_for(s), s, {})[:choice]]
+  end
+
+  def test_a_locked_link_is_probed_then_idled_until_a_dialogue_opens
+    wrapper = probing
+    kinds = []
+    12.times { |i| kinds << step(wrapper, play(frame: i * 10)) }
+    assert_equal({ buttons: [], frames: 5 }, kinds.first.last)
+    probes = kinds.drop(1).map { |_, choice| choice }
+    assert_equal [[:up], [:right], [:down], [:left], [], [:up], [:right], [:down], [:left], []], probes.first(10).map { |c| c[:buttons] }
+    assert_equal [8, 8, 8, 8, 30], probes.first(5).map { |c| c[:frames] }
+    assert_equal :handed, step(wrapper, play(frame: 200, dialog: 3)).first
+  end
+
+  def test_a_link_that_moves_with_the_pressed_direction_is_handed_over
+    wrapper = probing
+    step(wrapper, play)
+    assert_equal [:up], step(wrapper, play)[1][:buttons]
+    assert_equal [:right], step(wrapper, play)[1][:buttons]
+    assert_equal :handed, step(wrapper, play(x: 90)).first
+  end
+
+  def test_a_slide_against_the_pressed_direction_does_not_count
+    wrapper = probing
+    step(wrapper, play)
+    step(wrapper, play)
+    assert_equal :boot, step(wrapper, play(y: 70)).first
+  end
+
+  def test_the_probe_tick_limit_hands_over_anyway
+    wrapper = probing
+    Koholint::Policies::StartGame::PROBE_TICK_LIMIT.times { assert_equal :boot, step(wrapper, play).first }
+    assert_equal :handed, step(wrapper, play).first
+  end
+
+  def test_a_state_that_is_not_playing_never_probes
+    wrapper = probing
+    loading = Koholint::GameState.new(frame: 1, hp: 24, x: 80, y: 60, game_mode: 0x0B, game_submode: 3, milestone: :none)
+    2.times { assert_equal({ buttons: [], frames: 5 }, step(wrapper, loading).last) }
+  end
+
+  class RecordingPolicy < Koholint::Policies::WalkAndTalk
+    attr_reader :frames
+
+    def decide(*)
+      (@frames ||= []) << @frame
+      super
+    end
+
+    def observe(state, **) = (@frame = state.frame)
+  end
+
+  def test_engine_keeps_the_agent_out_until_the_intro_dialogue_opens
+    skip_without_rom!
+    Dir.mktmpdir do |dir|
+      run = Koholint::Run.create(root: dir, flow_version: Koholint::FLOW_VERSION, budget: {})
+      inner = RecordingPolicy.new
+      Koholint::Engine.new(run:, policy: probing(inner), budget: Koholint::Budget.new(frames: 1100)).run
+      events = Koholint::Trace.read(File.join(run.dir, 'trace.jsonl'))
+      opened = events.find { |e| e['type'] == 'perception' && e['state']['dialog_state'].to_i.positive? }
+      assert opened, 'no dialogue opened'
+      refute_empty inner.frames
+      assert_operator inner.frames.first, :>=, opened['frame']
+      puts "hand-over frame #{inner.frames.first}, dialogue opened at #{opened['frame']}"
+      assert_equal [], Koholint::Replay.verify(run, every: 300).reject(&:last)
+    end
+  end
+
   def test_engine_run_from_a_cold_boot_reaches_a_playable_state_quickly
     skip_without_rom!
     Dir.mktmpdir do |dir|

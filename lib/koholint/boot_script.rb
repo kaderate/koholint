@@ -8,6 +8,9 @@ module Koholint
     PULSE_PERIOD = 20
     PRESS_FRAMES = 3
     WAIT_FRAMES = 5
+    PROBE_DIRECTIONS = %i[up right down left].freeze
+    PROBE_FRAMES = 8
+    PROBE_IDLE_FRAMES = 30
 
     module_function
 
@@ -18,6 +21,11 @@ module Koholint
       when NAME_ENTRY then name_entry(state)
       else wait
       end
+    end
+
+    def probe_free(step)
+      direction = PROBE_DIRECTIONS[step % (PROBE_DIRECTIONS.size + 1)]
+      direction ? { buttons: [direction], frames: PROBE_FRAMES } : { buttons: [], frames: PROBE_IDLE_FRAMES }
     end
 
     def title(frame)
