@@ -16,8 +16,23 @@ Live view: `bin/koholint watch runs/<id> [--port N] [--host H] [--from live|star
 `watching http://127.0.0.1:PORT` and serves the run as video, status and feed from a read-only replay (works on a
 finished run or one being written; Ctrl-C to stop). `run`/`resume --realtime` paces the engine at about 60 fps of
 wall time so the viewer can keep up; pacing never changes the journal or the game state.
-The viewer listens on 127.0.0.1 only; `--host 0.0.0.0` opens it to other devices on the same network (read-only,
-no authentication: use it on a network you trust).
+The viewer listens on 127.0.0.1 only; `--host 0.0.0.0` opens it to other devices on the same network (no
+authentication: use it on a network you trust).
+
+Past runs: `watch` also explores the runs under `--runs-root DIR` (default: the watched run's parent directory when it
+holds other runs, else `runs`). Routes besides `/`, `/frame.png` and `/state.json`:
+
+- `/runs` (table: sort by column, filter by minimum milestone, maximum dollars, tag substring, starred only; pick two
+  runs to compare) and `/runs.json` (one entry per run directory with a `summary.json`).
+- `/run/<id>`: the live page as a read-only replay of that run, from boot; `/frame.png?run=<id>` and
+  `/state.json?run=<id>` serve it. At most 3 replays are kept (least recently used evicted, idle ones dropped after
+  5 minutes). `/control?run=<id>&speed=1|4|16` and `&pause=0|1` drive a replay.
+- `/compare/<a>/<b>` and `/compare.json?a=<a>&b=<b>`: summaries side by side with the differing fields marked, and the
+  first frame at which each run reached each milestone and place.
+- `POST /star?run=<id>` with the form body `why=...` does what `bin/koholint star` does; the `Host` header must name the
+  viewer itself and an `Origin` header, if sent, must match it.
+
+Run ids are plain names directly under the runs root (`[A-Za-z0-9_.-]`, no leading dot, no `..`); anything else is a 404.
 
 Collision grid: `run --grid` (engine option `grid: true`) reads the screen each observation and probes unknown neighbour
 cells by walking. The trace gains `screen` and `screen_changed` (what the screen looks like), `affordance` (walk
