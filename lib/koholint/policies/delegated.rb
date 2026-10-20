@@ -450,7 +450,8 @@ module Koholint
         pages = [transcription].flatten(1).compact
         place = @read_at && @images ? @read_at[:place] : [state.room_id, state.map_id]
         source = @images ? @read_at[:source] : @talk_source
-        leads, rejected = @leads.absorb(output['leads'], transcription: pages.map { |page| page[:text] }.join(' '), place:, source:)
+        texts = pages.map { |page| page[:text] }
+        leads, rejected = @leads.absorb(output['leads'], transcription: [texts.join(' '), Dialogues.text(texts)], place:, source:)
         notes.merge(leads:, leads_rejected: rejected)
       end
 

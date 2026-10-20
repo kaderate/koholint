@@ -51,7 +51,7 @@ module Koholint
     end
 
     def absorb(raw, transcription:, place:, source:)
-      haystack = self.class.compact(transcription)
+      haystacks = Array(transcription).map { |text| self.class.compact(text) }
       accepted = []
       rejected = 0
       (raw.is_a?(Array) ? raw.first(LIMIT) : []).each do |entry|
@@ -59,7 +59,7 @@ module Koholint
         quote, claim, importance = lead.values_at('quote', 'claim', 'importance')
         key = self.class.compact(quote)
         unless quote.is_a?(String) && claim.is_a?(String) && IMPORTANCE.include?(importance) && self.class.normalize(quote).length.between?(QUOTE_MIN, QUOTE_MAX) &&
-               haystack.include?(key) && !self.class.clean(claim).empty?
+               haystacks.any? { |haystack| haystack.include?(key) } && !self.class.clean(claim).empty?
           rejected += 1
           next
         end

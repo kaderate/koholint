@@ -2,6 +2,7 @@ require_relative 'test_helper'
 require 'tmpdir'
 require 'json'
 require 'koholint/leads'
+require 'koholint/dialogues'
 require 'koholint/trace'
 
 class LeadsTest < Minitest::Test
@@ -17,6 +18,13 @@ class LeadsTest < Minitest::Test
     assert_equal 2, rejected
     assert_equal [[], 2], absorb(Koholint::Leads.new, [lead('Hello'), lead('x' * 301)])
     assert_equal [{ id: 'lead-1', place: [1, 2], source: { row: 3, col: 4 }, quote: 'the key IS in the north cave', claim: 'a claim', importance: 'high' }], accepted
+  end
+
+  def test_a_quote_may_match_the_stitched_text_or_the_raw_pages
+    pages = ['the key is in', 'key is in the north cave']
+    texts = [pages.join(' '), Koholint::Dialogues.text(pages)]
+    accepted, rejected = Koholint::Leads.new.absorb([lead('key is in the north cave'), lead('the key is in the north')], transcription: texts, place: [1, 2], source: nil)
+    assert_equal [2, 0], [accepted.size, rejected]
   end
 
   def test_bad_importance_missing_claims_and_garbage_are_rejected_and_long_claims_truncated
