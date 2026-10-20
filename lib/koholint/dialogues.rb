@@ -2,7 +2,8 @@ require 'koholint/summary'
 
 module Koholint
   module Dialogues
-    OVERLAP_MIN = 6
+    OVERLAP_MIN = 7
+    ENDED = /[.!?…]\z/
     MOVES = %w[walk step goto talk_to].freeze
 
     module_function
@@ -14,8 +15,8 @@ module Koholint
       kept = nil
       pages.each_with_index do |page, index|
         key = compact(page)
-        next if key.empty? || (kept && compact(kept).include?(key))
-        next if index + 1 < pages.size && compact(pages[index + 1]).include?(key)
+        next if key.empty? || (kept && compact(kept) == key)
+        next if index + 1 < pages.size && compact(pages[index + 1]).start_with?(key) && !page.strip.match?(ENDED)
 
         kept = page
         joined = out.last && join(out.last, page)

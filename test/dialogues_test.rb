@@ -34,8 +34,8 @@ class DialoguesTest < Minitest::Test
     assert_equal "Hello there.\n\nThe forest is dark.\n\nGo north!", Koholint::Dialogues.text(pages)
   end
 
-  def test_an_overlap_shorter_than_six_characters_is_not_joined
-    pages = ['I saw a cat', 'a cat ran off']
+  def test_an_overlap_shorter_than_seven_characters_is_not_joined
+    pages = ['I saw a big cat', 'big cat ran off']
     assert_equal pages, Koholint::Dialogues.stitch(pages)
   end
 
@@ -51,6 +51,20 @@ class DialoguesTest < Minitest::Test
     assert_equal ['Take this sword with you, and go'], out
     assert_keeps_words(pages, out)
     assert_equal ['same text'], Koholint::Dialogues.stitch(['Same text', 'Same  text', 'same text'])
+  end
+
+  def test_a_page_contained_in_a_neighbour_is_kept
+    [['Yes.', 'Oh, yes. I see.'], ['Go.', "Let's go. Now"], ['Ok.', 'Ok. Ok?'], ['Oh, yes. I see.', 'yes.']].each do |pages|
+      assert_equal pages, Koholint::Dialogues.stitch(pages)
+    end
+  end
+
+  def test_a_short_overlap_or_a_repeated_phrase_is_not_merged
+    [['He said no way.', 'No way. I mean it.'], ['I will go. Go now!', 'Go now! Go now! Go!']].each do |pages|
+      out = Koholint::Dialogues.stitch(pages)
+      assert_equal pages, out
+      assert_keeps_words(pages, out)
+    end
   end
 
   def test_random_windows_over_a_text_keep_every_word
