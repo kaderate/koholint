@@ -25,6 +25,7 @@ class ExplorerTest < Minitest::Test
     dir = File.join(root, id)
     FileUtils.mkdir_p(dir)
     File.write(File.join(dir, 'manifest.json'), JSON.generate('flow_version' => 'flow-3', 'status' => 'stopped'))
+    File.binwrite(File.join(dir, 'inputs.log'), "\x02")
     trace = Koholint::Trace.new(File.join(dir, 'trace.jsonl'))
     trace.emit(:perception, frame: 5, state: PLAYING, state_hash: 'h')
     trace.emit(:perception, frame: 40, state: PLAYING.merge('milestone' => milestone, 'room_id' => 4), state_hash: 'h')
@@ -43,7 +44,12 @@ class ExplorerTest < Minitest::Test
 
   def with_server(root, host: '127.0.0.1')
     built = []
-    registry = Koholint::Viewer::Registry.new(factory: ->(dir) { built << dir && StubFollower.new }, err: StringIO.new)
+    factory = lambda do |dir|
+      raise Koholint::Error, "garbled manifest at #{dir}" if dir.end_with?('broken')
+
+      built << dir && StubFollower.new
+    end
+    registry = Koholint::Viewer::Registry.new(factory:, err: StringIO.new)
     explorer = Koholint::Viewer::Explorer.new(root:, registry:)
     server = Koholint::Viewer::Server.new(follower: StubFollower.new, feed: -> { {} }, explorer:, host:)
     port = server.start
@@ -241,6 +247,78 @@ class ExplorerTest < Minitest::Test
       assert_equal root, Koholint::Viewer::Explorer.default_root(File.join(root, A))
       Dir.mktmpdir do |lonely|
         assert_equal 'runs', Koholint::Viewer::Explorer.default_root(make_run(lonely, A))
+      end
+    end
+  end
+
+  def break_run(dir, kind)
+    case kind
+    when :no_inputs then File.delete(File.join(dir, 'inputs.log'))
+    when :no_trace then File.delete(File.join(dir, 'trace.jsonl'))
+    when :corrupt_gz
+      File.delete(File.join(dir, 'trace.jsonl'))
+      File.binwrite(File.join(dir, 'trace.jsonl.gz'), "\x1f\x8bgarbage")
+    when :trace_dir then File.delete(File.join(dir, 'trace.jsonl')) && FileUtils.mkdir_p(File.join(dir, 'trace.jsonl'))
+    when :summary_dir then File.delete(File.join(dir, 'summary.json')) && FileUtils.mkdir_p(File.join(dir, 'summary.json'))
+    when :star_dir then FileUtils.mkdir_p(File.join(dir, 'star.json'))
+    end
+  end
+
+  BAD = %i[no_inputs no_trace corrupt_gz trace_dir summary_dir star_dir].freeze
+
+  def test_bad_runs_never_fail_with_a_500_or_a_path
+    with_root do |root|
+      BAD.each { |kind| break_run(make_run(root, "bad-#{kind}"), kind) }
+      make_run(root, 'replay-broken')
+      with_server(root) do |port, _|
+        listed = JSON.parse(get(port, '/runs.json').body).map { |run| run['run_id'] }
+        assert_includes listed, 'bad-star_dir'
+        refute_includes listed, 'bad-summary_dir'
+        (BAD.map { |kind| "bad-#{kind}" } + ['replay-broken']).each do |id|
+          ["/run/#{id}", "/frame.png?run=#{id}", "/state.json?run=#{id}", "/compare.json?a=#{A}&b=#{id}", "/compare/#{id}/#{A}",
+           "/control?run=#{id}&speed=4"].each do |path|
+            status, body = raw(port, "GET #{path} HTTP/1.1\r\nHost: x\r\n\r\n")
+            assert_includes %w[200 404 422], status, path
+            refute_includes body, root, path
+            refute_includes body, File.realpath(root), path
+          end
+          status, body = post_star(port, id, 'x')
+          assert_includes %w[200 404 422], status, "star #{id}"
+          refute_includes body, root
+        end
+      end
+    end
+  end
+
+  def test_a_run_that_cannot_be_replayed_is_a_404_or_a_422
+    with_root do |root|
+      break_run(make_run(root, 'bad-inputs'), :no_inputs)
+      break_run(make_run(root, 'bad-trace'), :trace_dir)
+      break_run(make_run(root, 'bad-summary'), :summary_dir)
+      make_run(root, 'replay-broken')
+      with_server(root) do |port, _|
+        %w[/run/bad-inputs /frame.png?run=bad-inputs /state.json?run=bad-inputs].each { |path| assert_equal '404', get(port, path).code, path }
+        frame = get(port, '/frame.png?run=replay-broken')
+        assert_equal '422', frame.code
+        assert_equal({ 'error' => 'run replay-broken cannot be read' }, JSON.parse(frame.body))
+        assert_equal '422', get(port, "/compare.json?a=#{A}&b=bad-trace").code
+        assert_equal '200', post_star(port, 'bad-summary', 'x').first
+      end
+    end
+  end
+
+  def test_an_expired_replay_says_so_until_the_page_is_reloaded
+    with_root do |root|
+      ids = %w[r1 r2 r3 r4].each { |id| make_run(root, id) }
+      with_server(root) do |port, built|
+        ids.each { |id| get(port, "/frame.png?run=#{id}") }
+        expired = get(port, '/state.json?run=r1')
+        assert_equal '410', expired.code
+        assert_equal 'replay expired: reload the page', JSON.parse(expired.body)['error']
+        assert_equal '410', get(port, '/control?run=r1&speed=4').code
+        assert_equal '200', get(port, '/run/r1').code
+        assert_equal '200', get(port, '/frame.png?run=r1').code
+        assert_equal 5, built.size
       end
     end
   end

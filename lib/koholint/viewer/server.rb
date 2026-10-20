@@ -130,6 +130,8 @@ module Koholint
         get(path, params(query))
       rescue Explorer::NotFound
         ['404 Not Found', 'text/plain', "not found\n", {}]
+      rescue Registry::Expired, Explorer::Unreadable => e
+        [e.is_a?(Registry::Expired) ? '410 Gone' : '422 Unprocessable Content', 'application/json', JSON.generate(error: e.message), NO_STORE]
       rescue Explorer::BadRequest, ArgumentError, EncodingError => e
         ['400 Bad Request', 'application/json', JSON.generate(error: e.message), NO_STORE]
       rescue StandardError => e
@@ -139,14 +141,16 @@ module Koholint
       def get(path, params)
         case path
         when '/' then html(@page)
-        when '/frame.png' then ['200 OK', 'image/png', params['run'] ? registry.frame_png(run_dir(params['run'])) : @follower.frame_png, NO_STORE]
-        when '/state.json' then json(params['run'] ? registry.state(run_dir(params['run'])) : @feed.call)
+        when '/frame.png' then ['200 OK', 'image/png', params['run'] ? explorer.frame_png(params['run']) : @follower.frame_png, NO_STORE]
+        when '/state.json' then json(params['run'] ? explorer.state(params['run']) : @feed.call)
         when '/runs' then html(@pages[:runs])
         when '/runs.json' then json(explorer.runs)
         when '/compare.json' then json(explorer.compare(*only(params, %w[a b], required: %w[a b]).values_at('a', 'b')))
         when '/control' then json(control(only(params, %w[run speed pause], required: %w[run])))
         when '/star' then not_allowed('POST')
-        when %r{\A/run/([^/]+)\z} then run_dir(segment(::Regexp.last_match(1))) && html(@page)
+        when %r{\A/run/([^/]+)\z}
+          explorer.open(segment(::Regexp.last_match(1)))
+          html(@page)
         when %r{\A/compare/([^/]+)/([^/]+)\z}
           [::Regexp.last_match(1), ::Regexp.last_match(2)].each { |id| run_dir(segment(id)) }
           html(@pages[:compare])
@@ -170,7 +174,7 @@ module Koholint
         raise Explorer::BadRequest, 'speed must be 1, 4 or 16' unless speed.nil? || Registry::SPEEDS.map(&:to_s).include?(speed)
         raise Explorer::BadRequest, 'pause must be 0 or 1' unless pause.nil? || %w[0 1].include?(pause)
 
-        registry.control(run_dir(params['run']), speed: speed&.to_i, paused: pause && pause == '1')
+        explorer.control(params['run'], speed: speed&.to_i, paused: pause && pause == '1')
       end
 
       def params(query)
@@ -195,8 +199,6 @@ module Koholint
       end
 
       def explorer = @explorer || raise(Explorer::NotFound, 'no runs root')
-
-      def registry = explorer.registry
 
       def run_dir(id) = explorer.resolve(id)
 

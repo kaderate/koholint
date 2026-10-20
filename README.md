@@ -26,7 +26,8 @@ holds other runs, else `runs`). Routes besides `/`, `/frame.png` and `/state.jso
   runs to compare) and `/runs.json` (one entry per run directory with a `summary.json`).
 - `/run/<id>`: the live page as a read-only replay of that run, from boot; `/frame.png?run=<id>` and
   `/state.json?run=<id>` serve it. At most 3 replays are kept (least recently used evicted, idle ones dropped after
-  5 minutes). `/control?run=<id>&speed=1|4|16` and `&pause=0|1` drive a replay.
+  5 minutes); an evicted replay answers 410 until its page is reloaded, and a run that cannot be replayed answers 404
+  or 422. `/control?run=<id>&speed=1|4|16` and `&pause=0|1` drive a replay.
 - `/compare/<a>/<b>` and `/compare.json?a=<a>&b=<b>`: summaries side by side with the differing fields marked, and the
   first frame at which each run reached each milestone and place.
 - `POST /star?run=<id>` with the form body `why=...` does what `bin/koholint star` does; the `Host` header must name the

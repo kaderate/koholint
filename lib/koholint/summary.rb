@@ -81,7 +81,7 @@ module Koholint
     def read_json(path)
       value = JSON.parse(File.read(path))
       value.is_a?(Hash) ? value : {}
-    rescue Errno::ENOENT, JSON::ParserError
+    rescue SystemCallError, JSON::ParserError
       {}
     end
 

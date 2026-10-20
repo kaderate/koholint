@@ -5,12 +5,15 @@ require 'koholint/archive'
 require 'koholint/perception'
 require 'koholint/run_compare'
 require 'koholint/summary'
+require 'koholint/viewer/registry'
+require 'zlib'
 
 module Koholint
   module Viewer
     class Explorer
       class NotFound < Error; end
       class BadRequest < Error; end
+      class Unreadable < Error; end
 
       RUN_ID = /\A(?!\.)(?!.*\.\.)[\w.-]{1,100}\z/
       MAX_WHY = 500
@@ -41,11 +44,26 @@ module Koholint
         raise NotFound, 'no such run'
       end
 
+      def replay_dir(id)
+        dir = resolve(id)
+        raise NotFound, 'no replay for this run' unless File.file?(File.join(dir, 'inputs.log'))
+
+        dir
+      end
+
+      def open(id) = registry.open(replay_dir(id))
+
+      def frame_png(id) = readable(id) { registry.frame_png(replay_dir(id)) }
+
+      def state(id) = readable(id) { registry.state(replay_dir(id)) }
+
+      def control(id, **controls) = readable(id) { registry.control(replay_dir(id), **controls) }
+
       def runs
         Archive.runs(@root).filter_map { |dir| row(dir) if File.basename(dir).match?(RUN_ID) }.sort_by { |row| row['run_id'] }.reverse
       end
 
-      def compare(a, b) = RunCompare.compare(resolve(a), resolve(b))
+      def compare(a, b) = readable("#{a} or #{b}") { RunCompare.compare(resolve(a), resolve(b)) }
 
       def star(id, why)
         why = why.to_s.strip
@@ -53,13 +71,27 @@ module Koholint
         raise BadRequest, "why is longer than #{MAX_WHY} characters" if why.length > MAX_WHY
         raise BadRequest, 'why must not contain control characters' if why.match?(/[[:cntrl:]]/)
 
-        Archive.star(resolve(id), why, out: StringIO.new)
+        readable(id) { Archive.star(resolve(id), why, out: StringIO.new) }
         { run_id: id, starred: true, why: }
       end
 
       private
 
+      def readable(id)
+        yield
+      rescue NotFound, BadRequest, Registry::Expired
+        raise
+      rescue Error, SystemCallError, Zlib::Error, JSON::ParserError
+        raise Unreadable, "run #{id} cannot be read"
+      end
+
       def row(dir)
+        row!(dir)
+      rescue Error, SystemCallError
+        nil
+      end
+
+      def row!(dir)
         summary = Summary.read_json(File.join(dir, Summary::FILE))
         return nil if summary.empty?
 
