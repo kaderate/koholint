@@ -44,11 +44,12 @@ Every finished run is kept in git as a light bundle under `runs/<id>/` (about 60
 
 - `bin/koholint run --tag NAME` labels a run.
 - `bin/koholint archive [--from DIR] [--root DIR] [--commit] [--full]` imports finished runs from `--from` (copying only the
-  light bundle; the source is never modified), gzips the trace, writes a missing `summary.json` and regenerates
-  `docs/runs/index.md`. `--commit` makes one commit (`Archive runs A..B`); `--full` also force-adds `prompts/`. Running it
+  light bundle and refreshing it when the source changed, e.g. after a resume or a star; the source is never modified),
+  gzips the trace, writes a missing `summary.json` and regenerates `docs/runs/index.md` at the repository root. `--commit` makes one commit (`Archive runs A..B`); `--full` also force-adds `prompts/`. Running it
   twice changes nothing. Runs without a final `stop` event or with a live lock are skipped.
 - `bin/koholint star <run_dir> "why"` marks a run worth keeping (`star.json`, `summary.json` `starred`).
 - `bin/koholint prune-heavy [--keep N] [--yes]` deletes `prompts/` and `keyframes/` of unstarred runs older than the N most
   recent (default 5); without `--yes` it only lists them.
 
-`resume` and `fork` work on an archived run: the trace is decompressed back to `trace.jsonl` (archive again after the stop).
+`resume` and `fork` work on an archived run, also on a fresh clone: the trace is decompressed back to `trace.jsonl`
+(archive again after the stop), and `fork` rebuilds missing saves by replay (checked against their `sav_sha256`).
