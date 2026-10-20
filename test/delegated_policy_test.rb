@@ -57,9 +57,9 @@ module DelegatedHelpers
 
   def teardown = (FileUtils.rm_rf(@dir) if @dir)
 
-  def policy(client, **opts)
+  def policy(client, triggers: nil, **opts)
     @objectives = Koholint::Objectives.new(trace: trace, **opts)
-    Koholint::Policies::Delegated.new(client:, registry: Koholint::Skills::Registry.default, objectives: @objectives, manual: 'notes')
+    Koholint::Policies::Delegated.new(client:, registry: Koholint::Skills::Registry.default, objectives: @objectives, manual: 'notes', triggers:)
   end
 
   def decide(policy, state = self.state)
@@ -260,17 +260,99 @@ class DelegatedPolicyTest < Minitest::Test
     end
   end
 
-  def test_fewer_than_four_distinct_blocked_directions_do_not_trigger_the_wait
-    [%w[up up down left], %w[up right down]].each do |directions|
+  def blocked(p, skill, params, pos: [68, 60], **extra)
+    outcome = { skill:, params:, frames: 8, moved_cells: 0, moved_px: 0, room_changed: false, hp_delta: 0, stopped_by: 'blocked', **extra }
+    p.after_action(choice: { skill:, params: }, outcome:, state: state(x: pos[0], y: pos[1]), frame: 101)
+  end
+
+  def idle(p, skill, params, pos: [68, 60], stopped_by: 'done')
+    p.after_action(choice: { skill:, params: }, outcome: { stopped_by:, moved_cells: 0 }, state: state(x: pos[0], y: pos[1]), frame: 102)
+  end
+
+  def new_policy = policy(ScriptedClient.new(objective: objective(kind: 'reach_place', place: [1, 2]), skill: walk)).tap { |p| decide(p) }
+
+  def test_a_movement_lock_survives_interleaved_press_wait_and_step_and_shows_one_line
+    p = new_policy
+    blocked(p, 'walk', { direction: 'left', cells: 1 })
+    idle(p, 'press', { button: 'b', frames: 3 })
+    blocked(p, 'walk', { direction: 'right', cells: 1 })
+    idle(p, 'wait', { frames: 30 })
+    blocked(p, 'walk', { direction: 'down', cells: 1 })
+    idle(p, 'press', { button: 'a', frames: 3 })
+    idle(p, 'advance_dialogue', {})
+    blocked(p, 'step', { direction: 'up', pixels: 4 })
+    result = decide(p).last
+    assert_equal({ skill: 'wait', params: { frames: 120 } }, result[:choice])
+    assert_equal 'delegated', result[:agent]
+  end
+
+  def test_the_lock_line_reaches_the_prompt_once_the_waits_are_spent
+    client = ScriptedClient.new(objective: objective(kind: 'reach_place', place: [1, 2]), skill: walk)
+    p = policy(client)
+    decide(p)
+    %w[left right down].each { |d| blocked(p, 'walk', { direction: d, cells: 1 }) }
+    15.times { decide(p) }
+    decide(p)
+    assert_includes client.calls.last[:prompt], 'Link has not moved in the last 3 attempts in different directions and no dialogue is open'
+  end
+
+  def test_goto_and_talk_to_blocks_count_but_add_no_direction
+    p = new_policy
+    blocked(p, 'goto', { row: 1, col: 1 })
+    blocked(p, 'talk_to', { row: 1, col: 1 })
+    blocked(p, 'walk', { direction: 'left', cells: 1 })
+    blocked(p, 'step', { direction: 'up', pixels: 2 })
+    assert_equal 'claude', decide(p).last[:agent]
+    blocked(p, 'walk', { direction: 'down', cells: 1 })
+    assert_equal 'delegated', decide(p).last[:agent]
+  end
+
+  def test_movement_or_a_dialogue_resets_the_lock_count
+    p = new_policy
+    2.times { |i| blocked(p, 'walk', { direction: %w[left right][i], cells: 1 }) }
+    p.after_action(choice: { skill: 'walk', params: { direction: 'down', cells: 1 } }, outcome: { stopped_by: 'done', moved_cells: 1 }, state: state, frame: 103)
+    blocked(p, 'walk', { direction: 'up', cells: 1 })
+    assert_equal 'claude', decide(p).last[:agent]
+    p = new_policy
+    2.times { |i| blocked(p, 'walk', { direction: %w[left right][i], cells: 1 }) }
+    idle(p, 'press', { button: 'b', frames: 3 }, pos: [70, 60])
+    blocked(p, 'walk', { direction: 'down', cells: 1 }, pos: [70, 60])
+    assert_equal 'claude', decide(p, state(x: 70)).last[:agent]
+  end
+
+  def test_fewer_than_three_distinct_blocked_directions_do_not_trigger_the_wait
+    [%w[up up down up], %w[up right]].each do |directions|
       p = policy(ScriptedClient.new(objective: objective(kind: 'reach_place', place: [1, 2]), skill: walk))
       hemmed(p, directions)
       assert_equal 'claude', decide(p).last[:agent]
     end
     p = policy(ScriptedClient.new(objective: objective(kind: 'reach_place', place: [1, 2]), skill: walk))
     decide(p)
-    %w[up right down].each { |d| blocked_walk(p, d) }
+    %w[up right].each { |d| blocked_walk(p, d) }
     blocked_walk(p, 'left', pos: [70, 60])
     assert_equal 'claude', decide(p).last[:agent]
+  end
+
+  def scripted_walk(p, direction, input)
+    outcome = { skill: 'walk', params: { direction:, cells: 1 }, moved_cells: 0, stopped_by: 'dialogue', dialog_before: false, dialog_after: true,
+                from: { room: 163, map: 16, row: 3, col: 4 }, to: { room: 163, map: 16, row: 3, col: 4 }, trigger_input: input }
+    p.after_action(choice: { skill: 'walk', params: outcome[:params] }, outcome:, state: state, frame: 110)
+  end
+
+  def test_an_explicit_press_of_the_forbidden_input_without_a_dialogue_clears_the_memory
+    triggers = Koholint::Triggers.new
+    p = policy(ScriptedClient.new(objective: objective(kind: 'reach_place', place: [1, 2]), skill: walk), triggers:)
+    decide(p)
+    scripted_walk(p, 'right', [:down])
+    assert_equal [:down], triggers.forbidden([163, 16], [3, 4])
+    spot = { room: 163, map: 16, row: 3, col: 4 }
+    quiet = { moved_cells: 1, stopped_by: 'done', dialog_before: false, dialog_after: false, from: spot, to: spot, trigger_input: nil }
+    p.after_action(choice: { skill: 'walk', params: { direction: 'up', cells: 1 } }, outcome: quiet, state: state, frame: 120)
+    assert_equal [:down], triggers.forbidden([163, 16], [3, 4])
+    p.after_action(choice: { skill: 'walk', params: { direction: 'down', cells: 1 } }, outcome: quiet.merge(dialog_after: true), state: state, frame: 121)
+    assert_equal [:down], triggers.forbidden([163, 16], [3, 4])
+    p.after_action(choice: { skill: 'press', params: { button: 'down', frames: 3 } }, outcome: quiet, state: state, frame: 122)
+    assert_equal [], triggers.forbidden([163, 16], [3, 4])
   end
 
   def test_overlay_frames_reuse_the_last_grid_or_a_blank_one
@@ -1250,7 +1332,7 @@ class DelegatedTriggersTest < Minitest::Test
     context = { grid: sprite_grid }
     p.decide(p.decision_point_for(state), state, context)
     assert_equal [:down], context[:triggers].forbidden([163, 16], [3, 4])
-    assert_includes client.calls.last[:prompt], 'Pressing down while Link was on this cell opened a dialogue by itself 1 times (the game triggers it; other inputs did not).'
+    assert_includes client.calls.last[:prompt], 'Pressing down while Link was on this cell opened a dialogue by itself 1 time (the game triggers it; other inputs did not; goto and talk_to routes avoid it, an explicit walk, step or press is not filtered).'
     finish(p, 'goto', { row: 3, col: 6 }, 102, trigger_input: ['down'])
     assert_includes tour(p, client), 'opened a dialogue by itself 2 times (the game triggers it'
     finish(p, 'walk', { direction: 'up', cells: 1 }, 103)
