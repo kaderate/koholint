@@ -5,6 +5,14 @@ module Koholint
   class TalkLog
     MAX_ROWS = 2
     MAX_COLS = 2
+    ATTEMPT_STOPS = %w[done no_response].freeze
+
+    def self.attempt?(result)
+      return false unless result.is_a?(Hash)
+
+      Ledger.pick(result, :talked) == true || ATTEMPT_STOPS.include?(Ledger.pick(result, :stopped_by).to_s)
+    end
+
     def self.from_events(events)
       log = new
       events.each do |event|
@@ -15,7 +23,7 @@ module Koholint
         place = result.is_a?(Hash) ? Ledger.place_of(Ledger.pick(result, :from)) : nil
         row = Ledger.pick(params, :row)
         col = Ledger.pick(params, :col)
-        log.record(place:, row:, col:, talked: Ledger.pick(result, :talked) == true) if place && row && col
+        log.record(place:, row:, col:, talked: Ledger.pick(result, :talked) == true) if place && row && col && attempt?(result)
       end
       log
     end

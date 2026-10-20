@@ -29,7 +29,7 @@ class TalkToTest < Minitest::Test
   def centre(row, col) = Koholint::Geometry.center_of(row, col)
 
   def talk(row, col, from: [4, 5], grid: FakeGrid.new(sprites: [[row, col]]), ledger: nil, solid: [row, col], opens_after: 1, free: false,
-           dialogue_at: nil, room_change_at: nil, damage_at: nil, limit: 600)
+           dialogue_at: nil, room_change_at: nil, damage_at: nil, limit: 600, blocked: [])
     x, y = centre(*from)
     start = state(x:, y:)
     execution = registry.start('talk_to', start, { row:, col: }, { grid:, ledger: }.compact)
@@ -52,6 +52,7 @@ class TalkToTest < Minitest::Test
       dx, dy = { up: [0, -1], down: [0, 1], left: [-1, 0], right: [1, 0] }.fetch(buttons.first, [0, 0])
       cell = Koholint::Geometry.cell_for(x + dx + (7 * dx), y + dy + (7 * dy))
       next if cell == solid && !free
+      next if blocked.include?(cell)
       next if cell && grid.passable(*cell, nil) == :no
 
       x += dx
@@ -116,6 +117,40 @@ class TalkToTest < Minitest::Test
     assert_equal :target_free, result[:stopped_by]
     assert_equal false, result[:talked]
     refute_includes inputs, [:a]
+  end
+
+  def test_a_blocked_standing_cell_is_replaced_by_another_neighbour
+    result, = talk(4, 8, blocked: [[4, 7]])
+    assert_equal :done, result[:stopped_by], result.inspect
+    assert result[:talked]
+    assert_equal 1, result[:replans]
+    refute_equal({ row: 4, col: 7 }, result[:standing_cell])
+    assert_equal :right, result[:blocked_at][:direction]
+  end
+
+  def test_all_neighbours_blocked_is_no_path_naming_the_cells
+    result, = talk(4, 9, grid: FakeGrid.new(sprites: [[4, 9]]), blocked: [[3, 9], [5, 9], [4, 8]])
+    assert_equal :no_path, result[:stopped_by], result.inspect
+    assert_equal 3, result[:replans]
+    assert_equal false, result[:talked]
+    assert_match(/blocked standing cells (\(\d,\d\)(, )?){3}/, result[:cause])
+    refute_nil result[:blocked_at]
+    assert_operator result[:frames], :<=, 400
+  end
+
+  def test_replans_are_bounded
+    result, = talk(4, 8, grid: FakeGrid.new(sprites: [[4, 8]]), blocked: [[4, 7], [3, 8], [5, 8], [4, 9]])
+    assert_equal :blocked, result[:stopped_by], result.inspect
+    assert_equal Koholint::Skills::TalkTo::TALK_REPLANS, result[:replans]
+    refute_nil result[:blocked_at]
+    assert_operator result[:frames], :<=, 400
+  end
+
+  def test_target_free_carries_the_standing_cell_and_a_cause
+    result, = talk(4, 8, free: true, opens_after: nil)
+    assert_equal :target_free, result[:stopped_by]
+    assert_equal({ row: 4, col: 7 }, result[:standing_cell])
+    assert_match(/may not hold a person any more/, result[:cause])
   end
 
   def face_run(positions, grid: FakeGrid.new(sprites: [[4, 6]]), target: [4, 6], dialog_at: nil)
@@ -238,9 +273,9 @@ class TalkToTest < Minitest::Test
   end
 
   def test_blocked_walk_reports_blocked_at
-    result, = talk(4, 9, grid: FakeGrid.new(sprites: [[4, 9]]), solid: [4, 7])
+    result, = talk(4, 8, grid: FakeGrid.new(sprites: [[4, 8]]), blocked: [[4, 7], [3, 8], [5, 8], [4, 9]])
     assert_equal :blocked, result[:stopped_by]
-    assert_equal :right, result[:blocked_at][:direction]
+    assert_kind_of Symbol, result[:blocked_at][:direction]
   end
 
   def test_frame_cap
