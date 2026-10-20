@@ -10,10 +10,13 @@ module Koholint
       SPEEDS = [1, 4, 16].freeze
       STEP_CHUNK = 60
       SLICE = 0.02
+      MAX_EXPIRED = 100
+
+      class Expired < Error; end
 
       Entry = Struct.new(:dir, :follower, :speed, :paused, :used_at, :ticked_at, :owed)
 
-      def initialize(factory: ->(dir) { Follower.new(dir, from: :start) }, clock: -> { Process.clock_gettime(Process::CLOCK_MONOTONIC) },
+      def initialize(factory: ->(dir) { Follower.new(dir, from: :start, max_lag_frames: Float::INFINITY) }, clock: -> { Process.clock_gettime(Process::CLOCK_MONOTONIC) },
                      idle: IDLE_SECONDS, max: MAX_REPLAYS, err: $stderr)
         @factory = factory
         @clock = clock
@@ -21,18 +24,14 @@ module Koholint
         @max = max
         @err = err
         @entries = {}
+        @expired = {}
         @lock = Mutex.new
       end
 
+      def open(dir) = @lock.synchronize { @expired.delete(dir) }
+
       def fetch(dir)
-        @lock.synchronize do
-          now = @clock.call
-          entry = @entries.delete(dir) || Entry.new(dir, @factory.call(dir), 1, false, now, now, 0.0)
-          entry.used_at = now
-          @entries[dir] = entry
-          @entries.shift while @entries.size > @max
-          entry
-        end
+        touch(dir) || insert(dir, @factory.call(dir))
       end
 
       def dirs = @lock.synchronize { @entries.keys }
@@ -59,7 +58,7 @@ module Koholint
       def tick
         now = @clock.call
         active = @lock.synchronize do
-          @entries.reject! { |_, entry| now - entry.used_at > @idle }
+          @entries.select { |_, entry| now - entry.used_at > @idle }.each_key { |dir| expire(dir) }
           @entries.values.each { |entry| owe(entry, now) }
         end
         active.each { |entry| advance(entry) }
@@ -82,6 +81,33 @@ module Koholint
 
       private
 
+      def touch(dir)
+        @lock.synchronize do
+          raise Expired, 'replay expired: reload the page' if @expired.key?(dir)
+
+          entry = @entries.delete(dir) or next nil
+          entry.used_at = @clock.call
+          @entries[dir] = entry
+        end
+      end
+
+      def insert(dir, follower)
+        @lock.synchronize do
+          now = @clock.call
+          entry = @entries.delete(dir) || Entry.new(dir, follower, 1, false, now, now, 0.0)
+          entry.used_at = now
+          @entries[dir] = entry
+          expire(@entries.first.first) while @entries.size > @max
+          entry
+        end
+      end
+
+      def expire(dir)
+        @entries.delete(dir)
+        @expired[dir] = true
+        @expired.shift while @expired.size > MAX_EXPIRED
+      end
+
       def controls(entry) = { speed: entry.speed, paused: entry.paused }
 
       def owe(entry, now)
@@ -99,7 +125,7 @@ module Koholint
         end
       rescue StandardError => e
         @err.puts "koholint: replay of #{File.basename(entry.dir)}: #{e.message}"
-        @lock.synchronize { @entries.delete(entry.dir) }
+        @lock.synchronize { @entries.delete(entry.dir) if @entries[entry.dir].equal?(entry) }
       end
     end
   end

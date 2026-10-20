@@ -3,6 +3,9 @@ require 'stringio'
 require 'tmpdir'
 require 'json'
 require 'koholint/viewer'
+require 'koholint/engine'
+require 'koholint/policies/start_game'
+require 'koholint/policies/walk_and_talk'
 
 class RegistryTest < Minitest::Test
   class StubFollower
@@ -56,6 +59,8 @@ class RegistryTest < Minitest::Test
     reg.fetch('a')
     reg.fetch('d')
     assert_equal %w[c a d], reg.dirs
+    assert_raises(Koholint::Viewer::Registry::Expired) { reg.fetch('b') }
+    reg.open('b')
     reg.fetch('b')
     assert_equal %w[a b c d b], @built
   end
@@ -68,6 +73,9 @@ class RegistryTest < Minitest::Test
     @now = 301.0
     reg.tick
     assert_equal %w[b], reg.dirs
+    error = assert_raises(Koholint::Viewer::Registry::Expired) { reg.state('a') }
+    assert_equal 'replay expired: reload the page', error.message
+    assert_equal %w[a b], @built
   end
 
   def test_tick_advances_in_real_time_at_the_chosen_speed
@@ -134,6 +142,67 @@ class RegistryTest < Minitest::Test
       assert_equal [10], state[:events].map { |e| e[:frame] }
       assert_equal({ speed: 1, paused: false }, state[:replay].slice(:speed, :paused))
       assert_equal 30, state[:replay][:frame]
+    end
+  end
+
+  def test_a_slow_build_does_not_block_other_replays_and_a_duplicate_is_discarded
+    entered = Queue.new
+    release = Queue.new
+    followers = []
+    factory = lambda do |dir|
+      if dir == 'slow'
+        entered << true
+        release.pop
+      end
+      StubFollower.new.tap { |follower| followers << follower }
+    end
+    reg = Koholint::Viewer::Registry.new(factory:, clock: -> { @now })
+    first = Thread.new { reg.fetch('slow') }
+    second = Thread.new { reg.fetch('slow') }
+    2.times { entered.pop }
+    assert_equal %w[fast], [reg.fetch('fast').dir]
+    2.times { release << true }
+    assert_same first.value, second.value
+    assert_equal 3, followers.size
+    assert_equal %w[fast slow], reg.dirs
+  end
+
+  def test_a_failure_does_not_drop_a_newer_replay_of_the_same_run
+    reg = nil
+    replacement = StubFollower.new
+    failing = StubFollower.new(fail: true)
+    failing.define_singleton_method(:step_available) do |max_frames:|
+      reg.send(:expire, 'a')
+      reg.open('a')
+      raise Koholint::Error, "replay broke at #{max_frames}"
+    end
+    built = [failing, replacement]
+    reg = Koholint::Viewer::Registry.new(factory: ->(_dir) { built.shift }, clock: -> { @now }, err: StringIO.new)
+    reg.fetch('a')
+    @now = 1.0
+    reg.instance_variable_get(:@entries)['a'].owed = 0.0
+    reg.tick
+    assert_equal %w[], reg.dirs
+    assert_same replacement, reg.fetch('a').follower
+    assert_equal %w[a], reg.dirs
+  end
+
+  def test_a_real_replay_starts_at_frame_zero_even_with_keyframes
+    skip_without_rom!
+    Dir.mktmpdir do |root|
+      run = Koholint::Run.create(root:, flow_version: Koholint::FLOW_VERSION, budget: {})
+      policy = Koholint::Policies::StartGame.new(Koholint::Policies::WalkAndTalk.new)
+      Koholint::Engine.new(run:, policy:, budget: Koholint::Budget.new(frames: 2400), keyframe_every: 300).run
+      refute_empty Dir.children(File.join(run.dir, 'keyframes'))
+      reg = Koholint::Viewer::Registry.new(clock: -> { @now })
+      follower = reg.fetch(run.dir).follower
+      assert_equal 0, follower.frame
+      @now = 0.5
+      reg.tick
+      assert_equal 30, follower.frame
+      @now = 1.0
+      reg.tick
+      assert_equal 60, follower.frame
     end
   end
 end
