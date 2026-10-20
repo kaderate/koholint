@@ -53,21 +53,28 @@ counts blocked edges per place (doubtful edges), `triggers.rb` forbids inputs th
 
 **Objectives** — `objectives.rb`: a short goal with a predicate the harness checks from memory
 (`leave_place`, `reach_place`, `reach_cell`, `dialogue_closed`, `new_place`); the engine emits started and
-achieved/abandoned/failed events. Long-term objectives and memory are still thin (see `ROADMAP.md`).
+achieved/abandoned/failed events; a `started` event may carry `because`, the id of the lead that motivated it. The
+long-term direction is the agent's own `goal` (a short text it sets and revises). `leads.rb` holds the leads: claims the
+agent extracts from texts it read (dialogue, signs, objects), each with a verbatim `quote`, a `claim` and an importance
+(`high`, `normal`, `low`). A lead whose quote is not in the transcription of the same call is dropped (`notable`
+`lead_rejected`), duplicates are dropped by quote. Goal and leads are rebuilt from the `goal` and `lead` trace events on
+resume.
 
 **Agents** (`agents/`) — `context.rb` renders state for the model (grid map, neighbours, objects on screen,
-recent results, plan), `prompts.rb` holds the system prompts, `claude_cli.rb` calls `claude -p` with a JSON
+goal, leads — every `high` one, `normal` ones of the current place, never `low` ones —, recent results, plan), `prompts.rb` holds the system prompts, `claude_cli.rb` calls `claude -p` with a JSON
 schema and reports cost and latency. Jev (tactical choices) is planned, not wired.
 
 **Run storage** — `run.rb`: `runs/<id>/` with `manifest.json` (flow version, ROM hash, tag, harness/prompts
 sha, model), `inputs.log`, `trace.jsonl` (events validated by `trace.rb`), `keyframes/`, `save/`, `prompts/`,
-`world.json`, `summary.json` (written at every stop by `summary.rb`), `star.json`. `budget.rb` enforces frames,
+`world.json` (`{ goal, leads }`, rewritten from the trace at every stop), `summary.json` (written at every stop by
+`summary.rb`), `star.json`. Trace events: `perception`, `decision`, `action`, `objective`, `dialogue`, `lead`, `goal`,
+`notable`, `screen`, `screen_changed`, `affordance`, `grid_contradiction`, `keyframe`, `save`, `budget_stop`, `stop`. `budget.rb` enforces frames,
 minutes, dollars and objective steps. `archive.rb` keeps a light bundle per run in git (trace gzipped);
 heavy artifacts stay local. A run resumes only with the same `flow_version` and ROM hash; a change to the
 play flow means a new `flow_version`.
 
 **Viewer** (`viewer.rb`, `viewer/`) — a small HTTP server. A `Follower` replays the journal of the watched
-run; `Feed` derives status, feed, reasoning and objectives from the trace. `Explorer` and `Registry` serve
+run; `Feed` derives status, feed, reasoning, objectives, goal and leads from the trace up to the shown frame. `Explorer` and `Registry` serve
 past runs (list, read-only replays with pacing, comparison via `run_compare.rb`, star). It never writes game
 state.
 
