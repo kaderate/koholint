@@ -64,7 +64,7 @@ module Koholint
     GOAL_SCHEMA = { type: 'string', maxLength: Leads::GOAL_MAX }.freeze
     LEADS_SCHEMA = { type: 'array', maxItems: Leads::LIMIT,
                      items: { type: 'object',
-                              properties: { quote: { type: 'string', minLength: Leads::QUOTE_MIN, maxLength: Leads::QUOTE_MAX },
+                              properties: { quote: { type: 'string', minLength: 1 },
                                             claim: { type: 'string', minLength: 1 }, importance: { type: 'string', enum: Leads::IMPORTANCE } },
                               required: %w[quote claim importance], additionalProperties: false } }.freeze
     PLACE_SCHEMA = { type: 'array', items: { type: 'integer' }, minItems: 2, maxItems: 2 }.freeze
