@@ -108,4 +108,27 @@ class TraceTest < Minitest::Test
       assert_raises(Koholint::Trace::InvalidEvent) { trace.emit(:decision, frame: 3, **base, image: 'yes') }
     end
   end
+
+  def test_read_falls_back_to_the_gzipped_trace
+    with_path do |path|
+      Koholint::Trace.new(path).emit(:stop, frame: 3, reason: 'frames')
+      Koholint::Trace.compress(path)
+      File.delete(path)
+      assert_equal "#{path}.gz", Koholint::Trace.located(path)
+      assert_equal [{ 'v' => 1, 'type' => 'stop', 'frame' => 3, 'reason' => 'frames' }], Koholint::Trace.read(path)
+      Koholint::Trace.decompress(path)
+      refute File.exist?("#{path}.gz")
+      assert_equal 3, Koholint::Trace.read(path).first['frame']
+    end
+  end
+
+  def test_compress_is_deterministic
+    with_path do |path|
+      Koholint::Trace.new(path).emit(:stop, frame: 3, reason: 'frames')
+      Koholint::Trace.compress(path)
+      first = File.binread("#{path}.gz")
+      Koholint::Trace.compress(path)
+      assert_equal first, File.binread("#{path}.gz")
+    end
+  end
 end

@@ -1,4 +1,5 @@
 require 'json'
+require 'zlib'
 require 'koholint'
 
 module Koholint
@@ -26,9 +27,31 @@ module Koholint
                               plan: ->(v) { v.is_a?(String) && v.length <= 200 && !v.match?(/[[:cntrl:]]/) } } }.freeze
 
     def self.read(path)
-      return [] unless File.exist?(path)
+      found = located(path)
+      return [] unless File.exist?(found)
 
-      File.foreach(path).filter_map do |line|
+      found == path ? parse(File.foreach(path)) : parse(Zlib::GzipReader.open(found, &:read).each_line)
+    end
+
+    def self.archived(path) = "#{path}.gz"
+
+    def self.located(path) = !File.exist?(path) && File.exist?(archived(path)) ? archived(path) : path
+
+    def self.compress(path, into: archived(path))
+      Zlib::GzipWriter.open("#{into}.tmp", Zlib::BEST_COMPRESSION) do |gz|
+        gz.mtime = 1
+        gz.write(File.binread(path))
+      end
+      File.rename("#{into}.tmp", into)
+    end
+
+    def self.decompress(path)
+      File.binwrite(path, Zlib::GzipReader.open(archived(path), &:read))
+      File.delete(archived(path))
+    end
+
+    def self.parse(lines)
+      lines.filter_map do |line|
         JSON.parse(line)
       rescue JSON::ParserError
         nil

@@ -257,4 +257,16 @@ class FollowerTest < Minitest::Test
       end
     end
   end
+
+  def test_follows_an_archived_run_from_its_gzipped_trace
+    with_recorded_run do |run|
+      path = File.join(run.dir, 'trace.jsonl')
+      Koholint::Trace.compress(path)
+      File.delete(path)
+      follower = Koholint::Viewer::Follower.new(run.dir, from: :start)
+      drain(follower)
+      assert_equal :in_sync, follower.sync
+      assert_operator follower.compared_frames, :>, 1
+    end
+  end
 end
