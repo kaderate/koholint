@@ -68,6 +68,11 @@ class AgentsContextTest < Minitest::Test
     refute_includes text, 'A dialogue opened by itself'
   end
 
+  def test_the_locked_phase_note_appears_only_with_locked_frames
+    refute_includes build, 'cause unknown'
+    assert_includes build(locked_frames: 930), 'Link has been locked for 930 frames (cause unknown)'
+  end
+
   def test_the_movement_lock_line_appears_only_when_locked
     refute_includes build, 'Link has not moved'
     assert_includes build(locked: 3), "Link has not moved in the last 3 attempts in different directions and no dialogue is open: movement may be locked by an animation or an event; waiting a few seconds is usually enough before trying again."

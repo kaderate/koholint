@@ -89,7 +89,7 @@ module Koholint
         started && (started['title'] || id)
       end
 
-      AUTOMATIC = ['automatic dialogue advance', 'deterministic hemmed-in'].freeze
+      AUTOMATIC = ['automatic dialogue advance', 'deterministic hemmed-in', 'locked: waiting'].freeze
 
       def objective_view(trace, id)
         return { objective_predicate: nil, objective_attempts: nil } unless id

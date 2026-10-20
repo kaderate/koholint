@@ -188,6 +188,11 @@ class PageTest < Minitest::Test
     assert_equal 'f5 · objective: new_place abandoned (unreachable)', fmt(abandoned)
   end
 
+  def test_a_locked_wait_reads_as_a_label
+    event = { frame: 9, type: 'decision', agent: 'delegated', justification: 'locked: waiting for Link to be free', choice: { skill: 'wait', params: { frames: 30 } } }
+    assert_equal 'f9 · locked: waiting for Link to be free', fmt(event)
+  end
+
   def test_objective_events_read_with_status_and_reason
     event = { frame: 5, type: 'objective', id: 'o1', status: 'started', predicate: { kind: 'leave_place', place: [163, 16] } }
     assert_equal 'f5 · objective: leave_place [163,16] started', fmt(event)

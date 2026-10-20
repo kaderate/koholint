@@ -31,6 +31,8 @@ module Koholint
       HEMMED_ATTEMPTS = 4
       LOCK_BUFFER = 8
       LOCK_SKILLS = %w[walk step goto talk_to].freeze
+      LOCKED_WAIT = { skill: 'wait', params: { frames: 30 } }.freeze
+      LOCKED_WAIT_LIMIT_FRAMES = 900
       HEMMED_WAIT_LIMIT = 1800 / HEMMED_WAIT[:params][:frames]
 
       def initialize(client:, registry:, objectives:, manual: '', on_step: nil, on_activity: nil, ledger: nil, triggers: nil, talk_log: nil)
@@ -52,10 +54,15 @@ module Koholint
         @page = 0
         @sequence = nil
         @agent_driven = false
+        @locked_since = nil
         @skill_point = DecisionPoint.choose_skill(registry)
       end
 
-      def decision_point_for(_state) = @objectives.current ? @skill_point : DecisionPoint.choose_objective
+      def decision_point_for(state)
+        return @skill_point if locked_waiting?(state)
+
+        @objectives.current ? @skill_point : DecisionPoint.choose_objective
+      end
 
       def observe(state, frame:)
         unless state.loading?
@@ -63,6 +70,7 @@ module Koholint
           @triggers.reset_unless([state.room_id, state.map_id])
         end
         release_hemmed(state)
+        track_locked(state)
         track { @objectives.update(state, frame:) }
       end
 
@@ -79,6 +87,8 @@ module Koholint
 
         reopen = reopen_wait(decision_point, state)
         return reopen if reopen
+
+        return locked_wait if locked_waiting?(state)
 
         if decision_point.name == :choose_skill && !@sequence && hemmed?(state)
           return hemmed_wait if @hemmed[:waits] < HEMMED_WAIT_LIMIT
@@ -111,8 +121,8 @@ module Koholint
           @page = 0
           @agent_driven = false
         end
-        if @auto
-          @auto = false
+        if @auto || @locked_wait
+          @auto = @locked_wait = false
           return track { @objectives.update(state, frame:) }
         end
         @last_results << outcome
@@ -350,6 +360,31 @@ module Koholint
         @sequence[:pages].size >= DIALOGUE_PAGE_LIMIT || state.frame - @sequence[:start] >= DIALOGUE_FRAME_LIMIT
       end
 
+      def track_locked(state)
+        if state.phase == :locked
+          unless @locked_since
+            @locked_since = state.frame
+            @objectives.touch(frame: state.frame)
+          end
+        elsif @locked_since && !state.loading?
+          @locked_since = nil
+          @objectives.touch(frame: state.frame)
+        end
+      end
+
+      def locked_frames(state) = @locked_since ? state.frame - @locked_since : 0
+
+      def locked_waiting?(state)
+        track_locked(state)
+        state.phase == :locked && locked_frames(state) < LOCKED_WAIT_LIMIT_FRAMES
+      end
+
+      def locked_wait
+        @locked_wait = true
+        { choice: LOCKED_WAIT, justification: 'locked: waiting for Link to be free', confidence: 1.0, agent: 'delegated', latency_ms: 0, cost_usd: 0.0,
+          fallback: false, prompt: nil, image: nil }
+      end
+
       def hemmed_wait
         @waiting = true
         @hemmed[:waits] += 1
@@ -361,7 +396,8 @@ module Koholint
       def ask(decision_point, state, context)
         @prompt = Agents::Context.build(state:, grid: grid_for(state, context), objective: @objectives.current, history: @objectives.history,
                                        attempts: @objectives.attempts_for_prompt, manual: @manual, last_results: @last_results, ledger: @ledger, refusals: @refusals, plan: @plan,
-                                       triggers: @triggers, talk_log: @talk_log, locked: (@hemmed[:attempts] if @hemmed && hemmed?(state)))
+                                       triggers: @triggers, talk_log: @talk_log, locked: (@hemmed[:attempts] if @hemmed && hemmed?(state)),
+                                       locked_frames: (locked_frames(state) if state.phase == :locked))
         if decision_point.name == :choose_skill && @sequence
           @pages_read = @sequence[:pages].size
           @images = Vision::DialogueShot.sheets(@sequence[:pages], per_sheet: SHEET_PAGES)
