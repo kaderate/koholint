@@ -74,7 +74,8 @@ schema and reports cost and latency. Jev (tactical choices) is planned, not wire
 **Run storage** — `run.rb`: `runs/<id>/` with `manifest.json` (flow version, ROM hash, tag, harness/prompts
 sha, model), `inputs.log`, `trace.jsonl` (events validated by `trace.rb`), `keyframes/`, `save/`, `prompts/`,
 `world.json` (`{ goal, leads }`, rewritten from the trace at every stop), `summary.json` (written at every stop by
-`summary.rb`), `star.json`. Trace events: `perception`, `decision`, `action`, `objective`, `dialogue`, `lead`, `goal`,
+`summary.rb` from the trace only, versioned by `Summary::VERSION`: totals, cost by skill, decisions by agent and
+feature usage; `archive` rewrites an outdated one), `star.json`. Trace events: `perception`, `decision`, `action`, `objective`, `dialogue`, `lead`, `goal`,
 `notable`, `screen`, `screen_changed`, `affordance`, `grid_contradiction`, `keyframe`, `save`, `budget_stop`, `stop`. `budget.rb` enforces frames,
 minutes, dollars and objective steps. `archive.rb` keeps a light bundle per run in git (trace gzipped);
 heavy artifacts stay local. A run resumes only with the same `flow_version` and ROM hash; a change to the

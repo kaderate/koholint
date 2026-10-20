@@ -88,10 +88,10 @@ runs, else `runs`). Routes besides `/`, `/frame.png` and `/state.json`:
 
 | Route | What it does |
 |---|---|
-| `/runs`, `/runs.json` | Table of runs with a `summary.json`: sort by column; filter by minimum milestone, maximum dollars, tag, starred only; pick two runs to compare |
+| `/runs`, `/runs.json` | Table of runs with a `summary.json`: sort by column; filter by minimum milestone, maximum dollars, tag, starred only; `$/call` and `free` (decisions not made by Claude); pick two runs to compare |
 | `/run/<id>` | The live page as a read-only replay of that run, from boot; `/frame.png?run=<id>` and `/state.json?run=<id>` serve it |
 | `/control?run=<id>&speed=1\|4\|16` and `&pause=0\|1` | Drive a replay |
-| `/compare/<a>/<b>`, `/compare.json?a=&b=` | Summaries side by side with differing fields marked, and the first frame at which each run reached each milestone and place |
+| `/compare/<a>/<b>`, `/compare.json?a=&b=` | Summaries, usage and cost by skill side by side with differing fields marked, and the first frame at which each run reached each milestone and place |
 | `POST /star?run=<id>` (form body `why=...`) | Same as `bin/koholint star`; the `Host` header must name the viewer itself and an `Origin` header, if sent, must match |
 
 At most 3 replays are kept (least recently used evicted, idle ones dropped after 5 minutes). An evicted replay answers
@@ -102,12 +102,14 @@ under the runs root (`[A-Za-z0-9_.-]`, no leading dot, no `..`); anything else i
 
 Every finished run is kept in git as a light bundle under `runs/<id>/` (about 60 KB): `manifest.json` (with `tag`,
 `harness_sha`, `prompts_sha`, `model`), `inputs.log`, `trace.jsonl.gz`, `world.json`, `suggestions.md`, `summary.json`
-(written by the engine at every stop) and `star.json` when starred. `prompts/`, `keyframes/`, `save/`, `video/`,
+(written by the engine at every stop) and `star.json` when starred. `summary.json` (`v: 2`) also holds `cost_by_skill`
+(model calls and dollars per skill), `decisions_by_agent` (free decisions included) and `usage` (goal changes, leads
+by importance, rejected leads, objectives by kind, `because` uses, talks, talks to a known target, dialogues). `prompts/`, `keyframes/`, `save/`, `video/`,
 `activity.json`, `run.lock` and the plain `trace.jsonl` are gitignored: saves and keyframes are derivable by replay.
 
 | Command | Effect |
 |---|---|
-| `archive [--from DIR] [--root DIR] [--commit] [--full]` | Imports finished runs from `--from` (light bundle only, refreshed when the source changed, e.g. after a resume or a star; the source is never modified), gzips the trace, writes a missing `summary.json`, regenerates `docs/runs/index.md`. `--commit` makes one commit (`Archive runs A..B`); `--full` also force-adds `prompts/`. Idempotent. Runs without a final `stop` event or with a live lock are skipped |
+| `archive [--from DIR] [--root DIR] [--commit] [--full]` | Imports finished runs from `--from` (light bundle only, refreshed when the source changed, e.g. after a resume or a star; the source is never modified), gzips the trace, writes a missing or outdated (`v` below the current version) `summary.json`, regenerates `docs/runs/index.md`. `--commit` makes one commit (`Archive runs A..B`); `--full` also force-adds `prompts/`. Idempotent. Runs without a final `stop` event or with a live lock are skipped |
 | `star <run_dir> "why"` | Marks a run worth keeping (`star.json`, `summary.json` `starred`); `prune-heavy` never deletes a starred run. Run `archive --commit` afterwards to record it in git |
 | `prune-heavy [--keep N] [--yes]` | Deletes `prompts/` and `keyframes/` of unstarred runs older than the N most recent (default 5); without `--yes` it only lists them |
 
