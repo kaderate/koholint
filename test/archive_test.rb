@@ -237,6 +237,42 @@ class ArchiveTest < Minitest::Test
     end
   end
 
+  def stale_summary(dir)
+    path = File.join(dir, 'summary.json')
+    File.write(path, JSON.generate(JSON.parse(File.read(path)).except('v', 'usage')))
+  end
+
+  def test_re_archiving_refreshes_an_archived_summary_older_than_the_summary_version
+    Dir.mktmpdir do |base|
+      root = File.join(base, 'runs')
+      make_run(root, '20261020-000001-aaaa')
+      Koholint::Archive.archive(root:, out: StringIO.new)
+      dest = File.join(root, '20261020-000001-aaaa')
+      stale_summary(dest)
+      _code, out = capture { |o| Koholint::Archive.archive(root:, out: o) }
+      assert_equal "archived 20261020-000001-aaaa\n", out
+      summary = JSON.parse(File.read(File.join(dest, 'summary.json')))
+      assert_equal [Koholint::Summary::VERSION, 1], summary.values_at('v', 'calls')
+      assert_equal 0, summary.dig('usage', 'talks')
+      _code, out = capture { |o| Koholint::Archive.archive(root:, out: o) }
+      assert_equal '', out
+    end
+  end
+
+  def test_importing_a_source_with_an_old_summary_writes_a_current_one
+    Dir.mktmpdir do |base|
+      root = File.join(base, 'runs')
+      source = make_run(File.join(base, 'live'), '20261020-000001-aaaa')
+      Koholint::Summary.write(source)
+      stale_summary(source)
+      Koholint::Archive.archive(root:, from: File.dirname(source), out: StringIO.new)
+      summary = JSON.parse(File.read(File.join(root, '20261020-000001-aaaa', 'summary.json')))
+      assert_equal Koholint::Summary::VERSION, summary['v']
+      _code, out = capture { |o| Koholint::Archive.archive(root:, from: File.dirname(source), out: o) }
+      assert_equal '', out
+    end
+  end
+
   def test_the_index_lists_only_archived_runs
     Dir.mktmpdir do |base|
       root = File.join(base, 'runs')
