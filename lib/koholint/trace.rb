@@ -20,11 +20,14 @@ module Koholint
       screen_changed: %i[place cells],
       affordance: %i[appearance action direction result method context source],
       grid_contradiction: %i[place row col direction believed observed],
-      dialogue: %i[place text source page]
+      dialogue: %i[place text source page],
+      lead: %i[id place source quote claim importance],
+      goal: %i[text]
     }.freeze
-    ALLOWED = { dialogue: { source: %w[agent] } }.freeze
+    ALLOWED = { dialogue: { source: %w[agent] }, lead: { importance: %w[high normal low] } }.freeze
     OPTIONAL = { decision: { prompt_sha: ->(v) { v.is_a?(String) && v.match?(/\A\h{64}\z/) }, image: ->(v) { [true, false].include?(v) },
-                              plan: ->(v) { v.is_a?(String) && v.length <= 200 && !v.match?(/[[:cntrl:]]/) } } }.freeze
+                              plan: ->(v) { v.is_a?(String) && v.length <= 200 && !v.match?(/[[:cntrl:]]/) } },
+                 objective: { because: ->(v) { v.is_a?(String) && v.match?(/\Alead-\d+\z/) } } }.freeze
 
     def self.read(path)
       found = located(path)
