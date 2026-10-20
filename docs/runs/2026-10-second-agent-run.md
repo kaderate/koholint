@@ -33,3 +33,30 @@ Plan 4a (`goto`, `step`, `talk_to`, ledger and doubt, automatic dialogues, `plan
 - **Shield milestone** is still not perceived (`highest_milestone: none`).
 - **Objectives.** `new_place` was never achieved nor abandoned in 4771 frames: the unreachable guard no longer ends non-`reach_cell` objectives, so a stuck objective can last the whole budget. A per-objective call cap would bound it.
 - **Speed.** The view still freezes while a model call runs (267 s of waiting out of the whole run).
+
+## Run 10: the agent leaves the starting house (`20261020-070238-d8c5`, code `8d438cd`)
+
+The trigger-input fix (record the input that opened a dialogue by itself, never press it while centring, avoid that edge in `goto` and `talk_to`) was added after the analysis above. Same 1 USD cap.
+
+| Measure | Run 9 | Run 10 |
+|---|---|---|
+| Frames / dollars | 4771 / 1.004 | 3593 / 1.003 |
+| Model calls | 59 | 69 (4 with images) |
+| Calls per 1000 frames / dollars per 1000 frames | 12.4 / 0.21 | 19.2 / 0.279 |
+| Latency median / p90 | 3.0 s / 9.9 s | 3.3 s / 6.0 s |
+| Time waiting for the model | 267 s | 291 s |
+| Automatic dialogue ticks | 132 | 58 |
+| Places seen | 1 | 3 (`163/16` the house, then `162/0`, `161/0`) |
+| Objectives | 1 never achieved | 3 `new_place`: 2 achieved (frames 3452 and 3593) |
+| Left the starting house | no | **yes, first room change at frame 3422, 63 calls, 0.936 USD** |
+
+- The agent talked to the person it had to talk to (`talk_to (4,7)` ended `done`, `talked: true`, at frame 2067, 43 calls and 0.60 USD in) after the earlier runs kept failing; a long dialogue followed. After it Link stood blocked in all directions for about 300 frames (an item animation, not understood by the agent, which tried A, B, waiting and every direction) before moving again.
+- The exit worked from the doorway after that; the agent stepped through and then explored two new rooms by `goto` along row 7 and the screen edges.
+- Only one trigger input was recorded (a `goto` left, from a dialogue opened by pushing into a pot): the guard on the exit did not re-fire this time because the dialogue had been resolved.
+- Cost to leave: 63 calls and 0.936 USD, 3422 frames. A rerun with identical code is not deterministic (model answers vary): this is one success, not a rate.
+
+### Still missing after run 10
+- The shield milestone is not perceived (`highest_milestone: none`) although the agent obtained it.
+- About 300 frames of "blocked in every direction" after the dialogue cost 7 calls: the agent should be told that movement can be locked by an animation (no cause is visible) and that waiting is the answer; an `animation locked` signal from perception would help.
+- The forbidden-input memory never expires within a place; a one-off cutscene input could block a `goto` edge (review follow-up): clear the entry when the same input is pressed explicitly later without any dialogue.
+- `Planner#why_not` does not name a forbidden edge as the cause of `no_path`.
