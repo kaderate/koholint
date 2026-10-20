@@ -35,4 +35,5 @@ Only what is left to do. When something lands, delete it here (git is the histor
 - Plan 4a parked: automatic dialogue pages flush only on `choose_skill` tours; step results never carry `blocked_at` by decision.
 - Agent loop deferred: the interaction log attributes a talk_to to the object at (or within one cell of) its target in the current grid, so NPCs that move can read as never tried.
 - Run storage: `places_seen` counts perceived places only.
+- `explore`: next steps are a candidate menu (the model picks among the frontiers and exits the engine lists) and place labels; its walked cells and walls are per-place memory outside the beliefs (not appearance evidence), an exit whose step opens a dialogue by itself is skipped silently (not listed in `no_frontier`), and its `untried_object` range (3 cells) and leg/outward frame limits are unmeasured.
 - Agent loop deferred: a failed sheet call loses the dialogue pages (their PNGs remain under `prompts/`).
