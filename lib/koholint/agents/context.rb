@@ -69,7 +69,11 @@ module Koholint
           lines << "Link offset from cell centre (positive = right of / below the centre): dx=#{dx}, dy=#{dy}"
         end
         lines << "Health: #{hearts(state.hp)} of #{hearts(state.max_hp)} hearts"
-        opened = link && triggers ? triggers.count(place, link) : 0
+        known = link && triggers ? triggers.forbidden(place, link) : []
+        known.each do |input|
+          lines << "Pressing #{input} while Link was on this cell opened a dialogue by itself #{triggers.input_count(place, link, input)} times (the game triggers it; other inputs did not)."
+        end
+        opened = link && triggers && known.empty? ? triggers.count(place, link) : 0
         lines << "A dialogue opened by itself #{opened} times while Link was on this cell (the game triggers it; repeating the same action here does not change that)." if opened >= TRIGGER_AT
         lines.join("\n")
       end

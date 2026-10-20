@@ -1,5 +1,6 @@
 require_relative 'test_helper'
 require 'koholint/ledger'
+require 'koholint/triggers'
 require 'support/emulator_cache'
 require 'koholint/decision'
 require 'koholint/vision/grid_builder'
@@ -215,6 +216,48 @@ class SkillsTest < Minitest::Test
     assert_equal :dialogue, result[:stopped_by]
     assert_equal 1, result[:frames]
     assert_nil result[:blocked_at]
+  end
+
+  def doorway(**over) = state(x: 88, y: 121, **over)
+
+  def test_execution_records_the_input_that_opened_a_dialogue_by_itself
+    execution = registry.start('walk', doorway, { direction: :right, cells: 1 })
+    open = doorway(dialog_state: 129)
+    inputs = drive(execution, [doorway] + [doorway(x: 89)] * 3 + [open])
+    assert_equal [[:right]] * 4, inputs
+    result = execution.result(open)
+    assert_equal :dialogue, result[:stopped_by]
+    assert_equal [:right], result[:trigger_input]
+  end
+
+  def test_trigger_input_is_the_centring_press_and_nil_for_a_and_for_other_stops
+    execution = registry.start('walk', doorway(y: 128), { direction: :up, cells: 1 })
+    drive(execution, [doorway(y: 128)] * 20)
+    assert_nil execution.result(doorway(y: 128))[:trigger_input]
+    pressing = registry.start('press', doorway, { button: :a, frames: 3 })
+    open = doorway(dialog_state: 129)
+    drive(pressing, [doorway, doorway, open])
+    assert_nil pressing.result(open)[:trigger_input]
+    advance = registry.start('advance_dialogue', open, {})
+    drive(advance, [open] * 3)
+    assert_nil advance.result(open)[:trigger_input]
+    centring = registry.start('walk', doorway, { direction: :up, cells: 1 })
+    drive(centring, [doorway] + [doorway] * 8 + [open])
+    assert_equal [:down], centring.result(open)[:trigger_input]
+  end
+
+  def test_centring_never_presses_a_forbidden_direction
+    triggers = Koholint::Triggers.new
+    cell = doorway.cell
+    triggers.record(place: [1, 0], cell:, skill: 'walk', direction: 'down', input: :down)
+    free = registry.start('walk', doorway, { direction: :right, cells: 1 })
+    assert_includes drive(free, [doorway] * 12 + [doorway(x: 100)] * 3).flatten, :down
+    execution = registry.start('walk', doorway, { direction: :right, cells: 1 }, { triggers: })
+    inputs = drive(execution, [doorway] * 30)
+    refute_includes inputs.flatten, :down
+    result = execution.result(doorway)
+    refute result[:aligned]
+    assert_equal 7, result[:offset][:dy].abs
   end
 
   def test_centring_stops_after_sixteen_frames_when_never_aligned
@@ -496,6 +539,35 @@ class SkillsTest < Minitest::Test
   end
 
   def fresh(emulator) = Koholint::Emulator.restore(emulator.dump)
+
+  def test_rom_walk_right_in_the_doorway_avoids_a_forbidden_down
+    skip_without_rom!
+    emulator = fresh(EmulatorCache.interactive)
+    [[:down, 3], [:down, 3], [:right, 1]].each { |direction, cells| run_skill(emulator, 'walk', { direction:, cells: }) }
+    result, = run_skill(emulator, 'walk', { direction: :down, cells: 2 })
+    skip 'setup did not provoke the trigger from the interactive snapshot' unless result[:stopped_by] == :dialogue && result[:trigger_input]
+
+    30.times do
+      state = Koholint::Perception.read(emulator)
+      break unless state.dialog_open?
+
+      run_skill(emulator, 'advance_dialogue', {})
+    end
+    state = Koholint::Perception.read(emulator)
+    skip 'dialogue did not close' if state.dialog_open?
+
+    triggers = Koholint::Triggers.new
+    triggers.record(place: [state.room_id, state.map_id], cell: state.cell, skill: 'walk', direction: 'down', input: :down)
+    execution = registry.start('walk', state, { direction: :right, cells: 1 }, { triggers: })
+    journal = []
+    while (buttons = execution.next_input(Koholint::Perception.read(emulator)))
+      emulator.step(buttons)
+      journal << buttons
+    end
+    final = execution.result(Koholint::Perception.read(emulator))
+    refute_includes journal.flatten, :down
+    refute_equal :dialogue, final[:stopped_by]
+  end
 
   def test_rom_walk_up_one_cell
     skip_without_rom!
