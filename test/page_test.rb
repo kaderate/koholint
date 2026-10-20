@@ -34,6 +34,14 @@ class PageTest < Minitest::Test
     assert_equal 'f8 · press start 3f', evaluate("formatEventPretty(#{JSON.generate(event)})")
   end
 
+  def test_the_phone_layout_overrides_the_base_left_column_width
+    base = PAGE.index("#left { flex: none; width: 480px")
+    media = PAGE.index('@media (max-width: 800px)')
+    phone = PAGE.index('#left { width: auto', media)
+    assert base < media, 'the base #left rule must come before the media query'
+    assert media < phone
+  end
+
   def test_a_decision_shows_its_reasoning_as_visible_text
     event = { frame: 9, type: 'decision', agent: 'claude', justification: "  go left <b>x</b>  \n" }
     assert_equal 'go left <b>x</b>', evaluate("formatReason(#{JSON.generate(event)})")
