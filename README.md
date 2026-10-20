@@ -71,6 +71,8 @@ visited places from the trace; `fork` branches a run at a frame. Both work on an
   to five leads (`quote`, `claim`, importance `high|normal|low`); a lead whose quote is not in that transcription is
   dropped. Both are trace events (`goal`, `lead`), shown in the context and the live view and written to `world.json`;
   an objective can cite the lead behind it (`because`).
+- Scrolling dialogue pages are stitched into one text; the context remembers what each person said and whether talking
+  again is worth it; `new_text` is an objective predicate; the live view lists the dialogues read.
 
 ## Live view
 
