@@ -7,6 +7,7 @@ require 'koholint/vision/grid_builder'
 require 'koholint/calibration/walk_probe'
 require 'koholint/navigation/planner'
 require 'koholint/triggers'
+require 'koholint/talk_log'
 require 'koholint/skills/registry'
 require 'support/emulator_cache'
 
@@ -30,10 +31,10 @@ class TalkToTest < Minitest::Test
   def centre(row, col) = Koholint::Geometry.center_of(row, col)
 
   def talk(row, col, from: [4, 5], grid: FakeGrid.new(sprites: [[row, col]]), ledger: nil, solid: [row, col], opens_after: 1, free: false,
-           dialogue_at: nil, room_change_at: nil, damage_at: nil, limit: 600, blocked: [], triggers: nil)
+           dialogue_at: nil, room_change_at: nil, damage_at: nil, limit: 600, blocked: [], triggers: nil, open_cells: nil, talk_log: nil)
     x, y = centre(*from)
     start = state(x:, y:)
-    execution = registry.start('talk_to', start, { row:, col: }, { grid:, ledger:, triggers: }.compact)
+    execution = registry.start('talk_to', start, { row:, col: }, { grid:, ledger:, triggers:, talk_log: }.compact)
     inputs = []
     a_presses = 0
     dialog = 0
@@ -47,7 +48,7 @@ class TalkToTest < Minitest::Test
       dialog = 3 if dialogue_at && i >= dialogue_at
       if buttons == [:a]
         a_presses += 1
-        dialog = 3 if opens_after && a_presses >= opens_after
+        dialog = 3 if opens_after && a_presses >= opens_after && (open_cells.nil? || open_cells.include?(Koholint::Geometry.cell_for(x, y)))
         next
       end
       dx, dy = { up: [0, -1], down: [0, 1], left: [-1, 0], right: [1, 0] }.fetch(buttons.first, [0, 0])
@@ -110,7 +111,56 @@ class TalkToTest < Minitest::Test
     result, inputs = talk(4, 8, opens_after: nil)
     assert_equal :no_response, result[:stopped_by]
     assert_equal false, result[:talked]
-    assert_equal 3, inputs.count([:a])
+    assert_equal 9, inputs.count([:a])
+    assert_equal 3, result[:standing_cells_tried].size
+    assert_operator result[:frames], :<=, 400
+  end
+
+  def tried(result) = result[:standing_cells_tried].map { |t| [t[:row], t[:col], t[:outcome]] }
+
+  def test_no_response_from_the_first_side_tries_another_one
+    result, = talk(4, 8, open_cells: [[3, 8], [5, 8], [4, 9]])
+    assert_equal :done, result[:stopped_by], result.inspect
+    assert result[:talked]
+    assert_equal 2, result[:standing_cells_tried].size
+    assert_equal [4, 7, :no_response], tried(result).first
+    assert_equal :done, tried(result).last.last
+    assert_equal 1, result[:replans]
+  end
+
+  def test_every_side_failing_is_no_response_after_three_tries
+    result, = talk(4, 8, open_cells: [])
+    assert_equal :no_response, result[:stopped_by]
+    assert_equal false, result[:talked]
+    assert_equal 3, result[:standing_cells_tried].size
+    assert_equal %i[no_response], tried(result).map(&:last).uniq
+    assert_equal 3, tried(result).map { |r, c, _| [r, c] }.uniq.size
+    assert_operator result[:frames], :<=, 400
+  end
+
+  def test_a_blocked_path_to_the_second_side_then_the_third
+    result, = talk(4, 8, blocked: [[3, 8]], open_cells: [[4, 9]])
+    assert_equal :done, result[:stopped_by], result.inspect
+    assert_equal [[4, 7, :no_response], [5, 8, :no_response], [4, 9, :done]], tried(result)
+    assert_operator result[:replans], :>=, 3
+    assert_operator result[:frames], :<=, 400
+  end
+
+  def test_sides_known_to_give_no_response_come_last
+    log = Koholint::TalkLog.new
+    log.record(place: [1, 0], row: 4, col: 8, talked: false, standing: [[[4, 7], true]])
+    result, = talk(4, 8, talk_log: log)
+    assert_equal :done, result[:stopped_by], result.inspect
+    refute_equal({ row: 4, col: 7 }, result[:standing_cell])
+    assert_equal 1, result[:standing_cells_tried].size
+  end
+
+  def test_when_every_side_is_known_the_exclusion_does_not_prevent_a_retry
+    log = Koholint::TalkLog.new
+    log.record(place: [1, 0], row: 4, col: 8, talked: false, standing: [[[4, 7], true], [[3, 8], true], [[5, 8], true], [[4, 9], true]])
+    result, = talk(4, 8, talk_log: log)
+    assert_equal :done, result[:stopped_by], result.inspect
+    assert_equal({ row: 4, col: 7 }, result[:standing_cell])
   end
 
   def test_target_free_when_link_walks_into_the_cell
@@ -334,6 +384,28 @@ class TalkToTest < Minitest::Test
       assert report.fetch(cell)[:talked], cell.inspect
       assert report.fetch(cell)[:dialog_after], cell.inspect
     end
+  end
+
+  def test_rom_talk_to_with_the_nearest_side_excluded_talks_from_another
+    skip_without_rom!
+    emulator = Koholint::Emulator.restore(EmulatorCache.interactive.dump)
+    state = Koholint::Perception.read(emulator)
+    trace = Struct.new(:events) { def emit(*, **) = nil }.new([])
+    builder = Koholint::Vision::GridBuilder.new(trace:, prober: ProbeAdapter.new)
+    grid = 2.times.map { builder.observe(emulator, state) }.last
+    log = Koholint::TalkLog.new
+    log.record(place: [state.room_id, state.map_id], row: 4, col: 7, talked: false, standing: [[[3, 7], true], [[4, 6], true]])
+    copy = Koholint::Emulator.restore(emulator.dump)
+    execution = registry.start('talk_to', Koholint::Perception.read(copy), { row: 4, col: 7 }, { grid:, talk_log: log })
+    while (buttons = execution.next_input(Koholint::Perception.read(copy)))
+      copy.step(buttons)
+    end
+    result = execution.result(Koholint::Perception.read(copy))
+    puts "\nROM talk_to with (3,7) and (4,6) excluded: #{result.slice(:stopped_by, :talked, :standing_cell, :standing_cells_tried, :frames).inspect}"
+    assert_equal :done, result[:stopped_by], result.inspect
+    assert result[:talked]
+    refute_equal({ row: 3, col: 7 }, result[:standing_cells_tried].first.slice(:row, :col))
+    assert_operator result[:replans], :>=, 1
   end
 
   class ProbeAdapter

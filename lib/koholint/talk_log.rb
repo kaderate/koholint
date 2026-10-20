@@ -23,9 +23,22 @@ module Koholint
         place = result.is_a?(Hash) ? Ledger.place_of(Ledger.pick(result, :from)) : nil
         row = Ledger.pick(params, :row)
         col = Ledger.pick(params, :col)
-        log.record(place:, row:, col:, talked: Ledger.pick(result, :talked) == true) if place && row && col && attempt?(result)
+        log.record(place:, row:, col:, talked: Ledger.pick(result, :talked) == true, standing: standing_of(result)) if place && row && col && attempt?(result)
       end
       log
+    end
+
+    def self.standing_of(result)
+      tried = Ledger.pick(result, :standing_cells_tried)
+      if tried.is_a?(Array)
+        return tried.filter_map do |entry|
+          cell = [Ledger.pick(entry, :row), Ledger.pick(entry, :col)]
+          [cell, Ledger.pick(entry, :outcome).to_s == 'no_response'] if cell.all?
+        end
+      end
+      standing = Ledger.pick(result, :standing_cell)
+      cell = standing.is_a?(Hash) ? [Ledger.pick(standing, :row), Ledger.pick(standing, :col)] : nil
+      cell&.all? ? [[cell, Ledger.pick(result, :stopped_by).to_s == 'no_response']] : []
     end
 
     def self.objects(grid)
@@ -67,22 +80,30 @@ module Koholint
     def initialize
       @attempts = Hash.new(0)
       @talked = Hash.new(0)
+      @silent = Hash.new { |hash, key| hash[key] = [] }
     end
 
-    def record(place:, row:, col:, talked:)
+    def record(place:, row:, col:, talked:, standing: [])
       @attempts[[place, [row, col]]] += 1
       @talked[[place, [row, col]]] += 1 if talked
+      standing.each do |cell, silent|
+        list = @silent[[place, [row, col]]]
+        silent ? (list << cell unless list.include?(cell)) : list.delete(cell)
+      end
     end
+
+    def failed_sides(place, cell) = @silent.fetch([place, cell], []).dup
 
     def lines(grid, place, limit: nil)
       objects = self.class.objects(grid)
-      stats = objects.to_h { |cells| [cells, [0, 0]] }
+      stats = objects.to_h { |cells| [cells, [0, 0, []]] }
       @attempts.each do |(where, cell), tried|
         next unless where == place
 
         owner = owner_of(objects, cell) or next
         stats[owner][0] += tried
         stats[owner][1] += @talked[[where, cell]]
+        stats[owner][2] |= @silent.fetch([where, cell], [])
       end
       shown = limit && objects.size > limit ? kept(objects, stats, limit) : objects
       out = shown.map { |cells| "- at #{label(cells)}: #{describe(*stats[cells])}" }
@@ -107,8 +128,11 @@ module Koholint
       (tried + untried).first(limit).sort
     end
 
-    def describe(tried, talked)
-      tried.zero? ? 'never tried' : "talked to #{tried} #{tried == 1 ? 'time' : 'times'} (dialogue opened #{talked})"
+    def describe(tried, talked, silent = [])
+      return 'never tried' if tried.zero?
+
+      text = "talked to #{tried} #{tried == 1 ? 'time' : 'times'} (dialogue opened #{talked})"
+      silent.empty? ? text : "#{text}; no response from #{silent.map { |r, c| "(#{r},#{c})" }.join(', ')}"
     end
 
     def label(cells)
