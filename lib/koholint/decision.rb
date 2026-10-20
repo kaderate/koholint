@@ -2,6 +2,7 @@ require 'koholint'
 require 'json'
 require 'koholint/skills/registry'
 require 'koholint/objectives'
+require 'koholint/leads'
 
 module Koholint
   class DecisionPoint
@@ -51,7 +52,7 @@ module Koholint
         properties: registry.schema.merge(justification: { type: 'string' },
                                            confidence: { type: 'number', minimum: 0, maximum: 1 },
                                            transcription: { type: 'string' },
-                                           plan: PLAN_SCHEMA),
+                                           leads: LEADS_SCHEMA, goal: GOAL_SCHEMA, plan: PLAN_SCHEMA),
         required: %w[skill params justification confidence plan], additionalProperties: false }
     end
 
@@ -60,6 +61,11 @@ module Koholint
     TITLE_MAX = 80
     PLAN_MAX = 200
     PLAN_SCHEMA = { type: 'string', maxLength: PLAN_MAX }.freeze
+    GOAL_SCHEMA = { type: 'string', maxLength: Leads::GOAL_MAX }.freeze
+    LEADS_SCHEMA = { type: 'array', maxItems: Leads::LIMIT,
+                     items: { type: 'object', properties: { quote: { type: 'string', minLength: 1 }, claim: { type: 'string', minLength: 1, maxLength: Leads::CLAIM_MAX },
+                                                            importance: { type: 'string', enum: Leads::IMPORTANCE } },
+                              required: %w[quote claim importance], additionalProperties: false } }.freeze
     PLACE_SCHEMA = { type: 'array', items: { type: 'integer' }, minItems: 2, maxItems: 2 }.freeze
     FIELD_SCHEMAS = { place: PLACE_SCHEMA, row: { type: 'integer', minimum: 0, maximum: 7 },
                       col: { type: 'integer', minimum: 0, maximum: 9 } }.freeze
@@ -72,7 +78,7 @@ module Koholint
       { type: 'object',
         properties: { title: { type: 'string', minLength: 1, maxLength: TITLE_MAX }, predicate: { oneOf: predicates },
                       justification: { type: 'string' }, confidence: { type: 'number', minimum: 0, maximum: 1 },
-                      plan: PLAN_SCHEMA },
+                      goal: GOAL_SCHEMA, because: { type: 'string' }, plan: PLAN_SCHEMA },
         required: %w[title predicate justification confidence plan], additionalProperties: false }
     end
 

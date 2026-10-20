@@ -19,8 +19,9 @@ module Koholint
         An objective is a short goal with a title and a predicate that the harness can check from memory. The predicate is one of five kinds: leave_place (place), reach_place (place), reach_cell (place, row, col), dialogue_closed or new_place (no fields). A place is [room, map] as integers, row is 0-7 and col is 0-9.
         leave_place means finding a way out of the current place. new_place means reaching a place not yet visited in this run. reach_cell targets that are already reachable over cells observed free are refused: choose goals that need exploration.
         Pick an objective that is achievable from the current state and different from objectives that already failed or were abandoned. Give the exact fields of the chosen kind and no others.
+        The goal is your long-term goal, shown in the context: set it in goal when you have a reason, revise it only when new information changes it, omit it to keep it. Use the high leads of the context when choosing the goal and the objective; when a lead motivates the objective, give its id in because.
         The plan field is mandatory on every call: one line saying what you will do over the next few calls and why. Your previous plan, if any, is shown in the context.
-        Output fields: title, predicate, justification, confidence, and plan.
+        Output fields: title, predicate, justification, confidence, plan, and optionally goal and because.
       TEXT
 
       SKILL = <<~TEXT.freeze
@@ -31,12 +32,14 @@ module Koholint
         step moves Link a few pixels (1 to 16) along one axis and does not recentre him; the offset line shows how far he is from the centre of his cell, and a passage may be offset from the cell grid.
         A dialogue that opens by itself is triggered by the game and may repeat while you stay where it triggers. The context lists the things on screen with how many times you talked to each: people or objects you have never tried to talk to are worth trying before repeating an action that keeps failing.
         Do not repeat a skill that just stopped the same way from the same state; try something different or gather information. When on-screen text matters, transcribe it in the optional transcription field. When an image is attached it shows the top and the bottom of the screen stacked; a dialogue box may be in either.
+        Texts are what people say and what signs or objects you read show. When you transcribe a text, you may also extract leads: up to five, each with a quote copied word for word from your transcription, a short claim saying what it tells you, and an importance. high: it states a goal, a destination, an item to obtain, a condition or obstacle, or a danger. normal: a local hint, such as a passage or what a room is for. low: flavour, small talk, shop prices. A lead whose quote is not in the transcription is dropped.
+        The goal is your long-term goal, shown in the context: set it in goal when you have a reason, revise it only when new information changes it, omit it to keep it. Use the high leads when choosing it.
         The plan field is mandatory on every call: one line saying what you will do over the next few calls and why. Your previous plan, if any, is shown in the context.
-        Output fields: skill, params, justification, confidence, plan, and optionally transcription.
+        Output fields: skill, params, justification, confidence, plan, and optionally transcription, leads and goal.
       TEXT
 
       SHEETS = <<~TEXT.freeze
-        The attached images are the pages of the dialogue that just closed, oldest first: each page shows the top and the bottom of the screen stacked, and the pages are stacked vertically in sheets. Give the full transcription of all the pages, in order, in transcription, one paragraph per page separated by a blank line.
+        The attached images are the pages of the dialogue that just closed, oldest first: each page shows the top and the bottom of the screen stacked, and the pages are stacked vertically in sheets. Give the full transcription of all the pages, in order, in transcription, one paragraph per page separated by a blank line, then extract its leads.
       TEXT
 
       def self.system_for(decision_point, sheets: false)

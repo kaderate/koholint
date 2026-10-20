@@ -45,6 +45,19 @@ class PromptsTest < Minitest::Test
     end
   end
 
+  def test_goal_and_leads_are_offered_with_a_generic_rubric
+    objective, skill = points.map { |p| Koholint::Agents::Prompts.system_for(p) }
+    [objective, skill].each { |text| assert_includes text, 'revise it only when new information changes it, omit it to keep it' }
+    assert_includes objective, 'give its id in because'
+    assert_includes skill, 'signs or objects you read'
+    assert_includes skill, 'high: it states a goal, a destination, an item to obtain, a condition or obstacle, or a danger.'
+    assert_includes Koholint::Agents::Prompts.system_for(points.last, sheets: true), 'then extract its leads'
+    assert_equal %i[goal because], points.first.json_schema[:properties].keys & %i[goal because leads]
+    leads = points.last.json_schema[:properties][:leads]
+    assert_equal [5, %w[high normal low], 160], [leads[:maxItems], leads[:items][:properties][:importance][:enum], leads[:items][:properties][:claim][:maxLength]]
+    assert_equal 120, points.last.json_schema[:properties][:goal][:maxLength]
+  end
+
   def test_unknown_point_raises
     assert_raises(ArgumentError) { Koholint::Agents::Prompts.system_for(Koholint::DecisionPoint.move) }
   end
