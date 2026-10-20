@@ -18,7 +18,8 @@ module Koholint
                     hp: read_byte.(:hp), max_hp: read_byte.(:max_hearts) * HP_PER_HEART,
                     milestone: milestone_for(read_byte.(:shield_level)),
                     game_mode: read_byte.(:game_mode), game_submode: read_byte.(:game_submode),
-                    name_length: read_byte.(:name_length), dialog_state: read_byte.(:dialog_state))
+                    name_length: read_byte.(:name_length), dialog_state: read_byte.(:dialog_state),
+                    motion_blocked: read_byte.(:link_motion_blocked), scene_state: read_byte.(:scene_state))
     end
   end
 end
