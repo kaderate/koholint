@@ -163,6 +163,8 @@ module Koholint
       end
 
       def refresh_trace
+        return load_archived_trace if Trace.located(@trace_path) != @trace_path
+
         size = File.exist?(@trace_path) ? File.size(@trace_path) : 0
         if size < @trace_offset
           @trace_offset = 0
@@ -177,11 +179,21 @@ module Koholint
         complete.each_line { |line| record(line) }
       end
 
+      def load_archived_trace
+        return if @archived
+
+        @archived = true
+        Trace.read(@trace_path).each { |event| expect(event) }
+      end
+
       def record(line)
-        event = JSON.parse(line)
-        @expected[event['frame']] = event['state_hash'] if event['type'] == 'perception' && event['state_hash']
+        expect(JSON.parse(line))
       rescue JSON::ParserError
         nil
+      end
+
+      def expect(event)
+        @expected[event['frame']] = event['state_hash'] if event['type'] == 'perception' && event['state_hash']
       end
 
       def capture

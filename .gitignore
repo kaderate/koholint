@@ -19,3 +19,6 @@ roms/
 Gemfile.lock
 /runs/*/prompts/
 /runs/*/activity.json*
+/runs/*/save/
+/runs/*/trace.jsonl
+/runs/*/*.tmp

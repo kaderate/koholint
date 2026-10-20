@@ -1,8 +1,10 @@
 require 'digest'
 require 'fileutils'
 require 'json'
+require 'open3'
 require 'securerandom'
 require 'koholint'
+require 'koholint/agents/prompts'
 require 'koholint/trace'
 require 'koholint/input_log'
 
@@ -13,7 +15,7 @@ module Koholint
 
     attr_reader :dir, :manifest
 
-    def self.create(root: 'runs', flow_version:, budget:, parent: nil, seed: 0, rom_path: Koholint.rom_path)
+    def self.create(root: 'runs', flow_version:, budget:, parent: nil, seed: 0, rom_path: Koholint.rom_path, tag: nil, model: nil)
       dir = unique_dir(root)
       FileUtils.mkdir_p(File.join(dir, 'save'))
       FileUtils.mkdir_p(File.join(dir, 'keyframes'))
@@ -22,7 +24,8 @@ module Koholint
       File.write(File.join(dir, 'suggestions.md'), '')
       InputLog.new(File.join(dir, 'inputs.log')).flush
       manifest = { 'flow_version' => flow_version, 'rom_sha256' => rom_hash(rom_path), 'seed' => seed,
-                   'budget' => JSON.parse(JSON.generate(budget)), 'status' => 'created', 'parent' => parent }
+                   'budget' => JSON.parse(JSON.generate(budget)), 'status' => 'created', 'parent' => parent,
+                   'tag' => tag, 'harness_sha' => harness_sha, 'prompts_sha' => Agents::Prompts.digest, 'model' => model }
       new(dir, manifest).tap(&:write_manifest)
     end
 
@@ -42,6 +45,13 @@ module Koholint
 
     def self.rom_hash(path) = Digest::SHA256.file(path).hexdigest
 
+    def self.harness_sha
+      sha, status = Open3.capture2('git', '-C', File.expand_path('../..', __dir__), 'rev-parse', 'HEAD', err: File::NULL)
+      status.success? ? sha.strip : nil
+    rescue SystemCallError
+      nil
+    end
+
     def self.unique_dir(root)
       loop do
         dir = File.join(root, "#{Time.now.strftime('%Y%m%d-%H%M%S')}-#{SecureRandom.hex(2)}")
@@ -56,7 +66,13 @@ module Koholint
     end
 
     def id = File.basename(dir)
-    def trace = @trace ||= Trace.new(File.join(dir, 'trace.jsonl'))
+    def trace = @trace ||= restore_trace!.then { Trace.new(trace_path) }
+    def trace_path = File.join(dir, 'trace.jsonl')
+
+    def restore_trace!
+      Trace.decompress(trace_path) if Trace.located(trace_path) != trace_path
+      self
+    end
     def inputs = @inputs ||= InputLog.new(File.join(dir, 'inputs.log'))
 
     def status=(value)
@@ -68,7 +84,8 @@ module Koholint
       raise Error, "cannot fork at frame #{at_frame}: run has #{inputs.frames} frames" unless (0..inputs.frames).cover?(at_frame)
 
       child = self.class.create(root: File.dirname(dir), flow_version: flow_version, budget: manifest['budget'],
-                                parent: { 'id' => id, 'frame' => at_frame }, seed: manifest['seed'], rom_path: rom_path)
+                                parent: { 'id' => id, 'frame' => at_frame }, seed: manifest['seed'], rom_path: rom_path,
+                                tag: manifest['tag'], model: manifest['model'])
       journal = InputLog.new(File.join(child.dir, 'inputs.log'))
       inputs.each_frame.first(at_frame).each { |buttons| journal.append(buttons) }
       journal.flush
@@ -76,9 +93,7 @@ module Koholint
         event['frame'] < at_frame && !%w[stop budget_stop].include?(event['type'])
       end
       rewrite_trace(File.join(child.dir, 'trace.jsonl'), events)
-      events.select { |event| event['type'] == 'save' }.each do |event|
-        FileUtils.cp(File.join(dir, 'save', event['path']), File.join(child.dir, 'save'))
-      end
+      events.select { |event| event['type'] == 'save' }.each { |event| copy_save(event, File.join(child.dir, 'save')) }
       Dir.glob(File.join(dir, 'keyframes', 'kf-*.zlib')).each do |path|
         FileUtils.cp(path, File.join(child.dir, 'keyframes')) if File.basename(path)[/\d+/].to_i <= at_frame
       end
@@ -102,7 +117,8 @@ module Koholint
     end
 
     def truncate_trace!(frames)
-      path = File.join(dir, 'trace.jsonl')
+      restore_trace!
+      path = trace_path
       kept = Trace.read(path).reject do |event|
         event['frame'] > frames || (%w[perception decision].include?(event['type']) && event['frame'] >= frames)
       end
@@ -138,6 +154,17 @@ module Koholint
     end
 
     private
+
+    def copy_save(event, into)
+      path = File.join(dir, 'save', event['path'])
+      return FileUtils.cp(path, into) if File.file?(path)
+
+      require 'koholint/replay'
+      ram = Replay.to(self, event['frame']).cartridge_ram
+      raise Error, "save #{event['path']} of run #{id} cannot be rebuilt by replay" unless Digest::SHA256.hexdigest(ram) == event['sav_sha256']
+
+      File.binwrite(File.join(into, event['path']), ram)
+    end
 
     def wall_clock = Time.now.to_f
 

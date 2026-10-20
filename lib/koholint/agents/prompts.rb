@@ -1,3 +1,5 @@
+require 'digest'
+
 module Koholint
   module Agents
     module Prompts
@@ -46,6 +48,8 @@ module Koholint
         body = [body.chomp.sub(/^Output fields:.*\z/m, '').chomp, SHEETS.chomp, body[/^Output fields:.*/m]].join("\n") if sheets
         [ROLE, body, OUTPUT_RULES].join("\n")
       end
+
+      def self.digest = Digest::SHA256.hexdigest(constants.sort.map { |name| const_get(name) }.grep(String).join("\0"))
     end
   end
 end

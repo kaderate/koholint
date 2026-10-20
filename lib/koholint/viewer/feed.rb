@@ -20,8 +20,6 @@ module Koholint
         'dialogue' => %w[frame type place text source page]
       }.freeze
 
-      DETERMINISTIC_AGENTS = %w[start_game walk_and_talk].freeze
-
       CACHE = {}
       CACHE_LOCK = Mutex.new
       GRID_CACHE = {}
@@ -58,29 +56,16 @@ module Koholint
       end
 
       def latency(trace)
-        samples = trace.select { |e| e['type'] == 'decision' && model_call?(e) && e['latency_ms'].is_a?(Numeric) }.map { |e| e['latency_ms'] }
-        return { last_ms: nil, median_ms: nil, p90_ms: nil, count: 0 } if samples.empty?
-
-        { last_ms: samples.last, median_ms: percentile(samples, 0.5), p90_ms: percentile(samples, 0.9), count: samples.size }
+        samples = Summary.latencies(trace)
+        { last_ms: samples.last, median_ms: Summary.percentile(samples, 0.5), p90_ms: Summary.percentile(samples, 0.9), count: samples.size }
       end
-
-      def percentile(samples, fraction)
-        sorted = samples.sort
-        sorted[((sorted.size - 1) * fraction).ceil]
-      end
-
-      def model_call?(event) = event['agent'] == 'claude' && event['latency_ms'].to_i.positive?
 
       def budget(manifest, trace)
         cap = manifest['budget'].is_a?(Hash) ? manifest['budget']['dollars'] : nil
         { spent: trace.select { |e| e['type'] == 'decision' }.sum { |e| e['cost_usd'].to_f }, cap: cap.is_a?(Numeric) ? cap : nil, calls: calls(trace) }
       end
 
-      def calls(trace)
-        trace.count { |e| e['type'] == 'decision' && !DETERMINISTIC_AGENTS.include?(e['agent']) && !free_delegated?(e) }
-      end
-
-      def free_delegated?(event) = event['agent'] == 'delegated' && !event['prompt_sha'] && event['cost_usd'].to_f.zero?
+      def calls(trace) = trace.count { |e| Summary.model_call?(e) }
 
       def objective_title(trace, id)
         return nil unless id
@@ -108,14 +93,14 @@ module Koholint
       def automatic_decision?(event) = AUTOMATIC.any? { |text| event['justification'].to_s.start_with?(text) }
 
       def trace_events(run_dir)
-        path = File.join(run_dir, 'trace.jsonl')
+        path = Trace.located(File.join(run_dir, 'trace.jsonl'))
         stat = File.stat(path)
         signature = [stat.size, stat.mtime]
         CACHE_LOCK.synchronize do
           cached = CACHE[path]
           return remember(CACHE, path, cached).last if cached && cached.first == signature
 
-          Trace.read(path).tap { |parsed| remember(CACHE, path, [signature, parsed]) }
+          Trace.read(File.join(run_dir, 'trace.jsonl')).tap { |parsed| remember(CACHE, path, [signature, parsed]) }
         end
       rescue SystemCallError
         []

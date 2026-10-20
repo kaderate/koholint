@@ -1,10 +1,10 @@
 require 'json'
 require 'optparse'
 require 'koholint'
+require 'koholint/archive'
 require 'koholint/budget'
 require 'koholint/engine'
 require 'koholint/agents/claude_cli'
-require 'koholint/game_state'
 require 'koholint/ledger'
 require 'koholint/talk_log'
 require 'koholint/triggers'
@@ -21,9 +21,10 @@ require 'koholint/viewer'
 
 module Koholint
   module CLI
-    USAGE = 'usage: koholint run|resume <run_dir>|fork <run_dir> --at-frame N|verify <run_dir>|summary <run_dir>|watch <run_dir> ' \
-            '[--frames N --minutes N --steps N --dollars X --root DIR --realtime --grid --port N --host H --from live|start --speed X ' \
-            '--agent --model M --max-dollars X --claude-command PATH]'.freeze
+    USAGE = 'usage: koholint run|resume <run_dir>|fork <run_dir> --at-frame N|verify <run_dir>|summary <run_dir>|watch <run_dir>|' \
+            'archive|star <run_dir> WHY|prune-heavy ' \
+            '[--frames N --minutes N --steps N --dollars X --root DIR --tag NAME --realtime --grid --port N --host H --from live|start|DIR ' \
+            '--speed X --agent --model M --max-dollars X --claude-command PATH --commit --full --keep N --yes]'.freeze
 
     DEFAULT_MODEL = 'sonnet'.freeze
     DEFAULT_MAX_DOLLARS = 1.5
@@ -40,6 +41,7 @@ module Koholint
         o.on('--dollars X', Float) { |v| options[:dollars] = v }
         o.on('--flow-version V') { |v| options[:flow_version] = v }
         o.on('--root DIR') { |v| options[:root] = v }
+        o.on('--tag NAME') { |v| options[:tag] = v }
         o.on('--at-frame N', Integer) { |v| options[:at_frame] = v }
         o.on('--realtime') { options[:realtime] = true }
         o.on('--grid') { options[:grid] = true }
@@ -49,7 +51,11 @@ module Koholint
         o.on('--claude-command PATH') { |v| options[:claude_command] = v }
         o.on('--port N', Integer) { |v| options[:port] = v }
         o.on('--host H') { |v| options[:host] = v }
-        o.on('--from MODE', %w[live start]) { |v| options[:from] = v.to_sym }
+        o.on('--from MODE') { |v| options[:from] = v }
+        o.on('--commit') { options[:commit] = true }
+        o.on('--full') { options[:full] = true }
+        o.on('--yes') { options[:yes] = true }
+        o.on('--keep N', Integer) { |v| options[:keep] = v.negative? ? raise(OptionParser::InvalidArgument, v.to_s) : v }
         o.on('--speed X', Float) { |v| options[:speed] = v.positive? ? v : raise(OptionParser::InvalidArgument, v.to_s) }
       end
       args = parser.parse(rest)
@@ -70,7 +76,8 @@ module Koholint
       case command
       when 'run'
         factory = policy_factory(options, budget, probe: true)
-        run = Run.create(root: options.fetch(:root, 'runs'), flow_version: flow, budget: limits)
+        run = Run.create(root: options.fetch(:root, 'runs'), flow_version: flow, budget: limits, tag: options[:tag],
+                         model: options[:agent] ? options.fetch(:model, DEFAULT_MODEL) : nil)
         play(Engine.new(run:, policy: factory.call(run), budget:, **engine_options(options)), run, out)
       when 'resume'
         factory = policy_factory(options, budget)
@@ -83,7 +90,13 @@ module Koholint
         out.puts "run #{child.dir}"
         0
       when 'watch'
-        Viewer.watch(run_dir(args), **options.slice(:port, :host, :from, :speed), out: out)
+        Viewer.watch(run_dir(args), **options.slice(:port, :host, :speed), **watch_from(options), out: out)
+      when 'archive'
+        root = options.fetch(:root, 'runs')
+        Archive.archive(root:, from: options.fetch(:from, root), **options.slice(:commit, :full), out:)
+      when 'star'
+        Archive.star(run_dir(args), args[1] || raise(OptionParser::MissingArgument, 'why'), out:)
+      when 'prune-heavy' then Archive.prune_heavy(root: options.fetch(:root, 'runs'), **options.slice(:keep, :yes), out:)
       when 'verify' then verify(Run.open(run_dir(args), flow_version: flow), out)
       when 'summary'
         out.puts JSON.pretty_generate(Summary.for(Run.open(run_dir(args), flow_version: flow)))
@@ -91,6 +104,13 @@ module Koholint
       else
         raise OptionParser::InvalidOption, command.to_s
       end
+    end
+
+    def watch_from(options)
+      return {} unless options.key?(:from)
+      raise OptionParser::InvalidArgument, options[:from] unless %w[live start].include?(options[:from])
+
+      { from: options[:from].to_sym }
     end
 
     def engine_options(options) = options.slice(:grid).merge(options[:realtime] ? { pacer: Pacer.new } : {})
@@ -116,22 +136,12 @@ module Koholint
     end
 
     def objectives_for(run, events = events_for(run))
-      Objectives.resume(trace: run.trace, events:, frame: run.inputs.frames, visited: visited_places(events))
+      Objectives.resume(trace: run.trace, events:, frame: run.inputs.frames, visited: Summary.visited_places(events))
     end
 
     def events_for(run) = Trace.read(File.join(run.dir, 'trace.jsonl'))
 
     def ledger_for(run, events = events_for(run)) = Ledger.from_events(events)
-
-    def visited_places(events)
-      events.filter_map do |event|
-        state = event['state']
-        next unless event['type'] == 'perception' && state.is_a?(Hash)
-
-        game = GameState.new(game_mode: state['game_mode'], game_submode: state['game_submode'])
-        [state['room_id'], state['map_id']] unless %i[loading boot].include?(game.phase)
-      end.uniq
-    end
 
     def executable?(command)
       return File.executable?(command) && !File.directory?(command) if command.include?(File::SEPARATOR)

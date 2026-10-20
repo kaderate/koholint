@@ -108,4 +108,47 @@ class TraceTest < Minitest::Test
       assert_raises(Koholint::Trace::InvalidEvent) { trace.emit(:decision, frame: 3, **base, image: 'yes') }
     end
   end
+
+  def test_read_falls_back_to_the_gzipped_trace
+    with_path do |path|
+      Koholint::Trace.new(path).emit(:stop, frame: 3, reason: 'frames')
+      Koholint::Trace.compress(path)
+      File.delete(path)
+      assert_equal "#{path}.gz", Koholint::Trace.located(path)
+      assert_equal [{ 'v' => 1, 'type' => 'stop', 'frame' => 3, 'reason' => 'frames' }], Koholint::Trace.read(path)
+      Koholint::Trace.decompress(path)
+      refute File.exist?("#{path}.gz")
+      assert_equal 3, Koholint::Trace.read(path).first['frame']
+    end
+  end
+
+  def test_compress_is_deterministic
+    with_path do |path|
+      Koholint::Trace.new(path).emit(:stop, frame: 3, reason: 'frames')
+      Koholint::Trace.compress(path)
+      first = File.binread("#{path}.gz")
+      Koholint::Trace.compress(path)
+      assert_equal first, File.binread("#{path}.gz")
+    end
+  end
+
+  def test_a_truncated_gzipped_trace_reads_what_it_can_and_refuses_to_decompress
+    with_path do |path|
+      trace = Koholint::Trace.new(path)
+      400.times { |n| trace.emit(:stop, frame: n, reason: "r#{n}" * 20) }
+      Koholint::Trace.compress(path)
+      File.delete(path)
+      gz = "#{path}.gz"
+      File.binwrite(gz, File.binread(gz)[0, File.size(gz) / 2])
+      events = Koholint::Trace.read(path)
+      assert_operator events.size, :<, 400
+      assert_equal (0...events.size).to_a, events.map { |e| e['frame'] }
+      refute Koholint::Trace.intact?(path)
+      assert_raises(Koholint::Error) { Koholint::Trace.decompress(path) }
+      assert File.file?(gz)
+      refute File.exist?(path)
+      File.binwrite(gz, 'garbage')
+      assert_equal [], Koholint::Trace.read(path)
+    end
+  end
 end

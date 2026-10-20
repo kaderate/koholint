@@ -8,6 +8,7 @@ require 'koholint/keyframes'
 require 'koholint/perception'
 require 'koholint/replay'
 require 'koholint/run'
+require 'koholint/summary'
 require 'koholint/vision/dialogue_shot'
 require 'koholint/vision/grid_builder'
 
@@ -227,6 +228,11 @@ module Koholint
       checkpoint_keyframe
       @run.trace.emit(:stop, frame: @emulator.frame, reason: reason.to_s)
       @run.status = reason == :error ? 'crashed' : 'stopped'
+      begin
+        Summary.write(@run.dir)
+      rescue StandardError => e
+        warn "koholint: summary.json not written: #{e.message}"
+      end
       activity(:stopped, "stopped: #{reason}", reason: reason.to_s)
       reason
     end

@@ -1,5 +1,6 @@
 require_relative 'test_helper'
 require 'tmpdir'
+require 'json'
 require 'koholint/summary'
 require 'koholint/run'
 
@@ -89,6 +90,60 @@ class SummaryTest < Minitest::Test
     with_run do |run|
       assert_equal 'progressing', Koholint::Summary.for(run)[:health]
       assert_equal 0, Koholint::Summary.for(run)[:frames]
+    end
+  end
+
+  PLAYING = STATE.merge('game_mode' => 0x0B, 'game_submode' => 7)
+
+  def decide(trace, frame, agent, latency_ms, cost_usd, **extra)
+    trace.emit(:decision, frame:, decision_point: 'choose_skill', input: {}, options: [], choice: {}, justification: 'j', confidence: 1.0,
+                          agent:, latency_ms:, cost_usd:, **extra)
+  end
+
+  def test_model_calls_exclude_scripted_agents_and_free_delegated_advances
+    with_run do |run|
+      t = run.trace
+      decide(t, 0, 'start_game', 0, 0.0)
+      decide(t, 1, 'walk_and_talk', 0, 0.0)
+      decide(t, 2, 'delegated', 0, 0.0)
+      decide(t, 3, 'delegated', 0, 0.02, prompt_sha: 'a' * 64)
+      decide(t, 4, 'claude', 4000, 0.01)
+      decide(t, 5, 'claude', 0, 0.0, fallback: true)
+      calls = Koholint::Trace.read(File.join(run.dir, 'trace.jsonl')).select { |e| Koholint::Summary.model_call?(e) }
+      assert_equal [3, 4, 5], calls.map { |e| e['frame'] }
+    end
+  end
+
+  def test_record_derives_the_run_summary_from_manifest_and_trace
+    with_run do |run|
+      run.manifest.merge!('tag' => 'exp', 'model' => 'sonnet', 'harness_sha' => 'abc')
+      run.write_manifest
+      t = run.trace
+      t.emit(:perception, frame: 0, state: STATE.merge('room_id' => 0, 'map_id' => 0, 'game_mode' => 1), state_hash: 'h')
+      t.emit(:perception, frame: 10, state: PLAYING, state_hash: 'h')
+      [1000, 3000, 2000, 5000].each_with_index { |ms, n| decide(t, 20 + n, 'claude', ms, 0.25) }
+      decide(t, 30, 'start_game', 0, 0.0)
+      t.emit(:objective, frame: 40, id: 'obj-1', status: 'started', predicate: {})
+      t.emit(:objective, frame: 50, id: 'obj-1', status: 'achieved', predicate: {})
+      t.emit(:objective, frame: 50, id: 'obj-1', status: 'achieved', predicate: {})
+      t.emit(:objective, frame: 50, id: 'obj-2', status: 'started', predicate: {})
+      t.emit(:perception, frame: 1000, state: PLAYING.merge('room_id' => 1, 'milestone' => 'shield'), state_hash: 'h')
+      t.emit(:stop, frame: 2000, reason: 'dollars')
+      assert_equal({ run_id: run.id, flow_version: 'f', tag: 'exp', harness_sha: 'abc', prompts_sha: run.manifest['prompts_sha'], model: 'sonnet',
+                     frames: 2000, dollars: 1.0, calls: 4, calls_per_1000f: 2.0, usd_per_1000f: 0.5,
+                     latency_ms: { median: 3000, p90: 5000 }, highest_milestone: 'shield', places_seen: 2,
+                     objectives: { count: 2, achieved: 1 }, stop_reason: 'dollars', symptoms: [], starred: false },
+                   Koholint::Summary.record(run.dir))
+    end
+  end
+
+  def test_write_stores_the_record_and_sees_a_star
+    with_run do |run|
+      File.write(File.join(run.dir, 'star.json'), '{}')
+      Koholint::Summary.write(run.dir)
+      summary = JSON.parse(File.read(File.join(run.dir, 'summary.json')))
+      assert_equal [true, 0, nil, nil], summary.values_at('starred', 'calls', 'calls_per_1000f', 'stop_reason')
+      assert_equal({ 'median' => nil, 'p90' => nil }, summary['latency_ms'])
     end
   end
 end

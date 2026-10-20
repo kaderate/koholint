@@ -31,4 +31,5 @@ Only what is left to do. When something lands, delete it here (git is the histor
 - Plan 4a parked: the ROM goto/walk tests hardcode distances and read `@centring`; no test for centring falling back to the other axis.
 - Plan 4a parked: automatic dialogue pages flush only on `choose_skill` tours; step results never carry `blocked_at` by decision.
 - Agent loop deferred: the interaction log attributes a talk_to to the object at (or within one cell of) its target in the current grid, so NPCs that move can read as never tried.
+- Run storage: `summary.json` `symptoms` is always empty (no detector yet); `places_seen` counts perceived places only.
 - Agent loop deferred: a failed sheet call loses the dialogue pages (their PNGs remain under `prompts/`).

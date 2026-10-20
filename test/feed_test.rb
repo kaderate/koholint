@@ -415,4 +415,14 @@ class FeedTest < Minitest::Test
       assert_equal({ 'kind' => 'leave_place' }, status[:objective_predicate])
     end
   end
+
+  def test_an_archived_run_is_read_from_the_gzipped_trace
+    with_dir do |dir, trace|
+      decision(trace, 2)
+      path = File.join(dir, 'trace.jsonl')
+      Koholint::Trace.compress(path)
+      File.delete(path)
+      assert_equal [2], Koholint::Viewer::Feed.for(dir, FOLLOWER)[:events].map { |e| e[:frame] }
+    end
+  end
 end

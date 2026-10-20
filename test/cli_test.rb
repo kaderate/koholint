@@ -31,9 +31,11 @@ class CliTest < Minitest::Test
   def test_run_accepts_the_grid_flag
     skip_without_rom!
     Dir.mktmpdir do |dir|
-      code, out, = cli('run', '--frames', '120', '--grid', '--root', dir)
+      code, out, = cli('run', '--frames', '120', '--grid', '--tag', 'smoke', '--root', dir)
       assert_equal 0, code
       assert_match(/^stopped: frames$/, out)
+      manifest = JSON.parse(File.read(File.join(out[/^run (.+)$/, 1], 'manifest.json')))
+      assert_equal ['smoke', nil], manifest.values_at('tag', 'model')
     end
   end
 
@@ -144,6 +146,8 @@ class CliTest < Minitest::Test
       assert(decisions.all? { |d| d['fallback'] && d['cost_usd'] == 0.0123 })
       argv = JSON.parse(File.readlines(ENV.fetch('FAKE_CLAUDE_LOG')).first)['argv']
       assert_equal 'haiku', argv[argv.index('--model') + 1]
+      assert_equal 'haiku', JSON.parse(File.read(File.join(run_dir, 'manifest.json')))['model']
+      assert_equal [2, 'haiku'], JSON.parse(File.read(File.join(run_dir, 'summary.json'))).values_at('calls', 'model')
       assert_equal 0, cli('verify', run_dir)[0]
     end
   end
