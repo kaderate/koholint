@@ -10,7 +10,8 @@ module Koholint
         DELTAS.find { |_, (dr, dc)| [from[0] + dr, from[1] + dc] == to }&.first
       end
 
-      def initialize(grid:, ledger:, place:, triggers: nil)
+      def initialize(grid:, ledger:, place:, triggers: nil, mode: :explore)
+        @mode = mode
         @triggers = triggers
         @grid = grid
         @ledger = ledger
@@ -22,7 +23,7 @@ module Koholint
         @avoided << [cell, direction]
       end
 
-      def path(from:, to:, mode: :explore, doubt: true, forbid: true)
+      def path(from:, to:, mode: @mode, doubt: true, forbid: true)
         return nil unless inside?(from) && inside?(to)
         return [from] if from == to
 
