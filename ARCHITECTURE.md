@@ -81,7 +81,8 @@ heavy artifacts stay local. A run resumes only with the same `flow_version` and 
 play flow means a new `flow_version`.
 
 **Viewer** (`viewer.rb`, `viewer/`) — a small HTTP server. A `Follower` replays the journal of the watched
-run; `Feed` derives status, feed, reasoning, objectives, goal and leads from the trace up to the shown frame. `Explorer` and `Registry` serve
+run; `Feed` derives status, feed, reasoning, objectives, goal, leads and the stitched dialogue history (newest first,
+with the person talked to) from the trace up to the shown frame. `Explorer` and `Registry` serve
 past runs (list, read-only replays with pacing, comparison via `run_compare.rb`, star). It never writes game
 state.
 
