@@ -1,0 +1,55 @@
+{
+  "goal": "Explore and find the way out of this place",
+  "leads": [
+    {
+      "id": "lead-1",
+      "place": [
+        163,
+        16
+      ],
+      "source": null,
+      "quote": "Tu es sur l'île Cocolint!",
+      "claim": "The island where Link is is called Cocolint",
+      "importance": "normal"
+    },
+    {
+      "id": "lead-2",
+      "place": [
+        163,
+        16
+      ],
+      "source": null,
+      "quote": "Tu n'y arriveras jamais rien que par la force de tes bras!",
+      "claim": "A heavy object can't be moved by arm strength alone; something else is needed.",
+      "importance": "normal"
+    },
+    {
+      "id": "lead-3",
+      "place": [
+        163,
+        16
+      ],
+      "source": {
+        "row": 4,
+        "col": 7
+      },
+      "quote": "Vous récupérez votre bouclier!",
+      "claim": "Link got his shield back from Tarkin",
+      "importance": "normal"
+    },
+    {
+      "id": "lead-4",
+      "place": [
+        179,
+        0
+      ],
+      "source": {
+        "row": 5,
+        "col": 2
+      },
+      "quote": "appuyez sur tous les boutons",
+      "claim": "Pressing all buttons at once opens the save menu.",
+      "importance": "normal"
+    }
+  ]
+}

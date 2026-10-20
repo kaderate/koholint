@@ -1,0 +1,26 @@
+{
+  "run_id": "20261020-143458-de95",
+  "flow_version": "flow-4",
+  "tag": "goal-leads",
+  "harness_sha": "935f9093ed238edd62226c8740de9ee48c04cb0b",
+  "prompts_sha": "8c10c81a493261a6e4c62b34ab047ac79914586ed7b1d5ed0a0cfd54dc5b4674",
+  "model": "sonnet",
+  "frames": 7867,
+  "dollars": 1.513942,
+  "calls": 106,
+  "calls_per_1000f": 13.474005,
+  "usd_per_1000f": 0.192442,
+  "latency_ms": {
+    "median": 3793,
+    "p90": 8805
+  },
+  "highest_milestone": "shield",
+  "places_seen": 5,
+  "objectives": {
+    "count": 6,
+    "achieved": 5
+  },
+  "stop_reason": "dollars",
+  "symptoms": [],
+  "starred": false
+}
