@@ -1,0 +1,15 @@
+{
+  "flow_version": "flow-5",
+  "rom_sha256": "211a1d1559dc2684d63d87f62a6b1e9109201a6383b4004e9dd5e18ee926ee83",
+  "seed": 0,
+  "budget": {
+    "active_seconds": 1500.0,
+    "dollars": 1.5
+  },
+  "status": "stopped",
+  "parent": null,
+  "tag": "npc-dialogues-2",
+  "harness_sha": "a6a289d902e49d54872f9d6a6c5a056cc1922370",
+  "prompts_sha": "25729ddc41b19a4033783db4c40557982640b345c1f916f72f7a355cd4082c23",
+  "model": "sonnet"
+}

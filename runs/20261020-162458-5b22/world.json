@@ -1,0 +1,41 @@
+{
+  "goal": "Explore the world and find the first dungeon key",
+  "leads": [
+    {
+      "id": "lead-1",
+      "place": [
+        163,
+        16
+      ],
+      "source": null,
+      "quote": "Tu es sur l'île Cocolint!",
+      "claim": "The island is called Cocolint (Koholint); Marine is the girl who woke Link.",
+      "importance": "normal"
+    },
+    {
+      "id": "lead-2",
+      "place": [
+        163,
+        16
+      ],
+      "source": null,
+      "quote": "Tu n'y arriveras jamais rien que par la force de tes bras!",
+      "claim": "A heavy object cannot be lifted by arm strength alone, so an item is probably needed.",
+      "importance": "normal"
+    },
+    {
+      "id": "lead-3",
+      "place": [
+        163,
+        16
+      ],
+      "source": {
+        "row": 4,
+        "col": 7
+      },
+      "quote": "Utilisez-le pour",
+      "claim": "The shield was recovered and repels enemies.",
+      "importance": "normal"
+    }
+  ]
+}
