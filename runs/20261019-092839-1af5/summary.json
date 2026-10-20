@@ -1,0 +1,26 @@
+{
+  "run_id": "20261019-092839-1af5",
+  "flow_version": "flow-1",
+  "tag": null,
+  "harness_sha": null,
+  "prompts_sha": null,
+  "model": null,
+  "frames": 2601,
+  "dollars": 1.001863,
+  "calls": 78,
+  "calls_per_1000f": 29.988466,
+  "usd_per_1000f": 0.385184,
+  "latency_ms": {
+    "median": 3517,
+    "p90": 7106
+  },
+  "highest_milestone": "none",
+  "places_seen": 1,
+  "objectives": {
+    "count": 5,
+    "achieved": 4
+  },
+  "stop_reason": "dollars",
+  "symptoms": [],
+  "starred": false
+}

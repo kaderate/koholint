@@ -1,0 +1,26 @@
+{
+  "run_id": "20261019-205631-5875",
+  "flow_version": "flow-3",
+  "tag": null,
+  "harness_sha": null,
+  "prompts_sha": null,
+  "model": null,
+  "frames": 2570,
+  "dollars": 0.321343,
+  "calls": 26,
+  "calls_per_1000f": 10.116732,
+  "usd_per_1000f": 0.125036,
+  "latency_ms": {
+    "median": 3718,
+    "p90": 8816
+  },
+  "highest_milestone": "none",
+  "places_seen": 1,
+  "objectives": {
+    "count": 1,
+    "achieved": 0
+  },
+  "stop_reason": "agent_failures",
+  "symptoms": [],
+  "starred": false
+}
