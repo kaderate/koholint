@@ -27,8 +27,9 @@ module Koholint
       FALLBACK_CHOICE = { skill: 'wait', params: { frames: 30 } }.freeze
       HEMMED_WAIT = { skill: 'wait', params: { frames: 120 } }.freeze
       ADVANCE = { skill: 'advance_dialogue', params: {} }.freeze
-      HEMMED_DIRECTIONS = 3
-      HEMMED_ATTEMPTS = 3
+      HEMMED_DIRECTIONS = 4
+      HEMMED_ATTEMPTS = 4
+      LOCK_BUFFER = 8
       LOCK_SKILLS = %w[walk step goto talk_to].freeze
       HEMMED_WAIT_LIMIT = 1800 / HEMMED_WAIT[:params][:frames]
 
@@ -295,6 +296,7 @@ module Koholint
             params = choice[:params] || {}
             direction = skill == 'goto' || skill == 'talk_to' ? nil : (params[:direction] || params['direction']).to_s
             @locks << { direction:, pos: }
+            @locks.shift while @locks.size > LOCK_BUFFER
           elsif stopped != 'no_path'
             @locks.clear
           end
@@ -303,9 +305,10 @@ module Koholint
       end
 
       def latch_hemmed(state)
+        return if @hemmed && @hemmed[:waits] < HEMMED_WAIT_LIMIT && hemmed?(state)
         return if state.dialog_open? || @locks.size < HEMMED_ATTEMPTS || @locks.filter_map { |l| l[:direction] }.uniq.size < HEMMED_DIRECTIONS
 
-        @hemmed = { pos: @locks.first[:pos], place: [state.room_id, state.map_id], waits: 0, attempts: @locks.size }
+        @hemmed = { pos: @locks.first[:pos], place: [state.room_id, state.map_id], waits: 0, attempts: @locks.count { |l| l[:direction] } }
       end
 
       def hemmed?(state) = !!@hemmed && !state.dialog_open? && [state.x, state.y] == @hemmed[:pos] && [state.room_id, state.map_id] == @hemmed[:place]
@@ -350,6 +353,7 @@ module Koholint
       def hemmed_wait
         @waiting = true
         @hemmed[:waits] += 1
+        @locks.clear if @hemmed[:waits] >= HEMMED_WAIT_LIMIT
         { choice: HEMMED_WAIT, justification: 'deterministic hemmed-in wait: blocked in several directions without movement at the same position',
           confidence: 1.0, agent: 'delegated', latency_ms: 0, cost_usd: 0.0, fallback: false, prompt: nil, image: nil }
       end

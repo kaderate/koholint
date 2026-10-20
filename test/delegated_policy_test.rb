@@ -286,49 +286,56 @@ class DelegatedPolicyTest < Minitest::Test
     assert_equal 'delegated', result[:agent]
   end
 
-  def test_the_lock_line_reaches_the_prompt_once_the_waits_are_spent
-    client = ScriptedClient.new(objective: objective(kind: 'reach_place', place: [1, 2]), skill: walk)
+  def test_the_waits_are_capped_then_the_agent_is_called_with_the_lock_line
+    client = ScriptedClient.new(objective: objective(kind: 'reach_place', place: [1, 2]), skill: [walk, walk])
     p = policy(client)
     decide(p)
-    %w[left right down].each { |d| blocked(p, 'walk', { direction: d, cells: 1 }) }
-    15.times { decide(p) }
-    decide(p)
-    assert_includes client.calls.last[:prompt], 'Link has not moved in the last 3 attempts in different directions and no dialogue is open'
+    %w[left right down up].each { |d| blocked(p, 'walk', { direction: d, cells: 1 }) }
+    waits = 0
+    loop do
+      result = decide(p).last
+      break unless result[:agent] == 'delegated'
+
+      waits += 1
+      flunk 'waits never end' if waits > 100
+      p.after_action(choice: result[:choice], outcome: { stopped_by: 'done', moved_cells: 0 }, state:, frame: 300)
+    end
+    assert_equal Koholint::Policies::Delegated::HEMMED_WAIT_LIMIT, waits
+    assert_includes client.calls.last[:prompt], 'Link has not moved in the last 4 attempts in different directions and no dialogue is open'
   end
 
-  def test_goto_and_talk_to_blocks_count_but_add_no_direction
+  def test_goto_and_talk_to_blocks_count_as_attempts_but_add_no_direction
     p = new_policy
     blocked(p, 'goto', { row: 1, col: 1 })
     blocked(p, 'talk_to', { row: 1, col: 1 })
-    blocked(p, 'walk', { direction: 'left', cells: 1 })
-    blocked(p, 'step', { direction: 'up', pixels: 2 })
+    %w[left up down].each { |d| blocked(p, 'walk', { direction: d, cells: 1 }) }
     assert_equal 'claude', decide(p).last[:agent]
-    blocked(p, 'walk', { direction: 'down', cells: 1 })
+    blocked(p, 'step', { direction: 'right', pixels: 2 })
     assert_equal 'delegated', decide(p).last[:agent]
   end
 
   def test_movement_or_a_dialogue_resets_the_lock_count
     p = new_policy
-    2.times { |i| blocked(p, 'walk', { direction: %w[left right][i], cells: 1 }) }
+    3.times { |i| blocked(p, 'walk', { direction: %w[left right up][i], cells: 1 }) }
     p.after_action(choice: { skill: 'walk', params: { direction: 'down', cells: 1 } }, outcome: { stopped_by: 'done', moved_cells: 1 }, state: state, frame: 103)
     blocked(p, 'walk', { direction: 'up', cells: 1 })
     assert_equal 'claude', decide(p).last[:agent]
     p = new_policy
-    2.times { |i| blocked(p, 'walk', { direction: %w[left right][i], cells: 1 }) }
+    3.times { |i| blocked(p, 'walk', { direction: %w[left right up][i], cells: 1 }) }
     idle(p, 'press', { button: 'b', frames: 3 }, pos: [70, 60])
     blocked(p, 'walk', { direction: 'down', cells: 1 }, pos: [70, 60])
     assert_equal 'claude', decide(p, state(x: 70)).last[:agent]
   end
 
-  def test_fewer_than_three_distinct_blocked_directions_do_not_trigger_the_wait
-    [%w[up up down up], %w[up right]].each do |directions|
+  def test_fewer_than_four_distinct_blocked_directions_do_not_trigger_the_wait
+    [%w[up up down left], %w[up right down]].each do |directions|
       p = policy(ScriptedClient.new(objective: objective(kind: 'reach_place', place: [1, 2]), skill: walk))
       hemmed(p, directions)
       assert_equal 'claude', decide(p).last[:agent]
     end
     p = policy(ScriptedClient.new(objective: objective(kind: 'reach_place', place: [1, 2]), skill: walk))
     decide(p)
-    %w[up right].each { |d| blocked_walk(p, d) }
+    %w[up right down].each { |d| blocked_walk(p, d) }
     blocked_walk(p, 'left', pos: [70, 60])
     assert_equal 'claude', decide(p).last[:agent]
   end
@@ -346,12 +353,16 @@ class DelegatedPolicyTest < Minitest::Test
     scripted_walk(p, 'right', [:down])
     assert_equal [:down], triggers.forbidden([163, 16], [3, 4])
     spot = { room: 163, map: 16, row: 3, col: 4 }
-    quiet = { moved_cells: 1, stopped_by: 'done', dialog_before: false, dialog_after: false, from: spot, to: spot, trigger_input: nil }
+    quiet = { moved_cells: 1, frames: 8, stopped_by: 'done', dialog_before: false, dialog_after: false, from: spot, to: spot, trigger_input: nil }
     p.after_action(choice: { skill: 'walk', params: { direction: 'up', cells: 1 } }, outcome: quiet, state: state, frame: 120)
     assert_equal [:down], triggers.forbidden([163, 16], [3, 4])
     p.after_action(choice: { skill: 'walk', params: { direction: 'down', cells: 1 } }, outcome: quiet.merge(dialog_after: true), state: state, frame: 121)
     assert_equal [:down], triggers.forbidden([163, 16], [3, 4])
-    p.after_action(choice: { skill: 'press', params: { button: 'down', frames: 3 } }, outcome: quiet, state: state, frame: 122)
+    [{ stopped_by: 'damage' }, { stopped_by: 'room_change' }, { stopped_by: 'blocked', moved_cells: 0, frames: 2 }].each do |bad|
+      p.after_action(choice: { skill: 'walk', params: { direction: 'down', cells: 1 } }, outcome: quiet.merge(bad), state: state, frame: 122)
+      assert_equal [:down], triggers.forbidden([163, 16], [3, 4]), bad.inspect
+    end
+    p.after_action(choice: { skill: 'step', params: { direction: 'down', pixels: 4 } }, outcome: quiet, state: state, frame: 123)
     assert_equal [], triggers.forbidden([163, 16], [3, 4])
   end
 
