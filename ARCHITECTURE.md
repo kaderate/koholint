@@ -43,7 +43,12 @@ with the fewest turns over known cells), `skills/` (`walk`, `goto`, `step`, `tal
 `advance_dialogue`, `wait`) behind `skills/registry.rb`. A skill is a bounded, deterministic action with
 validated parameters; it reports how it stopped (`done`, `blocked`, `no_path`, `no_response`…). `ledger.rb`
 counts blocked edges per place (doubtful edges), `triggers.rb` forbids inputs that re-fire a scripted event,
-`talk_log.rb` remembers which sides of a person gave no response.
+`talk_log.rb` remembers which sides of a person gave no response and, per person (the last `talk_to` target), the hash of
+each stitched text read and a world stamp (milestone, places visited, leads): the context says whether the last talk gave
+new text, how many talks in a row gave nothing new, and `worth retrying` (the stamp changed or the last talk was new) or
+`exhausted` (the last two talks repeated under the same stamp).
+`dialogues.rb` groups `dialogue` events (same frame and place) into one dialogue and stitches the overlapping pages of a
+scrolling text box into the full text without losing a word; the stored events stay raw.
 
 **Decision points and policies** — `decision.rb` defines the points (`choose_objective`, `choose_skill`,
 `move`, macros) with their output schema and validation. A policy answers them: `policies/delegated.rb`

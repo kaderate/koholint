@@ -811,6 +811,23 @@ class DelegatedPolicyTest < Minitest::Test
     refute @objectives.note_text('go north, then east.')
   end
 
+  def test_a_person_talked_to_is_remembered_with_whether_the_talk_gave_new_text
+    sheet = ok('skill' => 'wait', 'params' => { 'frames' => 3 }, 'transcription' => 'Hello there.')
+    client = ScriptedClient.new(objective: objective, skill: [sheet, walk])
+    p = policy(client)
+    cells = Array.new(8) { Array.new(10) { 'floor' } }
+    person = Koholint::Vision::Grid.new(cells:, static_sprites: [{ 'x' => 72, 'y' => 48, 'pattern' => 'p', 'height' => 16 }],
+                                        beliefs: Koholint::Vision::Beliefs.new, capabilities: Koholint::Vision::Capabilities.new)
+    shot = ->(at) { p.decide(p.decision_point_for(at), at, { grid: person, dialogue_shot: -> { SHOT }, dialogue_rgb: -> { PAGE } }) }
+    shot.call(state)
+    p.after_action(choice: { skill: 'talk_to', params: { 'row' => 2, 'col' => 4 } }, outcome: { stopped_by: 'done', talked: true }, state: state, frame: 100)
+    2.times { |i| at = state(frame: 100 + (i * 30), **OPEN); advance(p, shot.call(at), at, at.frame + 30) }
+    shot.call(state(frame: 300))
+    shot.call(state(frame: 310))
+    shot.call(state(frame: 320))
+    assert_includes client.calls.last[:prompt], '- at (2,4): talked to 1 time (dialogue opened 1); 1 text read, last talk gave new text, worth retrying: yes'
+  end
+
   def test_a_goal_is_reported_only_when_it_changes_and_leads_need_a_transcription
     same = ok('skill' => 'wait', 'params' => { 'frames' => 3 }, 'goal' => 'explore',
               'leads' => [{ 'quote' => 'q', 'claim' => 'c', 'importance' => 'low' }])

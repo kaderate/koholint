@@ -50,6 +50,8 @@ class PromptsTest < Minitest::Test
     objective, skill = points.map { |p| Koholint::Agents::Prompts.system_for(p) }
     assert_includes skill, 'revise it only when new information changes it, omit it to keep it'
     assert_includes objective, 'Review it at every objective: re-read the leads'
+    assert_includes skill, 'talk to the same person again while each talk gives a new text, and stop when the listing says exhausted'
+    assert_includes objective, 'which ones are worth retrying and which are exhausted'
     assert_includes points.first.json_schema[:required], 'goal'
     refute_includes points.last.json_schema[:required], 'goal'
     assert_includes objective, 'give its id in because'

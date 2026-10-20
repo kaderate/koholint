@@ -107,7 +107,7 @@ module Koholint
         start_objective(choice, state, context, reply.output['because']) if decision_point.name == :choose_objective
         plan = remember_plan(reply.output)
         transcription = transcription_for(reply.output, state, decision_point)
-        remember_text(transcription[:transcription])
+        remember_text(transcription[:transcription], state)
         answer(choice, reply, reply.output).merge(plan ? { plan: } : {}).merge(transcription).merge(notes_for(reply.output, transcription[:transcription], state))
       rescue NameError, TypeError
         raise
@@ -412,7 +412,7 @@ module Koholint
         @prompt = Agents::Context.build(state:, grid: grid_for(state, context), objective: @objectives.current, history: @objectives.history,
                                        attempts: @objectives.attempts_for_prompt, manual: @manual, last_results: @last_results, ledger: @ledger, refusals: @refusals, plan: @plan,
                                        triggers: @triggers, talk_log: @talk_log, locked: (@hemmed[:attempts] if @hemmed && hemmed?(state)),
-                                       locked_frames: (locked_frames(state) if state.phase == :locked), goal: goal_line, leads: @leads.all)
+                                       locked_frames: (locked_frames(state) if state.phase == :locked), goal: goal_line, leads: @leads.all, stamp: stamp(state))
         if decision_point.name == :choose_skill && @sequence
           @pages_read = @sequence[:pages].size
           @images = Vision::DialogueShot.sheets(@sequence[:pages], per_sheet: SHEET_PAGES)
@@ -437,10 +437,18 @@ module Koholint
         "#{@leads.goal} (set at frame #{@leads.goal_frame}, #{ago} #{ago == 1 ? 'objective' : 'objectives'} ago)"
       end
 
-      def remember_text(transcription)
+      def remember_text(transcription, state)
         pages = [transcription].flatten(1).compact.map { |page| page[:text] }
-        @objectives.note_text(Dialogues.text(pages)) unless pages.empty?
+        return if pages.empty?
+
+        text = Dialogues.text(pages)
+        @objectives.note_text(text)
+        source = @images ? @read_at[:source] : @talk_source
+        place = @images ? @read_at[:place] : [state.room_id, state.map_id]
+        @talk_log.remember(place:, cell: [source[:row], source[:col]], text:, stamp: stamp(state)) if source
       end
+
+      def stamp(state) = Dialogues.stamp(milestone: state.milestone, places: @objectives.visited.size, leads: @leads.all.size)
 
       def notes_for(output, transcription, state)
         goal = @leads.change_goal(output['goal'], frame: state.frame, objectives: @objectives.finished)

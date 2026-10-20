@@ -1,3 +1,5 @@
+require 'digest'
+require 'koholint/dialogues'
 require 'koholint/ledger'
 require 'koholint/vision/grid'
 
@@ -24,6 +26,10 @@ module Koholint
         row = Ledger.pick(params, :row)
         col = Ledger.pick(params, :col)
         log.record(place:, row:, col:, talked: Ledger.pick(result, :talked) == true, standing: standing_of(result)) if place && row && col && attempt?(result)
+      end
+      Dialogues.from_events(events).each do |dialogue|
+        source = dialogue[:source] or next
+        log.remember(place: dialogue[:place], cell: [source[:row], source[:col]], text: dialogue[:text], stamp: dialogue[:stamp])
       end
       log
     end
@@ -81,6 +87,14 @@ module Koholint
       @attempts = Hash.new(0)
       @talked = Hash.new(0)
       @silent = Hash.new { |hash, key| hash[key] = [] }
+      @texts = []
+    end
+
+    def remember(place:, cell:, text:, stamp:)
+      key = Dialogues.compact(text)
+      return if key.empty? || !cell.all?(Integer)
+
+      @texts << { place:, cell:, key: Digest::SHA256.hexdigest(key)[0, 16], stamp: }
     end
 
     def record(place:, row:, col:, talked:, standing: [])
@@ -94,9 +108,16 @@ module Koholint
 
     def failed_sides(place, cell) = @silent.fetch([place, cell], []).dup
 
-    def lines(grid, place, limit: nil)
+    def lines(grid, place, limit: nil, stamp: nil)
       objects = self.class.objects(grid)
       stats = objects.to_h { |cells| [cells, [0, 0, []]] }
+      talks = objects.to_h { |cells| [cells, []] }
+      @texts.each do |talk|
+        next unless talk[:place] == place
+
+        owner = owner_of(objects, talk[:cell]) or next
+        talks[owner] << talk
+      end
       @attempts.each do |(where, cell), tried|
         next unless where == place
 
@@ -106,7 +127,7 @@ module Koholint
         stats[owner][2] |= @silent.fetch([where, cell], [])
       end
       shown = limit && objects.size > limit ? kept(objects, stats, limit) : objects
-      out = shown.map { |cells| "- at #{label(cells)}: #{describe(*stats[cells])}" }
+      out = shown.map { |cells| "- at #{label(cells)}: #{[describe(*stats[cells]), memory(talks[cells], stamp)].compact.join('; ')}" }
       out << "... #{objects.size - shown.size} more objects" if shown.size < objects.size
       out
     end
@@ -133,6 +154,23 @@ module Koholint
 
       text = "talked to #{tried} #{tried == 1 ? 'time' : 'times'} (dialogue opened #{talked})"
       silent.empty? ? text : "#{text}; no response from #{silent.map { |r, c| "(#{r},#{c})" }.join(', ')}"
+    end
+
+    def memory(talks, stamp)
+      return if talks.empty?
+
+      keys = talks.map { |talk| talk[:key] }
+      fresh = keys.each_index.map { |i| !keys.first(i).include?(keys[i]) }
+      dry = fresh.reverse.take_while { |new| !new }.size
+      changed = stamp && stamp != talks.last[:stamp]
+      exhausted = !changed && talks.size >= 2 && keys[-1] == keys[-2] && talks[-1][:stamp] == talks[-2][:stamp]
+      text = "#{talks.size} #{talks.size == 1 ? 'text' : 'texts'} read, last talk #{fresh.last ? 'gave new text' : 'gave nothing new'}"
+      text += " (#{dry} #{dry == 1 ? 'talk' : 'talks'} in a row with nothing new)" if dry.positive?
+      if changed then "#{text}, worth retrying: yes (something changed since the last talk)"
+      elsif fresh.last then "#{text}, worth retrying: yes"
+      elsif exhausted then "#{text}, exhausted"
+      else text
+      end
     end
 
     def label(cells)
