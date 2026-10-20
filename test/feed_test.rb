@@ -82,6 +82,14 @@ class FeedTest < Minitest::Test
     end
   end
 
+  def test_locked_waits_are_not_counted_as_calls_nor_as_attempts
+    with_dir do |dir, trace|
+      trace.emit(:decision, frame: 1, decision_point: 'choose_skill', input: {}, options: [], choice: { skill: 'wait', params: { frames: 30 } },
+                            justification: 'locked: waiting for Link to be free', confidence: 1.0, agent: 'delegated', latency_ms: 0, cost_usd: 0.0)
+      assert_equal 0, Koholint::Viewer::Feed.for(dir, FOLLOWER)[:status][:calls]
+    end
+  end
+
   def test_free_delegated_decisions_are_not_counted_as_calls
     with_dir do |dir, trace|
       emit = ->(frame, **extra) { trace.emit(:decision, frame:, decision_point: 'move', input: {}, options: [], choice: {}, justification: 'j', confidence: 1.0, agent: 'delegated', latency_ms: 0, **extra) }

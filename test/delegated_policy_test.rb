@@ -697,12 +697,85 @@ class DelegatedPolicyTest < Minitest::Test
 
   def test_boot_wrapper_forwards_after_boot_only
     delegated = policy(ScriptedClient.new(objective: objective))
-    wrapper = Koholint::Policies::StartGame.new(delegated, ready: ->(s) { %i[playing locked dialogue].include?(s.phase) })
+    wrapper = Koholint::Policies::StartGame.new(delegated, ready: ->(s) { %i[playing dialogue].include?(s.phase) })
     2.times { |i| wrapper.observe(state, frame: i) }
     assert_equal :boot, wrapper.decision_point_for(state(game_mode: 1)).name
     assert_equal :choose_objective, wrapper.decision_point_for(state).name
     assert_equal :choose_objective, wrapper.decision_point_for(state(dialog_state: 3)).name
     wrapper.after_action(choice: { buttons: [:a], frames: 1 }, outcome: {}, state:, frame: 1)
+  end
+
+  LOCKED = { motion_blocked: 2 }.freeze
+
+  def locked_step(policy, frame, **over)
+    at = state(frame:, **LOCKED, **over)
+    result = decide_with_shot(policy, at)
+    advance(policy, result, at, frame + 30)
+    result
+  end
+
+  def test_a_locked_link_waits_without_calling_the_client_or_logging_attempts
+    client = ScriptedClient.new(objective: objective, skill: walk)
+    p = policy(client)
+    decide(p)
+    calls = client.calls.size
+    results = 3.times.map { |i| locked_step(p, 100 + (i * 30)) }
+    assert_equal calls, client.calls.size
+    results.each do |r|
+      assert_equal [{ skill: 'wait', params: { frames: 30 } }, 'locked: waiting for Link to be free', 'delegated', 0.0, false, nil, nil],
+                   r.values_at(:choice, :justification, :agent, :cost_usd, :fallback, :prompt, :image)
+    end
+    assert_equal 0, @objectives.attempts_for_prompt.to_s.scan('wait').size
+  end
+
+  def test_a_locked_link_with_no_objective_still_waits_with_a_skill
+    client = ScriptedClient.new
+    p = policy(client)
+    point = p.decision_point_for(state(**LOCKED))
+    assert_equal :choose_skill, point.name
+    assert_empty client.calls
+  end
+
+  def test_the_locked_cap_hands_the_decision_back_to_the_agent_with_a_note
+    client = ScriptedClient.new(objective: objective, skill: walk)
+    p = policy(client)
+    decide(p)
+    frame = 100
+    while frame < 100 + Koholint::Policies::Delegated::LOCKED_WAIT_LIMIT_FRAMES
+      assert_equal 'locked: waiting for Link to be free', locked_step(p, frame)[:justification]
+      frame += 30
+    end
+    calls = client.calls.size
+    result = locked_step(p, frame)
+    assert_equal 'claude', result[:agent]
+    assert_equal calls + 1, client.calls.size
+    assert_includes client.calls.last[:prompt], 'Phase: locked'
+    assert_includes client.calls.last[:prompt], "Link has been locked for #{frame - 100} frames (cause unknown)"
+  end
+
+  def test_leaving_the_locked_phase_resets_the_cap_and_touches_the_objective
+    client = ScriptedClient.new(objective: objective, skill: walk)
+    p = policy(client)
+    decide(p)
+    p.observe(state(frame: 100, **LOCKED), frame: 100)
+    p.observe(state(frame: 1000, **LOCKED), frame: 1000)
+    p.observe(state(frame: 1010), frame: 1010)
+    assert_equal 1010, @objectives.instance_variable_get(:@last_change_frame)
+    p.observe(state(frame: 1100, **LOCKED), frame: 1100)
+    calls = client.calls.size
+    assert_equal 'locked: waiting for Link to be free', locked_step(p, 1100)[:justification]
+    assert_equal calls, client.calls.size
+  end
+
+  def test_a_dialogue_opening_during_the_lock_advances_automatically
+    client = ScriptedClient.new(objective: objective, skill: walk)
+    p = policy(client)
+    decide(p)
+    locked_step(p, 100)
+    calls = client.calls.size
+    result = decide_with_shot(p, state(frame: 130, **OPEN))
+    assert_equal 'automatic dialogue advance', result[:justification]
+    assert_equal calls, client.calls.size
   end
 end
 
@@ -716,7 +789,7 @@ class DelegatedEngineTest < Minitest::Test
   def agent_engine(run, client, emulator: nil, **limits)
     delegated = Koholint::Policies::Delegated.new(client:, registry: Koholint::Skills::Registry.default,
                                                   objectives: Koholint::Objectives.new(trace: run.trace), manual: '')
-    policy = Koholint::Policies::StartGame.new(delegated, ready: ->(s) { %i[playing locked dialogue].include?(s.phase) })
+    policy = Koholint::Policies::StartGame.new(delegated, ready: ->(s) { %i[playing dialogue].include?(s.phase) })
     Koholint::Engine.new(run:, policy:, budget: Koholint::Budget.new(**limits), grid: true, emulator:)
   end
 
@@ -732,7 +805,7 @@ class DelegatedEngineTest < Minitest::Test
     skip_without_rom!
     with_run do |run|
       client = ScriptedClient.new(objective: [ok('title' => 'x')] + [leave_house] * 40, default: wait)
-      assert_equal :frames, agent_engine(run, client, frames: 800).run
+      assert_equal :frames, agent_engine(run, client, frames: 4200).run
       agent = events(run, :decision).select { |d| d['agent'] == 'claude' }
       assert_equal %w[choose_skill choose_objective choose_skill], agent.first(3).map { |d| d['decision_point'] }
       assert agent.first['fallback']
@@ -845,7 +918,6 @@ class DelegatedEngineTest < Minitest::Test
       png.each { |f| assert_match(/-choose_skill-\d\.png\z/, f) }
       assert File.binread(png.first).start_with?("\x89PNG".b)
       refute_includes File.read(File.join(run.dir, 'trace.jsonl')), 'PNG'
-      assert_equal [], Koholint::Replay.verify(run, every: 600).reject(&:last)
     end
   end
 
@@ -881,7 +953,7 @@ class DelegatedEngineTest < Minitest::Test
       first = events(run, :decision).find { |d| d['agent'] == 'claude' }
       earlier = events(run, :perception).select { |p| p['frame'] <= first['frame'] }.last(2).map { |p| p['state'].values_at('x', 'y', 'game_mode') }
       assert_equal earlier.first, earlier.last
-      assert_includes %i[playing locked], Koholint::GameState.new(**first['input'].transform_keys(&:to_sym)).phase
+      assert_includes %i[playing dialogue], Koholint::GameState.new(**first['input'].transform_keys(&:to_sym)).phase
     end
   end
 
@@ -893,7 +965,7 @@ class DelegatedEngineTest < Minitest::Test
       far = ok('title' => 'far', 'predicate' => { 'kind' => 'reach_place', 'place' => [0, 0] })
       client = ScriptedClient.new(objective: [far, far, far], default: wait)
       delegated = Koholint::Policies::Delegated.new(client:, registry: Koholint::Skills::Registry.default, objectives:, on_step: budget.method(:step_done))
-      policy = Koholint::Policies::StartGame.new(delegated, ready: ->(s) { %i[playing locked dialogue].include?(s.phase) })
+      policy = Koholint::Policies::StartGame.new(delegated, ready: ->(s) { %i[playing dialogue].include?(s.phase) })
       eng = Koholint::Engine.new(run:, policy:, budget:, grid: true, emulator: EmulatorCache.interactive)
       assert_equal :steps, eng.run
       assert_equal ['steps'], events(run, :budget_stop).map { |e| e['kind'] }
@@ -973,6 +1045,24 @@ class DelegatedEngineTest < Minitest::Test
       abandoned = events(run, :objective).select { |e| e['status'] == 'abandoned' }
       assert_equal [['obj-2', 'resume']], abandoned.map { |e| [e['id'], e['reason']] }
       assert_equal 'obj-3', made.start(frame: 330, title: 'n', predicate:)
+    end
+  end
+
+  def test_a_fresh_agent_boot_waits_through_the_bed_lock_and_never_asks_before_the_dialogue
+    skip_without_rom!
+    with_run do |run|
+      eng = nil
+      client = ScriptedClient.new(objective: leave_house, default: -> { eng.request_stop; wait })
+      eng = agent_engine(run, client)
+      eng.run
+      trace = Koholint::Trace.read(File.join(run.dir, 'trace.jsonl'))
+      opened = trace.find { |e| e['type'] == 'perception' && e['state']['dialog_state'].to_i.positive? }
+      asked = trace.find { |e| e['type'] == 'decision' && e['agent'] == 'claude' }
+      assert opened
+      assert_operator asked['frame'], :>=, opened['frame']
+      waits = trace.select { |e| e['type'] == 'decision' && e['justification'] == 'locked: waiting for Link to be free' }
+      assert_operator waits.size, :>, 0
+      assert_equal [], Koholint::Replay.verify(run, every: 600).reject(&:last)
     end
   end
 end

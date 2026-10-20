@@ -158,19 +158,27 @@ class CliTest < Minitest::Test
     end
   end
 
-  def probe_presses(run_dir)
-    Koholint::Trace.read(File.join(run_dir, 'trace.jsonl')).count { |e| e['type'] == 'decision' && e['agent'] == 'start_game' && e['choice']['frames'] == 8 }
+  def start_game_macros(run_dir)
+    Koholint::Trace.read(File.join(run_dir, 'trace.jsonl')).select { |e| e['type'] == 'decision' && e['agent'] == 'start_game' }
   end
 
-  def test_only_a_fresh_agent_run_probes_and_a_resumed_one_does_not
+  def test_a_fresh_agent_run_waits_while_locked_and_a_resumed_one_adds_no_boot_macros
     skip_without_rom!
     with_fake_claude do |dir|
-      out = cli('run', '--agent', '--claude-command', FAKE_CLAUDE, '--frames', '320', '--root', dir)[1]
+      out = cli('run', '--agent', '--claude-command', FAKE_CLAUDE, '--frames', '900', '--root', dir)[1]
       run_dir = out[/^run (.+)$/, 1]
-      assert_operator probe_presses(run_dir), :>, 0
-      before = probe_presses(run_dir)
+      events = Koholint::Trace.read(File.join(run_dir, 'trace.jsonl'))
+      opened = events.find { |e| e['type'] == 'perception' && e['state']['dialog_state'].to_i.positive? }
+      asked = events.find { |e| e['type'] == 'decision' && e['agent'] == 'claude' }
+      assert opened
+      assert_operator asked['frame'], :>=, opened['frame'] if asked
+      assert_operator start_game_macros(run_dir).count { |e| e['choice']['frames'] == 30 && e['choice']['buttons'].empty? }, :>, 0
+      assert_equal 0, start_game_macros(run_dir).count { |e| e['choice']['frames'] == 8 }
+      before = start_game_macros(run_dir).size
       cli('resume', run_dir, '--agent', '--claude-command', FAKE_CLAUDE, '--max-dollars', '0.01')
-      assert_equal before, probe_presses(run_dir)
+      added = start_game_macros(run_dir).drop(before)
+      assert_equal 0, added.count { |e| e['choice']['frames'] == 8 }
+      assert_operator added.size, :<=, 1
     end
   end
 

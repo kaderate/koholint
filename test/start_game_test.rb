@@ -76,6 +76,34 @@ class StartGameTest < Minitest::Test
     [:boot, wrapper.decide(wrapper.decision_point_for(s), s, {})[:choice]]
   end
 
+  def locked(frame: 0, x: 80) = Koholint::GameState.new(frame:, hp: 24, x:, y: 60, game_mode: 0x0B, game_submode: 7, dialog_state: 0, motion_blocked: 2, milestone: :none)
+
+  def test_a_locked_link_gets_neutral_waits_and_never_counts_toward_probing_or_hand_over
+    wrapper = probing
+    kinds = 60.times.map { |i| step(wrapper, locked(frame: i * 30)) }
+    assert(kinds.all? { |kind, choice| kind == :boot && choice == { buttons: [], frames: 30 } })
+  end
+
+  def test_playing_after_the_lock_continues_with_the_probe_and_a_dialogue_still_hands_over
+    wrapper = probing
+    3.times { |i| step(wrapper, locked(frame: i * 30)) }
+    assert_equal [:up], step(wrapper, play(frame: 100))[1][:buttons]
+    assert_equal :handed, step(wrapper, locked(frame: 120).tap { |s| s.dialog_state = 3 }).first
+  end
+
+  def test_a_locked_state_is_never_ready_even_if_the_ready_set_allows_it
+    wrapper = Koholint::Policies::StartGame.new(Koholint::Policies::WalkAndTalk.new, ready: ->(s) { %i[playing locked dialogue].include?(s.phase) })
+    30.times { |i| wrapper.observe(locked(frame: i), frame: i) }
+    assert_equal :boot, wrapper.decision_point_for(locked).name
+  end
+
+  def test_after_the_hand_over_a_lock_goes_to_the_inner_policy
+    wrapper = probing
+    step(wrapper, play(frame: 0, x: 80))
+    step(wrapper, play(frame: 1, dialog: 3))
+    assert_equal :move, wrapper.decision_point_for(locked).name
+  end
+
   def test_a_locked_link_is_probed_then_idled_until_a_dialogue_opens
     wrapper = probing
     kinds = []
