@@ -80,7 +80,7 @@ module Koholint
         properties: { title: { type: 'string', minLength: 1, maxLength: TITLE_MAX }, predicate: { oneOf: predicates },
                       justification: { type: 'string' }, confidence: { type: 'number', minimum: 0, maximum: 1 },
                       goal: GOAL_SCHEMA, because: { type: 'string' }, plan: PLAN_SCHEMA },
-        required: %w[title predicate justification confidence plan], additionalProperties: false }
+        required: %w[title predicate justification confidence plan goal], additionalProperties: false }
     end
 
     def validate_objective(choice)

@@ -54,7 +54,8 @@ counts blocked edges per place (doubtful edges), `triggers.rb` forbids inputs th
 **Objectives** — `objectives.rb`: a short goal with a predicate the harness checks from memory
 (`leave_place`, `reach_place`, `reach_cell`, `dialogue_closed`, `new_place`); the engine emits started and
 achieved/abandoned/failed events; a `started` event may carry `because`, the id of the lead that motivated it. The
-long-term direction is the agent's own `goal` (a short text it sets and revises). `leads.rb` holds the leads: claims the
+long-term direction is the agent's own `goal` (a short text it restates or revises at every objective; the context shows
+when it was set). `leads.rb` holds the leads: claims the
 agent extracts from texts it read (dialogue, signs, objects), each with a verbatim `quote`, a `claim` and an importance
 (`high`, `normal`, `low`). A lead whose quote is not in the transcription of the same call is dropped (`notable`
 `lead_rejected`), duplicates are dropped by quote. Goal and leads are rebuilt from the `goal` and `lead` trace events on

@@ -19,9 +19,9 @@ module Koholint
         An objective is a short goal with a title and a predicate that the harness can check from memory. The predicate is one of five kinds: leave_place (place), reach_place (place), reach_cell (place, row, col), dialogue_closed or new_place (no fields). A place is [room, map] as integers, row is 0-7 and col is 0-9.
         leave_place means finding a way out of the current place. new_place means reaching a place not yet visited in this run. reach_cell targets that are already reachable over cells observed free are refused: choose goals that need exploration.
         Pick an objective that is achievable from the current state and different from objectives that already failed or were abandoned. Give the exact fields of the chosen kind and no others.
-        The goal is your long-term goal, shown in the context: set it in goal when you have a reason, revise it only when new information changes it, omit it to keep it. Use the high leads of the context when choosing the goal and the objective; when a lead motivates the objective, give its id in because.
+        The goal is your long-term goal, shown in the context with when you set it. Review it at every objective: re-read the leads and what people told you before restating it, then repeat it to keep it or rewrite it. Revise it when what you learned or reached makes it obsolete, for example when it names a place you already reached or left. Use the high leads of the context when choosing the goal and the objective; when a lead motivates the objective, give its id in because.
         The plan field is mandatory on every call: one line saying what you will do over the next few calls and why. Your previous plan, if any, is shown in the context.
-        Output fields: title, predicate, justification, confidence, plan, and optionally goal and because.
+        Output fields: title, predicate, justification, confidence, plan, goal, and optionally because.
       TEXT
 
       SKILL = <<~TEXT.freeze

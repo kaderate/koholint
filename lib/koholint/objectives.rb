@@ -85,6 +85,8 @@ module Koholint
       id
     end
 
+    def finished = @counter - (@current ? 1 : 0)
+
     def record_attempt(skill:, params:, result_summary:)
       return unless @current
 

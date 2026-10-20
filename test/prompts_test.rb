@@ -47,7 +47,10 @@ class PromptsTest < Minitest::Test
 
   def test_goal_and_leads_are_offered_with_a_generic_rubric
     objective, skill = points.map { |p| Koholint::Agents::Prompts.system_for(p) }
-    [objective, skill].each { |text| assert_includes text, 'revise it only when new information changes it, omit it to keep it' }
+    assert_includes skill, 'revise it only when new information changes it, omit it to keep it'
+    assert_includes objective, 'Review it at every objective: re-read the leads'
+    assert_includes points.first.json_schema[:required], 'goal'
+    refute_includes points.last.json_schema[:required], 'goal'
     assert_includes objective, 'give its id in because'
     assert_includes skill, 'signs or objects you read'
     assert_includes skill, 'high: it states a goal, a destination, an item to obtain, a condition or obstacle, or a danger.'

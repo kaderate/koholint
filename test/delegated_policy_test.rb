@@ -794,7 +794,7 @@ class DelegatedPolicyTest < Minitest::Test
     assert_equal [{ id: 'lead-1', place: [163, 16], source: { row: 2, col: 4 }, quote: 'find the KEY', claim: 'a key is needed', importance: 'high' }], result[:leads]
     assert_equal [1, 'find the key'], result.values_at(:leads_rejected, :goal)
     decide_with_shot(p, state(frame: 400))
-    assert_includes client.calls.last[:prompt], "Goal (yours, long-term): find the key\n"
+    assert_match(/Goal \(yours, long-term\): find the key \(set at frame \d+, 0 objectives ago\)\n/, client.calls.last[:prompt])
     assert_includes client.calls.last[:prompt], '- [lead-1 high] a key is needed — "find the KEY"'
   end
 
@@ -808,6 +808,20 @@ class DelegatedPolicyTest < Minitest::Test
     _, second = decide(p)
     refute second.key?(:goal)
     assert_equal [[], 1], second.values_at(:leads, :leads_rejected)
+  end
+
+  def test_the_goal_line_says_when_it_was_set_and_how_many_objectives_ago
+    keep = ok('title' => 'go', 'predicate' => { 'kind' => 'new_place' }, 'goal' => 'explore')
+    p = policy(ScriptedClient.new(objective: [keep, keep, keep]))
+    client = p.instance_variable_get(:@client)
+    decide(p)
+    2.times do |n|
+      @objectives.abandon(frame: 101 + n, reason: 'test')
+      decide(p, state(frame: 200 + n))
+    end
+    assert_includes client.calls.last[:prompt], 'Goal (yours, long-term): explore (set at frame 100, 2 objectives ago)'
+    leads = Koholint::Leads.from_events(Koholint::Trace.read(File.join(@dir, 'trace.jsonl')) + [{ 'type' => 'goal', 'frame' => 300, 'text' => 'new' }])
+    assert_equal ['new', 300, 2], [leads.goal, leads.goal_frame, leads.goal_objectives]
   end
 
   def test_because_is_kept_only_when_it_names_a_known_lead

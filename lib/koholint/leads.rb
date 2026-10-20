@@ -1,5 +1,6 @@
 require 'json'
 require 'koholint/ledger'
+require 'koholint/objectives'
 require 'koholint/trace'
 
 module Koholint
@@ -11,14 +12,16 @@ module Koholint
     QUOTE_MAX = 300
     GOAL_MAX = 120
 
-    attr_reader :all, :goal
+    attr_reader :all, :goal, :goal_frame, :goal_objectives
 
     def self.from_events(events)
       leads = new
+      done = 0
       events.each do |event|
         case Ledger.pick(event, :type).to_s
         when 'lead' then leads.restore(event)
-        when 'goal' then leads.change_goal(Ledger.pick(event, :text))
+        when 'goal' then leads.change_goal(Ledger.pick(event, :text), frame: Ledger.pick(event, :frame), objectives: done)
+        when 'objective' then done += 1 if Objectives::TERMINAL.include?(Ledger.pick(event, :status).to_s)
         end
       end
       leads
@@ -69,10 +72,12 @@ module Koholint
       [accepted, rejected]
     end
 
-    def change_goal(text)
+    def change_goal(text, frame: nil, objectives: nil)
       goal = text.is_a?(String) ? self.class.clean(text, GOAL_MAX) : ''
       return if goal.empty? || goal == @goal
 
+      @goal_frame = frame
+      @goal_objectives = objectives
       @goal = goal
     end
 

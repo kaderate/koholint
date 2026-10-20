@@ -410,7 +410,7 @@ module Koholint
         @prompt = Agents::Context.build(state:, grid: grid_for(state, context), objective: @objectives.current, history: @objectives.history,
                                        attempts: @objectives.attempts_for_prompt, manual: @manual, last_results: @last_results, ledger: @ledger, refusals: @refusals, plan: @plan,
                                        triggers: @triggers, talk_log: @talk_log, locked: (@hemmed[:attempts] if @hemmed && hemmed?(state)),
-                                       locked_frames: (locked_frames(state) if state.phase == :locked), goal: @leads.goal, leads: @leads.all)
+                                       locked_frames: (locked_frames(state) if state.phase == :locked), goal: goal_line, leads: @leads.all)
         if decision_point.name == :choose_skill && @sequence
           @pages_read = @sequence[:pages].size
           @images = Vision::DialogueShot.sheets(@sequence[:pages], per_sheet: SHEET_PAGES)
@@ -427,8 +427,16 @@ module Koholint
         @client.call(system: Agents::Prompts.system_for(decision_point, sheets: !@images.nil?), prompt: @prompt, schema: decision_point.json_schema, **pictures)
       end
 
+      def goal_line
+        return unless @leads.goal
+        return @leads.goal unless @leads.goal_frame && @leads.goal_objectives
+
+        ago = @objectives.finished - @leads.goal_objectives
+        "#{@leads.goal} (set at frame #{@leads.goal_frame}, #{ago} #{ago == 1 ? 'objective' : 'objectives'} ago)"
+      end
+
       def notes_for(output, transcription, state)
-        goal = @leads.change_goal(output['goal'])
+        goal = @leads.change_goal(output['goal'], frame: state.frame, objectives: @objectives.finished)
         notes = goal ? { goal: } : {}
         return notes unless output.key?('leads')
 
