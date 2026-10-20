@@ -2,14 +2,17 @@
 
 A deterministic engine that plays Link's Awakening DX headless through emu-gb and calls agents
 (Jev for tactical choices, Claude for strategy) at defined decision points. Each run lives in
-`runs/<id>/`: manifest, trace, input journal, saves, keyframes, summary.
+`runs/<id>/`: manifest, trace, input journal, saves, keyframes, summary; finished runs are archived in git
+as a light bundle (see Run storage) and listed in `docs/runs/index.md`.
+
+- Architecture: `ARCHITECTURE.md` (layers, data flow, invariants); what remains: `ROADMAP.md`
 
 - Design: `docs/superpowers/specs/2026-10-16-koholint-v2-architecture-design.md`
 - Plans: `docs/superpowers/plans/`
-- v1 (agent session driving the game): git tag `v1-archive`, analysis in `docs/RETROSPECTIVE.md`
+- v1 (agent session driving the game): git tag `v1-archive` (its notes, screenshots and decisions were removed from the tree), analysis in `docs/RETROSPECTIVE.md`
 
 Needs Ruby 4.0.1, an emu-gb checkout and the ROM. Copy `.env.example` to `.env` (gitignored) and set
-`EMU_GB_HOME` and `KOHOLINT_ROM`; real environment variables take precedence. Tests: `rake test` (one process per file, in parallel, ~40 s; the first run builds a local emulator
+`EMU_GB_HOME` and `KOHOLINT_ROM`; real environment variables take precedence. Tests: `rake test` (one process per file, ~2.5 min; the first run builds a local emulator
 state cache in `tmp/`), `rake test:e2e` to also play the full boot from frame 0.
 
 Live view: `bin/koholint watch runs/<id> [--port N] [--host H] [--from live|start] [--speed X] [--runs-root DIR]` prints
@@ -45,11 +48,17 @@ Budgets: `run`/`resume` accept `--frames N`, `--minutes N`, `--dollars X` and `-
 only meaningful with `--agent`). With `--agent`, the engine also writes what the agent saw to `runs/<id>/prompts/<frame>-<decision_point>.txt`
 (and `.png` when an image was sent; gitignored, not part of replay); the `decision` trace event carries its `prompt_sha`. Ctrl-C cancels an in-flight agent call.
 
-Agent skills: `goto row col` walks to a cell of the known grid with a shortest path with the fewest turns (stops `done`, `blocked`, `no_path`, ...; a result carries
-`blocked_at` when a move hit a wall), and `step direction pixels` moves a few pixels. A ledger counts blocked edges per place; an edge
-blocked twice is marked doubtful in the context, and an objective that keeps failing is abandoned as `unreachable`. Dialogue pages are
-advanced automatically (one `decision` with agent `delegated` and cost 0 per page) and read once from the page sheets. `--steps N` counts
-finished objectives. `resume` rebuilds the ledger and the visited places from the trace; the flow version is `flow-3`. `talk_to` walks next to a person, faces them and presses A; the agent also writes a one-line `plan` that the next call sees, and the live view shows its reasoning and plan under each decision.
+Agent skills (`flow-3`):
+
+- `goto row col` walks to a cell of the known grid by a shortest path with the fewest turns (stops `done`, `blocked`,
+  `no_path`, ...; a result carries `blocked_at` when a move hit a wall); `step direction pixels` moves a few pixels;
+  `talk_to row col` walks next to a person, faces them and presses A, trying other sides on no response.
+- A ledger counts blocked edges per place; an edge blocked twice is marked doubtful in the context, and an objective
+  that keeps failing is abandoned as `unreachable`.
+- Dialogue pages are advanced automatically (one `decision` with agent `delegated` and cost 0 per page) and read once
+  from page sheets. `--steps N` counts finished objectives.
+- The agent writes a one-line `plan` that the next call sees; the live view shows its reasoning and plan under each
+  decision. `resume` rebuilds the ledger and the visited places from the trace.
 
 ## Run storage
 

@@ -5,18 +5,20 @@ Only what is left to do. When something lands, delete it here (git is the histor
 **Goal:** an agent plays Link's Awakening DX through the engine. First milestones: shield, then sword.
 
 ## Next, in order
-1. **Make the starting-house run reliable and cheaper.** Run 10 left the house (63 calls, 0.94 USD, `docs/runs/2026-10-second-agent-run.md`) after earlier runs failed; it is one success, not a rate. Needed next: the forbidden-input memory should expire when an explicit press shows nothing happens; `no_path` should name a forbidden edge; an animation lock (blocked everywhere with no dialogue) should be perceived; then repeated runs to measure a success rate and the cost spread. Jev wiring after that.
-2. **Plan 4b: finer navigation** — tile lattice and tile-level beliefs, per-appearance room survey, exits that straddle two cells, Jev routing for `choose_skill`.
-3. **Perception gaps** — inventory/items and Link's capabilities (find addresses by tracing), milestone detection (shield, sword), deterministic dialogue text decoding (the first loop reads dialogue as an image), `notable` events (so the feed's health stops being `unknown`).
-4. **Dialogue to leads** — texts and leads (claims extracted by the agent, with status open/tested/refuted and evidence); Claude interprets NPC and sign dialogue.
-5. **Interactions beyond walking** — push, dive/swim, item use; capabilities feed the beliefs of the vision plan.
-6. **Combat** — open question: micro-decisions; settle by spike (Jev macros vs deterministic vs hybrid) after the first agent loop.
-7. **Navigation spike** — A* on the known grid vs Jev macros vs hybrid, measured on success, frames, cost, latency.
-8. **Live view, layout C** — clickable timeline of notable events and agent calls, fork from the UI, pause/stop.
+1. **Make the starting-house run reliable and cheaper.** Runs 10 and 13 left the house (about 1 USD each, `docs/runs/2026-10-second-agent-run.md`); it is two successes, not a rate. Needed: repeated runs to measure a success rate and the cost spread; a per-objective call cap; `no_path` should name a forbidden edge; `target_free` should trigger a `talk_to` retry.
+2. **Long-term objectives and memory.** After the intro the agent only picks "explore to a new place", which gives no progress signal and `world.json` stays empty. Needs a small richer objective vocabulary and a long-term memory so planning heads toward the sword. Jev wiring after that.
+3. **Analysis loop.** `koholint analyze <run>` (standard report, comparison with previous runs), symptom detectors writing `suggestions.md` and filling `summary.json` `symptoms`, scenario runs forked from keyframes, recorded agent answers replayed by a fake client, owner annotations from the viewer. Open question: how much of the harness the agent may amend itself during a run (Continual Harness, arXiv 2605.09998) versus code-versioned changes.
+4. **Plan 4b: finer navigation** — tile lattice and tile-level beliefs, per-appearance room survey, exits that straddle two cells, Jev routing for `choose_skill`.
+5. **Perception gaps** — inventory/items and Link's capabilities (find addresses by tracing), the sword milestone (find its address by RAM diff like `shield_level`), deterministic dialogue text decoding (dialogue is read as an image), `notable` events (so `last_notable` stops being empty).
+6. **Dialogue to leads** — texts and leads (claims extracted by the agent, with status open/tested/refuted and evidence); Claude interprets NPC and sign dialogue.
+7. **Interactions beyond walking** — push, dive/swim, item use; capabilities feed the beliefs of the vision plan.
+8. **Combat** — open question: micro-decisions; settle by spike (Jev macros vs deterministic vs hybrid) after the first agent loop.
+9. **Navigation spike** — A* on the known grid vs Jev macros vs hybrid, measured on success, frames, cost, latency.
+10. **Live view, layout C** — clickable timeline of notable events and agent calls, fork from the UI, pause/stop.
+11. **Real-time play** — the emulator stays paused between decisions; an optional `--live-clock` with pause-on-danger and a reflex layer (Jev or deterministic) is undecided.
 
 ## Open decisions and loose ends
 - Addresses at `verified_count: 1` need a second independent check (`game_mode`, `game_submode`, `name_length`, `max_hearts`, `dialog_state`).
-- Agent loop, run 9: sprite-to-cell mapping needs a minimum overlap (phantom object cells made 3 of 11 `talk_to` calls end `target_free`); the centring phase presses DOWN at the doorway (cell centre y 128, Link at y 121) and re-fires the scripted dialogue: record the input that opened a dialogue and forbid it in centring; add a per-objective call cap; the shield milestone is still not perceived. Measurements in `docs/runs/2026-10-second-agent-run.md`.
 - Ladder beyond shield and sword; whether a run may inherit a map from a previous run.
 - Viewer: Host-header check on GET routes (only `POST /star` checks it); per-macro fsync cost on long runs; `verify` replays from boot (use keyframes).
 - Test runner: rspec vs minitest (not decided).
@@ -31,5 +33,5 @@ Only what is left to do. When something lands, delete it here (git is the histor
 - Plan 4a parked: the ROM goto/walk tests hardcode distances and read `@centring`; no test for centring falling back to the other axis.
 - Plan 4a parked: automatic dialogue pages flush only on `choose_skill` tours; step results never carry `blocked_at` by decision.
 - Agent loop deferred: the interaction log attributes a talk_to to the object at (or within one cell of) its target in the current grid, so NPCs that move can read as never tried.
-- Run storage: `summary.json` `symptoms` is always empty (no detector yet); `places_seen` counts perceived places only.
+- Run storage: `places_seen` counts perceived places only.
 - Agent loop deferred: a failed sheet call loses the dialogue pages (their PNGs remain under `prompts/`).

@@ -2,7 +2,7 @@
 
 A deterministic engine plays Link's Awakening DX through emu-gb and calls agents at decision
 points. Design: `docs/superpowers/specs/2026-10-16-koholint-v2-architecture-design.md`.
-Plans: `docs/superpowers/plans/`. v1 is archived under the git tag `v1-archive`.
+High-level architecture: `ARCHITECTURE.md` (update it in the same commit as any change to a layer, a data flow or a run artifact). Plans: `docs/superpowers/plans/`. v1 is archived under the git tag `v1-archive`.
 
 ## Conventions
 
