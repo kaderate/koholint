@@ -13,13 +13,15 @@ module Koholint
         from = Ledger.place_of(Ledger.pick(result, :from))
         to = Ledger.place_of(Ledger.pick(result, :to))
         ledger.reset_unless(from) if from
-        blocked_at = Ledger.pick(result, :blocked_at)
-        if from && blocked_at
-          ledger.record(place: from, blocked_at:)
-        end
+        Ledger.edges_of(result).each { |blocked_at| ledger.record(place: from, blocked_at:) } if from
         ledger.reset_unless(to) if to
       end
       ledger
+    end
+
+    def self.edges_of(result)
+      edges = pick(result, :blocked_edges)
+      edges.is_a?(Array) ? edges : [pick(result, :blocked_at)].compact
     end
 
     def self.pick(hash, key)

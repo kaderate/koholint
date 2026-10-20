@@ -2,6 +2,7 @@ require 'koholint/agents/context'
 require 'koholint/agents/prompts'
 require 'koholint/decision'
 require 'koholint/dialogues'
+require 'koholint/explore_log'
 require 'koholint/leads'
 require 'koholint/ledger'
 require 'koholint/navigation/planner'
@@ -32,12 +33,14 @@ module Koholint
       HEMMED_DIRECTIONS = 4
       HEMMED_ATTEMPTS = 4
       LOCK_BUFFER = 8
-      LOCK_SKILLS = %w[walk step goto talk_to].freeze
+      LOCK_SKILLS = %w[walk step goto talk_to explore].freeze
+      PATH_SKILLS = %w[goto talk_to explore].freeze
       LOCKED_WAIT = { skill: 'wait', params: { frames: 30 } }.freeze
       LOCKED_WAIT_LIMIT_FRAMES = 900
       HEMMED_WAIT_LIMIT = 1800 / HEMMED_WAIT[:params][:frames]
 
-      def initialize(client:, registry:, objectives:, manual: '', on_step: nil, on_activity: nil, ledger: nil, triggers: nil, talk_log: nil, leads: nil)
+      def initialize(client:, registry:, objectives:, manual: '', on_step: nil, on_activity: nil, ledger: nil, triggers: nil, talk_log: nil, leads: nil, explore_log: nil)
+        @explore_log = explore_log || ExploreLog.new
         @leads = leads || Leads.new
         @ledger = hook_doubt(ledger || Ledger.new)
         @triggers = triggers || Triggers.new
@@ -84,6 +87,7 @@ module Koholint
         context[:ledger] = @ledger
         context[:triggers] = @triggers
         context[:talk_log] = @talk_log
+        context[:explore_log] = @explore_log
         remember_grid(state, context)
         drop_stale_sequence(state)
         automatic = automatic_advance(decision_point, state, context)
@@ -138,6 +142,7 @@ module Koholint
         feed_ledger(choice, outcome, state, frame)
         opened = feed_triggers(choice, outcome, state)
         feed_talk_log(choice, outcome, state)
+        @explore_log.absorb(outcome) if choice[:skill] == 'explore'
         note_no_path(choice, outcome, frame)
         unless @waiting
           @objectives.record_attempt(skill: choice[:skill], params: choice[:params], result_summary: summary(outcome, opened))
@@ -176,7 +181,7 @@ module Koholint
       end
 
       def note_no_path(choice, outcome, frame)
-        return unless %w[goto talk_to].include?(choice[:skill]) && outcome[:stopped_by].to_s == 'no_path' && @objectives.current
+        return unless PATH_SKILLS.include?(choice[:skill]) && %w[no_path no_frontier].include?(outcome[:stopped_by].to_s) && @objectives.current
 
         track { @objectives.note_no_path(frame:) }
       end
@@ -259,9 +264,9 @@ module Koholint
       def feed_ledger(choice, outcome, state, frame)
         from = outcome[:from].is_a?(Hash) ? outcome[:from] : {}
         place = from[:room] && from[:map] ? [from[:room], from[:map]] : [state.room_id, state.map_id]
+        Ledger.edges_of(outcome).each { |edge| @ledger.record(place:, blocked_at: edge) }
         blocked_at = outcome[:blocked_at]
         if blocked_at
-          @ledger.record(place:, blocked_at:)
           track { @objectives.note_blocked(blocked_at:, target: @objectives.current&.dig(:predicate), frame:) } if @objectives.current
         end
         note_entered(choice, outcome, place)
@@ -306,7 +311,7 @@ module Koholint
             @ledger.entered(place:, cell:, direction:)
             cell = [cell[0] + delta[0], cell[1] + delta[1]]
           end
-        elsif %w[goto talk_to].include?(choice[:skill])
+        elsif PATH_SKILLS.include?(choice[:skill])
           Array(outcome[:crossed]).each { |row, col, direction| @ledger.entered(place:, cell: [row, col], direction:) }
         end
       end
@@ -319,7 +324,7 @@ module Koholint
           stopped = outcome[:stopped_by].to_s
           if stopped == 'blocked' && outcome[:moved_cells].to_i.zero? && outcome[:moved_px].to_i.zero?
             params = choice[:params] || {}
-            direction = skill == 'goto' || skill == 'talk_to' ? nil : (params[:direction] || params['direction']).to_s
+            direction = PATH_SKILLS.include?(skill) ? nil : (params[:direction] || params['direction']).to_s
             @locks << { direction:, pos: }
             @locks.shift while @locks.size > LOCK_BUFFER
           elsif stopped != 'no_path'
@@ -519,6 +524,7 @@ module Koholint
         text += ", cause #{outcome[:cause]}" if outcome[:cause]
         text += ", talked #{outcome[:talked]}" unless outcome[:talked].nil?
         text += ", dialogue opened by itself x#{opened}" if opened
+        text += Agents::Context.explore_note(outcome) if outcome[:skill].to_s == 'explore'
         standing = outcome[:standing_cell]
         text += ", standing_cell (#{standing[:row]},#{standing[:col]})" if standing.is_a?(Hash)
         text
