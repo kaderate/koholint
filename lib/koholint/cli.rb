@@ -26,7 +26,7 @@ module Koholint
             '--agent --model M --max-dollars X --claude-command PATH]'.freeze
 
     DEFAULT_MODEL = 'sonnet'.freeze
-    DEFAULT_MAX_DOLLARS = 1.0
+    DEFAULT_MAX_DOLLARS = 1.5
 
     module_function
 
