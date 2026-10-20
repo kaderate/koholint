@@ -35,11 +35,13 @@ module Koholint
     end
 
     def self.clearing(skill:, params:, result:)
-      return unless %w[walk step press].include?(skill.to_s)
+      return unless %w[walk step].include?(skill.to_s)
+      return unless Ledger.pick(result, :stopped_by).to_s == 'done'
       return unless Ledger.pick(result, :dialog_before) == false && Ledger.pick(result, :dialog_after) == false
       return if Array(Ledger.pick(result, :trigger_input)).any?
+      return unless Ledger.pick(result, :moved_cells).to_i.positive? || Ledger.pick(result, :moved_px).to_i.positive? || Ledger.pick(result, :frames).to_i >= 4
 
-      input = Ledger.pick(params, skill.to_s == 'press' ? :button : :direction)&.to_s
+      input = Ledger.pick(params, :direction)&.to_s
       from = Ledger.pick(result, :from)
       row = Ledger.pick(from, :row)
       col = Ledger.pick(from, :col)

@@ -51,12 +51,15 @@ class TriggersTest < Minitest::Test
 
   def test_from_events_replays_the_explicit_clearing
     scripted = action('goto', { 'row' => 1, 'col' => 1 }, result.merge(trigger_input: ['down']))
-    quiet = ->(skill, params, after: false) { action(skill, params, result(after:).merge(trigger_input: nil)) }
+    quiet = lambda do |skill, params, after: false, **over|
+      action(skill, params, result(after:).merge(trigger_input: nil, stopped_by: 'done', moved_cells: 1, frames: 8, **over))
+    end
     refute_empty Koholint::Triggers.from_events([scripted]).forbidden(PLACE, [3, 4])
-    cleared = Koholint::Triggers.from_events([scripted, quiet.call('step', { 'direction' => 'down', 'pixels' => 2 })])
-    assert_equal [], cleared.forbidden(PLACE, [3, 4])
-    cleared = Koholint::Triggers.from_events([scripted, quiet.call('press', { 'button' => 'down', 'frames' => 3 })])
-    assert_equal [], cleared.forbidden(PLACE, [3, 4])
+    assert_equal [], Koholint::Triggers.from_events([scripted, quiet.call('step', { 'direction' => 'down', 'pixels' => 2 })]).forbidden(PLACE, [3, 4])
+    assert_equal [], Koholint::Triggers.from_events([scripted, quiet.call('walk', { 'direction' => 'down' })]).forbidden(PLACE, [3, 4])
+    bad = [quiet.call('walk', { 'direction' => 'down' }, stopped_by: 'damage'), quiet.call('walk', { 'direction' => 'down' }, stopped_by: 'room_change'),
+           quiet.call('walk', { 'direction' => 'down' }, stopped_by: 'blocked', moved_cells: 0, frames: 2)]
+    bad.each { |event| assert_equal [:down], Koholint::Triggers.from_events([scripted, event]).forbidden(PLACE, [3, 4]) }
     kept = [quiet.call('walk', { 'direction' => 'up' }), quiet.call('press', { 'button' => 'b' }), quiet.call('walk', { 'direction' => 'down' }, after: true)]
     assert_equal [:down], Koholint::Triggers.from_events([scripted, *kept]).forbidden(PLACE, [3, 4])
   end
