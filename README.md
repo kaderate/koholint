@@ -2,7 +2,7 @@
 
 A deterministic engine that plays Link's Awakening DX headless through emu-gb and calls agents
 (Jev for tactical choices, Claude for strategy) at defined decision points. Each run lives in
-`runs/<id>/`: manifest, trace, input journal, saves, keyframes.
+`runs/<id>/`: manifest, trace, input journal, saves, keyframes, summary.
 
 - Design: `docs/superpowers/specs/2026-10-16-koholint-v2-architecture-design.md`
 - Plans: `docs/superpowers/plans/`
@@ -34,3 +34,21 @@ Agent skills: `goto row col` walks to a cell of the known grid with a shortest p
 blocked twice is marked doubtful in the context, and an objective that keeps failing is abandoned as `unreachable`. Dialogue pages are
 advanced automatically (one `decision` with agent `delegated` and cost 0 per page) and read once from the page sheets. `--steps N` counts
 finished objectives. `resume` rebuilds the ledger and the visited places from the trace; the flow version is `flow-3`. `talk_to` walks next to a person, faces them and presses A; the agent also writes a one-line `plan` that the next call sees, and the live view shows its reasoning and plan under each decision.
+
+## Run storage
+
+Every finished run is kept in git as a light bundle under `runs/<id>/` (about 60 KB): `manifest.json` (with `tag`,
+`harness_sha`, `prompts_sha`, `model`), `inputs.log`, `trace.jsonl.gz`, `world.json`, `suggestions.md`, `summary.json`
+(written by the engine at every stop) and `star.json` when starred. `prompts/`, `keyframes/`, `save/`, `video/`,
+`activity.json`, `run.lock` and the plain `trace.jsonl` are gitignored: saves and keyframes are derivable by replay.
+
+- `bin/koholint run --tag NAME` labels a run.
+- `bin/koholint archive [--from DIR] [--root DIR] [--commit] [--full]` imports finished runs from `--from` (copying only the
+  light bundle; the source is never modified), gzips the trace, writes a missing `summary.json` and regenerates
+  `docs/runs/index.md`. `--commit` makes one commit (`Archive runs A..B`); `--full` also force-adds `prompts/`. Running it
+  twice changes nothing. Runs without a final `stop` event or with a live lock are skipped.
+- `bin/koholint star <run_dir> "why"` marks a run worth keeping (`star.json`, `summary.json` `starred`).
+- `bin/koholint prune-heavy [--keep N] [--yes]` deletes `prompts/` and `keyframes/` of unstarred runs older than the N most
+  recent (default 5); without `--yes` it only lists them.
+
+`resume` and `fork` work on an archived run: the trace is decompressed back to `trace.jsonl` (archive again after the stop).
