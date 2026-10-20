@@ -919,7 +919,7 @@ class DelegatedEngineTest < Minitest::Test
     emulator.step until Koholint::Perception.read(emulator).dialog_open?
     with_run do |run|
       eng = nil
-      leads = [{ 'quote' => 'enfin', 'claim' => 'someone waited', 'importance' => 'normal' }, { 'quote' => 'nope', 'claim' => 'c', 'importance' => 'low' }]
+      leads = [{ 'quote' => 'ah! enfin', 'claim' => 'someone waited', 'importance' => 'normal' }, { 'quote' => 'nope', 'claim' => 'c', 'importance' => 'low' }]
       talk = -> { eng.request_stop; ok('skill' => 'advance_dialogue', 'params' => {}, 'transcription' => 'Ah! Enfin...', 'leads' => leads, 'goal' => 'wake up') }
       client = ScriptedClient.new(objective: leave_house, skill: talk)
       eng = agent_engine(run, client, emulator:)
@@ -933,7 +933,7 @@ class DelegatedEngineTest < Minitest::Test
       assert_equal 1, event['page']
       assert_equal 2, event['place'].size
       refute_includes File.read(File.join(run.dir, 'trace.jsonl')), 'PNG'
-      assert_equal [['lead-1', 'enfin', 'normal']], events(run, :lead).map { |e| e.values_at('id', 'quote', 'importance') }
+      assert_equal [['lead-1', 'ah! enfin', 'normal']], events(run, :lead).map { |e| e.values_at('id', 'quote', 'importance') }
       assert_equal ['wake up'], events(run, :goal).map { |e| e['text'] }
       assert_equal ['lead_rejected'], events(run, :notable).map { |e| e['kind'] }
       world = JSON.parse(File.read(File.join(run.dir, 'world.json')))

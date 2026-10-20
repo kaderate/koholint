@@ -54,7 +54,9 @@ class PromptsTest < Minitest::Test
     assert_includes Koholint::Agents::Prompts.system_for(points.last, sheets: true), 'then extract its leads'
     assert_equal %i[goal because], points.first.json_schema[:properties].keys & %i[goal because leads]
     leads = points.last.json_schema[:properties][:leads]
-    assert_equal [5, %w[high normal low], 160], [leads[:maxItems], leads[:items][:properties][:importance][:enum], leads[:items][:properties][:claim][:maxLength]]
+    quote = leads[:items][:properties][:quote]
+    assert_equal [5, %w[high normal low], 8, 300], [leads[:maxItems], leads[:items][:properties][:importance][:enum], quote[:minLength], quote[:maxLength]]
+    assert_nil leads[:items][:properties][:claim][:maxLength]
     assert_equal 120, points.last.json_schema[:properties][:goal][:maxLength]
   end
 
