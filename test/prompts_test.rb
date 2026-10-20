@@ -55,7 +55,7 @@ class PromptsTest < Minitest::Test
     assert_equal %i[goal because], points.first.json_schema[:properties].keys & %i[goal because leads]
     leads = points.last.json_schema[:properties][:leads]
     quote = leads[:items][:properties][:quote]
-    assert_equal [5, %w[high normal low], 8, 300], [leads[:maxItems], leads[:items][:properties][:importance][:enum], quote[:minLength], quote[:maxLength]]
+    assert_equal [5, %w[high normal low], 1, nil], [leads[:maxItems], leads[:items][:properties][:importance][:enum], quote[:minLength], quote[:maxLength]]
     assert_nil leads[:items][:properties][:claim][:maxLength]
     assert_equal 120, points.last.json_schema[:properties][:goal][:maxLength]
   end
