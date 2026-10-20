@@ -1,5 +1,6 @@
 require_relative 'test_helper'
 require 'tmpdir'
+require 'json'
 require 'koholint/engine'
 require 'koholint/policies/walk_and_talk'
 
@@ -27,6 +28,8 @@ class EngineTest < Minitest::Test
       assert_equal 900, Koholint::InputLog.load(File.join(run.dir, 'inputs.log')).frames
       stop_save = events(run, :save).find { |e| e['source'] == 'stop' }
       assert File.file?(File.join(run.dir, 'save', stop_save['path']))
+      summary = JSON.parse(File.read(File.join(run.dir, 'summary.json')))
+      assert_equal [run.id, 900, 'frames', 0, false], summary.values_at('run_id', 'frames', 'stop_reason', 'calls', 'starred')
     end
   end
 
