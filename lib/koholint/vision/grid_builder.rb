@@ -1,4 +1,6 @@
 require 'koholint/calibration/walk_probe'
+require 'koholint/game_state'
+require 'koholint/geometry'
 require 'koholint/vision/beliefs'
 require 'koholint/vision/capabilities'
 require 'koholint/vision/grid'
@@ -14,8 +16,6 @@ module Koholint
       # Link walks about 1 px per frame: 32 frames cross the 16 px to the next cell with a 2x margin.
       PROBE_HOLD_FRAMES = 32
       STEPS = { up: [-1, 0], down: [1, 0], left: [0, -1], right: [0, 1] }.freeze
-      # A stop only says the neighbour blocks when Link's center is within 4 px of its center line.
-      ALIGNMENT_TOLERANCE = 4
       OVERLAY_STUCK_FRAMES = 600
 
       def self.link_sprite?(sprite, state)
@@ -24,11 +24,7 @@ module Koholint
       end
 
       # Link's sprites cover x - 8...x + 8 and y - 16...y on screen; walls stop his center out of their cell.
-      def self.link_cell(x, y)
-        row = (y - 8) / 16
-        col = x / 16
-        [row, col] if row.between?(0, Grid::ROWS - 1) && col.between?(0, Grid::COLS - 1)
-      end
+      def self.link_cell(x, y) = GameState.cell_at(x, y)
 
       def initialize(trace:, capabilities: Capabilities.new, beliefs: Beliefs.new, prober: Calibration::WalkProbe)
         @trace = trace
@@ -187,8 +183,7 @@ module Koholint
       end
 
       def aligned?(start, cell, direction)
-        offset = STEPS.fetch(direction)[0].zero? ? (start[:y] - 8) - ((cell[0] * 16) + 8) : start[:x] - ((cell[1] * 16) + 8)
-        offset.abs <= ALIGNMENT_TOLERANCE
+        Geometry.aligned?(start[:x], start[:y], cell, axis: STEPS.fetch(direction)[0].zero? ? :y : :x)
       end
 
       def record(appearance, direction, result, frame)

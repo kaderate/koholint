@@ -55,4 +55,20 @@ class BudgetTest < Minitest::Test
     3.times { b.tick(cost: 0.04) }
     assert_equal :dollars, b.exhausted
   end
+
+  def test_the_first_stop_reason_wins
+    b = budget(FakeClock.new)
+    b.stop!
+    b.stop!(:agent_failures)
+    assert_equal :stopped, b.exhausted
+  end
+
+  def test_stop_remembers_its_reason
+    b = budget(FakeClock.new)
+    b.stop!(:agent_failures)
+    assert_equal :agent_failures, b.exhausted
+    other = budget(FakeClock.new)
+    other.stop!
+    assert_equal :stopped, other.exhausted
+  end
 end

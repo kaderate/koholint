@@ -211,7 +211,7 @@ class GridBuilderTest < Minitest::Test
     Class.new(Koholint::Policies::WalkAndTalk) do
       attr_reader :contexts
 
-      def decide(point, state, context)
+      def decide(decision_point, state, context)
         (@contexts ||= []) << context
         super
       end
@@ -258,16 +258,16 @@ class GridBuilderTest < Minitest::Test
       @log = []
     end
 
-    def point_for(state)
+    def decision_point_for(state)
       dialogue? ? Koholint::DecisionPoint.macro(:dialogue) : super
     end
 
     def dialogue? = @emulator.read(Koholint::Vision::ScreenVision::ADDRESSES.fetch(:dialog_state)).positive?
 
-    def decide(point, state, context)
+    def decide(decision_point, state, context)
       @log << { frame: state.frame, dialog: @emulator.read(Koholint::Vision::ScreenVision::ADDRESSES.fetch(:dialog_state)),
                 grid: context[:grid] }
-      return super unless point.name == :dialogue
+      return super unless decision_point.name == :dialogue
 
       @pressed = !@pressed
       choice = @pressed ? { buttons: [:a], frames: 3 } : { buttons: [], frames: 57 }
@@ -297,9 +297,9 @@ class GridBuilderTest < Minitest::Test
     end
   end
 
-  def test_engine_without_grid_passes_an_empty_context
+  def test_engine_without_grid_passes_no_grid
     skip_without_rom!
-    play(grid: false, frames: 120) { |_run, policy, _emulator| assert(policy.contexts.all?(&:empty?)) }
+    play(grid: false, frames: 120) { |_run, policy, _emulator| assert(policy.contexts.none? { |c| c.key?(:grid) }) }
   end
 
   def test_link_standing_still_never_has_static_sprites_but_objects_do

@@ -1,9 +1,10 @@
 require 'koholint/trace'
+require 'koholint/perception'
 
 module Koholint
   module Summary
     STALL_FRAMES = 3600
-    HP_PER_HEART = 8.0
+    HP_PER_HEART = Perception::HP_PER_HEART.to_f
     DIAGNOSTIC_NOTABLE_KINDS = %w[grid_overlay_stuck].freeze
     TERMINAL = %w[achieved abandoned failed].freeze
 
@@ -28,10 +29,15 @@ module Koholint
         max_hearts: state && state['max_hp'] / HP_PER_HEART,
         objective: current_objective(events),
         last_notable: events.reverse_each.find { |e| e['type'] == 'notable' && progress?(e) }&.slice('kind', 'detail'),
-        highest_milestone: state && state['milestone'],
+        highest_milestone: highest_milestone(events),
         frames: frames,
         cost_usd: events.select { |e| e['type'] == 'decision' }.sum { |e| e['cost_usd'] }
       }
+    end
+
+    def highest_milestone(events)
+      seen = events.filter_map { |e| e['state']&.fetch('milestone', nil) if e['type'] == 'perception' }
+      seen.max_by { |m| Perception::MILESTONES.index(m.to_sym) || 0 }
     end
 
     def health(events, state, frames)

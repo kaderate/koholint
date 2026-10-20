@@ -121,6 +121,104 @@ class CliTest < Minitest::Test
     end
   end
 
+  FAKE_CLAUDE = File.expand_path('fixtures/fake_claude', __dir__)
+
+  def with_fake_claude
+    Dir.mktmpdir do |dir|
+      ENV['FAKE_CLAUDE_LOG'] = File.join(dir, 'log.json')
+      yield dir
+    end
+  ensure
+    ENV.delete('FAKE_CLAUDE_LOG')
+  end
+
+  def test_agent_run_calls_the_claude_command_and_stops_at_the_dollar_cap
+    skip_without_rom!
+    with_fake_claude do |dir|
+      code, out, = cli('run', '--agent', '--claude-command', FAKE_CLAUDE, '--model', 'haiku', '--max-dollars', '0.02', '--root', dir)
+      assert_equal 0, code
+      assert_match(/^stopped: dollars$/, out)
+      run_dir = out[/^run (.+)$/, 1]
+      decisions = Koholint::Trace.read(File.join(run_dir, 'trace.jsonl')).select { |e| e['type'] == 'decision' && e['agent'] == 'claude' }
+      assert_equal 2, decisions.size
+      assert(decisions.all? { |d| d['fallback'] && d['cost_usd'] == 0.0123 })
+      argv = JSON.parse(File.readlines(ENV.fetch('FAKE_CLAUDE_LOG')).first)['argv']
+      assert_equal 'haiku', argv[argv.index('--model') + 1]
+      assert_equal 0, cli('verify', run_dir)[0]
+    end
+  end
+
+  def test_resume_accepts_the_agent_flags
+    skip_without_rom!
+    with_fake_claude do |dir|
+      run_dir = cli('run', '--frames', '300', '--root', dir)[1][/^run (.+)$/, 1]
+      code, out, = cli('resume', run_dir, '--agent', '--claude-command', FAKE_CLAUDE, '--max-dollars', '0.01')
+      assert_equal 0, code
+      assert_match(/^stopped: dollars$/, out)
+    end
+  end
+
+  def probe_presses(run_dir)
+    Koholint::Trace.read(File.join(run_dir, 'trace.jsonl')).count { |e| e['type'] == 'decision' && e['agent'] == 'start_game' && e['choice']['frames'] == 8 }
+  end
+
+  def test_only_a_fresh_agent_run_probes_and_a_resumed_one_does_not
+    skip_without_rom!
+    with_fake_claude do |dir|
+      out = cli('run', '--agent', '--claude-command', FAKE_CLAUDE, '--frames', '320', '--root', dir)[1]
+      run_dir = out[/^run (.+)$/, 1]
+      assert_operator probe_presses(run_dir), :>, 0
+      before = probe_presses(run_dir)
+      cli('resume', run_dir, '--agent', '--claude-command', FAKE_CLAUDE, '--max-dollars', '0.01')
+      assert_equal before, probe_presses(run_dir)
+    end
+  end
+
+  def test_resume_refuses_a_flow_1_run
+    skip_without_rom!
+    Dir.mktmpdir do |dir|
+      run = Koholint::Run.create(root: dir, flow_version: 'flow-1', budget: {})
+      code, _out, err = cli('resume', run.dir)
+      assert_equal 1, code
+      assert_match(/flow-1/, err)
+    end
+  end
+
+  def test_resume_rebuilds_the_ledger_and_visited_places_from_the_trace
+    skip_without_rom!
+    Dir.mktmpdir do |dir|
+      run = Koholint::Run.create(root: dir, flow_version: Koholint::FLOW_VERSION, budget: {})
+      playing = { 'game_mode' => 0x0B, 'game_submode' => 7, 'x' => 40, 'y' => 40 }
+      run.trace.emit(:perception, frame: 1, state: playing.merge('room_id' => 1, 'map_id' => 2), state_hash: 'h')
+      run.trace.emit(:perception, frame: 2, state: playing.merge('game_submode' => 3, 'room_id' => 9, 'map_id' => 9), state_hash: 'h')
+      run.trace.emit(:perception, frame: 3, state: playing.merge('game_mode' => 1, 'room_id' => 8, 'map_id' => 8), state_hash: 'h')
+      run.trace.emit(:perception, frame: 4, state: playing.merge('room_id' => 3, 'map_id' => 2), state_hash: 'h')
+      run.trace.emit(:perception, frame: 5, state: playing.merge('room_id' => 1, 'map_id' => 2), state_hash: 'h')
+      2.times do |n|
+        run.trace.emit(:action, frame: 6 + n, skill: 'goto', params: { row: 1, col: 1 },
+                                result: { from: { room: 1, map: 2 }, to: { room: 1, map: 2 }, stopped_by: 'blocked',
+                                          blocked_at: { row: 2, col: 3, direction: 'up' } })
+      end
+      2.times { |n| run.trace.emit(:objective, frame: 8 + n, id: "obj-#{n + 1}", status: 'started', title: 't', predicate: { kind: 'new_place' }) }
+      run.trace.emit(:objective, frame: 11, id: 'obj-1', status: 'achieved', title: 't', predicate: { kind: 'new_place' })
+
+      ledger = Koholint::CLI.ledger_for(run)
+      assert ledger.doubtful?([1, 2], [2, 3], :up)
+      assert_equal 2, ledger.count([1, 2], [2, 3], :up)
+      objectives = Koholint::CLI.objectives_for(run)
+      assert_equal [[1, 2], [3, 2]], objectives.visited
+      objectives.start(frame: 20, title: 'next', predicate: { kind: 'new_place' })
+      assert_equal 'obj-3', objectives.current[:id]
+    end
+  end
+
+  def test_agent_without_claude_executable_is_a_one_line_error
+    code, _out, err = cli('run', '--agent', '--claude-command', '/nope/claude', '--frames', '10')
+    assert_equal 1, code
+    assert_equal 1, err.lines.size
+    assert_match(/claude/, err)
+  end
+
   def http(port, path)
     Net::HTTP.start('127.0.0.1', port.to_i, open_timeout: 10, read_timeout: 20) { |h| h.get(path).body }
   end

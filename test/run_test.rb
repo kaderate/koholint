@@ -24,6 +24,16 @@ class RunTest < Minitest::Test
     end
   end
 
+  def test_truncate_prompts_drops_prompt_files_from_the_truncation_frame_on
+    with_env do |dir, rom|
+      run = Koholint::Run.create(root: dir, flow_version: 'f1', budget: {}, rom_path: rom)
+      FileUtils.mkdir_p(File.join(run.dir, 'prompts'))
+      %w[90-choose_skill.txt 100-choose_skill.txt 100-choose_skill.png 150-choose_objective.txt].each { |n| File.write(File.join(run.dir, 'prompts', n), 'x') }
+      run.truncate_prompts!(100)
+      assert_equal ['90-choose_skill.txt'], Dir.children(File.join(run.dir, 'prompts'))
+    end
+  end
+
   def test_open_with_other_flow_version_raises
     with_env do |dir, rom|
       run = Koholint::Run.create(root: dir, flow_version: 'f1', budget: {}, rom_path: rom)
@@ -58,6 +68,51 @@ class RunTest < Minitest::Test
       run = Koholint::Run.create(root: dir, flow_version: 'f1', budget: {}, rom_path: rom)
       run.status = 'stopped'
       assert_equal 'stopped', Koholint::Run.open(run.dir, flow_version: 'f1', rom_path: rom).manifest['status']
+    end
+  end
+
+  def test_write_activity_is_atomic_and_skips_unchanged_states
+    with_env do |dir, rom|
+      run = Koholint::Run.create(root: dir, flow_version: 'f1', budget: {}, rom_path: rom)
+      path = File.join(run.dir, 'activity.json')
+      run.write_activity(kind: 'deciding', label: 'asking', frame: 3, detail: { model: 'sonnet' })
+      first = JSON.parse(File.read(path))
+      assert_equal %w[kind label frame detail started_at].sort, first.keys.sort
+      assert_kind_of Float, first['started_at']
+      refute File.exist?("#{path}.tmp")
+      run.write_activity(kind: 'deciding', label: 'asking', frame: 9, detail: { model: 'sonnet' })
+      assert_equal 3, JSON.parse(File.read(path))['frame']
+      run.write_activity(kind: 'idle', label: 'between', frame: 9, detail: {})
+      assert_equal 'idle', JSON.parse(File.read(path))['kind']
+      refute File.exist?("#{path}.tmp")
+    end
+  end
+
+  def test_activity_is_ignored_by_fork_and_open
+    with_env do |dir, rom|
+      run = Koholint::Run.create(root: dir, flow_version: 'f1', budget: {}, rom_path: rom)
+      File.write(File.join(run.dir, 'activity.json'), 'garbage{')
+      reopened = Koholint::Run.open(run.dir, flow_version: 'f1', rom_path: rom)
+      child = reopened.fork(at_frame: 0, flow_version: 'f1', rom_path: rom)
+      refute File.exist?(File.join(child.dir, 'activity.json'))
+      reopened.truncate_trace!(0)
+    end
+  end
+
+  def test_write_activity_never_raises_and_leaves_no_temp_file
+    with_env do |dir, rom|
+      run = Koholint::Run.create(root: dir, flow_version: 'f1', budget: {}, rom_path: rom)
+      path = File.join(run.dir, 'activity.json')
+      [Float::NAN, "bad\xFF".b.force_encoding('UTF-8'), Object.new].each_with_index do |value, i|
+        run.write_activity(kind: 'acting', label: 'x', frame: 1, detail: { params: value, n: i })
+        refute File.exist?("#{path}.tmp")
+      end
+      FileUtils.rm_f(path)
+      FileUtils.mkdir_p(File.join(path, 'blocker'))
+      run.write_activity(kind: 'idle', label: 'x', frame: 1, detail: {})
+      refute File.exist?("#{path}.tmp")
+      FileUtils.rm_rf(run.dir)
+      run.write_activity(kind: 'stopped', label: 'x', frame: 1, detail: {})
     end
   end
 end

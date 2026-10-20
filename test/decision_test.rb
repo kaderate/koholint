@@ -8,26 +8,26 @@ class DecisionTest < Minitest::Test
   def state(frame) = Koholint::GameState.new(frame: frame, milestone: :none)
 
   def test_invalid_choice_raises
-    point = Koholint::DecisionPoint.move
-    assert_raises(Koholint::DecisionPoint::Invalid) { point.validate({ buttons: [:b], frames: 5 }) }
-    assert_equal point.options.first, point.validate(point.options.first)
+    decision_point = Koholint::DecisionPoint.move
+    assert_raises(Koholint::DecisionPoint::Invalid) { decision_point.validate({ buttons: [:b], frames: 5 }) }
+    assert_equal decision_point.options.first, decision_point.validate(decision_point.options.first)
   end
 
   def test_walk_and_talk_is_deterministic_for_same_frame
-    point = Koholint::DecisionPoint.move
+    decision_point = Koholint::DecisionPoint.move
     policy = Koholint::Policies::WalkAndTalk.new
-    first = policy.decide(point, state(95), {})
-    assert_equal first, policy.decide(point, state(95), {})
-    assert_includes point.options, first[:choice]
+    first = policy.decide(decision_point, state(95), {})
+    assert_equal first, policy.decide(decision_point, state(95), {})
+    assert_includes decision_point.options, first[:choice]
     assert_equal 'walk_and_talk', first[:agent]
   end
 
   def test_walk_and_talk_presses_a_every_tenth_cycle
-    point = Koholint::DecisionPoint.move
+    decision_point = Koholint::DecisionPoint.move
     policy = Koholint::Policies::WalkAndTalk.new
-    assert_equal({ buttons: [:up], frames: 30 }, policy.decide(point, state(0), {})[:choice])
-    assert_equal({ buttons: [:right], frames: 30 }, policy.decide(point, state(30), {})[:choice])
-    assert_equal({ buttons: [:a], frames: 2 }, policy.decide(point, state(30 * 9), {})[:choice])
+    assert_equal({ buttons: [:up], frames: 30 }, policy.decide(decision_point, state(0), {})[:choice])
+    assert_equal({ buttons: [:right], frames: 30 }, policy.decide(decision_point, state(30), {})[:choice])
+    assert_equal({ buttons: [:a], frames: 2 }, policy.decide(decision_point, state(30 * 9), {})[:choice])
   end
 
   class BadPrimary
@@ -35,24 +35,110 @@ class DecisionTest < Minitest::Test
 
     def initialize = @calls = 0
 
-    def decide(_point, _state, _context)
+    def decide(_decision_point, _state, _context)
       @calls += 1
       { choice: { buttons: [:b], frames: 1 }, justification: 'x', confidence: 1.0, agent: 'bad' }
     end
   end
 
   def test_fallback_used_after_one_retry
-    point = Koholint::DecisionPoint.move
+    decision_point = Koholint::DecisionPoint.move
     primary = BadPrimary.new
-    result = Koholint::Policies::WithFallback.new(primary, Koholint::Policies::WalkAndTalk.new).decide(point, state(0), {})
+    result = Koholint::Policies::WithFallback.new(primary, Koholint::Policies::WalkAndTalk.new).decide(decision_point, state(0), {})
     assert_equal 2, primary.calls
     assert result[:fallback]
     assert_equal 'walk_and_talk', result[:agent]
   end
 
   def test_valid_primary_is_not_flagged
-    point = Koholint::DecisionPoint.move
-    result = Koholint::Policies::WithFallback.new(Koholint::Policies::WalkAndTalk.new, BadPrimary.new).decide(point, state(0), {})
+    decision_point = Koholint::DecisionPoint.move
+    result = Koholint::Policies::WithFallback.new(Koholint::Policies::WalkAndTalk.new, BadPrimary.new).decide(decision_point, state(0), {})
     refute result[:fallback]
+  end
+
+  def objective_point = Koholint::DecisionPoint.choose_objective
+
+  def test_choose_objective_accepts_good_outputs
+    point = objective_point
+    assert_equal :choose_objective, point.name
+    assert_nil point.options
+    assert_equal %i[title predicate], point.output_schema
+    good = { title: 'Leave', predicate: { kind: 'leave_place', place: [163, 16] } }
+    assert_equal good, point.validate(good)
+    point.validate({ title: 'Talk', predicate: { 'kind' => 'dialogue_closed' } })
+    point.validate({ title: 'Go', predicate: { kind: 'reach_cell', place: [1, 2], row: 3, col: 4 } })
+    point.validate({ title: 'Explore', predicate: { kind: 'new_place' } })
+  end
+
+  def test_choose_objective_rejects_bad_outputs
+    point = objective_point
+    [{ title: '', predicate: { kind: 'dialogue_closed' } }, { title: 7, predicate: { kind: 'dialogue_closed' } },
+     { title: 'x', predicate: { kind: 'win' } }, { title: 'x', predicate: { kind: 'reach_cell', place: [1, 2] } },
+     { title: 'x', predicate: { kind: 'leave_place', place: 'x' } }, { title: 'x' }].each do |choice|
+      assert_raises(Koholint::DecisionPoint::Invalid, choice.inspect) { point.validate(choice) }
+    end
+  end
+
+  def test_choose_objective_title_bounds
+    point = objective_point
+    predicate = { kind: 'dialogue_closed' }
+    point.validate({ title: 'x' * 80, predicate: })
+    [{ title: 'x' * 81, predicate: }, { title: "a\nb", predicate: }, { title: "a\e[0m", predicate: }].each do |choice|
+      assert_raises(Koholint::DecisionPoint::Invalid) { point.validate(choice) }
+    end
+    assert_equal 80, point.json_schema[:properties][:title][:maxLength]
+  end
+
+  def test_plan_is_a_required_capped_string_for_the_model_but_validation_accepts_its_absence
+    registry = Koholint::Skills::Registry.default
+    [objective_point.json_schema, Koholint::DecisionPoint.choose_skill(registry).json_schema].each do |schema|
+      assert_equal({ type: 'string', maxLength: 200 }, schema[:properties][:plan])
+      assert_includes schema[:required], 'plan'
+    end
+    point = objective_point
+    point.validate({ title: 'x', predicate: { kind: 'dialogue_closed' }, plan: 'talk first' })
+    point.validate({ title: 'x', predicate: { kind: 'dialogue_closed' } })
+  end
+
+  def test_choose_objective_json_schema
+    schema = objective_point.json_schema
+    assert_equal 'object', schema[:type]
+    assert_equal %w[title predicate justification confidence plan], schema[:required]
+    kinds = schema[:properties][:predicate][:oneOf].map { |p| p[:properties][:kind][:enum] }
+    assert_equal [%w[leave_place], %w[reach_place], %w[reach_cell], %w[dialogue_closed], %w[new_place]], kinds
+    reach_cell = schema[:properties][:predicate][:oneOf][2]
+    assert_equal %w[kind place row col], reach_cell[:required]
+    assert_equal false, reach_cell[:additionalProperties]
+    JSON.parse(JSON.generate(schema))
+  end
+
+  def test_string_keyed_choices_are_normalised
+    objective = objective_point.validate({ 'title' => 'Talk', 'predicate' => { 'kind' => 'dialogue_closed' } })
+    assert_equal 'Talk', objective[:title]
+    point = Koholint::DecisionPoint.choose_skill(Koholint::Skills::Registry.default)
+    choice = point.validate({ 'skill' => 'walk', 'params' => { 'direction' => 'up', 'cells' => 2 } })
+    assert_equal 'walk', choice[:skill]
+    assert_raises(Koholint::DecisionPoint::Invalid) { point.validate({ 'skill' => 'walk' }) }
+  end
+
+  def test_choose_skill_schema_and_validation_cover_step
+    point = Koholint::DecisionPoint.choose_skill(Koholint::Skills::Registry.default)
+    step = point.json_schema.to_json
+    assert_includes step, '"step"'
+    pixels = JSON.parse(step).dig("properties", "params", "anyOf").find { |s| s["title"] == "step" }["properties"]["pixels"]
+    assert_equal [1, 16], [pixels["minimum"], pixels["maximum"]]
+    [0, 17].each { |n| assert_raises(Koholint::DecisionPoint::Invalid) { point.validate({ "skill" => "step", "params" => { "direction" => "up", "pixels" => n } }) } }
+    assert_equal "step", point.validate({ "skill" => "step", "params" => { "direction" => "up", "pixels" => 8 } })[:skill]
+  end
+
+  def test_malformed_params_raise_invalid_for_every_skill
+    registry = Koholint::Skills::Registry.default
+    point = Koholint::DecisionPoint.choose_skill(registry)
+    [5, 'up', nil, [1], 1.5].each do |bad|
+      registry.names.each do |name|
+        assert_raises(Koholint::DecisionPoint::Invalid, "#{name} with #{bad.inspect}") { point.validate({ 'skill' => name, 'params' => bad }) }
+      end
+    end
+    assert_raises(Koholint::DecisionPoint::Invalid) { point.validate({ 'skill' => 5, 'params' => {} }) }
   end
 end

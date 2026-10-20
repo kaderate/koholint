@@ -1,5 +1,6 @@
 require 'digest'
 require 'koholint/addresses'
+require 'koholint/game_state'
 require 'koholint/vision/screen_snapshot'
 
 module Koholint
@@ -12,9 +13,6 @@ module Koholint
       WX = 0xFF4B
       PLAYFIELD_LINES = 128
       SCREEN_RIGHT_WX = 167
-      # Values and meaning: notes of game_mode and game_submode in data/addresses.json (one boot run, hypotheses).
-      PLAY_MODE = 0x0B
-      PLAY_SETTLED_SUBMODE = 7
       ADDRESSES = Addresses.load.slice(:game_mode, :game_submode, :dialog_state).freeze
       OAM = 0xFE00
       OAM_SPRITES = 40
@@ -42,7 +40,7 @@ module Koholint
           # Mid-transition the tilemap holds parts of two rooms.
           (scx % 8).positive? || (scy % 8).positive? ||
           (lcdc.anybits?(0x20) && reader.read(WY) < PLAYFIELD_LINES && reader.read(WX) < SCREEN_RIGHT_WX) ||
-          (ram.(:game_mode) == PLAY_MODE && ram.(:game_submode) != PLAY_SETTLED_SUBMODE) ||
+          GameState.new(game_mode: ram.(:game_mode), game_submode: ram.(:game_submode)).loading? ||
           # Dialogue boxes are drawn into the BG tilemap itself, with no window register change.
           ram.(:dialog_state).positive?
       end

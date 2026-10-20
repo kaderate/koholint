@@ -109,6 +109,28 @@ module Koholint
       rewrite_trace(path, kept)
     end
 
+    def truncate_prompts!(frames)
+      Dir.glob(File.join(dir, 'prompts', '*')).each do |path|
+        File.delete(path) if File.basename(path).to_i >= frames
+      end
+    end
+
+    def write_activity(fields)
+      key = fields.values_at(:kind, :detail)
+      return if key == @activity_key
+
+      tmp = File.join(dir, 'activity.json.tmp')
+      File.write(tmp, JSON.generate({ started_at: wall_clock, detail: {} }.merge(fields)))
+      File.rename(tmp, File.join(dir, 'activity.json'))
+      @activity_key = key
+    rescue StandardError
+      begin
+        File.delete(tmp) if tmp
+      rescue StandardError
+        nil
+      end
+    end
+
     def write_manifest
       tmp = File.join(dir, 'manifest.json.tmp')
       File.write(tmp, JSON.pretty_generate(@manifest))
@@ -116,6 +138,8 @@ module Koholint
     end
 
     private
+
+    def wall_clock = Time.now.to_f
 
     def rewrite_trace(path, events)
       tmp = "#{path}.tmp"

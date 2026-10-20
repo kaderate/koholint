@@ -70,8 +70,8 @@ class ResilienceTest < Minitest::Test
     end
   end
 
-  def test_steps_flag_is_rejected_until_objectives_exist
-    code, _out, err = cli('run', '--steps', '2')
+  def test_steps_flag_must_be_positive
+    code, _out, err = cli('run', '--steps', '0')
     assert_equal 2, code
     assert_match(/usage/i, err)
   end

@@ -17,3 +17,5 @@ roms/
 /runs/*/run.lock
 .env
 Gemfile.lock
+/runs/*/prompts/
+/runs/*/activity.json*

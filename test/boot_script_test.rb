@@ -35,4 +35,10 @@ class BootScriptTest < Minitest::Test
     assert_equal({ buttons: [], frames: 5 }, macro(1))
     assert_equal({ buttons: [], frames: 5 }, macro(nil))
   end
+
+  def test_probe_free_cycles_four_presses_and_a_long_idle
+    steps = (0..5).map { |n| Koholint::BootScript.probe_free(n) }
+    assert_equal [[:up], [:right], [:down], [:left], [], [:up]], steps.map { |c| c[:buttons] }
+    assert_equal [8, 8, 8, 8, 30, 8], steps.map { |c| c[:frames] }
+  end
 end

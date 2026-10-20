@@ -85,7 +85,7 @@ class EngineTest < Minitest::Test
     def initialize(emulator) = (@emulator = emulator
                                 super())
 
-    def decide(point, state, context)
+    def decide(decision_point, state, context)
       @emulator.instance_variable_get(:@driver).motherboard.mmu.mbc.external_ram.bytes[3] = 0x42 if state.frame >= 120
       super
     end
@@ -141,5 +141,142 @@ class EngineTest < Minitest::Test
       assert_equal ['stopped'], stops.map { |e| e['reason'] }
       assert_equal 'stopped', JSON.parse(File.read(File.join(File.dirname(trace), 'manifest.json')))['status']
     end
+  end
+
+  class ScriptedPolicy
+    def initialize(choices, registry = Koholint::Skills::Registry.default)
+      @choices = choices.dup
+      @registry = registry
+    end
+
+    def decision_point_for(_state) = Koholint::DecisionPoint.choose_skill(@registry)
+
+    def decide(_decision_point, _state, _context)
+      { choice: @choices.shift || { skill: 'wait', params: { frames: 1 } }, justification: 'script', confidence: 1.0, agent: 'scripted' }
+    end
+  end
+
+  SKILL_SCRIPT = [{ skill: 'wait', params: { frames: 20 } }, { skill: 'press', params: { button: :a, frames: 3 } },
+                  { skill: 'walk', params: { direction: :right, cells: 1 } }].freeze
+
+  def play_script(frames)
+    with_run do |_dir, run|
+      Koholint::Engine.new(run: run, policy: ScriptedPolicy.new(SKILL_SCRIPT), budget: Koholint::Budget.new(frames:)).run
+      yield run
+    end
+  end
+
+  def test_skill_choices_journal_frames_and_emit_results
+    skip_without_rom!
+    play_script(800) do |run|
+      actions = events(run, :action)
+      assert_equal %w[wait press walk], actions.first(3).map { |a| a['skill'] }
+      assert_equal 20, actions[0]['result']['frames']
+      assert_equal 13, actions[1]['result']['frames']
+      assert_equal({ 'button' => 'a', 'frames' => 3 }, actions[1]['params'])
+      assert_equal 'wait', events(run, :decision).first['choice']['skill']
+      assert_equal 'choose_skill', events(run, :decision).first['decision_point']
+      assert_equal 800, Koholint::InputLog.load(File.join(run.dir, 'inputs.log')).frames
+    end
+  end
+
+  def test_same_skill_choices_give_identical_journals_and_state_hashes
+    skip_without_rom!
+    runs = Array.new(2) do
+      play_script(600) do |run|
+        break [File.binread(File.join(run.dir, 'inputs.log')), Koholint::Replay.to(run, 600).state_hash]
+      end
+    end
+    refute_empty runs[0][0]
+    assert_equal runs[0], runs[1]
+  end
+
+  class Endless
+    def name = 'endless'
+
+    def normalize(_params) = {}
+
+    def start(state, _params, _context = {}) = Koholint::Skills::Wait::Run.new(skill: name, params: {}, state:, duration: 10_000)
+  end
+
+  def test_budget_exhausted_mid_execution_is_reported
+    skip_without_rom!
+    with_run do |_dir, run|
+      policy = ScriptedPolicy.new([{ skill: 'wait', params: { frames: 100 } }])
+      Koholint::Engine.new(run: run, policy:, budget: Koholint::Budget.new(frames: 40)).run
+      action = events(run, :action).first
+      assert_equal 'budget', action['result']['stopped_by']
+      assert_equal 40, action['result']['frames']
+      assert_equal 40, Koholint::InputLog.load(File.join(run.dir, 'inputs.log')).frames
+    end
+  end
+
+  def test_hard_cap_and_single_flush_per_execution
+    skip_without_rom!
+    with_run do |_dir, run|
+      flushes = 0
+      inputs = run.inputs
+      inputs.define_singleton_method(:flush) { |*args| (flushes += 1) && super(*args) }
+      registry = Koholint::Skills::Registry.new([Endless.new])
+      policy = ScriptedPolicy.new([{ skill: 'endless', params: {} }], registry)
+      eng = Koholint::Engine.new(run: run, policy:, budget: Koholint::Budget.new, keyframe_every: 100_000)
+      eng.send(:iterate)
+      outcome = events(run, :action).first['result']
+      assert_equal 400, outcome['frames']
+      assert_equal 'frame_cap', outcome['stopped_by']
+      assert_equal 1, flushes
+    end
+  end
+
+  class ContextProbe
+    attr_reader :seen
+
+    def name = 'probe'
+
+    def normalize(_params) = {}
+
+    def start(state, _params, context = {})
+      @seen = context
+      Koholint::Skills::Wait::Run.new(skill: name, params: {}, state:, duration: 1)
+    end
+  end
+
+  def test_the_policy_context_reaches_the_skill
+    skip_without_rom!
+    with_run do |_dir, run|
+      probe = ContextProbe.new
+      registry = Koholint::Skills::Registry.new([probe])
+      policy = ScriptedPolicy.new([{ skill: 'probe', params: {} }], registry)
+      eng = Koholint::Engine.new(run:, policy:, budget: Koholint::Budget.new, keyframe_every: 100_000, grid: true)
+      eng.send(:iterate)
+      assert_kind_of Koholint::Vision::Grid, probe.seen[:grid]
+      assert probe.seen[:dialogue_shot].respond_to?(:call)
+    end
+  end
+
+  def test_activity_ends_stopped_and_is_never_read_by_verify_or_resume
+    skip_without_rom!
+    with_run do |_dir, run|
+      engine(run, frames: 300).run
+      path = File.join(run.dir, 'activity.json')
+      assert_equal 'stopped', JSON.parse(File.read(path))['kind']
+      refute File.exist?("#{path}.tmp")
+      File.write(path, 'not json{')
+      assert_equal [], Koholint::Replay.verify(run, every: 600).reject(&:last)
+      resumed = Koholint::Engine.resume(run.dir, policy: Koholint::Policies::WalkAndTalk.new, budget: Koholint::Budget.new(frames: 300))
+      assert_equal 600, resumed.run.then { Koholint::InputLog.load(File.join(run.dir, 'inputs.log')).frames }
+    end
+  end
+
+  def test_a_failing_activity_write_changes_neither_trace_nor_journal
+    skip_without_rom!
+    outputs = [false, true].map do |failing|
+      with_run do |_dir, run|
+        FileUtils.mkdir_p(File.join(run.dir, 'activity.json.tmp')) if failing
+        engine(run, frames: 200).run
+        [File.read(File.join(run.dir, 'trace.jsonl')), File.binread(File.join(run.dir, 'inputs.log'))]
+      end
+    end
+    assert_equal outputs.first, outputs.last
   end
 end

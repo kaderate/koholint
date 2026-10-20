@@ -68,20 +68,20 @@ class WorldTest < Minitest::Test
 
   def test_oam_to_cell_arithmetic
     sprites = [
-      { 'x' => 4, 'y' => 8, 'pattern' => 'first' }, { 'x' => 19, 'y' => 23, 'pattern' => 'dup' },
+      { 'x' => 4, 'y' => 8, 'pattern' => 'first' }, { 'x' => 24, 'y' => 32, 'pattern' => 'dup' },
       { 'x' => 20, 'y' => 24, 'pattern' => 'next' }, { 'x' => 80, 'y' => 56, 'pattern' => 'npc' }, { 'x' => 88, 'y' => 56, 'pattern' => 'half' },
       { 'x' => 120, 'y' => 80, 'pattern' => 'pot' }, { 'x' => 128, 'y' => 80, 'pattern' => 'pot_right' },
-      { 'x' => 163, 'y' => 135, 'pattern' => 'last' }, { 'x' => 164, 'y' => 16, 'pattern' => 'off_right' },
-      { 'x' => 3, 'y' => 16, 'pattern' => 'off_left' }, { 'x' => 8, 'y' => 7, 'pattern' => 'off_top' },
-      { 'x' => 8, 'y' => 136, 'pattern' => 'off_bottom' }
+      { 'x' => 163, 'y' => 135, 'pattern' => 'last' }, { 'x' => 168, 'y' => 16, 'pattern' => 'off_right' },
+      { 'x' => 0, 'y' => 16, 'pattern' => 'off_left' }, { 'x' => 8, 'y' => 0, 'pattern' => 'off_top' },
+      { 'x' => 8, 'y' => 144, 'pattern' => 'off_bottom' }
     ]
     grid = World.from_events([screen(1, sprites:)]).grid_for([1, 2], Caps.new)
     assert_equal 'first', grid.static_sprite(0, 0)
-    assert_equal 'next', grid.static_sprite(1, 1)
-    assert_equal %w[npc half], [grid.static_sprite(3, 4), grid.static_sprite(3, 5)]
+    assert_equal %w[next dup], [grid.static_sprite(0, 1), grid.static_sprite(1, 1)]
+    assert_equal %w[npc half npc half], [grid.static_sprite(2, 4), grid.static_sprite(2, 5), grid.static_sprite(3, 4), grid.static_sprite(3, 5)]
     assert_equal 'pot', grid.static_sprite(4, 7)
     assert_nil grid.static_sprite(4, 8)
-    assert_nil grid.static_sprite(2, 4)
+    assert_nil grid.static_sprite(4, 4)
     assert_equal 'last', grid.static_sprite(7, 9)
     assert_nil grid.static_sprite(0, 9)
     assert_nil grid.static_sprite(7, 0)

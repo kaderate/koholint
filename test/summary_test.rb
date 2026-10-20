@@ -18,9 +18,9 @@ class SummaryTest < Minitest::Test
     with_run do |run|
       t = run.trace
       t.emit(:perception, frame: 0, state: STATE, state_hash: 'h')
-      t.emit(:decision, frame: 0, point: 'move', input: {}, options: [], choice: {}, justification: 'j', confidence: 1.0,
+      t.emit(:decision, frame: 0, decision_point: 'move', input: {}, options: [], choice: {}, justification: 'j', confidence: 1.0,
                         agent: 'a', latency_ms: 5, cost_usd: 0.25)
-      t.emit(:decision, frame: 30, point: 'move', input: {}, options: [], choice: {}, justification: 'j', confidence: 1.0,
+      t.emit(:decision, frame: 30, decision_point: 'move', input: {}, options: [], choice: {}, justification: 'j', confidence: 1.0,
                         agent: 'a', latency_ms: 5, cost_usd: 0.5)
       t.emit(:objective, frame: 40, id: 'find-sword', status: 'started', predicate: 'item sword')
       t.emit(:notable, frame: 50, kind: 'new_room', detail: '163/16')
@@ -28,6 +28,15 @@ class SummaryTest < Minitest::Test
       assert_equal({ health: 'progressing', hearts: 2.0, max_hearts: 3.0, objective: 'find-sword',
                      last_notable: { 'kind' => 'new_room', 'detail' => '163/16' }, highest_milestone: 'none',
                      frames: 60, cost_usd: 0.75 }, Koholint::Summary.for(run))
+    end
+  end
+
+  def test_highest_milestone_keeps_the_best_perceived
+    with_run do |run|
+      run.trace.emit(:perception, frame: 0, state: STATE, state_hash: 'h')
+      run.trace.emit(:perception, frame: 5, state: STATE.merge('milestone' => 'shield'), state_hash: 'h')
+      run.trace.emit(:perception, frame: 9, state: STATE, state_hash: 'h')
+      assert_equal 'shield', Koholint::Summary.for(run)[:highest_milestone]
     end
   end
 

@@ -113,7 +113,7 @@ class ScreenDiffTest < Minitest::Test
     samples = []
     while emulator.frame < start + WALK_FRAMES
       state = Koholint::Perception.read(emulator)
-      choice = policy.decide(policy.point_for(state), state, {})[:choice]
+      choice = policy.decide(policy.decision_point_for(state), state, {})[:choice]
       choice[:frames].times do
         if ((emulator.frame - start) % SAMPLE_EVERY).zero?
           now = Koholint::Perception.read(emulator)

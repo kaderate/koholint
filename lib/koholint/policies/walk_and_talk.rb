@@ -6,7 +6,7 @@ module Koholint
       CYCLE_FRAMES = 30
       TALK_EVERY = 10
 
-      def decide(_point, state, _context)
+      def decide(_decision_point, state, _context)
         step = state.frame / CYCLE_FRAMES
         choice = if (step % TALK_EVERY) == TALK_EVERY - 1
                    { buttons: [:a], frames: 2 }

@@ -77,4 +77,35 @@ class TraceTest < Minitest::Test
       assert_equal [9], Koholint::Trace.read(path).map { |e| e['frame'] }
     end
   end
+
+  def test_dialogue_event_requires_its_fields_and_an_agent_source
+    path = File.join(Dir.mktmpdir, 'trace.jsonl')
+    trace = Koholint::Trace.new(path)
+    event = trace.emit(:dialogue, frame: 1, place: [1, 2], text: 'Hi', source: 'agent', page: 0)
+    assert_equal 'Hi', event['text']
+    assert_raises(Koholint::Trace::InvalidEvent) { trace.emit(:dialogue, frame: 1, place: [1, 2], text: 'Hi', source: 'agent') }
+    assert_raises(Koholint::Trace::InvalidEvent) { trace.emit(:dialogue, frame: 1, place: [1, 2], text: 'Hi', source: 'ocr', page: 0) }
+  end
+
+  def test_decision_plan_is_optional_and_validated
+    Dir.mktmpdir do |dir|
+      trace = Koholint::Trace.new(File.join(dir, 'trace.jsonl'))
+      base = { decision_point: 'p', input: {}, options: [], choice: {}, justification: 'j', confidence: 1.0, agent: 'claude', latency_ms: 0, cost_usd: 0.0 }
+      trace.emit(:decision, frame: 1, **base, plan: 'talk to him')
+      assert_raises(Koholint::Trace::InvalidEvent) { trace.emit(:decision, frame: 2, **base, plan: 7) }
+      assert_raises(Koholint::Trace::InvalidEvent) { trace.emit(:decision, frame: 2, **base, plan: "a\nb") }
+      assert_equal 'talk to him', Koholint::Trace.read(File.join(dir, 'trace.jsonl')).last['plan']
+    end
+  end
+
+  def test_decision_prompt_fields_are_optional_but_validated
+    Dir.mktmpdir do |dir|
+      trace = Koholint::Trace.new(File.join(dir, 'trace.jsonl'))
+      base = { decision_point: 'p', input: {}, options: [], choice: {}, justification: 'j', confidence: 1.0, agent: 'claude', latency_ms: 0, cost_usd: 0.0 }
+      trace.emit(:decision, frame: 1, **base)
+      trace.emit(:decision, frame: 2, **base, prompt_sha: 'a' * 64, image: false)
+      assert_raises(Koholint::Trace::InvalidEvent) { trace.emit(:decision, frame: 3, **base, prompt_sha: 'xyz') }
+      assert_raises(Koholint::Trace::InvalidEvent) { trace.emit(:decision, frame: 3, **base, image: 'yes') }
+    end
+  end
 end

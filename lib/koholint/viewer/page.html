@@ -4,8 +4,10 @@
 <meta charset="utf-8">
 <title>Koholint live</title>
 <style>
-  body { margin: 0; background: #111; color: #ddd; font: 13px/1.4 monospace; }
-  #bar { display: flex; flex-wrap: wrap; gap: 6px 18px; padding: 8px 12px; background: #222; }
+  body { margin: 0; overflow-x: hidden; background: #111; color: #ddd; font: 13px/1.4 monospace; }
+  #bar { display: flex; flex-wrap: wrap; gap: 6px 24px; padding: 8px 12px; background: #222; }
+  #bar .group { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 18px; min-width: 0; overflow-wrap: anywhere; }
+  #bar .group-label { color: #777; font-size: 0.85em; text-transform: uppercase; letter-spacing: 0.08em; }
   #bar b { color: #8f8; font-weight: normal; }
   #bar b.health-unknown { color: #aaa; }
   #banner, #lost { display: none; padding: 8px 12px; font-weight: bold; color: #fff; }
@@ -21,20 +23,61 @@
   #legend i { display: inline-block; width: 10px; height: 10px; margin-right: 4px; }
   #grid { background: #333; color: #ddd; border: 1px solid #555; font: inherit; padding: 2px 10px; cursor: pointer; }
   #grid:disabled { color: #777; cursor: default; }
-  #side { flex: 1; display: flex; flex-direction: column; }
+  #activity { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 14px; padding: 10px 12px; background: #1a2a22; border-bottom: 1px solid #2c4; }
+  #activity.stopped { background: #2a1a1a; border-color: #a44; }
+  #activity.idle { background: #1d1d1d; border-color: #444; }
+  #dot { width: 12px; height: 12px; border-radius: 50%; background: #2c4; flex: none; animation: pulse 1.2s ease-in-out infinite; }
+  #activity.stopped #dot, #activity.idle #dot { animation: none; background: #777; }
+  @keyframes pulse { 0%, 100% { opacity: 1; transform: scale(1); } 50% { opacity: 0.35; transform: scale(0.7); } }
+  @media (prefers-reduced-motion: reduce) { #dot { animation: none; } }
+  #activity-label { font-size: 1.25em; color: #fff; }
+  #activity-timer { font-size: 1.25em; color: #8f8; font-variant-numeric: tabular-nums; }
+  #activity, #activity-detail { overflow-wrap: anywhere; }
+  #activity-detail { color: #9ab; flex-basis: 100%; }
+  .panel { background: #181818; border: 1px solid #333; padding: 8px 10px; margin-bottom: 10px; overflow-wrap: anywhere; }
+  .panel h2 { margin: 0 0 4px; font-size: 0.85em; font-weight: normal; color: #888; text-transform: uppercase; letter-spacing: 0.08em; }
+  #reasoning-text { font-size: 1.25em; line-height: 1.5; color: #eef; white-space: pre-wrap; }
+  #reasoning-head, #reasoning-plan, #objective-predicate, #objective-attempts, #budget-line { color: #9ab; }
+  #reasoning-plan { margin-top: 6px; color: #dfe; }
+  #objective-title { font-size: 1.15em; color: #fd8; }
+  #meter { height: 6px; background: #333; margin: 4px 0; }
+  #meter-fill { height: 100%; width: 0; background: #2c4; }
+  #meter-fill.high { background: #e83; }
+  #left { flex: none; width: 480px; min-width: 0; }
+  @media (max-width: 800px) {
+    #main { flex-direction: column; align-items: stretch; }
+    #bar { flex-direction: column; }
+    #left { width: auto; max-width: 480px; }
+    #stage { width: 100%; max-width: 480px; height: auto; aspect-ratio: 10 / 9; }
+    #frame { width: 100%; height: 100%; }
+    #overlay { transform-origin: 0 0; }
+    #events { height: 300px; }
+  }
+  #left .panel:last-child { margin-bottom: 0; }
+  #stage { margin-bottom: 10px; }
+  #side { flex: 1; min-width: 0; display: flex; flex-direction: column; }
   #sidebar { display: flex; justify-content: space-between; align-items: center; padding: 4px 6px; background: #222; }
   #mode { background: #333; color: #ddd; border: 1px solid #555; font: inherit; padding: 2px 10px; cursor: pointer; }
   #events { height: 400px; overflow-y: auto; background: #181818; padding: 6px; margin: 0; white-space: pre-wrap; }
   #events .action { color: #999; }
   #events .decision { color: #dfe; }
+  #events .objective { color: #fd8; }
+  #events .dialogue { color: #9cf; }
+  #events .reason { display: block; color: #8a9; margin: 0 0 4px 14px; font-size: 0.92em; white-space: pre-wrap; }
 </style>
 </head>
 <body>
+<div id="activity" class="idle"><span id="dot"></span><span id="activity-label">Waiting for the engine...</span><span id="activity-timer"></span><span id="activity-detail"></span></div>
 <div id="bar"></div>
 <div id="banner">Replay diverged: the follower no longer matches the run.</div>
 <div id="lost">Connection lost, retrying...</div>
 <div id="main">
+  <div id="left">
   <div id="stage"><img id="frame" alt="game frame"><div id="overlay"></div></div>
+    <div class="panel" id="reasoning"><h2>Reasoning</h2><div id="reasoning-head"></div><div id="reasoning-text"></div><div id="reasoning-plan"></div></div>
+    <div class="panel" id="objective"><h2>Objective</h2><div id="objective-title"></div><div id="objective-predicate"></div><div id="objective-attempts"></div></div>
+    <div class="panel" id="budget"><h2>Budget</h2><div id="meter"><div id="meter-fill"></div></div><div id="budget-line"></div></div>
+  </div>
   <div id="side">
     <div id="sidebar"><span>events</span><span><button id="grid" type="button"></button> <button id="mode" type="button"></button></span></div>
     <div id="legend"></div>
@@ -54,15 +97,112 @@
     return JSON.stringify(choice);
   }
 
+  function plural(n, word) { return n + ' ' + word + (n === 1 ? '' : 's'); }
+
+  function formatPlace(place) { return Array.isArray(place) ? '[' + place.join(',') + ']' : ''; }
+
+  function formatParam(v) { return v !== null && typeof v === 'object' ? JSON.stringify(v) : String(v); }
+
+  function formatCell(p) { return '(' + p.row + ', ' + p.col + ')'; }
+
+  function formatSkillCall(skill, p) {
+    p = p && typeof p === 'object' ? p : {};
+    if (skill === 'goto' && Number.isInteger(p.row) && Number.isInteger(p.col)) return 'goto ' + formatCell(p);
+    if (skill === 'step' && typeof p.direction === 'string' && Number.isInteger(p.pixels)) return 'step ' + p.direction + ' ' + p.pixels + ' px';
+    return null;
+  }
+
+  function formatSkillChoice(choice) {
+    var p = choice.params && typeof choice.params === 'object' ? choice.params : {};
+    var named = formatSkillCall(choice.skill, p);
+    if (named) return named;
+    var keyed = choice.skill !== 'walk' && Object.keys(p).length > 1;
+    var params = Object.keys(p).map(function (k) { return keyed ? k + '=' + formatParam(p[k]) : formatParam(p[k]); });
+    return [choice.skill].concat(params).join(' ');
+  }
+
+  function formatDecisionChoice(choice) {
+    if (choice && typeof choice === 'object' && typeof choice.skill === 'string') return formatSkillChoice(choice);
+    if (choice && typeof choice === 'object' && typeof choice.title === 'string') return 'objective "' + choice.title + '"';
+    return formatChoice(choice);
+  }
+
+  var PAST = { walk: 'walked' };
+
+  function formatBlocked(b) {
+    if (!b || typeof b !== 'object' || !Number.isInteger(b.row) || !Number.isInteger(b.col)) return '';
+    return ', blocked at (' + b.row + ',' + b.col + ')' + (typeof b.direction === 'string' ? ' ' + b.direction : '');
+  }
+
+  function formatResult(e) {
+    var r = e.result;
+    var named = formatSkillCall(e.skill, e.params);
+    var plain = named === null || e.skill === 'walk';
+    var verb = PAST[e.skill] || e.skill;
+    var line;
+    if (e.skill === 'step' && typeof r.moved_px === 'number') line = 'moved ' + r.moved_px + ' px';
+    else line = typeof r.moved_cells === 'number' ? (named ? 'walked' : verb) + ' ' + plural(r.moved_cells, 'cell') : verb;
+    if (r.stopped_by) line += r.stopped_by === 'done' && plain ? ', done' : ', stopped: ' + r.stopped_by;
+    line += formatBlocked(r.blocked_at);
+    if (r.room_changed) line += ', room changed';
+    if (typeof r.hp_delta === 'number' && r.hp_delta !== 0) line += ', hp ' + (r.hp_delta > 0 ? '+' : '') + r.hp_delta;
+    return named ? named + ' · ' + line : line;
+  }
+
+  function truncate(value, max) {
+    var str = String(value);
+    return str.length > max ? str.slice(0, max - 1) + '…' : str;
+  }
+
+  function formatObjective(s) {
+    var st = s.status || {};
+    if (!st.objective) return 'none';
+    return truncate(st.objective_title || st.objective, 40);
+  }
+
+  function formatDollars(value) { return '$' + (typeof value === 'number' ? value : 0).toFixed(2); }
+
+  function formatCalls(s) { return (s.status && s.status.calls) || 0; }
+
   function formatEventPretty(e) {
     var head = 'f' + e.frame + ' · ';
     if (e.type === 'decision') {
-      var line = head + e.agent + ' decides ' + formatChoice(e.choice);
+      if (e.agent === 'delegated' && e.justification === 'automatic dialogue advance') return head + 'automatic dialogue advance';
+      var line = head + (e.agent || '?') + ' decides';
+      var choice = formatDecisionChoice(e.choice);
+      if (choice) line += ' ' + choice;
       if (typeof e.confidence === 'number' && e.confidence < 1) line += ' (' + Math.round(e.confidence * 100) + '%)';
+      if (e.fallback) line += ' [fallback]';
       return line;
     }
-    if (e.type === 'action') return head + e.skill + ' ' + formatChoice(e.params);
+    if (e.type === 'action') {
+      if (e.result && (e.result.stopped_by || typeof e.result.moved_cells === 'number' || typeof e.result.moved_px === 'number')) return head + formatResult(e);
+      return head + e.skill + ' ' + formatChoice(e.params);
+    }
+    if (e.type === 'objective') {
+      var p = e.predicate || {};
+      var what = [p.kind || e.id, formatPlace(p.place)].filter(Boolean).join(' ');
+      return head + 'objective: ' + what + ' ' + e.status + (e.reason ? ' (' + e.reason + ')' : '');
+    }
+    if (e.type === 'dialogue') return typeof e.text === 'string' ? head + 'dialogue: "' + truncate(e.text, 200) + '"' : head + 'dialogue';
     return head + e.type;
+  }
+
+  function eventTitle(e) {
+    if (e.type === 'decision') return typeof e.justification === 'string' ? e.justification : '';
+    if (e.type === 'objective') return typeof e.title === 'string' ? e.title : '';
+    if (e.type === 'dialogue') return typeof e.text === 'string' ? e.text : '';
+    return '';
+  }
+
+  function formatReason(e) {
+    if (e.type !== 'decision' || typeof e.justification !== 'string') return '';
+    return truncate(e.justification.trim(), 600);
+  }
+
+  function formatPlan(e) {
+    if (e.type !== 'decision' || typeof e.plan !== 'string' || !e.plan.trim()) return '';
+    return 'plan: ' + truncate(e.plan.trim(), 200);
   }
 
   function formatEventJson(e) { return JSON.stringify(e); }
@@ -100,19 +240,141 @@
     if (!grid) return 'Grid (no data)';
     return on ? 'Grid: on' : 'Grid: off';
   }
+
+  function formatElapsed(ms) {
+    var total = Math.max(0, Number(ms) || 0);
+    if (total < 60000) return (Math.floor(total / 100) / 10).toFixed(1) + ' s';
+    var seconds = Math.floor(total / 1000);
+    var rest = seconds % 60;
+    return Math.floor(seconds / 60) + ' min ' + (rest < 10 ? '0' : '') + rest + ' s';
+  }
+
+  var ACTIVITY_KINDS = {
+    deciding: 'Deciding', reading_dialogue: 'Reading dialogue', mapping: 'Mapping the screen',
+    acting: 'Acting', pacing: 'Pacing', idle: 'Idle', stopped: 'Stopped'
+  };
+
+  function activityLabel(a) {
+    if (!a || typeof a !== 'object') return 'Waiting for the engine...';
+    if (typeof a.label === 'string' && a.label) return a.label;
+    return ACTIVITY_KINDS[a.kind] || (typeof a.kind === 'string' && a.kind ? a.kind : 'Working');
+  }
+
+  function elapsedSince(a, serverNow, receivedAt, now) {
+    if (!a || typeof a.started_at !== 'number' || typeof serverNow !== 'number') return 0;
+    return Math.max(0, serverNow * 1000 + (now - receivedAt) - a.started_at * 1000);
+  }
+
+  function formatLastCall(latency) {
+    if (!latency || typeof latency.last_ms !== 'number') return '';
+    return 'last call ' + formatElapsed(latency.last_ms);
+  }
+
+  function activityDetail(a, latency) {
+    if (!a || typeof a !== 'object') return '';
+    var d = a.detail && typeof a.detail === 'object' ? a.detail : {};
+    var parts = [];
+    if (a.kind === 'stopped') return typeof d.reason === 'string' ? 'reason: ' + d.reason : '';
+    if (a.kind === 'deciding' || a.kind === 'reading_dialogue') {
+      if (d.model) parts.push('model ' + d.model);
+      if (Number.isInteger(d.images)) parts.push(plural(d.images, 'image'));
+      var hint = formatLastCall(latency);
+      if (hint) parts.push(hint);
+    } else if (typeof d.skill === 'string') {
+      var params = d.params && typeof d.params === 'object' && Object.keys(d.params).length ? ' ' + JSON.stringify(d.params) : '';
+      parts.push(d.skill + params);
+    }
+    return parts.join(' · ');
+  }
+
+  function predicateInWords(p) {
+    if (!p || typeof p !== 'object') return '';
+    var place = Array.isArray(p.place) ? ' ' + formatPlace(p.place) : '';
+    if (p.kind === 'reach_cell') return 'reach cell (' + p.row + ', ' + p.col + ') in' + place;
+    if (p.kind === 'reach_place') return 'reach' + place;
+    if (p.kind === 'leave_place') return 'leave' + place;
+    if (p.kind === 'dialogue_closed') return 'close the open dialogue';
+    return typeof p.kind === 'string' ? p.kind.replace(/_/g, ' ') + place : '';
+  }
+
+  function meterPercent(spent, cap) {
+    if (typeof spent !== 'number' || typeof cap !== 'number' || !(cap > 0)) return null;
+    return Math.max(0, Math.min(100, Math.round(spent / cap * 100)));
+  }
+
+  function formatBudgetLine(b, latency) {
+    b = b || {};
+    var line = formatDollars(b.spent) + (typeof b.cap === 'number' ? ' / ' + formatDollars(b.cap) : '') + ' · ' + plural(b.calls || 0, 'call');
+    if (latency && typeof latency.median_ms === 'number') line += ' · median ' + formatElapsed(latency.median_ms);
+    if (latency && typeof latency.last_ms === 'number') line += ' · last ' + formatElapsed(latency.last_ms);
+    return line;
+  }
+
+  function latestReasoning(list) {
+    for (var i = list.length - 1; i >= 0; i--) {
+      var e = list[i];
+      if (e.type === 'decision' && e.agent === 'claude' && typeof e.justification === 'string' && e.justification.trim()) return e;
+    }
+    return null;
+  }
+
+  function reasoningHead(e) {
+    var line = 'f' + e.frame + ' · ' + (e.agent || '?') + ' decides ' + formatDecisionChoice(e.choice);
+    if (typeof e.confidence === 'number') line += ' (' + Math.round(e.confidence * 100) + '%)';
+    return line;
+  }
+
+  function objectiveView(status) {
+    status = status || {};
+    if (!status.objective) return null;
+    var attempts = Number.isInteger(status.objective_attempts) ? status.objective_attempts : null;
+    return { title: status.objective_title || status.objective, predicate: predicateInWords(status.objective_predicate), attempts: attempts };
+  }
+
+  function effectiveActivity(a, manifestStatus) {
+    if (!a || typeof a !== 'object') return { kind: 'idle', label: 'No live activity for this run', detail: {} };
+    if (a.kind !== 'stopped' && manifestStatus && manifestStatus !== 'running') {
+      return { kind: 'idle', label: 'Engine not running (' + manifestStatus + ')', detail: {}, started_at: a.started_at };
+    }
+    return a;
+  }
+
+  function barText(value) {
+    if (value === null || value === undefined) return '-';
+    return typeof value === 'object' ? JSON.stringify(value) : String(value);
+  }
+
+  function lastNotable(list) {
+    for (var i = (list || []).length - 1; i >= 0; i--) {
+      var e = list[i];
+      if (e && (e.type === 'objective' || e.type === 'dialogue')) return truncate(formatEventPretty(e), 80);
+    }
+    return '-';
+  }
+
+  var BAR_ITEMS = [
+    { group: 'harness', name: 'run', value: function (s) { return s.status.run_id; } },
+    { group: 'harness', name: 'flow', value: function (s) { return s.status.flow_version; } },
+    { group: 'harness', name: 'health', value: function (s) { return s.status.health; } },
+    { group: 'harness', name: 'frame', value: function (s) { return s.replay.frame; } },
+    { group: 'harness', name: 'lag', value: function (s) { return s.replay.lag; } },
+    { group: 'harness', name: 'sync', value: function (s) { return s.replay.sync; } },
+    { group: 'harness', name: 'budget', value: function (s) { return s.status.budget; } },
+    { group: 'harness', name: 'manifest', value: function (s) { return s.status.manifest_status; } },
+    { group: 'game', name: 'hearts', value: formatHearts },
+    { group: 'game', name: 'objective', value: formatObjective },
+    { group: 'game', name: 'last', value: function (s) { return lastNotable(s.events); } }
+  ];
+
+  function barItems(state) {
+    return BAR_ITEMS.map(function (item) {
+      var value;
+      try { value = barText(item.value(state)); } catch (e) { value = '-'; }
+      return { group: item.group, name: item.name, text: value };
+    });
+  }
   // pure:end
 
-  var fields = [
-    ['run', function (s) { return s.status.run_id; }],
-    ['flow', function (s) { return s.status.flow_version; }],
-    ['health', function (s) { return s.status.health; }],
-    ['hearts', formatHearts],
-    ['frame', function (s) { return s.replay.frame; }],
-    ['lag', function (s) { return s.replay.lag; }],
-    ['sync', function (s) { return s.replay.sync; }],
-    ['budget', function (s) { return s.status.budget; }],
-    ['manifest', function (s) { return s.status.manifest_status; }]
-  ];
   var bar = document.getElementById('bar');
   var banner = document.getElementById('banner');
   var lost = document.getElementById('lost');
@@ -195,20 +457,29 @@
   renderLegend();
   renderGrid(null);
 
-  function text(value) {
-    if (value === null || value === undefined) return '-';
-    return typeof value === 'object' ? JSON.stringify(value) : String(value);
-  }
+  var GROUP_LABELS = { harness: 'Harness', game: 'Game' };
 
   function renderBar(state) {
     bar.textContent = '';
-    fields.forEach(function (field) {
+    var groups = {};
+    ['harness', 'game'].forEach(function (name) {
+      var group = document.createElement('div');
+      group.className = 'group';
+      var label = document.createElement('span');
+      label.className = 'group-label';
+      label.textContent = GROUP_LABELS[name];
+      group.appendChild(label);
+      groups[name] = group;
+      bar.appendChild(group);
+    });
+    barItems(state).forEach(function (field) {
       var item = document.createElement('span');
       var value = document.createElement('b');
-      try { value.textContent = text(field[1](state)); } catch (e) { value.textContent = '-'; }
-      if (field[0] === 'health') value.className = 'health-' + value.textContent;
-      item.append(field[0] + ' ', value);
-      bar.appendChild(item);
+      value.textContent = field.text;
+      if (field.name === 'objective' && state.status && state.status.objective) value.title = String(state.status.objective);
+      if (field.name === 'health') value.className = 'health-' + value.textContent;
+      item.append(field.name + ' ', value);
+      groups[field.group].appendChild(item);
     });
     banner.style.display = (state.replay && state.replay.sync === 'diverged') ? 'block' : 'none';
   }
@@ -229,7 +500,22 @@
       var row = document.createElement('div');
       row.className = event.type;
       row.textContent = lines[index];
+      if (mode !== 'json') row.title = eventTitle(event);
       events.appendChild(row);
+      var reason = mode === 'json' ? '' : formatReason(event);
+      if (reason) {
+        var note = document.createElement('div');
+        note.className = 'reason';
+        note.textContent = reason;
+        events.appendChild(note);
+      }
+      var plan = mode === 'json' ? '' : formatPlan(event);
+      if (plan) {
+        var planNote = document.createElement('div');
+        planNote.className = 'reason';
+        planNote.textContent = plan;
+        events.appendChild(planNote);
+      }
     });
     events.scrollTop = pinned ? events.scrollHeight : top;
   }
@@ -281,10 +567,61 @@
     stateBusy = true;
     fetch('/state.json', { cache: 'no-store' })
       .then(checked).then(function (r) { return r.json(); })
-      .then(function (state) { renderBar(state); renderEvents(state.events || []); renderGrid(state.grid || null); stateOk = true; stateError = null; })
+      .then(function (state) { renderBar(state); renderActivity(state); renderPanels(state); renderEvents(state.events || []); renderGrid(state.grid || null); stateOk = true; stateError = null; })
       .catch(function (e) { stateOk = false; stateError = messageOf(e); })
       .then(function () { stateBusy = false; updateLost(); });
   }
+
+
+  var activityState = { activity: null, serverNow: null, receivedAt: 0, latency: null };
+  var activityEl = document.getElementById('activity');
+  var activityLabelEl = document.getElementById('activity-label');
+  var activityTimerEl = document.getElementById('activity-timer');
+  var activityDetailEl = document.getElementById('activity-detail');
+  var stage = document.getElementById('stage');
+
+  function renderActivity(state) {
+    activityState = { activity: effectiveActivity(state.activity, (state.status || {}).manifest_status), serverNow: state.server_now, receivedAt: Date.now(), latency: state.latency || null };
+    var a = activityState.activity;
+    activityEl.className = a && (a.kind === 'stopped' || a.kind === 'idle') ? a.kind : '';
+    activityLabelEl.textContent = activityLabel(a);
+    activityDetailEl.textContent = activityDetail(a, activityState.latency);
+    tickActivity();
+  }
+
+  function tickActivity() {
+    var a = activityState.activity;
+    if (!a || a.kind === 'stopped' || a.kind === 'idle') { activityTimerEl.textContent = ''; return; }
+    activityTimerEl.textContent = formatElapsed(elapsedSince(a, activityState.serverNow, activityState.receivedAt, Date.now()));
+  }
+
+  function renderPanels(state) {
+    var list = state.events || [];
+    var reasoning = latestReasoning(list);
+    document.getElementById('reasoning-head').textContent = reasoning ? reasoningHead(reasoning) : '';
+    document.getElementById('reasoning-text').textContent = reasoning ? reasoning.justification.trim() : 'No agent decision yet.';
+    document.getElementById('reasoning-plan').textContent = reasoning && typeof reasoning.plan === 'string' ? 'plan: ' + reasoning.plan.trim() : '';
+    var objective = objectiveView(state.status);
+    document.getElementById('objective-title').textContent = objective ? objective.title : 'none';
+    document.getElementById('objective-predicate').textContent = objective ? objective.predicate : '';
+    document.getElementById('objective-attempts').textContent = objective ? (objective.attempts === null ? '' : plural(objective.attempts, 'skill call') + ' so far') : '';
+    var budget = state.budget || {};
+    var percent = meterPercent(budget.spent, budget.cap);
+    document.getElementById('meter').style.display = percent === null ? 'none' : 'block';
+    var fill = document.getElementById('meter-fill');
+    fill.style.width = (percent || 0) + '%';
+    fill.className = percent !== null && percent >= 80 ? 'high' : '';
+    document.getElementById('budget-line').textContent = formatBudgetLine(budget, state.latency);
+  }
+
+  function fitOverlay() {
+    var scale = stage.clientWidth / 480;
+    overlay.style.transform = scale < 1 ? 'scale(' + scale + ')' : '';
+  }
+
+  setInterval(tickActivity, 100);
+  window.addEventListener('resize', fitOverlay);
+  fitOverlay();
 
   setInterval(pollFrame, 100);
   setInterval(pollState, 500);

@@ -1,4 +1,5 @@
 require 'digest'
+require 'fileutils'
 require 'koholint/budget'
 require 'koholint/canonical_save'
 require 'koholint/decision'
@@ -7,33 +8,43 @@ require 'koholint/keyframes'
 require 'koholint/perception'
 require 'koholint/replay'
 require 'koholint/run'
+require 'koholint/vision/dialogue_shot'
 require 'koholint/vision/grid_builder'
 
 module Koholint
   class Engine
     SAVE_CHECK_EVERY = 60
+    AGENT_FAILURE_LIMIT = 5
+    AGENT_REFUSAL_LIMIT = 10
 
-    def self.resume(run_path, policy:, budget:, flow_version: Koholint::FLOW_VERSION, **options)
+    def self.resume(run_path, budget:, policy: nil, policy_factory: nil, flow_version: Koholint::FLOW_VERSION, **options)
       run = Run.open(run_path, flow_version: flow_version)
       run.lock!
       run.truncate_trace!(run.inputs.frames)
+      run.truncate_prompts!(run.inputs.frames)
+      policy = policy_factory.call(run) if policy_factory
       new(run: run, policy: policy, budget: budget, emulator: Replay.to(run, run.inputs.frames), **options)
     end
 
-    def initialize(run:, policy:, budget:, keyframe_every: 1800, point: DecisionPoint.move, emulator: nil, pacer: nil, grid: false)
+    def initialize(run:, policy:, budget:, keyframe_every: 1800, decision_point: DecisionPoint.move, emulator: nil, pacer: nil, grid: false)
       @run = run
       @policy = policy
       @budget = budget
       @keyframe_every = keyframe_every
-      @point = point
+      @decision_point = decision_point
       @pacer = pacer
+      @fallbacks = 0
+      @refusals = 0
       @emulator = emulator || Emulator.boot
       @keyframes = Keyframes.new(File.join(run.dir, 'keyframes'))
       @builder = Vision::GridBuilder.new(trace: run.trace, beliefs: known_beliefs(run)) if grid
       @ram_hash = Digest::SHA256.hexdigest(@emulator.cartridge_ram)
     end
 
-    def request_stop = @budget.stop!
+    def request_stop
+      @budget.stop!
+      @policy.cancel if @policy.respond_to?(:cancel)
+    end
 
     def run
       @run.lock!
@@ -57,15 +68,81 @@ module Koholint
     def iterate
       state = Perception.read(@emulator)
       @run.trace.emit(:perception, frame: state.frame, state: state.to_h, state_hash: @emulator.state_hash)
-      grid = @builder&.observe(@emulator, state)
-      point = @policy.respond_to?(:point_for) ? @policy.point_for(state) : @point
-      result = @policy.decide(point, state, @builder ? { grid: } : {})
-      choice = point.validate(result[:choice])
-      @run.trace.emit(:decision, frame: state.frame, point: point.name.to_s, input: state.to_h, options: point.options || [],
+      if @builder
+        activity(:mapping, 'mapping the screen')
+        grid = @builder.observe(@emulator, state)
+      end
+      @policy.observe(state, frame: state.frame) if @policy.respond_to?(:observe)
+      return if @budget.exhausted
+
+      decision_point = @policy.respond_to?(:decision_point_for) ? @policy.decision_point_for(state) : @decision_point
+      context = context_for(grid)
+      activity(:deciding, 'deciding what to do', decision_point: decision_point.name.to_s)
+      result = @policy.decide(decision_point, state, context)
+      @budget.tick(cost: result[:cost_usd].to_f)
+      chosen = result[:fallback] && result[:decision_point] || decision_point
+      choice = chosen.validate(result[:choice])
+      note_fallback(result)
+      emit_dialogue(result[:transcription], state)
+      seen = record_prompt(result, state.frame, chosen.name)
+      @run.trace.emit(:decision, frame: state.frame, decision_point: chosen.name.to_s, input: state.to_h, options: chosen.options || [],
                                  choice: choice, justification: result[:justification], confidence: result[:confidence],
-                                 agent: result[:agent], latency_ms: 0, cost_usd: 0.0, fallback: result[:fallback] || false)
-      frames = press(choice)
-      @run.trace.emit(:action, frame: @emulator.frame, skill: 'press', params: choice, result: { frames: frames })
+                                 agent: result[:agent], latency_ms: result[:latency_ms].to_i, cost_usd: result[:cost_usd].to_f, fallback: result[:fallback] || false,
+                                 **seen, **(result[:plan] ? { plan: result[:plan] } : {}))
+      if choice.key?(:skill)
+        activity(:acting, "acting: #{choice[:skill]}", skill: choice[:skill], params: choice[:params])
+        outcome = execute(choice, state, chosen.registry, context)
+        @run.trace.emit(:action, frame: @emulator.frame, skill: choice[:skill], params: choice[:params], result: outcome)
+        @policy.after_action(choice:, outcome:, state: Perception.read(@emulator), frame: @emulator.frame) if @policy.respond_to?(:after_action)
+      elsif chosen.name != :choose_objective
+        activity(:acting, 'acting: press', skill: 'press', params: choice)
+        frames = press(choice)
+        @run.trace.emit(:action, frame: @emulator.frame, skill: 'press', params: choice, result: { frames: frames })
+      end
+      activity(:idle, 'between decisions')
+    end
+
+    def activity(kind, label, **detail)
+      @acting = kind == :acting ? [label, detail] : nil
+      @run.write_activity(kind:, label:, frame: @emulator.frame, detail:)
+    end
+
+    def context_for(grid)
+      context = @builder ? { grid: } : {}
+      context.merge(dialogue_shot: -> { Vision::DialogueShot.crop(@emulator) }, dialogue_rgb: -> { Vision::DialogueShot.rgb(@emulator) })
+    end
+
+    def record_prompt(result, frame, name)
+      prompt = result[:prompt]
+      return {} unless prompt
+
+      dir = File.join(@run.dir, 'prompts')
+      FileUtils.mkdir_p(dir)
+      File.write(File.join(dir, "#{frame}-#{name}.txt"), prompt)
+      File.binwrite(File.join(dir, "#{frame}-#{name}.png"), result[:image]) if result[:image]
+      Array(result[:images]).each_with_index { |png, n| File.binwrite(File.join(dir, "#{frame}-#{name}-#{n + 1}.png"), png) }
+      { prompt_sha: Digest::SHA256.hexdigest(prompt), image: !result[:image].nil? || !Array(result[:images]).empty? }
+    end
+
+    def emit_dialogue(transcription, state)
+      [transcription].flatten(1).compact.each do |entry|
+        @run.trace.emit(:dialogue, frame: entry[:frame] || state.frame, place: entry[:place] || [state.room_id, state.map_id], text: entry[:text],
+                                   source: 'agent', page: entry[:page])
+      end
+    end
+
+    def note_fallback(result)
+      return if @budget.exhausted
+
+      if result[:refused]
+        @refusals += 1
+        @budget.stop!(:agent_refusals) if @refusals >= AGENT_REFUSAL_LIMIT
+        return
+      end
+
+      @refusals = 0
+      @fallbacks = result[:fallback] ? @fallbacks + 1 : 0
+      @budget.stop!(:agent_failures) if @fallbacks >= AGENT_FAILURE_LIMIT
     end
 
     def press(choice)
@@ -73,14 +150,45 @@ module Koholint
       choice[:frames].times do
         break if @budget.exhausted
 
-        @emulator.step(choice[:buttons])
-        @run.inputs.append(choice[:buttons])
-        @budget.tick(frames: 1)
+        step(choice[:buttons])
         done += 1
-        after_frame
       end
+      finish_frames(done)
+    end
+
+    def execute(choice, state, registry, context = {})
+      execution = registry.start(choice[:skill], state, choice[:params], context)
+      current = state
+      loop do
+        buttons = execution.next_input(current)
+        break unless buttons
+
+        if @budget.exhausted
+          execution.abort(:budget)
+          break
+        end
+
+        step(buttons)
+        current = Perception.read(@emulator)
+      end
+      finish_frames(execution.frames)
+      execution.result(current)
+    end
+
+    def step(buttons)
+      @emulator.step(buttons)
+      @run.inputs.append(buttons)
+      @budget.tick(frames: 1)
+      after_frame
+    end
+
+    def finish_frames(done)
       @run.inputs.flush
-      @pacer&.pace(done)
+      if @pacer
+        label, detail = @acting
+        activity(:acting, "#{label} (paced)", **detail, paced: true) if label
+        @pacer.pace(done)
+      end
       done
     end
 
@@ -119,6 +227,7 @@ module Koholint
       checkpoint_keyframe
       @run.trace.emit(:stop, frame: @emulator.frame, reason: reason.to_s)
       @run.status = reason == :error ? 'crashed' : 'stopped'
+      activity(:stopped, "stopped: #{reason}", reason: reason.to_s)
       reason
     end
   end

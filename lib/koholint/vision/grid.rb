@@ -3,6 +3,8 @@ module Koholint
     class Grid
       ROWS = 8
       COLS = 10
+      SPRITE_WIDTH = 8
+      SPRITE_HEIGHT = 16
 
       def initialize(cells:, static_sprites:, beliefs:, capabilities:)
         @cells = cells
@@ -10,11 +12,11 @@ module Koholint
         @capabilities = capabilities
         @sprites = {}
         static_sprites.each do |sprite|
-          row = (sprite['y'] - 8) / 16
-          col = (sprite['x'] - 4) / 16
-          next unless row.between?(0, ROWS - 1) && col.between?(0, COLS - 1)
-
-          @sprites[[row, col]] ||= sprite['pattern']
+          left = sprite['x'] - 8
+          top = sprite['y'] - 16
+          rows = (top.div(16)..(top + (sprite['height'] || SPRITE_HEIGHT) - 1).div(16)).select { |row| row.between?(0, ROWS - 1) }
+          cols = (left.div(16)..(left + SPRITE_WIDTH - 1).div(16)).select { |col| col.between?(0, COLS - 1) }
+          rows.product(cols).each { |cell| @sprites[cell] ||= sprite['pattern'] }
         end
       end
 
