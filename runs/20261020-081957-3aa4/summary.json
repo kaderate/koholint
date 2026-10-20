@@ -1,4 +1,5 @@
 {
+  "v": 2,
   "run_id": "20261020-081957-3aa4",
   "flow_version": "flow-3",
   "tag": null,
@@ -22,5 +23,53 @@
   },
   "stop_reason": "dollars",
   "symptoms": [],
-  "starred": false
+  "starred": false,
+  "cost_by_skill": {
+    "choose_objective": {
+      "calls": 2,
+      "usd": 0.022514
+    },
+    "goto": {
+      "calls": 29,
+      "usd": 0.430705
+    },
+    "step": {
+      "calls": 1,
+      "usd": 0.014781
+    },
+    "talk_to": {
+      "calls": 5,
+      "usd": 0.091146
+    },
+    "wait": {
+      "calls": 3,
+      "usd": 0.08017
+    },
+    "walk": {
+      "calls": 25,
+      "usd": 0.362403
+    }
+  },
+  "decisions_by_agent": {
+    "start_game": 56,
+    "claude": 65,
+    "delegated": 98
+  },
+  "usage": {
+    "goal_changes": 0,
+    "leads": {
+      "high": 0,
+      "normal": 0,
+      "low": 0
+    },
+    "lead_rejected": 0,
+    "objectives_by_kind": {
+      "dialogue_closed": 1,
+      "new_place": 1
+    },
+    "because_used": 0,
+    "talks": 5,
+    "talks_to_known": 3,
+    "dialogues": 9
+  }
 }

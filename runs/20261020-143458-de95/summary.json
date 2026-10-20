@@ -1,4 +1,5 @@
 {
+  "v": 2,
   "run_id": "20261020-143458-de95",
   "flow_version": "flow-4",
   "tag": "goal-leads",
@@ -22,5 +23,53 @@
   },
   "stop_reason": "dollars",
   "symptoms": [],
-  "starred": false
+  "starred": false,
+  "cost_by_skill": {
+    "choose_objective": {
+      "calls": 6,
+      "usd": 0.069886
+    },
+    "goto": {
+      "calls": 38,
+      "usd": 0.594686
+    },
+    "press": {
+      "calls": 1,
+      "usd": 0.013612
+    },
+    "step": {
+      "calls": 3,
+      "usd": 0.041257
+    },
+    "talk_to": {
+      "calls": 3,
+      "usd": 0.041883
+    },
+    "walk": {
+      "calls": 55,
+      "usd": 0.752619
+    }
+  },
+  "decisions_by_agent": {
+    "start_game": 62,
+    "claude": 106,
+    "delegated": 88
+  },
+  "usage": {
+    "goal_changes": 0,
+    "leads": {
+      "high": 0,
+      "normal": 4,
+      "low": 0
+    },
+    "lead_rejected": 0,
+    "objectives_by_kind": {
+      "dialogue_closed": 1,
+      "new_place": 5
+    },
+    "because_used": 0,
+    "talks": 3,
+    "talks_to_known": 0,
+    "dialogues": 4
+  }
 }

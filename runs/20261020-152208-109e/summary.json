@@ -1,4 +1,5 @@
 {
+  "v": 2,
   "run_id": "20261020-152208-109e",
   "flow_version": "flow-5",
   "tag": "npc-dialogues",
@@ -22,5 +23,57 @@
   },
   "stop_reason": "agent_failures",
   "symptoms": [],
-  "starred": false
+  "starred": false,
+  "cost_by_skill": {
+    "choose_objective": {
+      "calls": 2,
+      "usd": 0.02712
+    },
+    "goto": {
+      "calls": 19,
+      "usd": 0.36326
+    },
+    "press": {
+      "calls": 3,
+      "usd": 0.052653
+    },
+    "step": {
+      "calls": 1,
+      "usd": 0.016774
+    },
+    "talk_to": {
+      "calls": 6,
+      "usd": 0.104095
+    },
+    "wait": {
+      "calls": 5,
+      "usd": 0.0
+    },
+    "walk": {
+      "calls": 12,
+      "usd": 0.186364
+    }
+  },
+  "decisions_by_agent": {
+    "start_game": 56,
+    "claude": 48,
+    "delegated": 93
+  },
+  "usage": {
+    "goal_changes": 1,
+    "leads": {
+      "high": 1,
+      "normal": 3,
+      "low": 0
+    },
+    "lead_rejected": 0,
+    "objectives_by_kind": {
+      "dialogue_closed": 1,
+      "new_place": 1
+    },
+    "because_used": 0,
+    "talks": 6,
+    "talks_to_known": 2,
+    "dialogues": 4
+  }
 }
