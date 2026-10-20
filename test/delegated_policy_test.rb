@@ -604,7 +604,7 @@ class DelegatedPolicyTest < Minitest::Test
 
   def test_boot_wrapper_forwards_after_boot_only
     delegated = policy(ScriptedClient.new(objective: objective))
-    wrapper = Koholint::Policies::StartGame.new(delegated, ready: ->(s) { %i[playing dialogue].include?(s.phase) })
+    wrapper = Koholint::Policies::StartGame.new(delegated, ready: ->(s) { %i[playing locked dialogue].include?(s.phase) })
     2.times { |i| wrapper.observe(state, frame: i) }
     assert_equal :boot, wrapper.decision_point_for(state(game_mode: 1)).name
     assert_equal :choose_objective, wrapper.decision_point_for(state).name
@@ -623,7 +623,7 @@ class DelegatedEngineTest < Minitest::Test
   def agent_engine(run, client, emulator: nil, **limits)
     delegated = Koholint::Policies::Delegated.new(client:, registry: Koholint::Skills::Registry.default,
                                                   objectives: Koholint::Objectives.new(trace: run.trace), manual: '')
-    policy = Koholint::Policies::StartGame.new(delegated, ready: ->(s) { %i[playing dialogue].include?(s.phase) })
+    policy = Koholint::Policies::StartGame.new(delegated, ready: ->(s) { %i[playing locked dialogue].include?(s.phase) })
     Koholint::Engine.new(run:, policy:, budget: Koholint::Budget.new(**limits), grid: true, emulator:)
   end
 
@@ -788,7 +788,7 @@ class DelegatedEngineTest < Minitest::Test
       first = events(run, :decision).find { |d| d['agent'] == 'claude' }
       earlier = events(run, :perception).select { |p| p['frame'] <= first['frame'] }.last(2).map { |p| p['state'].values_at('x', 'y', 'game_mode') }
       assert_equal earlier.first, earlier.last
-      assert_equal :playing, Koholint::GameState.new(**first['input'].transform_keys(&:to_sym)).phase
+      assert_includes %i[playing locked], Koholint::GameState.new(**first['input'].transform_keys(&:to_sym)).phase
     end
   end
 
@@ -800,7 +800,7 @@ class DelegatedEngineTest < Minitest::Test
       far = ok('title' => 'far', 'predicate' => { 'kind' => 'reach_place', 'place' => [0, 0] })
       client = ScriptedClient.new(objective: [far, far, far], default: wait)
       delegated = Koholint::Policies::Delegated.new(client:, registry: Koholint::Skills::Registry.default, objectives:, on_step: budget.method(:step_done))
-      policy = Koholint::Policies::StartGame.new(delegated, ready: ->(s) { %i[playing dialogue].include?(s.phase) })
+      policy = Koholint::Policies::StartGame.new(delegated, ready: ->(s) { %i[playing locked dialogue].include?(s.phase) })
       eng = Koholint::Engine.new(run:, policy:, budget:, grid: true, emulator: EmulatorCache.interactive)
       assert_equal :steps, eng.run
       assert_equal ['steps'], events(run, :budget_stop).map { |e| e['kind'] }

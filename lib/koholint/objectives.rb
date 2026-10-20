@@ -103,7 +103,7 @@ module Koholint
     def update(state, frame:)
       return nil if state.loading?
 
-      playing = %i[playing dialogue].include?(state.phase)
+      playing = %i[playing locked dialogue].include?(state.phase)
       place = [state.room_id, state.map_id]
       first_visit = playing && @visited.any? && !@visited.include?(place)
       @visited << place if playing && !@visited.include?(place)

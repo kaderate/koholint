@@ -34,6 +34,22 @@ class GameStateTest < Minitest::Test
     assert_equal :playing, state(game_mode: 0x0B, game_submode: 7, dialog_state: 0).phase
   end
 
+  def test_locked_when_motion_is_blocked_or_the_scene_is_locked
+    settled = { game_mode: 0x0B, game_submode: 7, dialog_state: 0 }
+    assert_equal :locked, state(**settled, motion_blocked: 2, scene_state: 3).phase
+    assert_equal :locked, state(**settled, motion_blocked: 0, scene_state: 1).phase
+    assert_equal :playing, state(**settled, motion_blocked: 0, scene_state: 3).phase
+    assert_equal :playing, state(**settled, motion_blocked: 0, scene_state: 0).phase
+    assert_equal :playing, state(**settled).phase
+    refute state(frame: 0).locked?
+  end
+
+  def test_dialogue_and_loading_win_over_locked
+    assert_equal :dialogue, state(game_mode: 0x0B, game_submode: 7, dialog_state: 1, motion_blocked: 2).phase
+    assert_equal :loading, state(game_mode: 0x0B, game_submode: 3, motion_blocked: 2).phase
+    assert_equal :boot, state(game_mode: 0x01, motion_blocked: 2).phase
+  end
+
   def test_cell_is_the_grid_cell_under_link_or_nil_outside
     assert_equal [0, 0], state(x: 0, y: 8).cell
     assert_equal [3, 4], state(x: 68, y: 60).cell

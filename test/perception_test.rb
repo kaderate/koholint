@@ -35,7 +35,7 @@ class PerceptionTest < Minitest::Test
 
       emulator.step
     end
-    assert_equal :playing, Koholint::Perception.read(EmulatorCache.at(700)).phase
+    assert_equal :locked, Koholint::Perception.read(EmulatorCache.at(700)).phase
     assert_equal :dialogue, Koholint::Perception.read(emulator).phase
   end
 
