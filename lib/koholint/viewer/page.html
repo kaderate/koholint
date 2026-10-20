@@ -5,7 +5,9 @@
 <title>Koholint live</title>
 <style>
   body { margin: 0; overflow-x: hidden; background: #111; color: #ddd; font: 13px/1.4 monospace; }
-  #bar { display: flex; flex-wrap: wrap; gap: 6px 18px; padding: 8px 12px; background: #222; }
+  #bar { display: flex; flex-wrap: wrap; gap: 6px 24px; padding: 8px 12px; background: #222; }
+  #bar .group { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 18px; min-width: 0; overflow-wrap: anywhere; }
+  #bar .group-label { color: #777; font-size: 0.85em; text-transform: uppercase; letter-spacing: 0.08em; }
   #bar b { color: #8f8; font-weight: normal; }
   #bar b.health-unknown { color: #aaa; }
   #banner, #lost { display: none; padding: 8px 12px; font-weight: bold; color: #fff; }
@@ -43,11 +45,16 @@
   #meter-fill.high { background: #e83; }
   @media (max-width: 800px) {
     #main { flex-direction: column; align-items: stretch; }
+    #bar { flex-direction: column; }
+    #left { width: auto; max-width: 480px; }
     #stage { width: 100%; max-width: 480px; height: auto; aspect-ratio: 10 / 9; }
     #frame { width: 100%; height: 100%; }
     #overlay { transform-origin: 0 0; }
     #events { height: 300px; }
   }
+  #left { flex: none; width: 480px; min-width: 0; }
+  #left .panel:last-child { margin-bottom: 0; }
+  #stage { margin-bottom: 10px; }
   #side { flex: 1; min-width: 0; display: flex; flex-direction: column; }
   #sidebar { display: flex; justify-content: space-between; align-items: center; padding: 4px 6px; background: #222; }
   #mode { background: #333; color: #ddd; border: 1px solid #555; font: inherit; padding: 2px 10px; cursor: pointer; }
@@ -65,11 +72,13 @@
 <div id="banner">Replay diverged: the follower no longer matches the run.</div>
 <div id="lost">Connection lost, retrying...</div>
 <div id="main">
+  <div id="left">
   <div id="stage"><img id="frame" alt="game frame"><div id="overlay"></div></div>
-  <div id="side">
     <div class="panel" id="reasoning"><h2>Reasoning</h2><div id="reasoning-head"></div><div id="reasoning-text"></div><div id="reasoning-plan"></div></div>
     <div class="panel" id="objective"><h2>Objective</h2><div id="objective-title"></div><div id="objective-predicate"></div><div id="objective-attempts"></div></div>
     <div class="panel" id="budget"><h2>Budget</h2><div id="meter"><div id="meter-fill"></div></div><div id="budget-line"></div></div>
+  </div>
+  <div id="side">
     <div id="sidebar"><span>events</span><span><button id="grid" type="button"></button> <button id="mode" type="button"></button></span></div>
     <div id="legend"></div>
     <div id="events"></div>
@@ -297,6 +306,7 @@
     b = b || {};
     var line = formatDollars(b.spent) + (typeof b.cap === 'number' ? ' / ' + formatDollars(b.cap) : '') + ' · ' + plural(b.calls || 0, 'call');
     if (latency && typeof latency.median_ms === 'number') line += ' · median ' + formatElapsed(latency.median_ms);
+    if (latency && typeof latency.last_ms === 'number') line += ' · last ' + formatElapsed(latency.last_ms);
     return line;
   }
 
@@ -328,22 +338,43 @@
     }
     return a;
   }
+
+  function barText(value) {
+    if (value === null || value === undefined) return '-';
+    return typeof value === 'object' ? JSON.stringify(value) : String(value);
+  }
+
+  function lastNotable(list) {
+    for (var i = (list || []).length - 1; i >= 0; i--) {
+      var e = list[i];
+      if (e && (e.type === 'objective' || e.type === 'dialogue')) return truncate(formatEventPretty(e), 80);
+    }
+    return '-';
+  }
+
+  var BAR_ITEMS = [
+    { group: 'harness', name: 'run', value: function (s) { return s.status.run_id; } },
+    { group: 'harness', name: 'flow', value: function (s) { return s.status.flow_version; } },
+    { group: 'harness', name: 'health', value: function (s) { return s.status.health; } },
+    { group: 'harness', name: 'frame', value: function (s) { return s.replay.frame; } },
+    { group: 'harness', name: 'lag', value: function (s) { return s.replay.lag; } },
+    { group: 'harness', name: 'sync', value: function (s) { return s.replay.sync; } },
+    { group: 'harness', name: 'budget', value: function (s) { return s.status.budget; } },
+    { group: 'harness', name: 'manifest', value: function (s) { return s.status.manifest_status; } },
+    { group: 'game', name: 'hearts', value: formatHearts },
+    { group: 'game', name: 'objective', value: formatObjective },
+    { group: 'game', name: 'last', value: function (s) { return lastNotable(s.events); } }
+  ];
+
+  function barItems(state) {
+    return BAR_ITEMS.map(function (item) {
+      var value;
+      try { value = barText(item.value(state)); } catch (e) { value = '-'; }
+      return { group: item.group, name: item.name, text: value };
+    });
+  }
   // pure:end
 
-  var fields = [
-    ['run', function (s) { return s.status.run_id; }],
-    ['flow', function (s) { return s.status.flow_version; }],
-    ['health', function (s) { return s.status.health; }],
-    ['hearts', formatHearts],
-    ['objective', formatObjective],
-    ['spent', function (s) { return formatDollars(s.status.cost_usd); }],
-    ['calls', formatCalls],
-    ['frame', function (s) { return s.replay.frame; }],
-    ['lag', function (s) { return s.replay.lag; }],
-    ['sync', function (s) { return s.replay.sync; }],
-    ['budget', function (s) { return s.status.budget; }],
-    ['manifest', function (s) { return s.status.manifest_status; }]
-  ];
   var bar = document.getElementById('bar');
   var banner = document.getElementById('banner');
   var lost = document.getElementById('lost');
@@ -426,21 +457,29 @@
   renderLegend();
   renderGrid(null);
 
-  function text(value) {
-    if (value === null || value === undefined) return '-';
-    return typeof value === 'object' ? JSON.stringify(value) : String(value);
-  }
+  var GROUP_LABELS = { harness: 'Harness', game: 'Game' };
 
   function renderBar(state) {
     bar.textContent = '';
-    fields.forEach(function (field) {
+    var groups = {};
+    ['harness', 'game'].forEach(function (name) {
+      var group = document.createElement('div');
+      group.className = 'group';
+      var label = document.createElement('span');
+      label.className = 'group-label';
+      label.textContent = GROUP_LABELS[name];
+      group.appendChild(label);
+      groups[name] = group;
+      bar.appendChild(group);
+    });
+    barItems(state).forEach(function (field) {
       var item = document.createElement('span');
       var value = document.createElement('b');
-      try { value.textContent = text(field[1](state)); } catch (e) { value.textContent = '-'; }
-      if (field[0] === 'objective' && state.status && state.status.objective) value.title = String(state.status.objective);
-      if (field[0] === 'health') value.className = 'health-' + value.textContent;
-      item.append(field[0] + ' ', value);
-      bar.appendChild(item);
+      value.textContent = field.text;
+      if (field.name === 'objective' && state.status && state.status.objective) value.title = String(state.status.objective);
+      if (field.name === 'health') value.className = 'health-' + value.textContent;
+      item.append(field.name + ' ', value);
+      groups[field.group].appendChild(item);
     });
     banner.style.display = (state.replay && state.replay.sync === 'diverged') ? 'block' : 'none';
   }

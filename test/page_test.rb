@@ -320,4 +320,42 @@ class PageTest < Minitest::Test
   def test_agent_text_never_goes_through_inner_html
     refute_match(/innerHTML|outerHTML|insertAdjacentHTML|document\.write/, PAGE)
   end
+
+  BAR_STATE = { status: { run_id: 'r1', flow_version: 3, health: 'ok', hearts: 2, max_hearts: 3, objective: 'o', objective_title: 'Find the sword',
+                          cost_usd: 1.5, calls: 4, budget: 'wall 10m', manifest_status: 'running' },
+                replay: { frame: 120, lag: 0, sync: 'ok' },
+                events: [{ frame: 5, type: 'objective', id: 'o', status: 'started', predicate: { kind: 'reach_place', place: [1, 2] } }] }.freeze
+
+  def test_bar_items_are_assigned_to_a_group
+    items = evaluate("barItems(#{JSON.generate(BAR_STATE)})")
+    groups = items.to_h { |i| [i['name'], i['group']] }
+    assert_equal %w[run flow health frame lag sync budget manifest], groups.select { |_, g| g == 'harness' }.keys
+    assert_equal %w[hearts objective last], groups.select { |_, g| g == 'game' }.keys
+  end
+
+  def test_bar_has_no_spent_or_calls
+    names = evaluate("barItems(#{JSON.generate(BAR_STATE)})").map { |i| i['name'] }
+    refute_includes names, 'spent'
+    refute_includes names, 'calls'
+  end
+
+  def test_bar_item_formats_are_unchanged
+    texts = evaluate("barItems(#{JSON.generate(BAR_STATE)})").to_h { |i| [i['name'], i['text']] }
+    assert_equal 'r1', texts['run']
+    assert_equal '2/3', texts['hearts']
+    assert_equal 'Find the sword', texts['objective']
+    assert_equal '120', texts['frame']
+    assert_equal 'wall 10m', texts['budget']
+    assert_equal 'f5 · objective: reach_place [1,2] started', texts['last']
+  end
+
+  def test_budget_line_shows_last_call_latency
+    assert_equal '$0.75 / $1.50 · 3 calls · median 4.0 s · last 2.0 s', evaluate('formatBudgetLine({spent: 0.75, cap: 1.5, calls: 3}, {median_ms: 4000, last_ms: 2000})')
+  end
+
+  def test_bar_items_survive_missing_data
+    items = evaluate("barItems({status: {}, replay: {}})")
+    assert_equal '-', items.find { |i| i['name'] == 'hearts' }['text']
+    assert_equal '-', items.find { |i| i['name'] == 'last' }['text']
+  end
 end
