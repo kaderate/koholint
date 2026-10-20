@@ -158,6 +158,22 @@ class CliTest < Minitest::Test
     end
   end
 
+  def probe_presses(run_dir)
+    Koholint::Trace.read(File.join(run_dir, 'trace.jsonl')).count { |e| e['type'] == 'decision' && e['agent'] == 'start_game' && e['choice']['frames'] == 8 }
+  end
+
+  def test_only_a_fresh_agent_run_probes_and_a_resumed_one_does_not
+    skip_without_rom!
+    with_fake_claude do |dir|
+      out = cli('run', '--agent', '--claude-command', FAKE_CLAUDE, '--frames', '320', '--root', dir)[1]
+      run_dir = out[/^run (.+)$/, 1]
+      assert_operator probe_presses(run_dir), :>, 0
+      before = probe_presses(run_dir)
+      cli('resume', run_dir, '--agent', '--claude-command', FAKE_CLAUDE, '--max-dollars', '0.01')
+      assert_equal before, probe_presses(run_dir)
+    end
+  end
+
   def test_resume_refuses_a_flow_1_run
     skip_without_rom!
     Dir.mktmpdir do |dir|
