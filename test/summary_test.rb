@@ -31,6 +31,15 @@ class SummaryTest < Minitest::Test
     end
   end
 
+  def test_highest_milestone_keeps_the_best_perceived
+    with_run do |run|
+      run.trace.emit(:perception, frame: 0, state: STATE, state_hash: 'h')
+      run.trace.emit(:perception, frame: 5, state: STATE.merge('milestone' => 'shield'), state_hash: 'h')
+      run.trace.emit(:perception, frame: 9, state: STATE, state_hash: 'h')
+      assert_equal 'shield', Koholint::Summary.for(run)[:highest_milestone]
+    end
+  end
+
   def test_health_is_stopped_after_a_stop_event
     with_run do |run|
       run.trace.emit(:stop, frame: 10, reason: 'frames')
