@@ -129,10 +129,13 @@ class SummaryTest < Minitest::Test
       t.emit(:objective, frame: 50, id: 'obj-2', status: 'started', predicate: {})
       t.emit(:perception, frame: 1000, state: PLAYING.merge('room_id' => 1, 'milestone' => 'shield'), state_hash: 'h')
       t.emit(:stop, frame: 2000, reason: 'dollars')
-      assert_equal({ run_id: run.id, flow_version: 'f', tag: 'exp', harness_sha: 'abc', prompts_sha: run.manifest['prompts_sha'], model: 'sonnet',
+      assert_equal({ v: Koholint::Summary::VERSION, run_id: run.id, flow_version: 'f', tag: 'exp', harness_sha: 'abc', prompts_sha: run.manifest['prompts_sha'], model: 'sonnet',
                      frames: 2000, dollars: 1.0, calls: 4, calls_per_1000f: 2.0, usd_per_1000f: 0.5,
                      latency_ms: { median: 3000, p90: 5000 }, highest_milestone: 'shield', places_seen: 2,
-                     objectives: { count: 2, achieved: 1 }, stop_reason: 'dollars', symptoms: [], starred: false },
+                     objectives: { count: 2, achieved: 1 }, stop_reason: 'dollars', symptoms: [], starred: false,
+                     cost_by_skill: { 'choose_skill' => { calls: 4, usd: 1.0 } }, decisions_by_agent: { 'claude' => 4, 'start_game' => 1 },
+                     usage: { goal_changes: 0, leads: { high: 0, normal: 0, low: 0 }, lead_rejected: 0, objectives_by_kind: { 'unknown' => 2 },
+                              because_used: 0, talks: 0, talks_to_known: 0, dialogues: 0 } },
                    Koholint::Summary.record(run.dir))
     end
   end
@@ -144,6 +147,43 @@ class SummaryTest < Minitest::Test
       summary = JSON.parse(File.read(File.join(run.dir, 'summary.json')))
       assert_equal [true, 0, nil, nil], summary.values_at('starred', 'calls', 'calls_per_1000f', 'stop_reason')
       assert_equal({ 'median' => nil, 'p90' => nil }, summary['latency_ms'])
+    end
+  end
+
+  def talk(trace, frame, room, row, col)
+    trace.emit(:action, frame:, skill: 'talk_to', params: { row:, col: }, result: { from: { room:, map: 16 } })
+  end
+
+  def test_record_measures_cost_by_skill_free_decisions_and_feature_usage
+    with_run do |run|
+      t = run.trace
+      t.emit(:decision, frame: 0, decision_point: 'choose_objective', input: {}, options: [], choice: { title: 'x' }, justification: 'j',
+                        confidence: 1.0, agent: 'claude', latency_ms: 5, cost_usd: 0.1)
+      decide(t, 1, 'claude', 5, 0.2, choice: { skill: 'walk', params: {} })
+      decide(t, 2, 'claude', 5, 0.3, choice: { skill: 'walk', params: {} })
+      decide(t, 3, 'delegated', 0, 0.0, choice: { skill: 'advance_dialogue', params: {} })
+      decide(t, 4, 'start_game', 0, 0.0)
+      t.emit(:goal, frame: 5, text: 'a')
+      t.emit(:goal, frame: 6, text: 'b')
+      t.emit(:goal, frame: 7, text: 'c')
+      t.emit(:lead, frame: 8, id: 'lead-1', place: [1, 16], source: nil, quote: 'q', claim: 'c', importance: 'high')
+      t.emit(:lead, frame: 8, id: 'lead-2', place: [1, 16], source: nil, quote: 'q', claim: 'c', importance: 'normal')
+      t.emit(:notable, frame: 8, kind: 'lead_rejected', detail: '1 leads')
+      t.emit(:objective, frame: 9, id: 'obj-1', status: 'started', predicate: { kind: 'dialogue_closed' }, because: 'lead-1')
+      t.emit(:objective, frame: 9, id: 'obj-1', status: 'achieved', predicate: { kind: 'dialogue_closed' })
+      t.emit(:objective, frame: 9, id: 'obj-2', status: 'started', predicate: { kind: 'dialogue_closed' })
+      talk(t, 10, 1, 2, 3)
+      talk(t, 11, 1, 2, 3)
+      talk(t, 12, 2, 2, 3)
+      talk(t, 13, 1, 2, 4)
+      t.emit(:dialogue, frame: 14, place: [1, 16], text: 'a', source: 'agent', page: 1)
+      t.emit(:dialogue, frame: 14, place: [1, 16], text: 'b', source: 'agent', page: 2)
+      t.emit(:dialogue, frame: 15, place: [1, 16], text: 'c', source: 'agent', page: 1)
+      record = Koholint::Summary.record(run.dir)
+      assert_equal({ 'choose_objective' => { calls: 1, usd: 0.1 }, 'walk' => { calls: 2, usd: 0.5 } }, record[:cost_by_skill])
+      assert_equal({ 'claude' => 3, 'delegated' => 1, 'start_game' => 1 }, record[:decisions_by_agent])
+      assert_equal({ goal_changes: 2, leads: { high: 1, normal: 1, low: 0 }, lead_rejected: 1, objectives_by_kind: { 'dialogue_closed' => 2 },
+                     because_used: 1, talks: 4, talks_to_known: 1, dialogues: 2 }, record[:usage])
     end
   end
 end
