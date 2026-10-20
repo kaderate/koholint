@@ -267,4 +267,16 @@ class EngineTest < Minitest::Test
       assert_equal 600, resumed.run.then { Koholint::InputLog.load(File.join(run.dir, 'inputs.log')).frames }
     end
   end
+
+  def test_a_failing_activity_write_changes_neither_trace_nor_journal
+    skip_without_rom!
+    outputs = [false, true].map do |failing|
+      with_run do |_dir, run|
+        FileUtils.mkdir_p(File.join(run.dir, 'activity.json.tmp')) if failing
+        engine(run, frames: 200).run
+        [File.read(File.join(run.dir, 'trace.jsonl')), File.binread(File.join(run.dir, 'inputs.log'))]
+      end
+    end
+    assert_equal outputs.first, outputs.last
+  end
 end

@@ -299,11 +299,25 @@ class PageTest < Minitest::Test
     json = JSON.generate(events)
     assert_equal 'newest', evaluate("latestReasoning(#{json}).justification")
     assert_equal 'f5 · claude decides goto (1, 2) (80%)', evaluate("reasoningHead(latestReasoning(#{json}))")
-    assert_equal({ 'title' => 'Go out', 'predicate' => 'leave [1,2]', 'attempts' => 2 }, evaluate("objectiveView(#{json}, {objective: 'o1'})"))
-    assert_nil evaluate("objectiveView(#{json}, {objective: 'other'})")
+  end
+
+  def test_objective_panel_uses_the_status_not_the_event_window
+    status = { objective: 'o1', objective_title: 'Go out', objective_predicate: { kind: 'leave_place', place: [1, 2] }, objective_attempts: 7 }
+    assert_equal({ 'title' => 'Go out', 'predicate' => 'leave [1,2]', 'attempts' => 7 }, evaluate("objectiveView(#{JSON.generate(status)})"))
+    assert_equal({ 'title' => 'o1', 'predicate' => '', 'attempts' => nil }, evaluate("objectiveView({objective: 'o1'})"))
+    assert_nil evaluate('objectiveView({})')
+  end
+
+  def test_a_dead_engine_shows_as_idle_even_if_the_file_says_deciding
+    deciding = '{kind: "deciding", label: "asking", started_at: 1}'
+    assert_equal 'idle', evaluate("effectiveActivity(#{deciding}, 'stopped').kind")
+    assert_equal 'Engine not running (crashed)', evaluate("effectiveActivity(#{deciding}, 'crashed').label")
+    assert_equal 'deciding', evaluate("effectiveActivity(#{deciding}, 'running').kind")
+    assert_equal 'stopped', evaluate("effectiveActivity({kind: 'stopped'}, 'stopped').kind")
+    assert_equal 'No live activity for this run', evaluate("effectiveActivity(null, 'running').label")
   end
 
   def test_agent_text_never_goes_through_inner_html
-    refute_match(/innerHTML|insertAdjacentHTML|document\.write/, PAGE)
+    refute_match(/innerHTML|outerHTML|insertAdjacentHTML|document\.write/, PAGE)
   end
 end

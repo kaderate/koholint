@@ -39,7 +39,7 @@ module Koholint
         {
           status: summary.merge(run_id: File.basename(run_dir), flow_version: manifest['flow_version'],
                                 manifest_status: manifest['status'], budget: manifest['budget'], calls: calls(trace),
-                                objective_title: objective_title(trace, summary[:objective])),
+                                objective_title: objective_title(trace, summary[:objective])).merge(objective_view(trace, summary[:objective])),
           replay: { frame: follower.frame, journal_frames: follower.journal_frames, lag: follower.lag, sync: follower.sync },
           events: events(trace, limit),
           grid: grid(run_dir, trace, follower.frame),
@@ -88,6 +88,24 @@ module Koholint
         started = trace.reverse_each.find { |e| e['type'] == 'objective' && e['id'] == id && e['status'] == 'started' }
         started && (started['title'] || id)
       end
+
+      AUTOMATIC = ['automatic dialogue advance', 'deterministic hemmed-in'].freeze
+
+      def objective_view(trace, id)
+        return { objective_predicate: nil, objective_attempts: nil } unless id
+
+        index = trace.rindex { |e| e['type'] == 'objective' && e['id'] == id && e['status'] == 'started' }
+        return { objective_predicate: nil, objective_attempts: nil } unless index
+
+        automatic = false
+        attempts = trace[index..].count do |e|
+          automatic = automatic_decision?(e) if e['type'] == 'decision'
+          e['type'] == 'action' && !automatic
+        end
+        { objective_predicate: trace[index]['predicate'], objective_attempts: attempts }
+      end
+
+      def automatic_decision?(event) = AUTOMATIC.any? { |text| event['justification'].to_s.start_with?(text) }
 
       def trace_events(run_dir)
         path = File.join(run_dir, 'trace.jsonl')

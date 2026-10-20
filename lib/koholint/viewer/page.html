@@ -30,6 +30,7 @@
   @media (prefers-reduced-motion: reduce) { #dot { animation: none; } }
   #activity-label { font-size: 1.25em; color: #fff; }
   #activity-timer { font-size: 1.25em; color: #8f8; font-variant-numeric: tabular-nums; }
+  #activity, #activity-detail { overflow-wrap: anywhere; }
   #activity-detail { color: #9ab; flex-basis: 100%; }
   .panel { background: #181818; border: 1px solid #333; padding: 8px 10px; margin-bottom: 10px; overflow-wrap: anywhere; }
   .panel h2 { margin: 0 0 4px; font-size: 0.85em; font-weight: normal; color: #888; text-transform: uppercase; letter-spacing: 0.08em; }
@@ -313,15 +314,19 @@
     return line;
   }
 
-  function objectiveView(list, status) {
-    var started = null, attempts = 0;
-    for (var i = list.length - 1; i >= 0; i--) {
-      var e = list[i];
-      if (e.type === 'action') attempts += 1;
-      if (e.type === 'objective' && e.status === 'started' && e.id === (status || {}).objective) { started = e; break; }
+  function objectiveView(status) {
+    status = status || {};
+    if (!status.objective) return null;
+    var attempts = Number.isInteger(status.objective_attempts) ? status.objective_attempts : null;
+    return { title: status.objective_title || status.objective, predicate: predicateInWords(status.objective_predicate), attempts: attempts };
+  }
+
+  function effectiveActivity(a, manifestStatus) {
+    if (!a || typeof a !== 'object') return { kind: 'idle', label: 'No live activity for this run', detail: {} };
+    if (a.kind !== 'stopped' && manifestStatus && manifestStatus !== 'running') {
+      return { kind: 'idle', label: 'Engine not running (' + manifestStatus + ')', detail: {}, started_at: a.started_at };
     }
-    if (!started) return null;
-    return { title: started.title || started.id, predicate: predicateInWords(started.predicate), attempts: attempts };
+    return a;
   }
   // pure:end
 
@@ -537,7 +542,7 @@
   var stage = document.getElementById('stage');
 
   function renderActivity(state) {
-    activityState = { activity: state.activity || null, serverNow: state.server_now, receivedAt: Date.now(), latency: state.latency || null };
+    activityState = { activity: effectiveActivity(state.activity, (state.status || {}).manifest_status), serverNow: state.server_now, receivedAt: Date.now(), latency: state.latency || null };
     var a = activityState.activity;
     activityEl.className = a && (a.kind === 'stopped' || a.kind === 'idle') ? a.kind : '';
     activityLabelEl.textContent = activityLabel(a);
@@ -547,7 +552,7 @@
 
   function tickActivity() {
     var a = activityState.activity;
-    if (!a || a.kind === 'stopped') { activityTimerEl.textContent = ''; return; }
+    if (!a || a.kind === 'stopped' || a.kind === 'idle') { activityTimerEl.textContent = ''; return; }
     activityTimerEl.textContent = formatElapsed(elapsedSince(a, activityState.serverNow, activityState.receivedAt, Date.now()));
   }
 
@@ -557,10 +562,10 @@
     document.getElementById('reasoning-head').textContent = reasoning ? reasoningHead(reasoning) : '';
     document.getElementById('reasoning-text').textContent = reasoning ? reasoning.justification.trim() : 'No agent decision yet.';
     document.getElementById('reasoning-plan').textContent = reasoning && typeof reasoning.plan === 'string' ? 'plan: ' + reasoning.plan.trim() : '';
-    var objective = objectiveView(list, state.status);
+    var objective = objectiveView(state.status);
     document.getElementById('objective-title').textContent = objective ? objective.title : 'none';
     document.getElementById('objective-predicate').textContent = objective ? objective.predicate : '';
-    document.getElementById('objective-attempts').textContent = objective ? plural(objective.attempts, 'action') + ' so far' : '';
+    document.getElementById('objective-attempts').textContent = objective ? (objective.attempts === null ? '' : plural(objective.attempts, 'skill call') + ' so far') : '';
     var budget = state.budget || {};
     var percent = meterPercent(budget.spent, budget.cap);
     document.getElementById('meter').style.display = percent === null ? 'none' : 'block';
