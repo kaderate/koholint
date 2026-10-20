@@ -780,6 +780,48 @@ class DelegatedPolicyTest < Minitest::Test
     assert_equal 'automatic dialogue advance', result[:justification]
     assert_equal calls, client.calls.size
   end
+
+  def test_leads_from_dialogue_sheets_are_validated_sourced_and_shown_with_the_goal
+    sheet = ok('skill' => 'wait', 'params' => { 'frames' => 3 }, 'transcription' => "Go north.\n\nFind the  key.", 'goal' => 'find the key',
+               'leads' => [{ 'quote' => 'find the KEY', 'claim' => 'a key is needed', 'importance' => 'high' },
+                           { 'quote' => 'never said', 'claim' => 'x', 'importance' => 'high' }])
+    client = ScriptedClient.new(objective: objective, skill: [sheet, walk])
+    p = policy(client)
+    decide_with_shot(p, state)
+    p.after_action(choice: { skill: 'talk_to', params: { 'row' => 2, 'col' => 4 } }, outcome: { stopped_by: 'done', talked: true }, state: state, frame: 100)
+    pages(p, 2)
+    result = flush(p, 300)
+    assert_equal [{ id: 'lead-1', place: [163, 16], source: { row: 2, col: 4 }, quote: 'find the KEY', claim: 'a key is needed', importance: 'high' }], result[:leads]
+    assert_equal [1, 'find the key'], result.values_at(:leads_rejected, :goal)
+    decide_with_shot(p, state(frame: 400))
+    assert_includes client.calls.last[:prompt], "Goal (yours, long-term): find the key\n"
+    assert_includes client.calls.last[:prompt], '- [lead-1 high] a key is needed — "find the KEY"'
+  end
+
+  def test_a_goal_is_reported_only_when_it_changes_and_leads_need_a_transcription
+    same = ok('skill' => 'wait', 'params' => { 'frames' => 3 }, 'goal' => 'explore',
+              'leads' => [{ 'quote' => 'q', 'claim' => 'c', 'importance' => 'low' }])
+    client = ScriptedClient.new(objective: ok('title' => 'go', 'predicate' => { 'kind' => 'new_place' }, 'goal' => 'explore'), skill: same)
+    p = policy(client)
+    _, first = decide(p)
+    assert_equal 'explore', first[:goal]
+    _, second = decide(p)
+    refute second.key?(:goal)
+    assert_equal [[], 1], second.values_at(:leads, :leads_rejected)
+  end
+
+  def test_because_is_kept_only_when_it_names_a_known_lead
+    known = Koholint::Leads.from_events([{ 'type' => 'lead', 'id' => 'lead-1', 'place' => [1, 2], 'source' => nil, 'quote' => 'q', 'claim' => 'c', 'importance' => 'high' }])
+    because = ->(id) { ok('title' => 'go', 'predicate' => { 'kind' => 'new_place' }, 'because' => id) }
+    client = ScriptedClient.new(objective: [because.call('lead-1'), because.call('lead-7')])
+    @objectives = Koholint::Objectives.new(trace:)
+    p = Koholint::Policies::Delegated.new(client:, registry: Koholint::Skills::Registry.default, objectives: @objectives, leads: known)
+    decide(p)
+    @objectives.abandon(frame: 101, reason: 'test')
+    decide(p)
+    started = Koholint::Trace.read(File.join(@dir, 'trace.jsonl')).select { |e| e['status'] == 'started' }
+    assert_equal ['lead-1', nil], started.map { |e| e['because'] }
+  end
 end
 
 class DelegatedEngineTest < Minitest::Test
@@ -877,7 +919,8 @@ class DelegatedEngineTest < Minitest::Test
     emulator.step until Koholint::Perception.read(emulator).dialog_open?
     with_run do |run|
       eng = nil
-      talk = -> { eng.request_stop; ok('skill' => 'advance_dialogue', 'params' => {}, 'transcription' => 'Ah! Enfin...') }
+      leads = [{ 'quote' => 'enfin', 'claim' => 'someone waited', 'importance' => 'normal' }, { 'quote' => 'nope', 'claim' => 'c', 'importance' => 'low' }]
+      talk = -> { eng.request_stop; ok('skill' => 'advance_dialogue', 'params' => {}, 'transcription' => 'Ah! Enfin...', 'leads' => leads, 'goal' => 'wake up') }
       client = ScriptedClient.new(objective: leave_house, skill: talk)
       eng = agent_engine(run, client, emulator:)
       assert_equal :stopped, eng.run
@@ -890,6 +933,11 @@ class DelegatedEngineTest < Minitest::Test
       assert_equal 1, event['page']
       assert_equal 2, event['place'].size
       refute_includes File.read(File.join(run.dir, 'trace.jsonl')), 'PNG'
+      assert_equal [['lead-1', 'enfin', 'normal']], events(run, :lead).map { |e| e.values_at('id', 'quote', 'importance') }
+      assert_equal ['wake up'], events(run, :goal).map { |e| e['text'] }
+      assert_equal ['lead_rejected'], events(run, :notable).map { |e| e['kind'] }
+      world = JSON.parse(File.read(File.join(run.dir, 'world.json')))
+      assert_equal ['wake up', ['lead-1']], [world['goal'], world['leads'].map { |l| l['id'] }]
     end
   end
 

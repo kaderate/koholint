@@ -1,6 +1,7 @@
 require 'koholint/agents/context'
 require 'koholint/agents/prompts'
 require 'koholint/decision'
+require 'koholint/leads'
 require 'koholint/ledger'
 require 'koholint/navigation/planner'
 require 'koholint/talk_log'
@@ -35,7 +36,8 @@ module Koholint
       LOCKED_WAIT_LIMIT_FRAMES = 900
       HEMMED_WAIT_LIMIT = 1800 / HEMMED_WAIT[:params][:frames]
 
-      def initialize(client:, registry:, objectives:, manual: '', on_step: nil, on_activity: nil, ledger: nil, triggers: nil, talk_log: nil)
+      def initialize(client:, registry:, objectives:, manual: '', on_step: nil, on_activity: nil, ledger: nil, triggers: nil, talk_log: nil, leads: nil)
+        @leads = leads || Leads.new
         @ledger = hook_doubt(ledger || Ledger.new)
         @triggers = triggers || Triggers.new
         @talk_log = talk_log || TalkLog.new
@@ -101,9 +103,10 @@ module Koholint
         raise Failure, reply.error if reply.error
 
         choice = decision_point.validate(reply.output).slice(*decision_point.output_schema)
-        start_objective(choice, state, context) if decision_point.name == :choose_objective
+        start_objective(choice, state, context, reply.output['because']) if decision_point.name == :choose_objective
         plan = remember_plan(reply.output)
-        answer(choice, reply, reply.output).merge(plan ? { plan: } : {}).merge(transcription_for(reply.output, state, decision_point))
+        transcription = transcription_for(reply.output, state, decision_point)
+        answer(choice, reply, reply.output).merge(plan ? { plan: } : {}).merge(transcription).merge(notes_for(reply.output, transcription[:transcription], state))
       rescue NameError, TypeError
         raise
       rescue StandardError => e
@@ -129,6 +132,7 @@ module Koholint
         @last_results << outcome
         @last_results.shift while @last_results.size > RESULT_LIMIT
         note_lock(choice, outcome, state)
+        note_talk_source(choice, outcome)
         feed_ledger(choice, outcome, state, frame)
         opened = feed_triggers(choice, outcome, state)
         feed_talk_log(choice, outcome, state)
@@ -161,6 +165,12 @@ module Koholint
         col = cell[1] + dcol
         @last_grid && row.between?(0, Vision::Grid::ROWS - 1) && col.between?(0, Vision::Grid::COLS - 1) &&
           @last_grid.passable(row, col, direction.to_sym) == :yes
+      end
+
+      def note_talk_source(choice, outcome)
+        return unless LOCK_SKILLS.include?(choice[:skill])
+
+        @talk_source = choice[:skill] == 'talk_to' && outcome[:talked] == true ? choice[:params].transform_keys(&:to_sym).slice(:row, :col) : nil
       end
 
       def note_no_path(choice, outcome, frame)
@@ -209,7 +219,7 @@ module Koholint
         @on_step&.call
       end
 
-      def start_objective(choice, state, context)
+      def start_objective(choice, state, context, because = nil)
         predicate = Objectives.normalize(choice[:predicate])
         place = [state.room_id, state.map_id]
         if predicate[:kind].to_s == 'leave_place' && predicate[:place] != place
@@ -223,7 +233,8 @@ module Koholint
 
         clear_hemmed
         @refusals.clear
-        @objectives.start(frame: state.frame, title: choice[:title], predicate: choice[:predicate])
+        because = nil unless @leads.known?(because)
+        @objectives.start(frame: state.frame, title: choice[:title], predicate: choice[:predicate], because:)
       end
 
       def satisfied?(predicate, state, place)
@@ -346,7 +357,7 @@ module Koholint
         end
         rgb = context[:dialogue_rgb]&.call or return
         unless @sequence
-          @sequence = { pages: [], start: state.frame, place: [state.room_id, state.map_id] }
+          @sequence = { pages: [], start: state.frame, place: [state.room_id, state.map_id], source: @talk_source }
           @objectives.touch(frame: state.frame)
         end
         @sequence[:last] = state.frame
@@ -399,11 +410,11 @@ module Koholint
         @prompt = Agents::Context.build(state:, grid: grid_for(state, context), objective: @objectives.current, history: @objectives.history,
                                        attempts: @objectives.attempts_for_prompt, manual: @manual, last_results: @last_results, ledger: @ledger, refusals: @refusals, plan: @plan,
                                        triggers: @triggers, talk_log: @talk_log, locked: (@hemmed[:attempts] if @hemmed && hemmed?(state)),
-                                       locked_frames: (locked_frames(state) if state.phase == :locked))
+                                       locked_frames: (locked_frames(state) if state.phase == :locked), goal: @leads.goal, leads: @leads.all)
         if decision_point.name == :choose_skill && @sequence
           @pages_read = @sequence[:pages].size
           @images = Vision::DialogueShot.sheets(@sequence[:pages], per_sheet: SHEET_PAGES)
-          @read_at = @sequence.slice(:start, :place)
+          @read_at = @sequence.slice(:start, :place, :source)
           @sequence = nil
           @page = @pages_read
           @objectives.touch(frame: state.frame)
@@ -414,6 +425,18 @@ module Koholint
         announce_call(decision_point, state)
         pictures = @images ? { images: @images } : { image: @image }
         @client.call(system: Agents::Prompts.system_for(decision_point, sheets: !@images.nil?), prompt: @prompt, schema: decision_point.json_schema, **pictures)
+      end
+
+      def notes_for(output, transcription, state)
+        goal = @leads.change_goal(output['goal'])
+        notes = goal ? { goal: } : {}
+        return notes unless output.key?('leads')
+
+        pages = [transcription].flatten(1).compact
+        place = @read_at && @images ? @read_at[:place] : [state.room_id, state.map_id]
+        source = @images ? @read_at[:source] : @talk_source
+        leads, rejected = @leads.absorb(output['leads'], transcription: pages.map { |page| page[:text] }.join(' '), place:, source:)
+        notes.merge(leads:, leads_rejected: rejected)
       end
 
       def announce_call(decision_point, state)

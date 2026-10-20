@@ -5,6 +5,7 @@ require 'koholint/canonical_save'
 require 'koholint/decision'
 require 'koholint/emulator'
 require 'koholint/keyframes'
+require 'koholint/leads'
 require 'koholint/perception'
 require 'koholint/replay'
 require 'koholint/run'
@@ -85,6 +86,7 @@ module Koholint
       choice = chosen.validate(result[:choice])
       note_fallback(result)
       emit_dialogue(result[:transcription], state)
+      emit_notes(result, state)
       seen = record_prompt(result, state.frame, chosen.name)
       @run.trace.emit(:decision, frame: state.frame, decision_point: chosen.name.to_s, input: state.to_h, options: chosen.options || [],
                                  choice: choice, justification: result[:justification], confidence: result[:confidence],
@@ -130,6 +132,13 @@ module Koholint
         @run.trace.emit(:dialogue, frame: entry[:frame] || state.frame, place: entry[:place] || [state.room_id, state.map_id], text: entry[:text],
                                    source: 'agent', page: entry[:page])
       end
+    end
+
+    def emit_notes(result, state)
+      Array(result[:leads]).each { |lead| @run.trace.emit(:lead, frame: state.frame, **lead) }
+      rejected = result[:leads_rejected].to_i
+      @run.trace.emit(:notable, frame: state.frame, kind: 'lead_rejected', detail: "#{rejected} leads whose quote is not in the transcription") if rejected.positive?
+      @run.trace.emit(:goal, frame: state.frame, text: result[:goal]) if result[:goal]
     end
 
     def note_fallback(result)
@@ -228,10 +237,10 @@ module Koholint
       checkpoint_keyframe
       @run.trace.emit(:stop, frame: @emulator.frame, reason: reason.to_s)
       @run.status = reason == :error ? 'crashed' : 'stopped'
-      begin
-        Summary.write(@run.dir)
+      { 'world.json' => -> { Leads.write_world(@run.dir) }, 'summary.json' => -> { Summary.write(@run.dir) } }.each do |file, write|
+        write.call
       rescue StandardError => e
-        warn "koholint: summary.json not written: #{e.message}"
+        warn "koholint: #{file} not written: #{e.message}"
       end
       activity(:stopped, "stopped: #{reason}", reason: reason.to_s)
       reason
