@@ -745,6 +745,9 @@ class DelegatedPolicyTest < Minitest::Test
       assert_equal 'locked: waiting for Link to be free', locked_step(p, frame)[:justification]
       frame += 30
     end
+    assert_equal 'obj-1', @objectives.current[:id]
+    assert_empty p.instance_variable_get(:@last_results)
+    assert_empty @objectives.attempts_for_prompt
     calls = client.calls.size
     result = locked_step(p, frame)
     assert_equal 'claude', result[:agent]
@@ -760,7 +763,7 @@ class DelegatedPolicyTest < Minitest::Test
     p.observe(state(frame: 100, **LOCKED), frame: 100)
     p.observe(state(frame: 1000, **LOCKED), frame: 1000)
     p.observe(state(frame: 1010), frame: 1010)
-    assert_equal 1010, @objectives.instance_variable_get(:@last_change_frame)
+    assert_equal 1010, @objectives.last_change_frame
     p.observe(state(frame: 1100, **LOCKED), frame: 1100)
     calls = client.calls.size
     assert_equal 'locked: waiting for Link to be free', locked_step(p, 1100)[:justification]

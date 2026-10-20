@@ -80,7 +80,7 @@ class StartGameTest < Minitest::Test
 
   def test_a_locked_link_gets_neutral_waits_and_never_counts_toward_probing_or_hand_over
     wrapper = probing
-    kinds = 60.times.map { |i| step(wrapper, locked(frame: i * 30)) }
+    kinds = 39.times.map { |i| step(wrapper, locked(frame: i * 30)) }
     assert(kinds.all? { |kind, choice| kind == :boot && choice == { buttons: [], frames: 30 } })
   end
 
@@ -89,6 +89,16 @@ class StartGameTest < Minitest::Test
     3.times { |i| step(wrapper, locked(frame: i * 30)) }
     assert_equal [:up], step(wrapper, play(frame: 100))[1][:buttons]
     assert_equal :handed, step(wrapper, locked(frame: 120).tap { |s| s.dialog_state = 3 }).first
+  end
+
+  def test_a_boot_lock_is_capped_then_the_probe_runs_and_a_free_tick_resets_it
+    wrapper = probing
+    limit = Koholint::Policies::StartGame::BOOT_LOCK_LIMIT_FRAMES / 30
+    kinds = (limit - 1).times.map { |i| step(wrapper, locked(frame: i * 30)) }
+    assert(kinds.all? { |kind, choice| kind == :boot && choice == { buttons: [], frames: 30 } })
+    assert_equal [:up], step(wrapper, locked(frame: 2000))[1][:buttons]
+    step(wrapper, play(frame: 2060))
+    assert_equal({ buttons: [], frames: 30 }, step(wrapper, locked(frame: 2090))[1])
   end
 
   def test_a_locked_state_is_never_ready_even_if_the_ready_set_allows_it
