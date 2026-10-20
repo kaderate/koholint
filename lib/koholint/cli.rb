@@ -23,7 +23,7 @@ module Koholint
   module CLI
     USAGE = 'usage: koholint run|resume <run_dir>|fork <run_dir> --at-frame N|verify <run_dir>|summary <run_dir>|watch <run_dir>|' \
             'archive|star <run_dir> WHY|prune-heavy ' \
-            '[--frames N --minutes N --steps N --dollars X --root DIR --tag NAME --realtime --grid --port N --host H --from live|start|DIR ' \
+            '[--frames N --minutes N --steps N --dollars X --root DIR --runs-root DIR --tag NAME --realtime --grid --port N --host H --from live|start|DIR ' \
             '--speed X --agent --model M --max-dollars X --claude-command PATH --commit --full --keep N --yes]'.freeze
 
     DEFAULT_MODEL = 'sonnet'.freeze
@@ -41,6 +41,7 @@ module Koholint
         o.on('--dollars X', Float) { |v| options[:dollars] = v }
         o.on('--flow-version V') { |v| options[:flow_version] = v }
         o.on('--root DIR') { |v| options[:root] = v }
+        o.on('--runs-root DIR') { |v| options[:runs_root] = v }
         o.on('--tag NAME') { |v| options[:tag] = v }
         o.on('--at-frame N', Integer) { |v| options[:at_frame] = v }
         o.on('--realtime') { options[:realtime] = true }
@@ -90,7 +91,7 @@ module Koholint
         out.puts "run #{child.dir}"
         0
       when 'watch'
-        Viewer.watch(run_dir(args), **options.slice(:port, :host, :speed), **watch_from(options), out: out)
+        Viewer.watch(run_dir(args), **options.slice(:port, :host, :speed, :runs_root), **watch_from(options), out: out)
       when 'archive'
         root = options.fetch(:root, 'runs')
         Archive.archive(root:, from: options.fetch(:from, root), **options.slice(:commit, :full), out:)

@@ -60,14 +60,14 @@ module Koholint
       }
     end
 
-    def visited_places(events)
-      events.filter_map do |event|
-        state = event['state']
-        next unless event['type'] == 'perception' && state.is_a?(Hash)
+    def visited_places(events) = events.filter_map { |event| perceived_place(event) }.uniq
 
-        game = GameState.new(game_mode: state['game_mode'], game_submode: state['game_submode'])
-        [state['room_id'], state['map_id']] unless %i[loading boot].include?(game.phase)
-      end.uniq
+    def perceived_place(event)
+      state = event['state']
+      return nil unless event['type'] == 'perception' && state.is_a?(Hash)
+
+      game = GameState.new(game_mode: state['game_mode'], game_submode: state['game_submode'])
+      [state['room_id'], state['map_id']] unless %i[loading boot].include?(game.phase)
     end
 
     def per_1000(value, frames) = frames.positive? ? (value * 1000.0 / frames).round(6) : nil
@@ -81,7 +81,7 @@ module Koholint
     def read_json(path)
       value = JSON.parse(File.read(path))
       value.is_a?(Hash) ? value : {}
-    rescue Errno::ENOENT, JSON::ParserError
+    rescue SystemCallError, JSON::ParserError
       {}
     end
 

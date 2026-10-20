@@ -5,16 +5,18 @@ require 'open3'
 class PageTest < Minitest::Test
   PAGE = File.read(File.expand_path('../lib/koholint/viewer/page.html', __dir__))
 
-  def pure_source
-    PAGE[%r{// pure:begin\n(.*?)// pure:end}m, 1] or flunk 'page has no pure section'
+  VIEWER = File.expand_path('../lib/koholint/viewer', __dir__)
+
+  def pure_source(page = PAGE)
+    page[%r{// pure:begin\n(.*?)// pure:end}m, 1] or flunk 'page has no pure section'
   end
 
-  def evaluate(expression)
+  def evaluate(expression, page: PAGE)
     unless system('which node > /dev/null 2>&1')
       flunk 'node is not installed and CI is set' if ENV['CI']
       skip 'node is not installed: page formatting tests not run'
     end
-    out, status = Open3.capture2('node', '-e', "#{pure_source}\nconsole.log(JSON.stringify(#{expression}));")
+    out, status = Open3.capture2('node', '-e', "#{pure_source(page)}\nconsole.log(JSON.stringify(#{expression}));")
     assert status.success?
     JSON.parse(out)
   end
@@ -370,5 +372,85 @@ class PageTest < Minitest::Test
     items = evaluate("barItems({status: {}, replay: {}})")
     assert_equal '-', items.find { |i| i['name'] == 'hearts' }['text']
     assert_equal '-', items.find { |i| i['name'] == 'last' }['text']
+  end
+
+  def test_the_page_finds_its_run_in_the_path_or_the_query
+    assert_nil evaluate("runFromLocation('/', '')")
+    assert_equal '20261020-085011-8330', evaluate("runFromLocation('/run/20261020-085011-8330', '')")
+    assert_equal 'a b', evaluate("runFromLocation('/run/a%20b', '')")
+    assert_equal 'x&y', evaluate("runFromLocation('/', '?t=1&run=x%26y')")
+    assert_nil evaluate("runFromLocation('/run/%E0%A4%A', '')")
+    assert_nil evaluate("runFromLocation('/run/a/b', '')")
+  end
+
+  def test_requests_carry_the_run_encoded
+    assert_equal '/state.json', evaluate("withRun('/state.json', null)")
+    assert_equal '/state.json?run=a%26b%3Dc', evaluate("withRun('/state.json', 'a&b=c')")
+    assert_equal '/frame.png?t=3&run=r1', evaluate("withRun('/frame.png?t=3', 'r1')")
+  end
+
+  def test_replay_label_shows_speed_pause_and_end
+    assert_equal 'Replay playing at 4x, f10 / 100', evaluate("replayLabel({frame: 10, journal_frames: 100, speed: 4, paused: false})")
+    assert_equal 'Replay paused at f10 / 100', evaluate("replayLabel({frame: 10, journal_frames: 100, speed: 4, paused: true})")
+    assert_equal 'Replay finished at f100 / 100', evaluate("replayLabel({frame: 100, journal_frames: 100, speed: 1})")
+    assert_equal 'Replay playing at 1x, f0', evaluate('replayLabel(null)')
+  end
+
+  def test_the_live_page_links_to_the_runs_and_the_replay_links_back
+    assert_includes PAGE, "runs.href = '/runs'"
+    assert_match(%r{<div id="replay">.*<a href="/">back to live</a>}, PAGE)
+    assert_includes PAGE, "'Replay of ' + runId"
+  end
+
+  RUNS = File.read(File.join(VIEWER, 'runs.html'))
+  COMPARE = File.read(File.join(VIEWER, 'compare.html'))
+  SAMPLE = [{ run_id: 'r1', tag: 'Agent-x', dollars: 0.5, milestone_rank: 0, highest_milestone: 'none', starred: false, frames: 10 },
+            { run_id: 'r2', tag: nil, dollars: 1.5, milestone_rank: 1, highest_milestone: 'shield', starred: true, frames: nil },
+            { run_id: 'r3', tag: 'other', dollars: nil, milestone_rank: nil, highest_milestone: nil, starred: false, frames: 30 }].freeze
+
+  def runs_eval(expression) = evaluate("(function () { var runs = #{JSON.generate(SAMPLE)}; return #{expression}; })()", page: RUNS)
+
+  def test_runs_filters
+    ids = ->(filters) { runs_eval("filterRuns(runs, #{JSON.generate(filters)}).map(function (r) { return r.run_id; })") }
+    assert_equal %w[r1 r2 r3], ids.call({})
+    assert_equal %w[r2], ids.call(minRank: 1)
+    assert_equal %w[r1 r2], ids.call(minRank: 0)
+    assert_equal %w[r1], ids.call(maxDollars: 1)
+    assert_equal %w[r1], ids.call(tag: 'agent')
+    assert_equal %w[r2], ids.call(starredOnly: true)
+  end
+
+  def test_runs_sort_puts_missing_values_last
+    sorted = ->(key, desc) { runs_eval("sortRuns(runs, '#{key}', #{desc}).map(function (r) { return r.run_id; })") }
+    assert_equal %w[r1 r3 r2], sorted.call('frames', false)
+    assert_equal %w[r3 r1 r2], sorted.call('frames', true)
+    assert_equal %w[r2 r1 r3], sorted.call('highest_milestone', true)
+    assert_equal %w[r3 r2 r1], sorted.call('run_id', true)
+  end
+
+  def test_runs_milestone_options_follow_the_ladder
+    assert_equal [{ 'name' => 'none', 'rank' => 0 }, { 'name' => 'shield', 'rank' => 1 }], runs_eval('milestoneOptions(runs)')
+  end
+
+  def test_compare_link_needs_exactly_two_runs
+    assert_nil runs_eval("compareHref(['a'])")
+    assert_equal '/compare/a/b%2Fc', runs_eval("compareHref(['a', 'b/c'])")
+  end
+
+  def test_run_cells_are_plain_text
+    assert_equal '0.5000', runs_eval("cellText(runs[0], {key: 'dollars'})")
+    assert_equal '★', runs_eval("cellText(runs[1], {key: 'starred'})")
+    assert_equal '', runs_eval("cellText(runs[1], {key: 'tag'})")
+    assert_equal '<b>x</b>', evaluate("cellText({tag: '<b>x</b>'}, {key: 'tag'})", page: RUNS)
+  end
+
+  def test_compare_page_reads_its_ids_and_marks_differences
+    assert_equal %w[a b], evaluate("idsFromPath('/compare/a/b')", page: COMPARE)
+    assert_nil evaluate("idsFromPath('/compare/a')", page: COMPARE)
+    data = { a: { summary: { tag: 'x', frames: 1 } }, b: { summary: { tag: 'x', frames: 2 } }, differences: ['frames'] }
+    assert_equal [{ 'field' => 'tag', 'a' => 'x', 'b' => 'x', 'diff' => false }, { 'field' => 'frames', 'a' => '1', 'b' => '2', 'diff' => true }],
+                 evaluate("summaryRows(#{JSON.generate(data)})", page: COMPARE)
+    assert_equal 'never', evaluate('frameText(null)', page: COMPARE)
+    assert_equal '[3,1]', evaluate('placeText([3, 1])', page: COMPARE)
   end
 end

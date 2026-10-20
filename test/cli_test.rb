@@ -80,6 +80,12 @@ class CliTest < Minitest::Test
     assert_match(/no run at/, err)
   end
 
+  def test_watch_accepts_a_runs_root_option
+    code, _out, err = cli('watch', '/nonexistent/run', '--runs-root', '/nonexistent')
+    assert_equal 1, code
+    assert_match(/no run at/, err)
+  end
+
   def test_watch_rejects_bad_options
     assert_equal 2, cli('watch', 'x', '--from', 'sideways')[0]
     assert_equal 2, cli('watch', 'x', '--speed', '0')[0]

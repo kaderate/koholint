@@ -18,7 +18,7 @@ Only what is left to do. When something lands, delete it here (git is the histor
 - Addresses at `verified_count: 1` need a second independent check (`game_mode`, `game_submode`, `name_length`, `max_hearts`, `dialog_state`).
 - Agent loop, run 9: sprite-to-cell mapping needs a minimum overlap (phantom object cells made 3 of 11 `talk_to` calls end `target_free`); the centring phase presses DOWN at the doorway (cell centre y 128, Link at y 121) and re-fires the scripted dialogue: record the input that opened a dialogue and forbid it in centring; add a per-objective call cap; the shield milestone is still not perceived. Measurements in `docs/runs/2026-10-second-agent-run.md`.
 - Ladder beyond shield and sword; whether a run may inherit a map from a previous run.
-- Viewer: Host-header check; per-macro fsync cost on long runs; `verify` replays from boot (use keyframes).
+- Viewer: Host-header check on GET routes (only `POST /star` checks it); per-macro fsync cost on long runs; `verify` replays from boot (use keyframes).
 - Test runner: rspec vs minitest (not decided).
 - Vision deferred (not fixed): sprite flips are not in the sprite pattern; sprites at y 1..8 in 8x8 mode; tile bytes not memoised per snapshot; BG-disable not handled; dialogue CLOSE never sampled in the overlay test; window-overlap overlay rule only unit-tested.
 - Vision deferred: `World#add_screen` assumes event order and `places` dups shallowly; probe `moved` ignores `hp_delta`; control compares end positions only; the misaligned memo is keyed by pixel; left `:no` sits on the 4 px tolerance boundary; the 32-frame hold margin is unmeasured; no free-Link rule at one-way ledges.

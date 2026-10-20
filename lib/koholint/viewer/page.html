@@ -13,6 +13,12 @@
   #banner, #lost { display: none; padding: 8px 12px; font-weight: bold; color: #fff; }
   #banner { background: #b00; }
   #lost { background: #a60; }
+  a { color: #8cf; }
+  #replay { display: none; flex-wrap: wrap; align-items: center; gap: 6px 14px; padding: 8px 12px; background: #1a2233; border-bottom: 1px solid #47a; }
+  #replay-title { font-size: 1.15em; color: #fff; }
+  #replay button { background: #333; color: #ddd; border: 1px solid #555; font: inherit; padding: 2px 10px; cursor: pointer; }
+  #replay button.on { border-color: #8cf; color: #fff; }
+  #replay-note { color: #9ab; }
   #main { display: flex; gap: 12px; padding: 12px; align-items: flex-start; }
   #stage { position: relative; width: 480px; height: 432px; flex: none; }
   #frame { width: 480px; height: 432px; image-rendering: pixelated; background: #000; display: block; }
@@ -67,6 +73,7 @@
 </style>
 </head>
 <body>
+<div id="replay"><span id="replay-title"></span><button id="play" type="button"></button><span id="speeds"></span><button id="star" type="button">★ Star</button><span id="replay-note"></span><a href="/runs">Runs</a><a href="/">back to live</a></div>
 <div id="activity" class="idle"><span id="dot"></span><span id="activity-label">Waiting for the engine...</span><span id="activity-timer"></span><span id="activity-detail"></span></div>
 <div id="bar"></div>
 <div id="banner">Replay diverged: the follower no longer matches the run.</div>
@@ -367,6 +374,29 @@
     { group: 'game', name: 'last', value: function (s) { return lastNotable(s.events); } }
   ];
 
+  function runFromLocation(pathname, search) {
+    var match = /^\/run\/([^\/]+)$/.exec(pathname || '');
+    if (match) { try { return decodeURIComponent(match[1]); } catch (e) { return null; } }
+    var query = /(?:^\?|&)run=([^&]*)/.exec(search || '');
+    if (!query) return null;
+    try { return decodeURIComponent(query[1].replace(/\+/g, ' ')) || null; } catch (e) { return null; }
+  }
+
+  function withRun(url, run) {
+    if (!run) return url;
+    return url + (url.indexOf('?') < 0 ? '?' : '&') + 'run=' + encodeURIComponent(run);
+  }
+
+  var SPEEDS = [1, 4, 16];
+
+  function replayLabel(replay) {
+    replay = replay || {};
+    var at = 'f' + (Number.isInteger(replay.frame) ? replay.frame : 0) + (Number.isInteger(replay.journal_frames) ? ' / ' + replay.journal_frames : '');
+    if (replay.paused) return 'Replay paused at ' + at;
+    if (Number.isInteger(replay.journal_frames) && replay.frame >= replay.journal_frames) return 'Replay finished at ' + at;
+    return 'Replay playing at ' + (replay.speed || 1) + 'x, ' + at;
+  }
+
   function barItems(state) {
     return BAR_ITEMS.map(function (item) {
       var value;
@@ -376,6 +406,7 @@
   }
   // pure:end
 
+  var runId = runFromLocation(window.location.pathname, window.location.search);
   var bar = document.getElementById('bar');
   var banner = document.getElementById('banner');
   var lost = document.getElementById('lost');
@@ -473,6 +504,10 @@
       groups[name] = group;
       bar.appendChild(group);
     });
+    var runs = document.createElement('a');
+    runs.href = '/runs';
+    runs.textContent = 'Runs';
+    groups.harness.appendChild(runs);
     barItems(state).forEach(function (field) {
       var item = document.createElement('span');
       var value = document.createElement('b');
@@ -550,7 +585,7 @@
     if (frameBusy) return;
     frameBusy = true;
     counter += 1;
-    fetch('/frame.png?t=' + counter, { cache: 'no-store' })
+    fetch(withRun('/frame.png?t=' + counter, runId), { cache: 'no-store' })
       .then(checked).then(function (r) { return r.blob(); })
       .then(function (blob) {
         var old = img.src;
@@ -566,7 +601,7 @@
   function pollState() {
     if (stateBusy) return;
     stateBusy = true;
-    fetch('/state.json', { cache: 'no-store' })
+    fetch(withRun('/state.json', runId), { cache: 'no-store' })
       .then(checked).then(function (r) { return r.json(); })
       .then(function (state) { renderBar(state); renderActivity(state); renderPanels(state); renderEvents(state.events || []); renderGrid(state.grid || null); stateOk = true; stateError = null; })
       .catch(function (e) { stateOk = false; stateError = messageOf(e); })
@@ -582,6 +617,15 @@
   var stage = document.getElementById('stage');
 
   function renderActivity(state) {
+    if (runId) {
+      renderReplay(state.replay || {});
+      activityState = { activity: null };
+      activityEl.className = 'idle';
+      activityLabelEl.textContent = replayLabel(state.replay);
+      activityDetailEl.textContent = '';
+      activityTimerEl.textContent = '';
+      return;
+    }
     activityState = { activity: effectiveActivity(state.activity, (state.status || {}).manifest_status), serverNow: state.server_now, receivedAt: Date.now(), latency: state.latency || null };
     var a = activityState.activity;
     activityEl.className = a && (a.kind === 'stopped' || a.kind === 'idle') ? a.kind : '';
@@ -613,6 +657,53 @@
     fill.style.width = (percent || 0) + '%';
     fill.className = percent !== null && percent >= 80 ? 'high' : '';
     document.getElementById('budget-line').textContent = formatBudgetLine(budget, state.latency);
+  }
+
+  var replayEl = document.getElementById('replay');
+  var playButton = document.getElementById('play');
+  var speedsEl = document.getElementById('speeds');
+  var replayNote = document.getElementById('replay-note');
+  var replayControls = { speed: 1, paused: false };
+
+  function control(query) {
+    fetch(withRun('/control?' + query, runId), { cache: 'no-store' })
+      .then(checked).then(function (r) { return r.json(); })
+      .then(function (controls) { renderReplay(controls); replayNote.textContent = ''; })
+      .catch(function (e) { replayNote.textContent = 'control failed: ' + (messageOf(e) || 'connection lost'); });
+  }
+
+  function renderReplay(replay) {
+    if (typeof replay.speed === 'number') replayControls.speed = replay.speed;
+    if (typeof replay.paused === 'boolean') replayControls.paused = replay.paused;
+    playButton.textContent = replayControls.paused ? 'Play' : 'Pause';
+    Array.prototype.forEach.call(speedsEl.children, function (button) {
+      button.className = Number(button.dataset.speed) === replayControls.speed ? 'on' : '';
+    });
+  }
+
+  function starRun() {
+    var why = window.prompt('Why star this run?');
+    if (!why || !why.trim()) return;
+    fetch(withRun('/star', runId), { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body: 'why=' + encodeURIComponent(why.trim()) })
+      .then(checked).then(function () { replayNote.textContent = 'starred'; })
+      .catch(function (e) { replayNote.textContent = 'star failed: ' + (messageOf(e) || 'connection lost'); });
+  }
+
+  if (runId) {
+    document.title = 'Koholint replay';
+    replayEl.style.display = 'flex';
+    document.getElementById('replay-title').textContent = 'Replay of ' + runId;
+    SPEEDS.forEach(function (speed) {
+      var button = document.createElement('button');
+      button.type = 'button';
+      button.dataset.speed = String(speed);
+      button.textContent = speed + 'x';
+      button.addEventListener('click', function () { control('speed=' + speed); });
+      speedsEl.appendChild(button);
+    });
+    playButton.addEventListener('click', function () { control('pause=' + (replayControls.paused ? '0' : '1')); });
+    document.getElementById('star').addEventListener('click', starRun);
+    renderReplay(replayControls);
   }
 
   function fitOverlay() {

@@ -29,9 +29,10 @@ module Koholint
 
       module_function
 
-      def for(run_dir, follower, limit: EVENT_LIMIT)
+      def for(run_dir, follower, limit: EVENT_LIMIT, upto: nil)
         manifest = read_manifest(run_dir)
-        trace = trace_events(run_dir)
+        full = trace_events(run_dir)
+        trace = upto ? full.select { |e| e['frame'].is_a?(Integer) && e['frame'] <= upto } : full
         summary = Summary.from_events(trace)
         summary[:health] = 'unknown' if trace.none? { |e| Summary.progress?(e) } && %w[progressing stalled].include?(summary[:health])
         {
@@ -40,7 +41,7 @@ module Koholint
                                 objective_title: objective_title(trace, summary[:objective])).merge(objective_view(trace, summary[:objective])),
           replay: { frame: follower.frame, journal_frames: follower.journal_frames, lag: follower.lag, sync: follower.sync },
           events: events(trace, limit),
-          grid: grid(run_dir, trace, follower.frame),
+          grid: grid(run_dir, full, follower.frame),
           activity: activity(run_dir),
           server_now: Time.now.to_f,
           latency: latency(trace),
