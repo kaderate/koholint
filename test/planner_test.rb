@@ -1,6 +1,7 @@
 require_relative 'test_helper'
 require 'koholint/navigation/planner'
 require 'koholint/ledger'
+require 'koholint/triggers'
 
 class PlannerTest < Minitest::Test
   Planner = Koholint::Navigation::Planner
@@ -35,6 +36,15 @@ class PlannerTest < Minitest::Test
     assert_equal 4, path.size - 1
     turns = path.each_cons(2).map { |a, b| Planner.direction_between(a, b) }.each_cons(2).count { |a, b| a != b }
     assert_equal 2, turns
+  end
+
+  def test_forbidden_edges_are_blocked
+    triggers = Koholint::Triggers.new
+    triggers.record(place: PLACE, cell: [2, 1], skill: 'walk', input: :right)
+    path = Planner.new(grid: FakeGrid.new, ledger: Koholint::Ledger.new, place: PLACE, triggers:).path(from: [2, 1], to: [2, 3])
+    refute_equal [2, 2], path[1]
+    assert_equal [2, 3], path.last
+    assert_equal [[2, 1], [2, 2], [2, 3]], planner.path(from: [2, 1], to: [2, 3])
   end
 
   def test_prefers_fewer_turns_among_shortest_paths

@@ -5,8 +5,10 @@ module Koholint
     class Execution
       HARD_CAP = 400
       CENTRING_FRAMES = 16
+      DIRECTIONS = %i[up right down left].freeze
 
       attr_reader :frames, :stopped_by
+      attr_writer :triggers
 
       def initialize(skill:, params:, state:)
         @skill = skill
@@ -17,10 +19,14 @@ module Koholint
         @stopped_by = nil
         @centring = nil
         @blocked_at = nil
+        @triggers = nil
+        @last_input = nil
+        @trigger_input = nil
       end
 
       def next_input(state)
         @last = state
+        @trigger_input = @last_input if state.dialog_open? && !@start.dialog_open? && @trigger_input.nil?
         return nil if @stopped_by
 
         buttons = if @frames >= HARD_CAP then finish(:frame_cap)
@@ -28,6 +34,7 @@ module Koholint
                   else input_for(state)
                   end
         @frames += 1 if buttons
+        @last_input = buttons if buttons
         buttons
       end
 
@@ -41,10 +48,23 @@ module Koholint
         { skill: @skill, params: @params, frames: @frames, from: place(@start), to: place(state),
           moved_cells: moved_cells(state), room_changed: room(@start) != room(state), hp_delta: state.hp.to_i - @start.hp.to_i,
           dialog_before: @start.dialog_open?, dialog_after: state.dialog_open?, stopped_by: @stopped_by,
-          aligned:, offset:, blocked_at: @blocked_at }
+          aligned:, offset:, blocked_at: @blocked_at, trigger_input: trigger_input }
       end
 
       private
+
+      def trigger_input
+        return nil unless @stopped_by == :dialogue && !@start.dialog_open?
+
+        directions = Array(@trigger_input) & DIRECTIONS
+        directions.empty? ? nil : directions
+      end
+
+      def forbidden_at(state)
+        return [] unless @triggers && state.cell
+
+        @triggers.forbidden([state.room_id, state.map_id], state.cell)
+      end
 
       def finish(reason)
         @blocked_at = blocked_at_for(@last) if reason == :blocked
@@ -92,7 +112,8 @@ module Koholint
         wanted = []
         wanted << (dx.positive? ? :left : :right) if dx.abs > Geometry::ALIGN_TOLERANCE
         wanted << (dy.positive? ? :up : :down) if dy.abs > Geometry::ALIGN_TOLERANCE
-        direction = wanted.find { |d| d != avoid }
+        blocked = forbidden_at(state)
+        direction = wanted.find { |d| d != avoid && !blocked.include?(d) }
         [direction] if direction
       end
 

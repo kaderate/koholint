@@ -68,6 +68,7 @@ module Koholint
       def decide(decision_point, state, context)
         @prompt = @image = @images = nil
         context[:ledger] = @ledger
+        context[:triggers] = @triggers
         remember_grid(state, context)
         drop_stale_sequence(state)
         automatic = automatic_advance(decision_point, state, context)
@@ -249,7 +250,8 @@ module Koholint
         return unless Triggers.scripted?(skill: choice[:skill], params: choice[:params], result: outcome)
 
         cell = Triggers.cell_of(outcome)
-        @triggers.record(place: place_of(outcome, :to, state), cell:, skill: choice[:skill], direction: Triggers.direction_of(choice[:skill], choice[:params]))
+        @triggers.record(place: place_of(outcome, :to, state), cell:, skill: choice[:skill], direction: Triggers.direction_of(choice[:skill], choice[:params]),
+                          input: outcome[:trigger_input]&.first)
         cell && @triggers.count(place_of(outcome, :to, state), cell)
       end
 

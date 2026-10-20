@@ -34,7 +34,11 @@ module Koholint
 
       def validate(name, params) = fetch(name).normalize(params)
 
-      def start(name, state, params, context = {}) = fetch(name).start(state, params, context)
+      def start(name, state, params, context = {})
+        execution = fetch(name).start(state, params, context)
+        execution.triggers = context[:triggers] if execution.respond_to?(:triggers=)
+        execution
+      end
 
       def schema
         { skill: { type: 'string', enum: names }, params: { anyOf: @skills.values.map(&:params_schema) } }

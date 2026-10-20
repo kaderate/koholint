@@ -1242,6 +1242,21 @@ class DelegatedTriggersTest < Minitest::Test
     refute_includes @objectives.attempts_for_prompt.last, 'opened by itself'
   end
 
+  def test_a_walk_interrupted_by_the_trigger_records_the_input_for_the_next_tours
+    p, client = setup_policy
+    tour(p, client)
+    finish(p, 'walk', { direction: 'right', cells: 1 }, 101, trigger_input: [:down])
+    refute_includes tour(p, client), 'A dialogue opened by itself'
+    context = { grid: sprite_grid }
+    p.decide(p.decision_point_for(state), state, context)
+    assert_equal [:down], context[:triggers].forbidden([163, 16], [3, 4])
+    assert_includes client.calls.last[:prompt], 'Pressing down while Link was on this cell opened a dialogue by itself 1 times (the game triggers it; other inputs did not).'
+    finish(p, 'goto', { row: 3, col: 6 }, 102, trigger_input: ['down'])
+    assert_includes tour(p, client), 'opened a dialogue by itself 2 times (the game triggers it'
+    finish(p, 'walk', { direction: 'up', cells: 1 }, 103)
+    assert_includes tour(p, client), 'Pressing down'
+  end
+
   def test_place_of_falls_back_to_the_state_place
     p, = setup_policy
     assert_equal [163, 16], p.send(:place_of, {}, :to, state)

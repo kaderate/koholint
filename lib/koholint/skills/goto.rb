@@ -39,7 +39,7 @@ module Koholint
           grid = context[:grid]
           return nil unless grid
 
-          Navigation::Planner.new(grid:, ledger: context[:ledger], place: [@start.room_id, @start.map_id])
+          Navigation::Planner.new(grid:, ledger: context[:ledger], place: [@start.room_id, @start.map_id], triggers: context[:triggers])
         end
 
         def initial_plan = plan(@start.cell)
@@ -116,8 +116,10 @@ module Koholint
           off = horizontal ? dy : dx
           return nil if off.abs <= Geometry::ALIGN_TOLERANCE
 
-          @settle += 1
           toward = horizontal ? (off.positive? ? :up : :down) : (off.positive? ? :left : :right)
+          return nil if forbidden_at(state).include?(toward)
+
+          @settle += 1
           press(toward)
         end
 

@@ -18,7 +18,8 @@ module Koholint
         skill = Ledger.pick(event, :skill)
         params = Ledger.pick(event, :params)
         if to && scripted?(skill:, params:, result:)
-          triggers.record(place: to, cell: cell_of(result), skill: skill.to_s, direction: direction_of(skill, params))
+          triggers.record(place: to, cell: cell_of(result), skill: skill.to_s, direction: direction_of(skill, params),
+                          input: Array(Ledger.pick(result, :trigger_input)).first)
         end
         triggers.reset_unless(to) if to
       end
@@ -49,12 +50,24 @@ module Koholint
 
     def initialize
       @counts = Hash.new(0)
+      @inputs = Hash.new(0)
     end
 
-    def record(place:, cell:, skill:, direction: nil)
+    def record(place:, cell:, skill:, direction: nil, input: nil)
       return unless cell
 
       @counts[[place, cell.to_a, direction&.to_s || skill.to_s]] += 1
+      @inputs[[place, cell.to_a, input.to_sym]] += 1 if input
+    end
+
+    def forbidden(place, cell)
+      return [] unless cell
+
+      @inputs.filter_map { |(p, c, input), _| input if p == place && c == cell.to_a }
+    end
+
+    def input_count(place, cell, input)
+      cell ? @inputs[[place, cell.to_a, input.to_sym]] : 0
     end
 
     def count(place, cell)
@@ -65,6 +78,7 @@ module Koholint
 
     def reset_unless(place)
       @counts.select! { |key, _| key[0] == place }
+      @inputs.select! { |key, _| key[0] == place }
     end
   end
 end

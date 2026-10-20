@@ -20,6 +20,27 @@ class TriggersTest < Minitest::Test
     assert_equal 0, triggers.count([1, 2], [3, 4])
   end
 
+  def test_record_forbidden_and_reset_with_inputs
+    triggers = Koholint::Triggers.new
+    assert_equal [], triggers.forbidden(PLACE, [3, 4])
+    triggers.record(place: PLACE, cell: [3, 4], skill: 'walk', direction: 'right', input: 'down')
+    triggers.record(place: PLACE, cell: [3, 4], skill: 'goto')
+    assert_equal [:down], triggers.forbidden(PLACE, [3, 4])
+    assert_equal 1, triggers.input_count(PLACE, [3, 4], :down)
+    assert_equal 2, triggers.count(PLACE, [3, 4])
+    assert_equal [], triggers.forbidden(PLACE, [3, 5])
+    triggers.reset_unless([1, 2])
+    assert_equal [], triggers.forbidden(PLACE, [3, 4])
+  end
+
+  def test_from_events_rebuilds_the_input_from_strings
+    events = [action('goto', { 'row' => 1, 'col' => 1 }, result.merge(trigger_input: ['down'])),
+              action('walk', { 'direction' => 'up' }, result)]
+    triggers = Koholint::Triggers.from_events(events)
+    assert_equal [:down], triggers.forbidden(PLACE, [3, 4])
+    assert_equal 2, triggers.count(PLACE, [3, 4])
+  end
+
   def test_reset_unless_keeps_only_the_given_place
     triggers = Koholint::Triggers.new
     triggers.record(place: PLACE, cell: [3, 4], skill: 'walk')

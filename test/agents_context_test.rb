@@ -57,6 +57,15 @@ class AgentsContextTest < Minitest::Test
     refute_includes base, 'Things on screen'
   end
 
+  def test_a_known_trigger_input_replaces_the_generic_line
+    triggers = Koholint::Triggers.new
+    link = grid && state.cell
+    triggers.record(place: [163, 16], cell: link, skill: 'walk', direction: 'right', input: 'down')
+    text = build(triggers:)
+    assert_includes text, 'Pressing down while Link was on this cell opened a dialogue by itself 1 times (the game triggers it; other inputs did not).'
+    refute_includes text, 'A dialogue opened by itself'
+  end
+
   def test_the_trigger_line_needs_two_openings_on_the_current_cell
     triggers = Koholint::Triggers.new
     link = state.cell

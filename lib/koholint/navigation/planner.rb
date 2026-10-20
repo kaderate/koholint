@@ -10,7 +10,8 @@ module Koholint
         DELTAS.find { |_, (dr, dc)| [from[0] + dr, from[1] + dc] == to }&.first
       end
 
-      def initialize(grid:, ledger:, place:)
+      def initialize(grid:, ledger:, place:, triggers: nil)
+        @triggers = triggers
         @grid = grid
         @ledger = ledger
         @place = place
@@ -80,6 +81,7 @@ module Koholint
       def walkable?(cell, target, direction, allowed, doubt)
         return false if @grid.static_sprite(*target)
         return false if @avoided.include?([cell, direction])
+        return false if @triggers&.forbidden(@place, cell)&.include?(direction)
 
         belief = @grid.passable(*target, direction)
         return false if doubt && belief == :yes && @ledger&.doubtful?(@place, cell, direction)
