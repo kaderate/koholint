@@ -1052,6 +1052,15 @@ class DelegatedLedgerTest < Minitest::Test
     assert_includes attempt, 'standing_cell (1,5)'
   end
 
+  def test_talk_to_blocked_or_target_free_is_not_a_talk_attempt
+    p = policy(ScriptedClient.new(objective: reach_cell(1, 9), skill: walk))
+    params = { row: 2, col: 5 }
+    %w[blocked no_path target_free].each do |reason|
+      p.after_action(choice: { skill: 'talk_to', params: }, outcome: { skill: 'talk_to', params:, stopped_by: reason, moved_cells: 0, talked: false, from: { room: PLACE[0], map: PLACE[1], row: 1, col: 1 } }, state:, frame: 140)
+    end
+    assert_equal 0, p.instance_variable_get(:@talk_log).attempts(PLACE, [[2, 5]])
+  end
+
   def test_new_place_starts_and_is_achieved_on_a_first_visit
     p = policy(ScriptedClient.new(objective: ok('title' => 'discover', 'predicate' => { 'kind' => 'new_place' }), skill: walk), visited: [PLACE])
     refute decide(p).last[:fallback]

@@ -41,10 +41,20 @@ class TalkLogTest < Minitest::Test
 
   def test_from_events_rebuilds_talk_to_counts_only
     spot = { 'room' => 163, 'map' => 16, 'row' => 3, 'col' => 4 }
-    talk = ->(talked, skill = 'talk_to') { { 'type' => 'action', 'skill' => skill, 'params' => { 'row' => 4, 'col' => 7 }, 'result' => { 'from' => spot, 'talked' => talked } } }
+    talk = ->(talked, skill = 'talk_to') { { 'type' => 'action', 'skill' => skill, 'params' => { 'row' => 4, 'col' => 7 }, 'result' => { 'from' => spot, 'talked' => talked, 'stopped_by' => talked ? 'done' : 'no_response' } } }
     log = Koholint::TalkLog.from_events([talk.call(true), talk.call(false), talk.call(true, 'goto'), { 'type' => 'decision' }])
     assert_equal 2, log.attempts(PLACE, [[4, 7]])
     assert_equal 1, log.talked(PLACE, [[4, 7]])
+  end
+
+  def test_only_a_reached_talk_is_an_attempt
+    assert Koholint::TalkLog.attempt?({ talked: true })
+    assert Koholint::TalkLog.attempt?({ stopped_by: :no_response })
+    assert Koholint::TalkLog.attempt?({ 'stopped_by' => 'done' })
+    %i[blocked no_path target_free frame_cap].each { |reason| refute Koholint::TalkLog.attempt?({ stopped_by: reason, talked: false }), reason.to_s }
+    log = Koholint::TalkLog.from_events([{ 'type' => 'action', 'skill' => 'talk_to', 'params' => { 'row' => 4, 'col' => 7 },
+                                           'result' => { 'from' => { 'room' => 163, 'map' => 16, 'row' => 3, 'col' => 4 }, 'talked' => false, 'stopped_by' => 'target_free' } }])
+    assert_equal 0, log.attempts(PLACE, [[4, 7]])
   end
 
   def test_adjacent_people_are_split_into_one_footprint_each

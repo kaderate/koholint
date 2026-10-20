@@ -254,7 +254,7 @@ module Koholint
       end
 
       def feed_talk_log(choice, outcome, state)
-        return unless choice[:skill] == 'talk_to'
+        return unless choice[:skill] == 'talk_to' && TalkLog.attempt?(outcome)
 
         params = choice[:params]
         @talk_log.record(place: place_of(outcome, :from, state), row: params[:row] || params['row'], col: params[:col] || params['col'], talked: outcome[:talked] == true)

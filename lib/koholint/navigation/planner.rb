@@ -14,6 +14,11 @@ module Koholint
         @grid = grid
         @ledger = ledger
         @place = place
+        @avoided = []
+      end
+
+      def avoid(cell, direction)
+        @avoided << [cell, direction]
       end
 
       def path(from:, to:, mode: :explore, doubt: true)
@@ -74,6 +79,7 @@ module Koholint
 
       def walkable?(cell, target, direction, allowed, doubt)
         return false if @grid.static_sprite(*target)
+        return false if @avoided.include?([cell, direction])
 
         belief = @grid.passable(*target, direction)
         return false if doubt && belief == :yes && @ledger&.doubtful?(@place, cell, direction)

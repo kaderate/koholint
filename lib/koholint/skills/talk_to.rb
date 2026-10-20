@@ -8,6 +8,8 @@ module Koholint
       FREE_PIXELS = 12
       PRESS_FRAMES = 3
       RESPONSE_FRAMES = 30
+      TALK_REPLANS = 3
+      FREE_CAUSE = 'target cell was walkable: it may not hold a person any more'.freeze
 
       class Run < Goto::Run
         def initialize(person:, **rest)
@@ -22,13 +24,17 @@ module Koholint
           @face_still = 0
           @press_frames = 0
           @response_frames = 0
+          @replans = 0
+          @failed = []
           super(target: nil, **rest)
           @facing = Navigation::Planner.direction_between(@standing, @person) if @standing
         end
 
         def next_input(state)
           buttons = super
-          return buttons unless buttons.nil? && @stopped_by == :done && @phase == :walk
+          return buttons unless buttons.nil? && @phase == :walk
+          return next_input(state) if @stopped_by == :blocked && replan(state)
+          return buttons unless @stopped_by == :done
 
           @stopped_by = nil
           @phase = :face
@@ -36,7 +42,9 @@ module Koholint
         end
 
         def result(state = @last)
-          super.merge(talked: @talked, standing_cell: (@standing && { row: @standing[0], col: @standing[1] }), facing: @facing)
+          merged = super.merge(talked: @talked, standing_cell: (@standing && { row: @standing[0], col: @standing[1] }), facing: @facing, replans: @replans)
+          merged[:cause] = FREE_CAUSE if @stopped_by == :target_free
+          merged
         end
 
         private
@@ -50,19 +58,45 @@ module Koholint
 
         def initial_plan
           from = @start.cell
-          options = neighbours.filter_map do |cell|
-            path = from && @planner&.path(from:, to: cell)
+          return choose(from) if from && @planner
+
+          @cause = no_standing_cause(from)
+          @initial_length = 0
+          nil
+        end
+
+        def choose(from)
+          options = neighbours.reject { |cell| @failed.include?(cell) }.filter_map do |cell|
+            path = @planner.path(from:, to: cell)
             [path.size, turns(path), cell] if path
           end
           best = options.min_by { |size, turns, _| [size, turns] }
           unless best
             @cause = no_standing_cause(from)
-            @initial_length = 0
+            @initial_length ||= 0
             return nil
           end
 
           @standing = @target = best.last
           plan(from)
+        end
+
+        def replan(state)
+          return false if @replans >= TALK_REPLANS || !@planner || !@blocked_at
+
+          @planner.avoid([@blocked_at[:row], @blocked_at[:col]], @blocked_at[:direction])
+          @failed << @standing
+          @replans += 1
+          @path = choose(state.cell || @blocked_at.values_at(:row, :col))
+          @index = 0
+          @arrived_by = nil
+          @settle = 0
+          @still = 0
+          @heading = nil
+          @position = [state.x, state.y]
+          @facing = Navigation::Planner.direction_between(@standing, @person) if @path
+          @stopped_by = @path ? nil : :no_path
+          true
         end
 
         def neighbours
@@ -80,6 +114,7 @@ module Koholint
         def no_standing_cause(from)
           return 'no grid' unless @planner
           return 'no current cell' unless from
+          return "no reachable cell next to the target: blocked standing cells #{@failed.map { |r, c| "(#{r},#{c})" }.join(', ')}" if @failed.any?
 
           reasons = neighbours.map do |cell|
             "(#{cell[0]},#{cell[1]}) #{@planner.why_not(from:, to: cell)}"
