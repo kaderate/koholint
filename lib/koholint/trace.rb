@@ -29,8 +29,20 @@ module Koholint
     def self.read(path)
       found = located(path)
       return [] unless File.exist?(found)
+      return parse(File.foreach(path)) if found == path
 
-      found == path ? parse(File.foreach(path)) : parse(Zlib::GzipReader.open(found, &:read).each_line)
+      events = []
+      Zlib::GzipReader.open(found) { |gz| parse(gz.each_line, events) }
+      events
+    rescue Zlib::Error, EOFError
+      events
+    end
+
+    def self.intact?(path)
+      found = located(path)
+      found == path || (Zlib::GzipReader.open(found) { |gz| gz.read && true })
+    rescue Zlib::Error, EOFError
+      false
     end
 
     def self.archived(path) = "#{path}.gz"
@@ -46,16 +58,20 @@ module Koholint
     end
 
     def self.decompress(path)
-      File.binwrite(path, Zlib::GzipReader.open(archived(path), &:read))
+      raise Error, "archived trace #{archived(path)} is corrupt" unless intact?(path)
+
+      File.binwrite("#{path}.tmp", Zlib::GzipReader.open(archived(path), &:read))
+      File.rename("#{path}.tmp", path)
       File.delete(archived(path))
     end
 
-    def self.parse(lines)
-      lines.filter_map do |line|
-        JSON.parse(line)
+    def self.parse(lines, events = [])
+      lines.each do |line|
+        events << JSON.parse(line)
       rescue JSON::ParserError
         nil
       end
+      events
     end
 
     def initialize(path, schema_version: 1)
