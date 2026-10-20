@@ -52,7 +52,8 @@ counts blocked edges per place (doubtful edges), `triggers.rb` forbids inputs th
 (an invalid answer falls back deterministically, 5 consecutive fallbacks stop the run).
 
 **Objectives** — `objectives.rb`: a short goal with a predicate the harness checks from memory
-(`leave_place`, `reach_place`, `reach_cell`, `dialogue_closed`, `new_place`); the engine emits started and
+(`leave_place`, `reach_place`, `reach_cell`, `dialogue_closed`, `new_place`, `new_text`: a text not read before in
+the run, compared whitespace-insensitively on the stitched text, the read texts rebuilt from `dialogue` events on resume); the engine emits started and
 achieved/abandoned/failed events; a `started` event may carry `because`, the id of the lead that motivated it. The
 long-term direction is the agent's own `goal` (a short text it restates or revises at every objective; the context shows
 when it was set). `leads.rb` holds the leads: claims the

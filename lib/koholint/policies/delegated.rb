@@ -1,6 +1,7 @@
 require 'koholint/agents/context'
 require 'koholint/agents/prompts'
 require 'koholint/decision'
+require 'koholint/dialogues'
 require 'koholint/leads'
 require 'koholint/ledger'
 require 'koholint/navigation/planner'
@@ -106,6 +107,7 @@ module Koholint
         start_objective(choice, state, context, reply.output['because']) if decision_point.name == :choose_objective
         plan = remember_plan(reply.output)
         transcription = transcription_for(reply.output, state, decision_point)
+        remember_text(transcription[:transcription])
         answer(choice, reply, reply.output).merge(plan ? { plan: } : {}).merge(transcription).merge(notes_for(reply.output, transcription[:transcription], state))
       rescue NameError, TypeError
         raise
@@ -433,6 +435,11 @@ module Koholint
 
         ago = @objectives.finished - @leads.goal_objectives
         "#{@leads.goal} (set at frame #{@leads.goal_frame}, #{ago} #{ago == 1 ? 'objective' : 'objectives'} ago)"
+      end
+
+      def remember_text(transcription)
+        pages = [transcription].flatten(1).compact.map { |page| page[:text] }
+        @objectives.note_text(Dialogues.text(pages)) unless pages.empty?
       end
 
       def notes_for(output, transcription, state)

@@ -304,6 +304,7 @@
     if (p.kind === 'reach_place') return 'reach' + place;
     if (p.kind === 'leave_place') return 'leave' + place;
     if (p.kind === 'dialogue_closed') return 'close the open dialogue';
+    if (p.kind === 'new_text') return 'read a new text';
     return typeof p.kind === 'string' ? p.kind.replace(/_/g, ' ') + place : '';
   }
 

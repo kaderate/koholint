@@ -83,6 +83,8 @@ class LeadsTest < Minitest::Test
       started = { id: 'obj-1', status: 'started', predicate: { kind: 'new_place' } }
       trace.emit(:objective, frame: 1, **started, because: 'lead-1')
       assert_raises(Koholint::Trace::InvalidEvent) { trace.emit(:objective, frame: 1, **started, because: 'the old man') }
+      trace.emit(:objective, frame: 1, **started, predicate: { kind: 'new_text' })
+      assert_raises(Koholint::Trace::InvalidEvent) { trace.emit(:objective, frame: 1, **started, predicate: { kind: 'find_item' }) }
     end
   end
 end

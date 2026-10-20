@@ -25,9 +25,10 @@ class PromptsTest < Minitest::Test
     assert_includes skill, 'skill'
   end
 
-  def test_the_objective_prompt_lists_all_five_kinds
+  def test_the_objective_prompt_lists_all_six_kinds
     text = Koholint::Agents::Prompts.system_for(Koholint::DecisionPoint.choose_objective)
-    assert_includes text, 'one of five kinds: leave_place (place), reach_place (place), reach_cell (place, row, col), dialogue_closed or new_place (no fields).'
+    assert_includes text, 'one of six kinds: leave_place (place), reach_place (place), reach_cell (place, row, col), dialogue_closed, new_place or new_text (no fields).'
+    assert_includes text, 'new_text means reading a text you have not read yet in this run: talk to a person, read a sign'
   end
 
   def test_the_plan_line_is_mandatory

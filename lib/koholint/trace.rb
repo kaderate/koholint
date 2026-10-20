@@ -1,6 +1,7 @@
 require 'json'
 require 'zlib'
 require 'koholint'
+require 'koholint/objectives'
 
 module Koholint
   class Trace
@@ -27,7 +28,7 @@ module Koholint
     ALLOWED = { dialogue: { source: %w[agent] }, lead: { importance: %w[high normal low] } }.freeze
     OPTIONAL = { decision: { prompt_sha: ->(v) { v.is_a?(String) && v.match?(/\A\h{64}\z/) }, image: ->(v) { [true, false].include?(v) },
                               plan: ->(v) { v.is_a?(String) && v.length <= 200 && !v.match?(/[[:cntrl:]]/) } },
-                 objective: { because: ->(v) { v.is_a?(String) && v.match?(/\Alead-\d+\z/) } } }.freeze
+                 objective: { because: ->(v) { v.is_a?(String) && v.match?(/\Alead-\d+\z/) }, predicate: ->(v) { Objectives.valid_predicate?(v) } } }.freeze
 
     def self.read(path)
       found = located(path)

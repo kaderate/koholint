@@ -798,6 +798,19 @@ class DelegatedPolicyTest < Minitest::Test
     assert_includes client.calls.last[:prompt], '- [lead-1 high] a key is needed — "find the KEY"'
   end
 
+  def test_a_transcribed_text_not_read_before_achieves_new_text
+    sheet = ok('skill' => 'wait', 'params' => { 'frames' => 3 }, 'transcription' => "Go no\n\nGo north, then east.")
+    client = ScriptedClient.new(objective: ok('title' => 'read', 'predicate' => { 'kind' => 'new_text' }), skill: [sheet, walk])
+    p = policy(client)
+    decide_with_shot(p, state)
+    pages(p, 2)
+    result = flush(p, 300)
+    assert_equal 'obj-1', @objectives.current[:id]
+    p.after_action(choice: result[:choice], outcome: { stopped_by: 'done' }, state: state(frame: 320), frame: 320)
+    assert_equal :achieved, @objectives.history.last[:outcome]
+    refute @objectives.note_text('go north, then east.')
+  end
+
   def test_a_goal_is_reported_only_when_it_changes_and_leads_need_a_transcription
     same = ok('skill' => 'wait', 'params' => { 'frames' => 3 }, 'goal' => 'explore',
               'leads' => [{ 'quote' => 'q', 'claim' => 'c', 'importance' => 'low' }])

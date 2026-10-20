@@ -34,7 +34,8 @@ class ObjectivesTest < Minitest::Test
     refute Koholint::Objectives.valid_predicate?({ kind: 'new_place', place: [1, 2] })
     refute Koholint::Objectives.valid_predicate?({ kind: 'nope' })
     refute Koholint::Objectives.valid_predicate?('x')
-    assert_equal %w[dialogue_closed leave_place new_place reach_cell reach_place], Koholint::Objectives::PREDICATES.keys.sort
+    assert Koholint::Objectives.valid_predicate?({ kind: 'new_text' })
+    assert_equal %w[dialogue_closed leave_place new_place new_text reach_cell reach_place], Koholint::Objectives::PREDICATES.keys.sort
   end
 
   def test_malformed_predicates_are_rejected
@@ -218,6 +219,27 @@ class ObjectivesTest < Minitest::Test
     start({ kind: 'new_place' }, frame: 3)
     assert_nil @objectives.update(state(room: 1), frame: 4)
     assert_equal :achieved, @objectives.update(state(room: 5), frame: 5)
+  end
+
+  def test_new_text_needs_a_text_not_read_before_in_the_run
+    refute @objectives.note_text('   ')
+    assert @objectives.note_text('Hello  there')
+    start({ kind: 'new_text' })
+    refute @objectives.note_text('hello there')
+    refute @objectives.note_text('there')
+    assert_nil @objectives.update(state(frame: 1), frame: 1)
+    assert @objectives.note_text('Go north')
+    assert_equal :achieved, @objectives.update(state(frame: 2), frame: 2)
+    start({ kind: 'new_text' }, frame: 3)
+    assert_nil @objectives.update(state(frame: 4), frame: 4)
+  end
+
+  def test_read_texts_are_rebuilt_from_dialogue_events_on_resume
+    @trace.emit(:dialogue, frame: 5, place: [1, 2], text: 'Pour sauvegard', source: 'agent', page: 1)
+    @trace.emit(:dialogue, frame: 5, place: [1, 2], text: 'sauvegarder, appuyez', source: 'agent', page: 2)
+    resumed = Koholint::Objectives.resume(trace: @trace, events: Koholint::Trace.read(@path), frame: 6)
+    refute resumed.note_text('pour sauvegarder, appuyez')
+    assert resumed.note_text('something else')
   end
 
   def test_visited_seeding_on_resume

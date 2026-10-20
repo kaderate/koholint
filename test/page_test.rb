@@ -301,6 +301,7 @@ class PageTest < Minitest::Test
     assert_equal 'reach cell (3, 4) in [1,2]', evaluate("predicateInWords({kind: 'reach_cell', row: 3, col: 4, place: [1, 2]})")
     assert_equal 'leave [1,2]', evaluate("predicateInWords({kind: 'leave_place', place: [1, 2]})")
     assert_equal 'close the open dialogue', evaluate("predicateInWords({kind: 'dialogue_closed'})")
+    assert_equal 'read a new text', evaluate("predicateInWords({kind: 'new_text'})")
     assert_equal 'find item', evaluate("predicateInWords({kind: 'find_item'})")
     assert_equal '', evaluate('predicateInWords(null)')
   end
