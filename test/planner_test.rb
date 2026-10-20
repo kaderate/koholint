@@ -103,6 +103,18 @@ class PlannerTest < Minitest::Test
     assert_nil planner(ledger:, walls: wall_line).path(from: [2, 1], to: [2, 3])
   end
 
+  def test_why_not_names_forbidden_trigger_edges
+    triggers = Koholint::Triggers.new
+    triggers.record(place: PLACE, cell: [2, 1], skill: 'walk', input: :right)
+    wall_line = (0..7).map { |row| [row, 2] } - [[2, 2]]
+    sealed = Planner.new(grid: FakeGrid.new(walls: wall_line), ledger: Koholint::Ledger.new, place: PLACE, triggers:)
+    assert_nil sealed.path(from: [2, 1], to: [2, 3])
+    assert_equal 'no route: edges where the game opens a dialogue by itself: (2,1) right; walk or step there explicitly if passing is the goal',
+                 sealed.why_not(from: [2, 1], to: [2, 3])
+    both = Planner.new(grid: FakeGrid.new(walls: wall_line), ledger: doubtful_ledger([2, 1], :right), place: PLACE, triggers:)
+    assert_match(/\Ano route: doubtful edges \(2,1\) right; edges where the game opens a dialogue by itself: \(2,1\) right; walk or step/, both.why_not(from: [2, 1], to: [2, 3]))
+  end
+
   def test_why_not_causes
     wall_line = (0..7).map { |row| [row, 2] } - [[2, 2]]
     assert_equal 'target believed blocked', planner(walls: [[2, 3]]).why_not(from: [2, 1], to: [2, 3])

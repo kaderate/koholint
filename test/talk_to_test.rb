@@ -6,6 +6,7 @@ require 'koholint/perception'
 require 'koholint/vision/grid_builder'
 require 'koholint/calibration/walk_probe'
 require 'koholint/navigation/planner'
+require 'koholint/triggers'
 require 'koholint/skills/registry'
 require 'support/emulator_cache'
 
@@ -29,10 +30,10 @@ class TalkToTest < Minitest::Test
   def centre(row, col) = Koholint::Geometry.center_of(row, col)
 
   def talk(row, col, from: [4, 5], grid: FakeGrid.new(sprites: [[row, col]]), ledger: nil, solid: [row, col], opens_after: 1, free: false,
-           dialogue_at: nil, room_change_at: nil, damage_at: nil, limit: 600, blocked: [])
+           dialogue_at: nil, room_change_at: nil, damage_at: nil, limit: 600, blocked: [], triggers: nil)
     x, y = centre(*from)
     start = state(x:, y:)
-    execution = registry.start('talk_to', start, { row:, col: }, { grid:, ledger: }.compact)
+    execution = registry.start('talk_to', start, { row:, col: }, { grid:, ledger:, triggers: }.compact)
     inputs = []
     a_presses = 0
     dialog = 0
@@ -250,6 +251,15 @@ class TalkToTest < Minitest::Test
     assert_equal :damage, talk(4, 8, damage_at: 3)[0][:stopped_by]
     assert_equal :room_change, talk(4, 6, room_change_at: 4)[0][:stopped_by]
     assert_equal :damage, talk(4, 6, damage_at: 4)[0][:stopped_by]
+  end
+
+  def test_no_path_cause_carries_the_forbidden_trigger_text
+    triggers = Koholint::Triggers.new
+    triggers.record(place: [1, 0], cell: [4, 5], skill: 'walk', input: :right)
+    walls = [[3, 5], [5, 5], [3, 6], [5, 6], [4, 4], [3, 7], [5, 7], [3, 8], [5, 8], [4, 9]]
+    result, = talk(4, 7, from: [4, 5], grid: FakeGrid.new(sprites: [[4, 7]], walls:), triggers:)
+    assert_equal :no_path, result[:stopped_by], result.inspect
+    assert_includes result[:cause], 'edges where the game opens a dialogue by itself: (4,5) right'
   end
 
   def test_no_reachable_neighbour_is_no_path_after_one_idle_frame
