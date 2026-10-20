@@ -16,7 +16,7 @@ Only what is left to do. When something lands, delete it here (git is the histor
 
 ## Open decisions and loose ends
 - Addresses at `verified_count: 1` need a second independent check (`game_mode`, `game_submode`, `name_length`, `max_hearts`, `dialog_state`).
-- Agent loop, run 9: sprite-to-cell mapping needs a minimum overlap (phantom object cells made 3 of 11 `talk_to` calls end `target_free`); leaving a scripted-trigger zone before the dialogue re-fires is not possible with the current skills; add a per-objective call cap; the shield milestone is still not perceived. Measurements in `docs/runs/2026-10-second-agent-run.md`.
+- Agent loop, run 9: sprite-to-cell mapping needs a minimum overlap (phantom object cells made 3 of 11 `talk_to` calls end `target_free`); the centring phase presses DOWN at the doorway (cell centre y 128, Link at y 121) and re-fires the scripted dialogue: record the input that opened a dialogue and forbid it in centring; add a per-objective call cap; the shield milestone is still not perceived. Measurements in `docs/runs/2026-10-second-agent-run.md`.
 - Ladder beyond shield and sword; whether a run may inherit a map from a previous run.
 - Viewer: Host-header check; per-macro fsync cost on long runs; `verify` replays from boot (use keyframes).
 - Test runner: rspec vs minitest (not decided).

@@ -23,13 +23,13 @@ Plan 4a (`goto`, `step`, `talk_to`, ledger and doubt, automatic dialogues, `plan
 
 - The loop is about twice as cheap per game frame and the agent keeps one coherent objective for the whole run, with a plan filled at every call.
 - `goto` and aligned walks work: 6 `goto`, 3 `done`; no `no_path` loop (one `talk_to` ended `no_path` with a cause naming the three blocked standing cells).
-- The scripted dialogue at the doorway still blocks the exit. Standing in the doorway zone, the dialogue re-opens as soon as the previous one closes (a 6-page dialogue of about 190 frames, repeated); every action started there is preempted within 2 frames (`walk` or `talk_to` ends `dialogue`). Four of eleven `talk_to` calls ended this way. The agent reads the dialogue correctly and plans to talk to the person at (4,7), but cannot get past the trigger.
+- The scripted dialogue at the doorway still blocks the exit. Measured by replaying run 9 to frame 2242 (a dialogue had just closed, Link at the doorway, y 121) and holding one input: **only DOWN re-opens the dialogue (after 2 frames)**; idle, up, left and right do not (up walked freely to y 66). Four of eleven `talk_to` calls and several walks still ended `dialogue` because **our own centring presses DOWN**: the doorway cell centre is y 128 and Link stands at y 121 (7 px, over the 4 px tolerance), so the centring phase of `walk`, `goto` and `talk_to` presses down and triggers the dialogue (e.g. `walk right` at (7,4) ended `dialogue` after 10 frames). The agent reads the dialogue correctly and plans to talk to the person at (4,7), but its own skills keep pressing down.
 - Three of eleven `talk_to` calls ended `target_free` on phantom cells: the grid marks a cell as occupied by a person where the sprite only straddles it by a pixel (the sprite-bleed risk found in the review of plan 4a Task 2).
 
 ## What was missing
 
 - **Phantom object cells.** The sprite-to-cell mapping needs a minimum overlap (for example at least 8 px on both axes), otherwise the interaction memory lists cells that hold nobody.
-- **Leaving a trigger zone.** After a scripted dialogue closes the agent has no way to move out before it re-fires. Options: a skill that holds a direction through the interruption, or spending the first frames after the dialogue on a fixed escape walk chosen by the agent in its plan.
+- **Centring must not press an input that triggers a scripted dialogue.** Record the input pressed on the frame a dialogue opened (per place and cell), forbid it in the centring phase of every skill, and tell the agent. Moving up first, away from the trigger, works.
 - **Shield milestone** is still not perceived (`highest_milestone: none`).
 - **Objectives.** `new_place` was never achieved nor abandoned in 4771 frames: the unreachable guard no longer ends non-`reach_cell` objectives, so a stuck objective can last the whole budget. A per-objective call cap would bound it.
 - **Speed.** The view still freezes while a model call runs (267 s of waiting out of the whole run).
