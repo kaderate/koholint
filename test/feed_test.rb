@@ -32,7 +32,7 @@ class FeedTest < Minitest::Test
       assert_equal File.basename(dir), doc[:status][:run_id]
       assert_equal({ flow_version: 'f', manifest_status: 'running', budget: { 'frames' => 9 }, health: 'unknown',
                      hearts: 2.0, max_hearts: 3.0, objective: nil, last_notable: nil, highest_milestone: 'none',
-                     frames: 3, cost_usd: 0.1, calls: 1, objective_title: nil, run_id: File.basename(dir) }, doc[:status])
+                     frames: 3, cost_usd: 0.1, calls: 1, objective_title: nil, objective_predicate: nil, objective_attempts: nil, run_id: File.basename(dir) }, doc[:status])
       assert_equal({ frame: 90, journal_frames: 100, lag: 10, sync: :in_sync }, doc[:replay])
       assert_equal [{ frame: 2, type: 'decision', decision_point: 'move', agent: 'a', choice: { 'to' => 2 }, confidence: 0.5,
                       justification: 'j' },
@@ -390,6 +390,21 @@ class FeedTest < Minitest::Test
       doc = Koholint::Viewer::Feed.for(dir, FOLLOWER)
       assert_equal({ last_ms: nil, median_ms: nil, p90_ms: nil, count: 0 }, doc[:latency])
       assert_nil doc[:budget][:cap]
+    end
+  end
+
+  def test_objective_attempts_count_manual_skill_calls_over_the_whole_trace
+    with_dir do |dir, trace|
+      trace.emit(:objective, frame: 1, id: 'o1', status: 'started', predicate: { kind: 'leave_place' }, title: 'Go out')
+      400.times do |i|
+        auto = i.even?
+        trace.emit(:decision, frame: 2 + i * 2, decision_point: 'choose_skill', input: {}, options: [], choice: {},
+                              justification: auto ? 'automatic dialogue advance' : 'j', confidence: 1.0, agent: auto ? 'delegated' : 'claude', latency_ms: 0, cost_usd: 0.0)
+        trace.emit(:action, frame: 3 + i * 2, skill: 'walk', params: {}, result: {})
+      end
+      status = Koholint::Viewer::Feed.for(dir, FOLLOWER)[:status]
+      assert_equal 200, status[:objective_attempts]
+      assert_equal({ 'kind' => 'leave_place' }, status[:objective_predicate])
     end
   end
 end

@@ -98,4 +98,21 @@ class RunTest < Minitest::Test
       reopened.truncate_trace!(0)
     end
   end
+
+  def test_write_activity_never_raises_and_leaves_no_temp_file
+    with_env do |dir, rom|
+      run = Koholint::Run.create(root: dir, flow_version: 'f1', budget: {}, rom_path: rom)
+      path = File.join(run.dir, 'activity.json')
+      [Float::NAN, "bad\xFF".b.force_encoding('UTF-8'), Object.new].each_with_index do |value, i|
+        run.write_activity(kind: 'acting', label: 'x', frame: 1, detail: { params: value, n: i })
+        refute File.exist?("#{path}.tmp")
+      end
+      FileUtils.rm_f(path)
+      FileUtils.mkdir_p(File.join(path, 'blocker'))
+      run.write_activity(kind: 'idle', label: 'x', frame: 1, detail: {})
+      refute File.exist?("#{path}.tmp")
+      FileUtils.rm_rf(run.dir)
+      run.write_activity(kind: 'stopped', label: 'x', frame: 1, detail: {})
+    end
+  end
 end

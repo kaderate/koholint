@@ -119,12 +119,16 @@ module Koholint
       key = fields.values_at(:kind, :detail)
       return if key == @activity_key
 
-      @activity_key = key
       tmp = File.join(dir, 'activity.json.tmp')
       File.write(tmp, JSON.generate({ started_at: wall_clock, detail: {} }.merge(fields)))
       File.rename(tmp, File.join(dir, 'activity.json'))
-    rescue SystemCallError
-      nil
+      @activity_key = key
+    rescue StandardError
+      begin
+        File.delete(tmp) if tmp
+      rescue StandardError
+        nil
+      end
     end
 
     def write_manifest

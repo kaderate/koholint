@@ -102,7 +102,10 @@ module Koholint
       activity(:idle, 'between decisions')
     end
 
-    def activity(kind, label, **detail) = @run.write_activity(kind:, label:, frame: @emulator.frame, detail:)
+    def activity(kind, label, **detail)
+      @acting = kind == :acting ? [label, detail] : nil
+      @run.write_activity(kind:, label:, frame: @emulator.frame, detail:)
+    end
 
     def context_for(grid)
       context = @builder ? { grid: } : {}
@@ -182,7 +185,8 @@ module Koholint
     def finish_frames(done)
       @run.inputs.flush
       if @pacer
-        activity(:pacing, 'pacing to real time')
+        label, detail = @acting
+        activity(:acting, "#{label} (paced)", **detail, paced: true) if label
         @pacer.pace(done)
       end
       done
