@@ -43,7 +43,7 @@ module Koholint
 
     TERMINAL = %w[achieved failed abandoned].freeze
 
-    attr_reader :current, :history, :visited, :trace
+    attr_reader :current, :history, :visited, :trace, :last_change_frame
 
     def self.resume(trace:, events:, frame:, **options)
       started = events.select { |e| e['type'] == 'objective' && e['status'] == 'started' }

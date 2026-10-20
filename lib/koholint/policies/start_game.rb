@@ -9,8 +9,9 @@ module Koholint
       PROBE_OFF_AXIS_TOLERANCE = 2
       PROBE_MIN_PIXELS = 2
       PROBE_MAX_PIXELS = 16
-      LOCKED_WAIT = { buttons: [], frames: 30 }.freeze
       PROBE_AXES = { up: [:y, -1], down: [:y, 1], left: [:x, -1], right: [:x, 1] }.freeze
+      LOCKED_WAIT = { buttons: [], frames: 30 }.freeze
+      BOOT_LOCK_LIMIT_FRAMES = 1200 # counts consecutive locked observations: one free tick resets it
 
       def initialize(after, ready: nil, probe: false)
         @probe = probe && !ready.nil?
@@ -24,9 +25,11 @@ module Koholint
         @handed = !@settle
         @position = nil
         @ready_ticks = 0
+        @locked_ticks = 0
       end
 
       def observe(state, frame:)
+        @locked_ticks = state.phase == :locked ? @locked_ticks + 1 : 0
         return observe_probing(state, frame:) if @probe && !@handed
 
         ready = ready_state?(state) && !locked_wait?(state)
@@ -58,7 +61,7 @@ module Koholint
         position = [state.x, state.y]
         @handed = true if state.phase == :dialogue || demonstrated_movement?(state)
         @pending = nil
-        if state.phase == :playing
+        if playing?(state)
           @probe_ticks += 1
           @handed = true if @probe_ticks > PROBE_PLAYING_TICK_LIMIT
         end
@@ -68,7 +71,7 @@ module Koholint
       end
 
       def demonstrated_movement?(state)
-        return false unless @pending && state.phase == :playing
+        return false unless @pending && playing?(state)
 
         axis, sign = PROBE_AXES.fetch(@pending[:direction])
         other = axis == :x ? :y : :x
@@ -79,7 +82,7 @@ module Koholint
       def boot_choice(state)
         return LOCKED_WAIT if locked_wait?(state)
 
-        return BootScript.macro_for(state) unless @probe && state.phase == :playing && @stable
+        return BootScript.macro_for(state) unless @probe && playing?(state) && @stable
 
         choice = BootScript.probe_free(@probe_step)
         @pending = { direction: choice[:buttons].first, start: { x: state.x, y: state.y } } unless choice[:buttons].empty?
@@ -87,9 +90,13 @@ module Koholint
         choice
       end
 
-      def ready_state?(state) = @ready.call(state)
+      def ready_state?(state) = @ready.call(state) || boot_lock_capped?(state)
 
-      def locked_wait?(state) = @settle && state.phase == :locked
+      def boot_lock_capped?(state) = @settle && state.phase == :locked && @locked_ticks * LOCKED_WAIT[:frames] >= BOOT_LOCK_LIMIT_FRAMES
+
+      def playing?(state) = state.phase == :playing || boot_lock_capped?(state)
+
+      def locked_wait?(state) = @settle && state.phase == :locked && !boot_lock_capped?(state)
 
       def ready?(state) = @handed && (ready_state?(state) || locked_wait?(state))
     end
