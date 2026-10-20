@@ -21,6 +21,23 @@ class PerceptionTest < Minitest::Test
     assert_equal :none, state.milestone
   end
 
+  def test_milestone_maps_the_shield_level
+    assert_equal :none, Koholint::Perception.milestone_for(0)
+    assert_equal :shield, Koholint::Perception.milestone_for(1)
+    assert_equal :shield, Koholint::Perception.milestone_for(2)
+  end
+
+  def test_no_milestone_before_the_shield_is_given
+    skip_without_rom!
+    assert_equal :none, Koholint::Perception.read(EmulatorCache.at(700)).milestone
+  end
+
+  def test_the_shield_addresses_are_verified
+    entries = JSON.parse(File.read(Koholint::Addresses::DEFAULT_PATH)).to_h { |entry| [entry['name'], entry] }
+    assert_equal 'verified', entries.fetch('shield_level')['confidence']
+    assert_equal 0xDB44, Koholint::Addresses.load.fetch(:shield_level)
+  end
+
   def test_phase_before_control_and_while_playing
     skip_without_rom!
     assert_equal :playing, Koholint::Perception.read(EmulatorCache.interactive).phase
