@@ -1,5 +1,6 @@
 require 'koholint/boot_script'
 require 'koholint/decision'
+require 'koholint/game_state'
 
 module Koholint
   module Policies
@@ -13,7 +14,8 @@ module Koholint
       LOCKED_WAIT = { buttons: [], frames: 30 }.freeze
       BOOT_LOCK_LIMIT_FRAMES = 1200 # counts consecutive locked observations: one free tick resets it
 
-      def initialize(after, ready: nil, probe: false)
+      def initialize(after, ready: nil, probe: false, played: false)
+        @played = played
         @probe = probe && !ready.nil?
         @probe_step = 0
         @probe_ticks = 0
@@ -29,6 +31,7 @@ module Koholint
       end
 
       def observe(state, frame:)
+        @played ||= state.game_mode == PLAY_MODE
         @locked_ticks = state.phase == :locked ? @locked_ticks + 1 : 0
         return observe_probing(state, frame:) if @probe && !@handed
 
@@ -98,7 +101,7 @@ module Koholint
 
       def locked_wait?(state) = @settle && state.phase == :locked && !boot_lock_capped?(state)
 
-      def ready?(state) = @handed && (ready_state?(state) || locked_wait?(state))
+      def ready?(state) = state.phase(booted: @played) == :menu || (@handed && (ready_state?(state) || locked_wait?(state)))
     end
   end
 end

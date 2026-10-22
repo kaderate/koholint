@@ -52,7 +52,7 @@ class StartGameTest < Minitest::Test
     assert_equal 81, inner.observed
     wrapper.observe(shifted, frame: 310)
     assert_equal :move, wrapper.decision_point_for(shifted).name
-    assert_equal({ buttons: [], frames: 5 }, wrapper.decide(Koholint::DecisionPoint.macro(:boot), state(mode: 1), {})[:choice])
+    assert_equal :move, wrapper.decision_point_for(state(mode: 1)).name
   end
 
   def test_ready_policy_hands_over_anyway_after_24_ready_ticks_of_a_moving_link
@@ -181,6 +181,39 @@ class StartGameTest < Minitest::Test
     wrapper = probing
     loading = Koholint::GameState.new(frame: 1, hp: 24, x: 80, y: 60, game_mode: 0x0B, game_submode: 3, milestone: :none)
     2.times { assert_equal({ buttons: [], frames: 5 }, step(wrapper, loading).last) }
+  end
+
+  def menu(frame: 0) = Koholint::GameState.new(frame:, hp: 24, x: 80, y: 60, game_mode: 0x0C, game_submode: 5, milestone: :none)
+
+  class AgentPolicy
+    attr_reader :calls
+
+    def decision_point_for(_state) = Koholint::DecisionPoint.move
+
+    def decide(_point, state, _context)
+      (@calls ||= []) << state.phase(booted: true)
+      { choice: { buttons: [:b], frames: 3 }, agent: 'claude' }
+    end
+  end
+
+  def test_a_menu_opened_after_play_goes_to_the_inner_policy_and_never_to_the_boot_script
+    inner = AgentPolicy.new
+    wrapper = probing(inner)
+    step(wrapper, play(frame: 0))
+    step(wrapper, play(frame: 1, dialog: 3))
+    10.times { |i| assert_equal :handed, step(wrapper, menu(frame: 10 + i)).first }
+    assert_equal 'claude', wrapper.decide(wrapper.decision_point_for(menu), menu, {})[:agent]
+    assert_equal [:menu], inner.calls.uniq
+  end
+
+  def test_a_menu_before_any_play_mode_stays_with_the_boot_script
+    wrapper = probing(AgentPolicy.new)
+    assert_equal :boot, step(wrapper, menu).first
+  end
+
+  def test_a_resumed_run_that_played_routes_a_menu_to_the_inner_policy_before_settling
+    wrapper = Koholint::Policies::StartGame.new(AgentPolicy.new, ready: ->(s) { %i[playing dialogue].include?(s.phase) }, played: true)
+    assert_equal :handed, step(wrapper, menu).first
   end
 
   class RecordingPolicy < Koholint::Policies::WalkAndTalk
