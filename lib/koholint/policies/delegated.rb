@@ -38,6 +38,7 @@ module Koholint
       LOCKED_WAIT = { skill: 'wait', params: { frames: 30 } }.freeze
       LOCKED_WAIT_LIMIT_FRAMES = 900
       HEMMED_WAIT_LIMIT = 1800 / HEMMED_WAIT[:params][:frames]
+      MENU_SKILLS = %w[press wait].freeze
 
       def initialize(client:, registry:, objectives:, manual: '', on_step: nil, on_activity: nil, ledger: nil, triggers: nil, talk_log: nil, leads: nil, explore_log: nil)
         @explore_log = explore_log || ExploreLog.new
@@ -62,9 +63,11 @@ module Koholint
         @agent_driven = false
         @locked_since = nil
         @skill_point = DecisionPoint.choose_skill(registry)
+        @menu_point = DecisionPoint.choose_skill(Skills::Registry.new(MENU_SKILLS.map { |name| registry.fetch(name) }))
       end
 
       def decision_point_for(state)
+        return @menu_point if menu?(state)
         return @skill_point if locked_waiting?(state)
 
         @objectives.current ? @skill_point : DecisionPoint.choose_objective
@@ -90,18 +93,20 @@ module Koholint
         context[:explore_log] = @explore_log
         remember_grid(state, context)
         drop_stale_sequence(state)
-        automatic = automatic_advance(decision_point, state, context)
-        return automatic if automatic
+        unless menu?(state)
+          automatic = automatic_advance(decision_point, state, context)
+          return automatic if automatic
 
-        reopen = reopen_wait(decision_point, state)
-        return reopen if reopen
+          reopen = reopen_wait(decision_point, state)
+          return reopen if reopen
 
-        return locked_wait if locked_waiting?(state)
+          return locked_wait if locked_waiting?(state)
 
-        if decision_point.name == :choose_skill && !@sequence && hemmed?(state)
-          return hemmed_wait if @hemmed[:waits] < HEMMED_WAIT_LIMIT
+          if decision_point.name == :choose_skill && !@sequence && hemmed?(state)
+            return hemmed_wait if @hemmed[:waits] < HEMMED_WAIT_LIMIT
 
-          @locks.clear
+            @locks.clear
+          end
         end
 
         reply = ask(decision_point, state, context)
@@ -152,6 +157,8 @@ module Koholint
       end
 
       private
+
+      def menu?(state) = state.phase(booted: true) == :menu
 
       def hook_doubt(ledger)
         ledger.on_doubt ||= method(:doubt)

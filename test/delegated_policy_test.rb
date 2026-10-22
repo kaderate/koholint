@@ -698,8 +698,9 @@ class DelegatedPolicyTest < Minitest::Test
   def test_boot_wrapper_forwards_after_boot_only
     delegated = policy(ScriptedClient.new(objective: objective))
     wrapper = Koholint::Policies::StartGame.new(delegated, ready: ->(s) { %i[playing dialogue].include?(s.phase) })
-    2.times { |i| wrapper.observe(state, frame: i) }
     assert_equal :boot, wrapper.decision_point_for(state(game_mode: 1)).name
+    2.times { |i| wrapper.observe(state, frame: i) }
+    assert_equal %w[press wait], wrapper.decision_point_for(state(game_mode: 1)).registry.names
     assert_equal :choose_objective, wrapper.decision_point_for(state).name
     assert_equal :choose_objective, wrapper.decision_point_for(state(dialog_state: 3)).name
     wrapper.after_action(choice: { buttons: [:a], frames: 1 }, outcome: {}, state:, frame: 1)
@@ -734,6 +735,21 @@ class DelegatedPolicyTest < Minitest::Test
     point = p.decision_point_for(state(**LOCKED))
     assert_equal :choose_skill, point.name
     assert_empty client.calls
+  end
+
+  def test_a_menu_asks_the_agent_with_press_and_wait_only_and_no_lock_or_dialogue_handling
+    press = ok('skill' => 'press', 'params' => { 'button' => 'b', 'frames' => 3 })
+    client = ScriptedClient.new(skill: press)
+    p = policy(client)
+    menu = state(game_mode: 0x0C, game_submode: 5, dialog_state: 1, motion_blocked: 2)
+    p.observe(menu, frame: 100)
+    point, result = decide(p, menu)
+    assert_equal :choose_skill, point.name
+    assert_equal %w[press wait], point.registry.names
+    assert_equal 'claude', result[:agent]
+    assert_equal({ skill: 'press', params: { 'button' => 'b', 'frames' => 3 } }, result[:choice])
+    assert_includes client.calls.last[:prompt], 'Phase: menu'
+    assert_includes client.calls.last[:prompt], 'B or START usually closes it'
   end
 
   def test_the_locked_cap_hands_the_decision_back_to_the_agent_with_a_note
