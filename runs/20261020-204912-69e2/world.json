@@ -1,0 +1,27 @@
+{
+  "goal": "Explore Cocolint island, find the first dungeon key and entrance.",
+  "leads": [
+    {
+      "id": "lead-1",
+      "place": [
+        163,
+        16
+      ],
+      "source": null,
+      "quote": "J'ai quêqu' chose à te dire!",
+      "claim": "A character in the room wants to tell Link something; talk to them.",
+      "importance": "high"
+    },
+    {
+      "id": "lead-2",
+      "place": [
+        163,
+        16
+      ],
+      "source": null,
+      "quote": "Tu n'y arriveras jamais rien que par la force de tes bras!",
+      "claim": "The heavy object can't be lifted by arm strength alone; an item (e.g. Power Bracelet) is needed.",
+      "importance": "high"
+    }
+  ]
+}

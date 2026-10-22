@@ -1,0 +1,15 @@
+{
+  "flow_version": "flow-6",
+  "rom_sha256": "211a1d1559dc2684d63d87f62a6b1e9109201a6383b4004e9dd5e18ee926ee83",
+  "seed": 0,
+  "budget": {
+    "active_seconds": 1500.0,
+    "dollars": 1.5
+  },
+  "status": "stopped",
+  "parent": null,
+  "tag": "explore-1",
+  "harness_sha": "b00f7852cd2a54fbe8e8a026a43974fd9db2f424",
+  "prompts_sha": "69286b2c983f208234d1248d4fdcb79060877b8eaa0d0ce779004d1134c4cea7",
+  "model": "sonnet"
+}
