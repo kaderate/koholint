@@ -1,17 +1,19 @@
 require 'koholint/geometry'
+require 'koholint/modes'
 
 module Koholint
   GRID_ROWS = 8
   GRID_COLS = 10
 
-  # Values and meaning: notes of game_mode and game_submode in data/addresses.json (one boot run, hypotheses).
+  # Values and meaning: notes of game_mode and game_submode in data/addresses.json and the catalogue data/modes.json.
   PLAY_MODE = 0x0B
   PLAY_SETTLED_SUBMODE = 7
   # Values and meaning: notes of link_motion_blocked and scene_state in data/addresses.json.
   SCENE_LOCKED = 1
 
   GameState = Struct.new(:frame, :room_id, :map_id, :x, :y, :direction, :hp, :max_hp, :milestone,
-                         :game_mode, :game_submode, :name_length, :dialog_state, :motion_blocked, :scene_state, keyword_init: true) do
+                         :game_mode, :game_submode, :name_length, :dialog_state, :motion_blocked, :scene_state,
+                         :link_motion_state, :game_over_stage, :inventory_cursor, :menu_option, :item_a, :item_b, keyword_init: true) do
     # Link's sprites cover x - 8...x + 8 and y - 16...y; nil when his center is outside the 8x10 grid.
     def self.cell_at(x, y) = Geometry.cell_for(x, y)
 
@@ -27,13 +29,8 @@ module Koholint
 
     def self.played?(events) = events.any? { |event| event['type'] == 'perception' && event.dig('state', 'game_mode') == PLAY_MODE }
 
-    def phase(booted: false)
-      return booted ? :menu : :boot unless game_mode == PLAY_MODE
-      return :loading if loading?
+    def mode = Modes.for(self)
 
-      return :dialogue if dialog_open?
-
-      locked? ? :locked : :playing
-    end
+    def phase(booted: false) = Modes.phase(self, booted:)
   end
 end

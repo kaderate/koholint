@@ -19,7 +19,10 @@ module Koholint
                     milestone: milestone_for(read_byte.(:shield_level)),
                     game_mode: read_byte.(:game_mode), game_submode: read_byte.(:game_submode),
                     name_length: read_byte.(:name_length), dialog_state: read_byte.(:dialog_state),
-                    motion_blocked: read_byte.(:link_motion_blocked), scene_state: read_byte.(:scene_state))
+                    motion_blocked: read_byte.(:link_motion_blocked), scene_state: read_byte.(:scene_state),
+                    link_motion_state: read_byte.(:link_motion_state), game_over_stage: read_byte.(:game_over_stage),
+                    inventory_cursor: read_byte.(:inventory_cursor), menu_option: read_byte.(:menu_option),
+                    item_a: read_byte.(:inventory_slot_a), item_b: read_byte.(:inventory_slot_b))
     end
   end
 end
