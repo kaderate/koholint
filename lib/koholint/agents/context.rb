@@ -195,6 +195,17 @@ module Koholint
       end
       private_class_method :objective_block
 
+      def self.explore_note(r)
+        r = r.transform_keys(&:to_sym)
+        target = r[:target].is_a?(Hash) ? r[:target].transform_keys(&:to_sym) : nil
+        cells = ->(list) { Array(list).map { |c| c.transform_keys(&:to_sym) }.map { |c| "(#{c[:row]},#{c[:col]})#{c[:direction] ? " #{c[:direction]}" : ''}" }.join(', ') }
+        note = ", cells walked #{r[:cells_walked]}, place_changed #{r[:place_changed]}"
+        note += ", last target #{target[:kind]} (#{target[:row]},#{target[:col]}) #{target[:direction]}" if target
+        note += ", untried objects nearby #{cells.call(r[:untried_objects])}" if Array(r[:untried_objects]).any?
+        note += ", exits already tried #{Array(r[:tried_exits]).empty? ? 'none' : cells.call(r[:tried_exits])}" if r.key?(:tried_exits)
+        note
+      end
+
       def self.result_line(r)
         cause = r[:cause] ? " (cause: #{r[:cause]})" : ''
         line = "#{r[:skill]} #{r[:params].to_json}: stopped_by #{r[:stopped_by]}#{cause}, #{r[:frames]} frames, " \
@@ -207,6 +218,7 @@ module Koholint
           line += ", standing cell (#{standing[:row]},#{standing[:col]})" if standing
           line += ", facing #{r[:facing]}" if r[:facing]
         end
+        line += explore_note(r) if r[:skill].to_s == 'explore'
         block = blocked_at(r)
         block ? "#{line}, blocked at (#{block[:row]},#{block[:col]}) #{block[:direction]}" : line
       end

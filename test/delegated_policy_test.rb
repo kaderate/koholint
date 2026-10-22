@@ -1418,6 +1418,38 @@ class DelegatedLedgerTest < Minitest::Test
     assert_equal [140], @objectives.no_paths
   end
 
+  def test_explore_results_feed_the_explore_log_the_ledger_and_the_no_path_count
+    @objectives = NoPathObjectives.new(trace:)
+    log = Koholint::ExploreLog.new
+    p = Koholint::Policies::Delegated.new(client: ScriptedClient.new(objective: reach_cell(1, 9), skill: walk), registry: Koholint::Skills::Registry.default,
+                                          objectives: @objectives, explore_log: log)
+    context = { grid: unknown_grid }
+    p.decide(p.decision_point_for(state), state, context)
+    assert_same log, context[:explore_log]
+    from = { room: 163, map: 16, row: 3, col: 4 }
+    edge = { row: 3, col: 5, direction: :right }
+    outcome = { skill: 'explore', params: {}, stopped_by: :no_frontier, moved_cells: 0, from:, to: from, blocked_at: nil, cells_walked: 2,
+                place_changed: false, blocked_edges: [edge, edge], exits: [{ row: 7, col: 5, direction: :down, outcome: :left }], offered: [], tried_exits: [] }
+    p.after_action(choice: { skill: 'explore', params: {} }, outcome:, state:, frame: 140)
+    assert_nil @objectives.no_paths
+    assert log.tried?(PLACE, [7, 5], :down)
+    assert p.instance_variable_get(:@ledger).doubtful?(PLACE, [3, 5], :right)
+    assert_includes @objectives.attempts_for_prompt.last, 'cells walked 2, place_changed false, exits already tried none'
+  end
+
+  def test_repeated_explore_no_frontier_does_not_abandon_a_reach_cell_objective
+    p = policy(ScriptedClient.new(objective: reach_cell(1, 9), skill: walk))
+    p.decide(p.decision_point_for(state), state, { grid: unknown_grid })
+    assert @objectives.current
+    from = { room: 163, map: 16, row: 3, col: 4 }
+    10.times do |i|
+      outcome = { skill: 'explore', params: {}, stopped_by: :no_frontier, moved_cells: 0, from:, to: from, cells_walked: 0, place_changed: false,
+                  blocked_edges: [], exits: [], offered: [], tried_exits: [] }
+      p.after_action(choice: { skill: 'explore', params: { direction: %w[up down][i % 2] } }, outcome:, state:, frame: 140 + i)
+    end
+    assert @objectives.current
+  end
+
   def test_a_doubtful_edge_emits_a_grid_contradiction_once_per_crossing
     sink = trace
     @objectives = Koholint::Objectives.new(trace: sink)

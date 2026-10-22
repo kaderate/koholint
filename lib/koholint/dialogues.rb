@@ -4,7 +4,7 @@ module Koholint
   module Dialogues
     OVERLAP_MIN = 7
     ENDED = /[.!?…]\z/
-    MOVES = %w[walk step goto talk_to].freeze
+    MOVES = %w[walk step goto talk_to explore].freeze
 
     module_function
 

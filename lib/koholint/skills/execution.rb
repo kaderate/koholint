@@ -29,7 +29,7 @@ module Koholint
         @trigger_input = @last_input if state.dialog_open? && !@start.dialog_open? && @trigger_input.nil?
         return nil if @stopped_by
 
-        buttons = if @frames >= HARD_CAP then finish(:frame_cap)
+        buttons = if @frames >= hard_cap then finish(:frame_cap)
                   elsif @centring then centre(state)
                   else input_for(state)
                   end
@@ -75,6 +75,8 @@ module Koholint
       end
 
       def centres? = false
+
+      def hard_cap = HARD_CAP
 
       def blocked_direction = nil
 

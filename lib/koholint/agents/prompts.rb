@@ -28,6 +28,7 @@ module Koholint
       SKILL = <<~TEXT.freeze
         Decision: choose the next skill to run towards the current objective.
         A skill is a bounded action with parameters; the harness runs it and reports how it stopped. Choose exactly one skill from the schema with parameters that satisfy it.
+        To discover new areas, prefer explore: it walks to the nearest unexplored exit or frontier by itself (an optional direction prefers that side) and stops when something happens: a new place, a dialogue, a thing never talked to nearby, blocked, nothing left to explore, or its frame budget. Keep goto, walk and step for specific targets.
         goto walks several cells along a path planned over the grid and stops when blocked. Cells marked ! may be doubtful: they looked free but blocked Link repeatedly; goto avoids a doubtful edge, and the neighbour lines say how many times each direction was blocked.
         talk_to walks next to a person or object at (row, col), faces it and presses A; use it instead of composing walk and press yourself. If it gets no response from one side, the listing of things on screen shows which sides failed: the skill tries another side by itself, and you can also walk next to a person from a specific side and press A.
         step moves Link a few pixels (1 to 16) along one axis and does not recentre him; the offset line shows how far he is from the centre of his cell, and a passage may be offset from the cell grid.

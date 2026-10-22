@@ -28,7 +28,7 @@ class SkillsTest < Minitest::Test
   end
 
   def test_registry_names_and_unknown_skill
-    assert_equal %w[walk press advance_dialogue wait goto step talk_to], registry.names
+    assert_equal %w[walk press advance_dialogue wait goto step talk_to explore], registry.names
     assert_raises(ArgumentError) { registry.fetch('fly') }
     assert_raises(ArgumentError) { registry.start('fly', state, {}) }
   end

@@ -56,8 +56,13 @@ place, so the grid went dark). The live view has a grid toggle that overlays the
 visited places from the trace; `fork` branches a run at a frame. Both work on an archived run, also on a fresh clone
 (see Run storage).
 
-## Agent skills (`flow-5`)
+## Agent skills (`flow-6`)
 
+- `explore [direction]` explores by itself: it walks to the nearest frontier (a known cell next to an unknown one) or
+  untried border exit (`direction` prefers that side), steps out, re-plans, and returns to the model only at an event:
+  `new_place`, `dialogue`, `untried_object` (once per thing never talked to within 3 cells), `blocked`, `no_frontier`
+  (with the exits already tried), `locked`, `damage` or `budget` (600 frames). What it walked, the walls it found, the
+  exits it tried and the things it offered are kept per place and rebuilt from the trace on resume.
 - `goto row col` walks to a cell of the known grid by a shortest path with the fewest turns (stops `done`, `blocked`,
   `no_path`, ...; a result carries `blocked_at` when a move hit a wall); `step direction pixels` moves a few pixels;
   `talk_to row col` walks next to a person, faces them and presses A, trying other sides on no response.

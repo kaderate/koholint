@@ -194,7 +194,7 @@ class CliTest < Minitest::Test
 
   def test_the_flow_is_4_and_resume_refuses_a_flow_3_run
     skip_without_rom!
-    assert_equal 'flow-5', Koholint::FLOW_VERSION
+    assert_equal 'flow-6', Koholint::FLOW_VERSION
     Dir.mktmpdir do |dir|
       run = Koholint::Run.create(root: dir, flow_version: 'flow-3', budget: {})
       code, _out, err = cli('resume', run.dir)
