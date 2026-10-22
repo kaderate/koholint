@@ -99,4 +99,13 @@ class DialoguesTest < Minitest::Test
                  first.except(:pages))
     assert_equal [nil, 'A sign.', ['none', 1, 1]], second.values_at(:source, :text, :stamp)
   end
+
+  def test_an_explore_between_a_talk_and_a_text_clears_the_source
+    events = [
+      { 'type' => 'action', 'frame' => 2, 'skill' => 'talk_to', 'params' => { 'row' => 3, 'col' => 4 }, 'result' => { 'talked' => true } },
+      { 'type' => 'action', 'frame' => 6, 'skill' => 'explore', 'params' => {}, 'result' => { 'stopped_by' => 'dialogue' } },
+      { 'type' => 'dialogue', 'frame' => 7, 'place' => [1, 0], 'text' => 'A sign.' }
+    ]
+    assert_nil Koholint::Dialogues.from_events(events).first[:source]
+  end
 end
