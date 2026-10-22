@@ -66,13 +66,14 @@ module Koholint
           @stalled = 0
           @legs = 0
           @locked = 0
-          @leg = @outward = @target = @stop = @heading = nil
+          @leg = @outward = @target = @stop = @heading = @idle = @fail_cause = nil
         end
 
         def result(state = @last)
           merged = super.merge(place_changed: room(state) != @place, cells_walked: @cells_walked, legs: @legs, target: target_summary,
                                crossed: @crossed.map(&:dup), walls: @new_walls.map { |row, col| { row:, col: } }, blocked_edges: @blocked.map(&:dup), exits: @exits.map(&:dup),
                                offered: @offered.map { |row, col| { row:, col: } })
+          merged[:cause] = @fail_cause if @stopped_by == :blocked && @fail_cause
           merged[:untried_objects] = @untried.map { |row, col| { row:, col: } } if @stopped_by == :untried_object
           merged[:tried_exits] = @log ? @log.tried_exits(@place) : [] if @stopped_by == :no_frontier
           merged[:cause] = @planner ? 'no current cell' : 'no grid' if @stopped_by == :no_frontier && !(@planner && @attempt_from)
@@ -86,9 +87,10 @@ module Koholint
         def blocked_at_for(_state) = @blocked.last&.dup
 
         def input_for(state)
+          return finish(@idle) if @idle
           return depart if room(state) != @place
-          return finish(:damage) if state.hp.to_i < @start.hp.to_i
-          return finish(:dialogue) if state.dialog_open? && !@start.dialog_open?
+          return harmed if state.hp.to_i < @start.hp.to_i
+          return stop_now(:dialogue) if state.dialog_open?
 
           @locked = state.locked? ? @locked + 1 : 0
           return finish(:locked) if @locked >= LOCK_FRAMES
@@ -103,8 +105,20 @@ module Koholint
                       else begin_attempt(state)
                       end
             return heading(buttons) if buttons
-            return finish(@stop) if @stop
+            return stop_now(@stop) if @stop
           end
+        end
+
+        def stop_now(reason)
+          return finish(reason) if @frames.positive?
+
+          @idle = reason
+          []
+        end
+
+        def harmed
+          fail_step(*@target.values_at(:cell, :direction)) if @target && (@leg || @outward)
+          finish(:damage)
         end
 
         def heading(buttons)
@@ -169,6 +183,8 @@ module Koholint
           return outward_from(state) if outcome[:stopped_by] == :done
 
           block(outcome[:blocked_at]) if outcome[:blocked_at]
+          row, col = @target[:cell]
+          @fail_cause = "goto leg to (#{row},#{col}) stopped #{outcome[:stopped_by]}#{outcome[:cause] ? ": #{outcome[:cause]}" : ''}"
           @excluded << @target.values_at(:cell, :direction)
           attempt_over(state)
         end
@@ -195,13 +211,20 @@ module Koholint
         end
 
         def outward_blocked(state, cell, direction)
+          fail_step(cell, direction)
+          @fail_cause = "step #{direction} from (#{cell[0]},#{cell[1]}) blocked"
+          @outward = nil
+          attempt_over(state)
+        end
+
+        def fail_step(cell, direction)
           edge = { row: cell[0], col: cell[1], direction: }
           block(edge)
           @exits << edge.merge(outcome: :blocked) if @target[:kind] == :exit
-          @new_walls << neighbour(cell, direction) if @target[:kind] == :frontier
-          @walls << neighbour(cell, direction) if @target[:kind] == :frontier
-          @outward = nil
-          attempt_over(state)
+          return unless @target[:kind] == :frontier
+
+          @new_walls << neighbour(cell, direction)
+          @walls << neighbour(cell, direction)
         end
 
         def block(edge)

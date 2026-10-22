@@ -32,14 +32,16 @@ class ExploreTest < Minitest::Test
     rows
   end
 
-  def explore(rows, truth: rows, exits: [], start: [88, 80], params: {}, limit: 1000, **context)
+  def explore(rows, truth: rows, exits: [], harm: [], start: [88, 80], params: {}, limit: 1000, **context)
     walls = truth.each_with_index.flat_map { |line, row| line.chars.each_index.select { |col| '#o'.include?(line[col]) }.map { |col| [row, col] } }
     execution = registry.start('explore', state(x: start[0], y: start[1]), params, { grid: MapGrid.new(rows), **context })
     x, y = start
     room_id = 1
+    hp = 24
     inputs = []
     limit.times do
-      buttons = execution.next_input(state(x:, y:, room_id:)) or break
+      hp = 20 if harm.include?(Koholint::Geometry.cell_for(x, y))
+      buttons = execution.next_input(state(x:, y:, room_id:, hp:)) or break
       inputs << buttons
       dx, dy = DELTA.fetch(buttons.first, [0, 0])
       next if dx.zero? && dy.zero?
@@ -51,7 +53,7 @@ class ExploreTest < Minitest::Test
       x += dx
       y += dy
     end
-    [execution.result(state(x:, y:, room_id:)), inputs]
+    [execution.result(state(x:, y:, room_id:, hp:)), inputs]
   end
 
   def test_walks_to_the_nearest_frontier_and_steps_into_the_unknown
@@ -100,7 +102,7 @@ class ExploreTest < Minitest::Test
     end
     result, inputs = explore(rows, explore_log: log)
     assert_equal :no_frontier, result[:stopped_by]
-    assert_empty inputs
+    assert_equal [[]], inputs
     assert_equal [{ row: 7, col: 5, direction: :down }], result[:tried_exits]
   end
 
@@ -113,10 +115,11 @@ class ExploreTest < Minitest::Test
     assert_equal({ direction: :up }, result[:params])
   end
 
-  def test_a_closed_known_place_is_no_frontier_without_frames
+  def test_a_closed_known_place_is_no_frontier_after_one_idle_frame
     result, inputs = explore(CLOSED)
     assert_equal :no_frontier, result[:stopped_by]
-    assert_empty inputs
+    assert_equal [[]], inputs
+    assert_equal 1, result[:frames]
     assert_equal 0, result[:cells_walked]
   end
 
@@ -152,6 +155,49 @@ class ExploreTest < Minitest::Test
     assert_equal 3, result[:legs]
     refute_nil result[:blocked_at]
     assert_equal 3, result[:blocked_edges].size
+    assert_match(/\Agoto leg to \(\d,\d\) stopped blocked\z/, result[:cause])
+  end
+
+  def test_a_failed_leg_reports_its_real_cause
+    rows = with(CLOSED, [1, 1], '?', [1, 8], '?', [6, 1], '?', [6, 8], '?')
+    execution = registry.start('explore', state, {}, { grid: MapGrid.new(rows) })
+    stub = Struct.new(:stopped) do
+      def next_input(_state) = nil
+      def result(_state) = { stopped_by: stopped, crossed: [], blocked_at: nil, cause: ('no route over known cells' if stopped == :no_path) }
+    end
+    frames = 0
+    until execution.stopped_by || frames > 20
+      leg = execution.instance_variable_get(:@leg)
+      execution.instance_variable_set(:@leg, stub.new(frames.even? ? :no_path : :frame_cap)) if leg && !leg.is_a?(stub)
+      execution.next_input(state)
+      frames += 1
+    end
+    result = execution.result
+    assert_equal :blocked, result[:stopped_by]
+    assert_match(/\Agoto leg to \(\d,\d\) stopped (no_path: no route over known cells|frame_cap)\z/, result[:cause])
+  end
+
+  def test_damage_walls_the_frontier_so_the_next_call_avoids_it
+    rows = with(CLOSED, [4, 7], '?', [1, 5], '?')
+    log = Koholint::ExploreLog.new
+    result, = explore(rows, harm: [[4, 7]], explore_log: log)
+    assert_equal :damage, result[:stopped_by]
+    assert_equal [{ row: 4, col: 7 }], result[:walls]
+    assert_includes result[:blocked_edges], { row: 4, col: 6, direction: :right }
+    log.absorb(result)
+    result, = explore(rows, harm: [[4, 7]], explore_log: log)
+    refute_equal :damage, result[:stopped_by]
+    refute_includes result[:crossed], [4, 6, :right]
+    assert_equal [1, 5], result[:to].values_at(:row, :col)
+  end
+
+  def test_an_open_dialogue_at_the_start_stops_after_one_idle_frame
+    open = state(dialog_state: 1)
+    execution = registry.start('explore', open, {}, { grid: MapGrid.new(with(CLOSED, [4, 7], '?')) })
+    assert_equal [], execution.next_input(open)
+    assert_nil execution.next_input(open)
+    assert_equal :dialogue, execution.result[:stopped_by]
+    assert_equal 1, execution.result[:frames]
   end
 
   def test_doubtful_edges_are_avoided
@@ -184,7 +230,7 @@ class ExploreTest < Minitest::Test
   end
 
   def test_without_a_grid_is_no_frontier_with_a_cause
-    result = registry.start('explore', state, {}).tap { |e| e.next_input(state) }.result
+    result = registry.start('explore', state, {}).tap { |e| 2.times { e.next_input(state) } }.result
     assert_equal :no_frontier, result[:stopped_by]
     assert_equal 'no grid', result[:cause]
   end
