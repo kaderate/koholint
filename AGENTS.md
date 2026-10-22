@@ -18,7 +18,7 @@ High-level architecture: `ARCHITECTURE.md` (update it in the same commit as any 
 - A rule a script can check is a validator, not a paragraph.
 - Game facts live in typed data with provenance (`data/addresses.json`, a run's `world.json`),
   never in prose. `verified` needs `verified_count >= 2` from independent checks.
-- The agent knows the manual and the genre, not a walkthrough: game facts are observed.
+- How to play is public knowledge and may be used freely, in code, data and prompts: controls, menus, map, save and game-over screens, dialogue, interactions with people, signs and objects, item use, general mechanics. Where to go and what to do next (routes, solutions, item locations, the order of the game) is a walkthrough and stays out: it is observed or read from in-game texts. Anything measurable is measured; a value taken from general knowledge enters data files as a hypothesis with its source and is verified by a probe.
 - What remains to do lives in `ROADMAP.md` (only what is left; delete items as they land, git is the history).
 - Runs are committed only as the light bundle written by `bin/koholint archive`; prompts, keyframes and saves stay local.
 - Playing and evolving the flow are separate: a run only emits `suggestions.md`.

@@ -8,7 +8,7 @@ a layer, a data flow or a run artifact. The detailed design and its rationale ar
 
 A deterministic engine plays Link's Awakening DX through the emu-gb emulator. It calls an agent only at
 **decision points** and executes what the agent chose with deterministic **skills**. The agent knows the game
-manual and the genre, never a walkthrough: game facts are observed and stored as typed data with provenance.
+manual, the genre and how the game is played (controls, menus, map, interactions), never a walkthrough: where to go is observed or read from in-game texts, and game facts are stored as typed data with provenance.
 The engine owns the loop, the budgets, the files of a run and the trace; agents never touch them.
 
 ```
@@ -113,7 +113,7 @@ state.
 
 - Only the engine writes `trace.jsonl`, `inputs.log` and `save/`; `verify` replays the journal and compares hashes.
 - Determinism: the same journal on the same ROM gives the same states. Agents are never called in replay.
-- No walkthrough or game knowledge in code or prompts; facts live in `data/addresses.json` and a run's
+- No walkthrough in code or prompts (how-to-play knowledge is allowed, see `AGENTS.md`); facts live in `data/addresses.json` and a run's
   `world.json`, with provenance.
 - A rule a script can check is a validator, not a paragraph.
 - Playing and evolving the flow are separate: a run only emits `suggestions.md`.
