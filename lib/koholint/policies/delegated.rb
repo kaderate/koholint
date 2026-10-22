@@ -181,7 +181,7 @@ module Koholint
       end
 
       def note_no_path(choice, outcome, frame)
-        return unless PATH_SKILLS.include?(choice[:skill]) && %w[no_path no_frontier].include?(outcome[:stopped_by].to_s) && @objectives.current
+        return unless PATH_SKILLS.include?(choice[:skill]) && outcome[:stopped_by].to_s == 'no_path' && @objectives.current
 
         track { @objectives.note_no_path(frame:) }
       end
