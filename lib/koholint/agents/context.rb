@@ -65,8 +65,11 @@ module Koholint
 
       def self.header(state, link, triggers = nil, place = nil, locked = nil, locked_frames = nil)
         where = link ? "row #{link[0]}, col #{link[1]}" : 'outside the grid (doorway or screen edge)'
-        lines = ["Phase: #{state.phase}", "Place: room #{state.room_id}, map #{state.map_id}",
+        phase = state.phase(booted: true)
+        lines = ["Phase: #{phase}", "Place: room #{state.room_id}, map #{state.map_id}",
                  "Link: #{where} (pixel x=#{state.x}, y=#{state.y}), facing #{state.direction}"]
+        lines << "A screen other than the play screen is open (game mode #{state.game_mode}, submode #{state.game_submode}); only press and wait work here. " \
+                 'B or START usually closes it (START opens the menu, SELECT the map, B cancels).' if phase == :menu
         lines << "Link has been locked for #{locked_frames} frames (cause unknown)" if locked_frames
         if link
           dx, dy = Geometry.offset(state.x, state.y, link)

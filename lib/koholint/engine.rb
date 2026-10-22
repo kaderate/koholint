@@ -18,6 +18,8 @@ module Koholint
     SAVE_CHECK_EVERY = 60
     AGENT_FAILURE_LIMIT = 5
     AGENT_REFUSAL_LIMIT = 10
+    STUCK_BOOT_FRAMES = 900
+    STUCK_BOOT_ANY_FRAMES = 3600
 
     def self.resume(run_path, budget:, policy: nil, policy_factory: nil, flow_version: Koholint::FLOW_VERSION, **options)
       run = Run.open(run_path, flow_version: flow_version)
@@ -41,6 +43,7 @@ module Koholint
       @keyframes = Keyframes.new(File.join(run.dir, 'keyframes'))
       @builder = Vision::GridBuilder.new(trace: run.trace, beliefs: known_beliefs(run)) if grid
       @ram_hash = Digest::SHA256.hexdigest(@emulator.cartridge_ram)
+      @played = GameState.played?(Trace.read(File.join(run.dir, 'trace.jsonl')))
     end
 
     def request_stop
@@ -70,6 +73,7 @@ module Koholint
     def iterate
       state = Perception.read(@emulator)
       @run.trace.emit(:perception, frame: state.frame, state: state.to_h, state_hash: @emulator.state_hash)
+      @played ||= state.game_mode == PLAY_MODE
       if @builder
         activity(:mapping, 'mapping the screen')
         grid = @builder.observe(@emulator, state)
@@ -85,6 +89,7 @@ module Koholint
       chosen = result[:fallback] && result[:decision_point] || decision_point
       choice = chosen.validate(result[:choice])
       note_fallback(result)
+      note_boot(result, state)
       emit_dialogue(result[:transcription], state)
       emit_notes(result, state)
       seen = record_prompt(result, state.frame, chosen.name)
@@ -153,6 +158,14 @@ module Koholint
       @refusals = 0
       @fallbacks = result[:fallback] ? @fallbacks + 1 : 0
       @budget.stop!(:agent_failures) if @fallbacks >= AGENT_FAILURE_LIMIT
+    end
+
+    def note_boot(result, state)
+      return @boot_since = nil unless result[:agent] == 'start_game'
+
+      @boot_since ||= state.frame
+      limit = @played && state.game_mode != PLAY_MODE ? STUCK_BOOT_FRAMES : STUCK_BOOT_ANY_FRAMES
+      @budget.stop!(:stuck_boot) if state.frame - @boot_since > limit
     end
 
     def press(choice)

@@ -56,7 +56,7 @@ place, so the grid went dark). The live view has a grid toggle that overlays the
 visited places from the trace; `fork` branches a run at a frame. Both work on an archived run, also on a fresh clone
 (see Run storage).
 
-## Agent skills (`flow-7`)
+## Agent skills (`flow-8`)
 
 - `explore [direction]` explores by itself: it walks to the nearest frontier (a known cell next to an unknown one) or
   untried border exit (`direction` prefers that side), steps out, re-plans, and returns to the model only at an event:

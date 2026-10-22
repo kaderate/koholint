@@ -34,6 +34,17 @@ class GameStateTest < Minitest::Test
     assert_equal :playing, state(game_mode: 0x0B, game_submode: 7, dialog_state: 0).phase
   end
 
+  def test_a_non_play_mode_is_a_menu_once_past_boot
+    assert_equal :menu, state(game_mode: 0x0C, game_submode: 5).phase(booted: true)
+    assert_equal :boot, state(game_mode: 0x0C, game_submode: 5).phase
+    assert_equal :playing, state(game_mode: 0x0B, game_submode: 7).phase(booted: true)
+  end
+
+  def test_played_once_a_perception_was_in_play_mode
+    assert Koholint::GameState.played?([{ 'type' => 'perception', 'state' => { 'game_mode' => 0x0C } }, { 'type' => 'perception', 'state' => { 'game_mode' => 0x0B } }])
+    refute Koholint::GameState.played?([{ 'type' => 'perception', 'state' => { 'game_mode' => 0x02 } }, { 'type' => 'decision', 'state' => { 'game_mode' => 0x0B } }])
+  end
+
   def test_locked_when_motion_is_blocked_or_the_scene_is_locked
     settled = { game_mode: 0x0B, game_submode: 7, dialog_state: 0 }
     assert_equal :locked, state(**settled, motion_blocked: 2, scene_state: 3).phase

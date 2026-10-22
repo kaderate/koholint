@@ -295,4 +295,52 @@ class EngineTest < Minitest::Test
     end
     assert_equal outputs.first, outputs.last
   end
+  class MenuEmulator
+    attr_reader :frame
+
+    def initialize = (@frame = 0)
+    def step(_buttons) = @frame += 1
+    def state_hash = @frame.to_s
+    def cartridge_ram = "\0" * 16
+    def dump = 'state'
+
+    def read(addr)
+      name = Koholint::Perception::ADDRESSES.key(addr)
+      { hp: 24, max_hearts: 3, link_x: 80, link_y: 60, game_mode: @frame < 300 ? 0x0B : 0x0C, game_submode: 7 }.fetch(name, 0)
+    end
+  end
+
+  class BootForever
+    def decision_point_for(_state) = Koholint::DecisionPoint.macro(:boot)
+    def decide(*) = { choice: { buttons: [], frames: 5 }, agent: 'start_game' }
+  end
+
+  def test_the_boot_script_stuck_in_a_menu_after_play_stops_the_run
+    with_run do |_dir, run|
+      reason = Koholint::Engine.new(run:, policy: BootForever.new, emulator: MenuEmulator.new, budget: Koholint::Budget.new(frames: 20_000)).run
+      assert_equal :stuck_boot, reason
+      assert_equal 'stuck_boot', events(run, :budget_stop).first['kind']
+      assert_operator run.inputs.frames, :<=, 300 + Koholint::Engine::STUCK_BOOT_FRAMES + 10
+      assert File.file?(File.join(run.dir, 'summary.json'))
+    end
+  end
+
+  def test_the_boot_script_deciding_forever_stops_the_run_even_before_play
+    with_run do |_dir, run|
+      emulator = MenuEmulator.new
+      emulator.define_singleton_method(:read) { |addr| Koholint::Perception::ADDRESSES.key(addr) == :game_mode ? 0x02 : 0 }
+      assert_equal :stuck_boot, Koholint::Engine.new(run:, policy: BootForever.new, emulator:, budget: Koholint::Budget.new(frames: 20_000)).run
+      assert_operator run.inputs.frames, :>, Koholint::Engine::STUCK_BOOT_ANY_FRAMES
+      assert_operator run.inputs.frames, :<=, Koholint::Engine::STUCK_BOOT_ANY_FRAMES + 10
+    end
+  end
+  def test_a_resumed_run_that_played_keeps_the_short_stuck_limit
+    with_run do |_dir, run|
+      run.trace.emit(:perception, frame: 0, state: { game_mode: 0x0B })
+      emulator = MenuEmulator.new
+      emulator.define_singleton_method(:read) { |addr| Koholint::Perception::ADDRESSES.key(addr) == :game_mode ? 0x0C : 24 }
+      assert_equal :stuck_boot, Koholint::Engine.new(run:, policy: BootForever.new, emulator:, budget: Koholint::Budget.new(frames: 20_000)).run
+      assert_operator run.inputs.frames, :<=, Koholint::Engine::STUCK_BOOT_FRAMES + 10
+    end
+  end
 end

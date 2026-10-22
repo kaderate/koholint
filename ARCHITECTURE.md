@@ -58,7 +58,11 @@ scrolling text box into the full text without losing a word; the stored events s
 `move`, macros) with their output schema and validation. A policy answers them: `policies/delegated.rb`
 (agent-driven; owns the context, plan memory, automatic dialogue pages, lock/hemmed handling),
 `policies/walk_and_talk.rb` and `start_game.rb` (deterministic baselines and the intro), `with_fallback.rb`
-(an invalid answer falls back deterministically, 5 consecutive fallbacks stop the run).
+(an invalid answer falls back deterministically, 5 consecutive fallbacks stop the run). Phases (`GameState#phase`):
+`boot` is any non-play game mode before the run first saw the play mode (the boot script owns it); once past boot (a
+`perception` in play mode, rebuilt from the trace on resume) a non-play mode is `menu` and goes to the agent with only
+`press` and `wait`; `loading`, `dialogue`, `locked` and `playing` are play-mode phases. The engine stops the run with
+`stuck_boot` when the boot script decides for over 900 consecutive frames in a non-play mode past boot, or 3600 in any case.
 
 **Objectives** — `objectives.rb`: a short goal with a predicate the harness checks from memory
 (`leave_place`, `reach_place`, `reach_cell`, `dialogue_closed`, `new_place`, `new_text`: a text not read before in
