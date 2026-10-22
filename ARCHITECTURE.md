@@ -42,8 +42,8 @@ model. Unknown cells are unknown, not walls.
 with the fewest turns over known cells), `skills/` (`walk`, `goto`, `step`, `talk_to`, `explore`, `press`,
 `advance_dialogue`, `wait`) behind `skills/registry.rb`. `explore` chains goto legs by itself: it walks to the
 nearest frontier (a known cell next to an unknown one) or untried border exit, steps out, re-plans, and stops at
-an event (`new_place`, `dialogue`, `untried_object` once per thing never talked to nearby, `blocked`, `no_frontier`,
-`locked`, `budget` at 600 frames); `explore_log.rb` keeps per place the cells it walked or found walled, the exits
+an event (`new_place`, `dialogue`, `untried_object` once per thing never talked to nearby, `blocked`, `stalled` after 3
+attempts that walked no new cell, `no_frontier`, `locked`, `budget` at 600 frames); `explore_log.rb` keeps per place the cells it walked or found walled, the exits
 tried (left, or blocked twice) and the things already offered, rebuilt from its `action` events on resume. A skill is a bounded, deterministic action with
 validated parameters; it reports how it stopped (`done`, `blocked`, `no_path`, `no_response`…). `ledger.rb`
 counts blocked edges per place (doubtful edges), `triggers.rb` forbids inputs that re-fire a scripted event,
