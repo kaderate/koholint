@@ -208,6 +208,30 @@ class ExploreTest < Minitest::Test
     assert_equal({ kind: :frontier, row: 2, col: 5, direction: :up }, result[:target])
   end
 
+  def test_a_walked_room_whose_frontiers_are_walls_stalls_instead_of_probing_them_all
+    rows = CLOSED.map { |line| line.tr('#', '?') }
+    log = Koholint::ExploreLog.new
+    (1..6).to_a.product((1..8).to_a).each { |cell| log.walk(PLACE, cell) }
+    result, inputs = explore(rows, truth: CLOSED, explore_log: log)
+    assert_equal :stalled, result[:stopped_by]
+    assert_equal 3, result[:legs]
+    assert_equal 3, result[:walls].size
+    assert_nil result[:blocked_at]
+    assert_operator inputs.size, :<, 200
+    log.absorb(result)
+    again, = explore(rows, truth: CLOSED, explore_log: log)
+    assert_equal :stalled, again[:stopped_by]
+    assert_empty again[:walls] & result[:walls]
+  end
+
+  def test_a_new_cell_between_wall_probes_resets_the_stall
+    rows = with(CLOSED.map { |line| line.tr('#', '?') }, [4, 7], '?')
+    log = Koholint::ExploreLog.new
+    ((1..6).to_a.product((1..8).to_a) - [[4, 7]]).each { |cell| log.walk(PLACE, cell) }
+    result, = explore(rows, truth: CLOSED, explore_log: log)
+    assert_operator result[:legs], :>, 3
+  end
+
   def test_budget_caps_a_call
     open = Array.new(8) { '.' * 10 }
     rows = Array.new(8) { '?' * 10 }

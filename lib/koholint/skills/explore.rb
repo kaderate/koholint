@@ -9,7 +9,8 @@ module Koholint
       OUTWARD_FRAMES = 48
       STILL_FRAMES = 8
       LOCK_FRAMES = 16
-      STALLED_ATTEMPTS = 3
+      STUCK_ATTEMPTS = 3
+      FRUITLESS_ATTEMPTS = 3
       OBJECT_RANGE = 3
       UNKNOWN = %i[unknown stale].freeze
 
@@ -63,7 +64,9 @@ module Koholint
           @walls = @log ? @log.walls(@place) : []
           @new_walls = []
           @cells_walked = 0
-          @stalled = 0
+          @stuck = 0
+          @fruitless = 0
+          @found = false
           @legs = 0
           @locked = 0
           @leg = @outward = @target = @stop = @heading = @idle = @fail_cause = nil
@@ -138,6 +141,7 @@ module Koholint
 
           @cell = cell
           @cells_walked += 1
+          @found = true unless @walked.include?(cell)
           @walked << cell unless @walked.include?(cell)
           @untried = near_objects(cell) - @offered
           @offered.concat(@untried)
@@ -233,8 +237,11 @@ module Koholint
         end
 
         def attempt_over(state)
-          @stalled = state.cell == @attempt_from ? @stalled + 1 : 0
-          @stop = :blocked if @stalled >= STALLED_ATTEMPTS
+          @stuck = state.cell == @attempt_from ? @stuck + 1 : 0
+          @fruitless = @found ? 0 : @fruitless + 1
+          @found = false
+          @stop = :blocked if @stuck >= STUCK_ATTEMPTS
+          @stop ||= :stalled if @fruitless >= FRUITLESS_ATTEMPTS
           nil
         end
 
