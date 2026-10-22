@@ -38,3 +38,4 @@ Only what is left to do. When something lands, delete it here (git is the histor
 - `explore`: walls and tried exits in the exploration log are permanent per place (never expire, even if the place changes).
 - `explore`: next steps are a candidate menu (the model picks among the frontiers and exits the engine lists) and place labels; its walked cells and walls are per-place memory outside the beliefs (not appearance evidence), an exit whose step opens a dialogue by itself is skipped silently (not listed in `no_frontier`), and its `untried_object` range (3 cells) and leg/outward frame limits are unmeasured.
 - Agent loop deferred: a failed sheet call loses the dialogue pages (their PNGs remain under `prompts/`).
+- Explore: border exits are tried blindly (no passability or static-sprite check) and a dead border cell costs two paid calls before it is marked tried.
