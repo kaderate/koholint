@@ -25,8 +25,10 @@ module Koholint
 
     def locked? = motion_blocked.to_i.positive? || scene_state == SCENE_LOCKED
 
-    def phase
-      return :boot unless game_mode == PLAY_MODE
+    def self.played?(events) = events.any? { |event| event['type'] == 'perception' && event.dig('state', 'game_mode') == PLAY_MODE }
+
+    def phase(booted: false)
+      return booted ? :menu : :boot unless game_mode == PLAY_MODE
       return :loading if loading?
 
       return :dialogue if dialog_open?
