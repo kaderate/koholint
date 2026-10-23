@@ -29,8 +29,22 @@ deterministic, so *ROM + journal* is the whole run. Time is the frame; wall cloc
 pacing (`pacer.rb`) and observability.
 
 **Perception** — `perception.rb`, `addresses.rb`, `game_state.rb`, `data/addresses.json`: a typed `GameState`
-(position, room/map, HP, phase such as dialogue or locked, milestone) read from RAM. Every address carries
+(position, room/map, HP, phase such as dialogue or locked, milestone, inventory cursor, menu option, A/B items) read from RAM. Every address carries
 provenance and a `verified_count`; `verified` needs two independent checks. No RAM writes to gameplay state.
+
+**Game modes** — `modes.rb`, `data/modes.json`: the catalogue of the game's screens (intro, file select, name entry,
+loading, play, dialogue, locks, dying, game over, inventory, map, save screen). Each entry has a kind, the engine phase it
+routes to, a `match` on the mode tuple (`game_mode`, `game_submode`, `dialog_state`, `motion_blocked`, `scene_state`,
+`link_motion_state`, `game_over_stage`; values are an integer, a list, `nonzero` or `{"not": ...}`), an optional
+`ready` (the settled submode), how to enter and leave it, its inputs, its cursor and options, and provenance
+(`source`, `confidence`, `verified_count`). The validator refuses missing keys, `verified` below two checks and two
+entries that match the same tuple unless one strictly refines the other (the most specific wins). `Modes.for(state)`
+resolves the entry; `GameState#phase` is `boot` for anything outside play mode before the run first played, else the
+entry's phase (`loading`, `playing`, `locked`, `dialogue`, `cutscene`, `menu`, `map`, `save`, `game_over`, `boot` for
+the title screens) or `unknown`; the engine emits a `notable` `unknown_mode` once per unknown tuple (rebuilt from the
+trace on resume). `calibration/mode_census.rb` (`bin/koholint census`) is the probe that measures them: from a replayed
+state it plays scenarios on throwaway copies (START, SELECT, the four-button save combination, health drained to zero
+by a RAM write in the copy only) and diffs RAM while moving cursors; reports go to `tmp/census/`.
 
 **Vision** (`vision/`) — what RAM does not give: `screen_vision` and `screen_snapshot` read the screen,
 `grid_builder` probes neighbouring cells (the only place that snapshots and restores the emulator) and
@@ -40,7 +54,9 @@ model. Unknown cells are unknown, not walls.
 
 **Navigation and skills** — `geometry.rb` (cell grid, pixel offsets), `navigation/planner.rb` (shortest path
 with the fewest turns over known cells), `skills/` (`walk`, `goto`, `step`, `talk_to`, `explore`, `press`,
-`advance_dialogue`, `wait`) behind `skills/registry.rb`. `explore` chains goto legs by itself: it walks to the
+`advance_dialogue`, `wait`, and the screen skills of `skills/screens.rb`: `open_menu`, `close_menu`, `menu_move`,
+`menu_assign`, `open_map`, `close_map`, `choose_option`, which check the current mode from the catalogue, stop with
+`wrong_mode` elsewhere and repeat a press the game ignored) behind `skills/registry.rb`. `explore` chains goto legs by itself: it walks to the
 nearest frontier (a known cell next to an unknown one) or untried border exit, steps out, re-plans, and stops at
 an event (`new_place`, `dialogue`, `untried_object` once per thing never talked to nearby, `blocked`, `stalled` after 3
 attempts that walked no new cell, `no_frontier`, `locked`, `budget` at 600 frames); `explore_log.rb` keeps per place the cells it walked or found walled, the exits
@@ -58,10 +74,12 @@ scrolling text box into the full text without losing a word; the stored events s
 `move`, macros) with their output schema and validation. A policy answers them: `policies/delegated.rb`
 (agent-driven; owns the context, plan memory, automatic dialogue pages, lock/hemmed handling),
 `policies/walk_and_talk.rb` and `start_game.rb` (deterministic baselines and the intro), `with_fallback.rb`
-(an invalid answer falls back deterministically, 5 consecutive fallbacks stop the run). Phases (`GameState#phase`):
-`boot` is any non-play game mode before the run first saw the play mode (the boot script owns it); once past boot (a
-`perception` in play mode, rebuilt from the trace on resume) a non-play mode is `menu` and goes to the agent with only
-`press` and `wait`; `loading`, `dialogue`, `locked` and `playing` are play-mode phases. The engine stops the run with
+(an invalid answer falls back deterministically, 5 consecutive fallbacks stop the run). Phases come from the mode
+catalogue (see Game modes): the boot script owns `boot` and `loading`; once the run has played (a `perception` in play
+mode, rebuilt from the trace on resume) the screens go to the agent with their own skills only (`menu`: `menu_move`,
+`menu_assign`, `close_menu`; `map`: `close_map`; `save` and `game_over`: `choose_option`; `unknown`: `press` and `wait`;
+all with `press` and `wait`), after a deterministic wait while the screen is still opening; `cutscene` waits like
+`locked`. The play skill set has no screen-only skill. The engine stops the run with
 `stuck_boot` when the boot script decides for over 900 consecutive frames in a non-play mode past boot, or 3600 in any case.
 
 **Objectives** — `objectives.rb`: a short goal with a predicate the harness checks from memory
@@ -96,7 +114,7 @@ past runs (list, read-only replays with pacing, comparison via `run_compare.rb`,
 state.
 
 **CLI** — `cli.rb`, `bin/koholint`: `run`, `resume`, `fork`, `verify`, `summary`, `watch`, `archive`, `star`,
-`prune-heavy`.
+`prune-heavy`, `census`.
 
 ## Data flow of one decision
 
@@ -113,8 +131,8 @@ state.
 
 - Only the engine writes `trace.jsonl`, `inputs.log` and `save/`; `verify` replays the journal and compares hashes.
 - Determinism: the same journal on the same ROM gives the same states. Agents are never called in replay.
-- No walkthrough in code or prompts (how-to-play knowledge is allowed, see `AGENTS.md`); facts live in `data/addresses.json` and a run's
-  `world.json`, with provenance.
+- No walkthrough in code or prompts (how-to-play knowledge is allowed, see `AGENTS.md`); facts live in `data/addresses.json`,
+  `data/modes.json` and a run's `world.json`, with provenance.
 - A rule a script can check is a validator, not a paragraph.
 - Playing and evolving the flow are separate: a run only emits `suggestions.md`.
 
