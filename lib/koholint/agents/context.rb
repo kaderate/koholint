@@ -68,8 +68,7 @@ module Koholint
         phase = state.phase(booted: true)
         lines = ["Phase: #{phase}", "Place: room #{state.room_id}, map #{state.map_id}",
                  "Link: #{where} (pixel x=#{state.x}, y=#{state.y}), facing #{state.direction}"]
-        lines << "A screen other than the play screen is open (game mode #{state.game_mode}, submode #{state.game_submode}); only press and wait work here. " \
-                 'B or START usually closes it (START opens the menu, SELECT the map, B cancels).' if phase == :menu
+        lines.concat(screen_lines(state, phase))
         lines << "Link has been locked for #{locked_frames} frames (cause unknown)" if locked_frames
         if link
           dx, dy = Geometry.offset(state.x, state.y, link)
@@ -88,6 +87,24 @@ module Koholint
         lines.join("\n")
       end
       private_class_method :header
+
+      def self.screen_lines(state, phase)
+        mode = state.mode
+        if phase == :unknown
+          return ["An uncatalogued screen is open (game mode #{state.game_mode}, submode #{state.game_submode}); only press and wait work here."]
+        end
+        return [] unless mode && %i[menu map save game_over cutscene].include?(phase)
+
+        lines = ["Screen: #{mode.name} (#{mode.kind})"]
+        lines << "To leave: #{mode.exit['text']}" if mode.exit
+        lines << "Inputs: #{mode.inputs.map { |input, effect| "#{input} #{effect}" }.join('; ')}" unless mode.inputs.empty?
+        cursor = mode.cursor
+        lines << "Cursor: #{cursor['field'].tr('_', ' ')} #{state[cursor['field'].to_sym]} of 0..#{cursor['count'] - 1}" if cursor
+        lines << "Options: #{mode.options.each_with_index.map { |text, i| "#{i} #{text}" }.join(', ')}" if mode.options
+        lines << "Item ids on the buttons: A #{state.item_a.to_i}, B #{state.item_b.to_i} (0 = empty)" if mode.kind == 'menu'
+        lines
+      end
+      private_class_method :screen_lines
 
       def self.things_block(grid, talk_log, place, stamp = nil)
         return [] unless talk_log

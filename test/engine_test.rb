@@ -325,6 +325,25 @@ class EngineTest < Minitest::Test
     end
   end
 
+  def unknown_screen_emulator
+    emulator = MenuEmulator.new
+    emulator.define_singleton_method(:read) do |addr|
+      { hp: 24, max_hearts: 3, link_x: 80, link_y: 60, game_mode: frame < 300 ? 0x0B : 0x0D, game_submode: 7 }.fetch(Koholint::Perception::ADDRESSES.key(addr), 0)
+    end
+    emulator
+  end
+
+  def test_an_uncatalogued_screen_is_noted_once_per_tuple_and_once_across_a_resume
+    with_run do |_dir, run|
+      Koholint::Engine.new(run:, policy: BootForever.new, emulator: unknown_screen_emulator, budget: Koholint::Budget.new(frames: 600)).run
+      unknown = events(run, :notable).select { |e| e['kind'] == 'unknown_mode' }
+      assert_equal 1, unknown.size
+      assert_includes unknown.first['detail'], 'game_mode=13 game_submode=7'
+      Koholint::Engine.new(run:, policy: BootForever.new, emulator: unknown_screen_emulator, budget: Koholint::Budget.new(frames: 600)).run
+      assert_equal 1, events(run, :notable).count { |e| e['kind'] == 'unknown_mode' }
+    end
+  end
+
   def test_the_boot_script_deciding_forever_stops_the_run_even_before_play
     with_run do |_dir, run|
       emulator = MenuEmulator.new

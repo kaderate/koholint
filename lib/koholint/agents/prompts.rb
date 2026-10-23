@@ -32,6 +32,12 @@ module Koholint
         goto walks several cells along a path planned over the grid and stops when blocked. Cells marked ! may be doubtful: they looked free but blocked Link repeatedly; goto avoids a doubtful edge, and the neighbour lines say how many times each direction was blocked.
         talk_to walks next to a person or object at (row, col), faces it and presses A; use it instead of composing walk and press yourself. If it gets no response from one side, the listing of things on screen shows which sides failed: the skill tries another side by itself, and you can also walk next to a person from a specific side and press A.
         step moves Link a few pixels (1 to 16) along one axis and does not recentre him; the offset line shows how far he is from the centre of his cell, and a passage may be offset from the cell grid.
+        Screens: when the phase is a screen (menu, map, save, game_over) the context names it, says how to leave it and lists only the skills that work there; a screen skill used elsewhere stops with wrong_mode.
+        open_menu opens the inventory with START during free play; close_menu closes it.
+        menu_move moves the inventory cursor to a slot (0-9, two columns, left to right then top to bottom).
+        menu_assign swaps the item under the inventory cursor with the item on the A or B button.
+        open_map opens the map with SELECT during free play; close_map closes it.
+        choose_option moves the arrow of a save or game-over screen to an option (0 = top) and confirms it with A.
         People may say more when talked to again: talk to the same person again while each talk gives a new text, and stop when the listing says exhausted. Come back to people when the listing says worth retrying after something changed (a new place reached, a new lead). Texts from people can name places or tasks: treat them as leads.
         A dialogue that opens by itself is triggered by the game and may repeat while you stay where it triggers. The context lists the things on screen with how many times you talked to each: people or objects you have never tried to talk to are worth trying before repeating an action that keeps failing.
         Do not repeat a skill that just stopped the same way from the same state; try something different or gather information. When on-screen text matters, transcribe it in the optional transcription field. When an image is attached it shows the top and the bottom of the screen stacked; a dialogue box may be in either.

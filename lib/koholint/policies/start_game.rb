@@ -12,6 +12,7 @@ module Koholint
       PROBE_MAX_PIXELS = 16
       PROBE_AXES = { up: [:y, -1], down: [:y, 1], left: [:x, -1], right: [:x, 1] }.freeze
       LOCKED_WAIT = { buttons: [], frames: 30 }.freeze
+      AGENT_PHASES = %i[menu map save game_over cutscene unknown].freeze
       BOOT_LOCK_LIMIT_FRAMES = 1200 # counts consecutive locked observations: one free tick resets it
 
       def initialize(after, ready: nil, probe: false, played: false)
@@ -101,7 +102,9 @@ module Koholint
 
       def locked_wait?(state) = @settle && state.phase == :locked && !boot_lock_capped?(state)
 
-      def ready?(state) = state.phase(booted: @played) == :menu || (@handed && (ready_state?(state) || locked_wait?(state)))
+      def ready?(state) = handed_screen?(state) || (@handed && (ready_state?(state) || locked_wait?(state)))
+
+      def handed_screen?(state) = @played && AGENT_PHASES.include?(state.phase(booted: true))
     end
   end
 end

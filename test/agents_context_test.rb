@@ -352,4 +352,22 @@ class AgentsContextTest < Minitest::Test
     assert_includes text, '[lead-1 high]'
     assert_operator text.size, :<, 2500 + 100
   end
+
+  def screen_header(**over) = Context.build(state: state(**over), grid:, objective: nil, history: [], attempts: [], manual: '', last_results: [])
+
+  def test_a_screen_is_named_with_how_to_leave_it_from_the_catalogue
+    text = screen_header(link_motion_state: 7, game_over_stage: 4, menu_option: 1)
+    assert_includes text, 'Phase: game_over'
+    assert_includes text, 'Screen: game_over (game_over)'
+    assert_includes text, "To leave: #{Koholint::Modes.catalogue.find { |m| m.name == 'game_over' }.exit['text']}"
+    assert_includes text, 'Options: 0 save and continue, 1 save and quit to the title screen, 2 continue without saving'
+    assert_includes text, 'Cursor: menu option 1 of 0..2'
+    refute_includes screen_header, 'Screen:'
+  end
+
+  def test_an_uncatalogued_screen_says_only_press_and_wait_work
+    text = screen_header(game_mode: 0x0D, game_submode: 1)
+    assert_includes text, 'Phase: unknown'
+    assert_includes text, 'An uncatalogued screen is open (game mode 13, submode 1); only press and wait work here.'
+  end
 end
