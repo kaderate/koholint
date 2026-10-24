@@ -31,7 +31,8 @@ bin/koholint archive --from /tmp/koholint-live --commit
 ```
 
 Commands: `run`, `resume <run_dir>`, `fork <run_dir> --at-frame N`, `verify <run_dir>`, `summary <run_dir>`,
-`watch <run_dir>`, `archive`, `star <run_dir> WHY`, `prune-heavy`, `census boot|<run_dir> FRAME...`.
+`watch <run_dir>`, `archive`, `star <run_dir> WHY`, `prune-heavy`, `census boot|<run_dir> FRAME...|entities <run_dir> FRAME...`,
+`npcs [--root DIR]`.
 
 ## Running
 
@@ -56,7 +57,7 @@ place, so the grid went dark). The live view has a grid toggle that overlays the
 visited places from the trace; `fork` branches a run at a frame. Both work on an archived run, also on a fresh clone
 (see Run storage).
 
-## Agent skills (`flow-9`)
+## Agent skills (`flow-11`)
 
 - `explore [direction]` explores by itself: it walks to the nearest frontier (a known cell next to an unknown one) or
   untried border exit (`direction` prefers that side), steps out, re-plans, and returns to the model only at an event:
@@ -84,6 +85,16 @@ visited places from the trace; `fork` branches a run at a frame. Both work on an
   run as `unknown_mode_stuck`. Options that quit to the title are refused.
 - Scrolling dialogue pages are stitched into one text; the context remembers what each person said and whether talking
   again is worth it; `new_text` is an objective predicate; the live view lists the dialogues read.
+- People on screen come from the game's entity table in RAM (`entities.rb`): the context lists each entity with its cell,
+  type id and measured kind (`data/entities.json`), sprites without an entity as a fallback, and the names people gave
+  (`speaker`, asked in the transcription call). People are remembered by (place, entity type), so a person who moved
+  keeps their memory.
+- People are talked to again deterministically (`revisit.rb`, no model call to decide it): when an `npc` of the current
+  place is not exhausted for the current world stamp (milestone, places visited, leads), the policy issues `talk_to`
+  itself (agent `delegated`, cost 0), lets the pages advance, and repeats until two conversations in a row are identical,
+  6 rounds per person, 1800 frames per place, or 2 failed talks; each round is a `notable` `revisit` event
+  (`{npc, round, outcome}`). A conversation is identified by a signature of its pages' text pixels; a conversation
+  already read is not sent to the model again (its stored text is reused, `dialogue` events with `cached: true`).
 
 ## Mode census
 
@@ -93,6 +104,22 @@ and drives the inventory, the map, the save screen and the game-over screen (rea
 in the copy only), and diffs RAM while moving their cursors. `census boot` records the boot modes idle and with a late
 START. Reports are written to `tmp/census/*.json` and feed `data/modes.json` and `data/addresses.json` (two different
 start states for `verified`).
+
+## Entity census
+
+`bin/koholint census entities <run_dir> FRAME...` replays the journal to each frame and, for every active slot of the
+entity table, records its position, type and matching sprites, then in throwaway copies (RAM writes in the copy only):
+places Link next to it on each side and presses A, with a control copy where the slot is cleared (a dialogue that also
+opens in the control is not the entity's); pins Link on it for 90 frames and compares health with the control; watches
+whether it moves; and talks to it twice and at a shifted frame to compare conversation signatures. Reports go to
+`tmp/entities/*.json` and feed `data/entities.json` (kinds) and `data/addresses.json`.
+
+## NPC catalogue
+
+`bin/koholint npcs [--root DIR]` prints a markdown table of the people of all runs under `DIR` (default `runs`): per
+place and person (entity type, or talk_to cell for older runs, or texts that opened by themselves), the names given, the
+number of talks and of runs, and the distinct texts read with the milestone when each first appeared and in how many
+runs. It writes nothing.
 
 ## Live view
 
