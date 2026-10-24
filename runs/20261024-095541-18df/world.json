@@ -1,0 +1,58 @@
+{
+  "goal": "Explore the surroundings and find the way to progress toward the first dungeon.",
+  "leads": [
+    {
+      "id": "lead-1",
+      "place": [
+        163,
+        16
+      ],
+      "source": null,
+      "quote": "Tu es sur l'île Cocolint!",
+      "claim": "The island is called Cocolint; Marine is the speaker.",
+      "importance": "normal"
+    },
+    {
+      "id": "lead-2",
+      "place": [
+        163,
+        16
+      ],
+      "source": {
+        "row": 4,
+        "col": 7
+      },
+      "quote": "Utilisez-le pour repousser vos ennemis!",
+      "claim": "Shield recovered; use it to repel enemies",
+      "importance": "normal"
+    },
+    {
+      "id": "lead-3",
+      "place": [
+        177,
+        0
+      ],
+      "source": {
+        "row": 5,
+        "col": 7
+      },
+      "quote": "YOUPI! J'ai la pêche! Et toi?",
+      "claim": "Cheerful NPC small talk",
+      "importance": "low"
+    },
+    {
+      "id": "lead-4",
+      "place": [
+        179,
+        0
+      ],
+      "source": {
+        "row": 5,
+        "col": 2
+      },
+      "quote": "appuyez sur tous les boutons",
+      "claim": "To save, press all buttons at once",
+      "importance": "normal"
+    }
+  ]
+}
