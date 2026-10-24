@@ -151,6 +151,7 @@ module Koholint
         when *INSIGHTS.keys then json(insight(INSIGHTS[path], only(params, %w[run])['run']))
         when '/header.json' then json(header(only(params, %w[run])['run']))
         when '/control' then json(control(only(params, %w[run speed pause seek], required: %w[run])))
+        when %r{\A/screens/(\d{1,3}-\d{1,3})\.png\z} then screen(::Regexp.last_match(1), only(params, %w[run])['run'])
         when '/star', '/notes' then not_allowed('POST')
         when %r{\A/run/([^/]+)\z}
           explorer.open(segment(::Regexp.last_match(1)))
@@ -190,6 +191,14 @@ module Koholint
 
         value = Feed.insight(kind, @run_dir, @follower)
         kind == :stats ? value.merge(reference: @explorer&.reference(@run_dir)) : value
+      end
+
+      def screen(place, run)
+        dir = run ? run_dir(run) : (@run_dir || raise(Explorer::NotFound, 'no live run'))
+        path = File.join(dir, 'screens', "#{place}.png")
+        raise Explorer::NotFound, 'no screenshot' unless File.file?(path) && !File.symlink?(path)
+
+        ['200 OK', 'image/png', File.binread(path), SHORT_CACHE]
       end
 
       def header(run)
@@ -257,6 +266,7 @@ module Koholint
       COMMON = { 'X-Content-Type-Options' => 'nosniff' }.freeze
       HTML = { 'Content-Security-Policy' => "default-src 'self'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; " \
                                            "img-src 'self' blob:; frame-ancestors 'none'" }.freeze
+      SHORT_CACHE = { 'Cache-Control' => 'max-age=30' }.freeze
       NO_STORE = { 'Cache-Control' => 'no-store' }.freeze
     end
   end
