@@ -1,0 +1,15 @@
+{
+  "flow_version": "flow-10",
+  "rom_sha256": "211a1d1559dc2684d63d87f62a6b1e9109201a6383b4004e9dd5e18ee926ee83",
+  "seed": 0,
+  "budget": {
+    "active_seconds": 1500.0,
+    "dollars": 1.5
+  },
+  "status": "stopped",
+  "parent": null,
+  "tag": "lock-fix",
+  "harness_sha": "94be2ac72c858736e8597e2276f5c70c9a36be91",
+  "prompts_sha": "704acd1d93b61a2fb105b92ed21a277afaa4f3bbb121309ab1789a050b409ce3",
+  "model": "sonnet"
+}

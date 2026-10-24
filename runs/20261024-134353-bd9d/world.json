@@ -1,0 +1,30 @@
+{
+  "goal": "Explore the surroundings and find the first dungeon.",
+  "leads": [
+    {
+      "id": "lead-1",
+      "place": [
+        163,
+        16
+      ],
+      "source": null,
+      "quote": "Tu es sur l'île Cocolint!",
+      "claim": "Link is on Koholint island (Cocolint)",
+      "importance": "normal"
+    },
+    {
+      "id": "lead-2",
+      "place": [
+        163,
+        16
+      ],
+      "source": {
+        "row": 4,
+        "col": 7
+      },
+      "quote": "Vous récupérez",
+      "claim": "Link got his shield back and can use it to repel enemies",
+      "importance": "normal"
+    }
+  ]
+}

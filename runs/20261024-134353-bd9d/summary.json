@@ -1,0 +1,67 @@
+{
+  "v": 2,
+  "run_id": "20261024-134353-bd9d",
+  "flow_version": "flow-10",
+  "tag": "lock-fix",
+  "harness_sha": "94be2ac72c858736e8597e2276f5c70c9a36be91",
+  "prompts_sha": "704acd1d93b61a2fb105b92ed21a277afaa4f3bbb121309ab1789a050b409ce3",
+  "model": "sonnet",
+  "frames": 10119,
+  "dollars": 1.091754,
+  "calls": 75,
+  "calls_per_1000f": 7.4118,
+  "usd_per_1000f": 0.107892,
+  "latency_ms": {
+    "median": 2170,
+    "p90": 2787
+  },
+  "highest_milestone": "shield",
+  "places_seen": 10,
+  "objectives": {
+    "count": 11,
+    "achieved": 10
+  },
+  "stop_reason": "stopped",
+  "symptoms": [],
+  "starred": false,
+  "cost_by_skill": {
+    "choose_objective": {
+      "calls": 11,
+      "usd": 0.142511
+    },
+    "explore": {
+      "calls": 57,
+      "usd": 0.852746
+    },
+    "goto": {
+      "calls": 1,
+      "usd": 0.012803
+    },
+    "talk_to": {
+      "calls": 6,
+      "usd": 0.083694
+    }
+  },
+  "decisions_by_agent": {
+    "start_game": 62,
+    "claude": 75,
+    "delegated": 63
+  },
+  "usage": {
+    "goal_changes": 0,
+    "leads": {
+      "high": 0,
+      "normal": 2,
+      "low": 0
+    },
+    "lead_rejected": 0,
+    "objectives_by_kind": {
+      "dialogue_closed": 1,
+      "new_place": 10
+    },
+    "because_used": 0,
+    "talks": 6,
+    "talks_to_known": 0,
+    "dialogues": 2
+  }
+}
