@@ -130,12 +130,13 @@ class SummaryTest < Minitest::Test
       t.emit(:perception, frame: 1000, state: PLAYING.merge('room_id' => 1, 'milestone' => 'shield'), state_hash: 'h')
       t.emit(:stop, frame: 2000, reason: 'dollars')
       assert_equal({ v: Koholint::Summary::VERSION, run_id: run.id, flow_version: 'f', tag: 'exp', harness_sha: 'abc', prompts_sha: run.manifest['prompts_sha'], model: 'sonnet',
-                     frames: 2000, dollars: 1.0, calls: 4, calls_per_1000f: 2.0, usd_per_1000f: 0.5,
+                     autopilot: nil, frames: 2000, dollars: 1.0, calls: 4, calls_per_1000f: 2.0, usd_per_1000f: 0.5,
                      latency_ms: { median: 3000, p90: 5000 }, highest_milestone: 'shield', places_seen: 2,
                      objectives: { count: 2, achieved: 1 }, stop_reason: 'dollars', symptoms: [], starred: false,
                      cost_by_skill: { 'choose_skill' => { calls: 4, usd: 1.0 } }, decisions_by_agent: { 'claude' => 4, 'start_game' => 1 },
                      usage: { goal_changes: 0, leads: { high: 0, normal: 0, low: 0 }, lead_rejected: 0, objectives_by_kind: { 'unknown' => 2 },
-                              because_used: 0, talks: 0, talks_to_known: 0, dialogues: 0, not_ready_frames: 0, not_ready_waits: 0 } },
+                              because_used: 0, talks: 0, talks_to_known: 0, dialogues: 0, not_ready_frames: 0, not_ready_waits: 0,
+                              autopilot_decisions: 0, chain_max: 0 } },
                    Koholint::Summary.record(run.dir))
     end
   end
@@ -186,7 +187,25 @@ class SummaryTest < Minitest::Test
       assert_equal({ 'choose_objective' => { calls: 1, usd: 0.1 }, 'walk' => { calls: 2, usd: 0.5 } }, record[:cost_by_skill])
       assert_equal({ 'claude' => 3, 'delegated' => 1, 'start_game' => 1 }, record[:decisions_by_agent])
       assert_equal({ goal_changes: 2, leads: { high: 1, normal: 1, low: 0 }, lead_rejected: 1, objectives_by_kind: { 'dialogue_closed' => 2 },
-                     because_used: 1, talks: 4, talks_to_known: 1, dialogues: 2, not_ready_frames: 41, not_ready_waits: 1 }, record[:usage])
+                     because_used: 1, talks: 4, talks_to_known: 1, dialogues: 2, not_ready_frames: 41, not_ready_waits: 1,
+                     autopilot_decisions: 0, chain_max: 0 }, record[:usage])
+    end
+  end
+
+  def test_usage_counts_autopilot_decisions_and_the_longest_chain
+    with_run do |run|
+      run.manifest['autopilot'] = true
+      run.write_manifest
+      t = run.trace
+      pattern = [false, true, true, false, true, true, true, false]
+      pattern.each_with_index do |free, frame|
+        t.emit(:decision, frame:, decision_point: 'choose_skill', input: {}, options: [], choice: { skill: 'explore', params: {} }, justification: 'j',
+                          confidence: 1.0, agent: free ? 'delegated' : 'claude', latency_ms: 0, cost_usd: free ? 0.0 : 0.1, **(free ? { autopilot: true } : {}))
+      end
+      record = Koholint::Summary.record(run.dir)
+      assert_equal [5, 3], record[:usage].values_at(:autopilot_decisions, :chain_max)
+      assert_equal [true, 3, { 'claude' => 3, 'delegated' => 5 }], [record[:autopilot], record[:calls], record[:decisions_by_agent]]
+      assert_equal({ 'explore' => { calls: 3, usd: 0.3 } }, record[:cost_by_skill])
     end
   end
 
