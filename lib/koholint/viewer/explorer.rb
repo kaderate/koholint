@@ -1,3 +1,4 @@
+require 'fileutils'
 require 'json'
 require 'stringio'
 require 'koholint'
@@ -5,6 +6,8 @@ require 'koholint/archive'
 require 'koholint/perception'
 require 'koholint/run_compare'
 require 'koholint/summary'
+require 'koholint/trace'
+require 'koholint/viewer/insights'
 require 'koholint/viewer/registry'
 require 'zlib'
 
@@ -17,6 +20,9 @@ module Koholint
 
       RUN_ID = /\A(?!\.)(?!.*\.\.)[\w.-]{1,100}\z/
       MAX_WHY = 500
+      MAX_NOTES = 8192
+      NOTES = 'notes.md'.freeze
+      HEADER = %w[run_id tag flow_version model harness_sha highest_milestone places_seen frames dollars stop_reason].freeze
       FIELDS = %w[run_id tag flow_version frames dollars calls usd_per_1000f highest_milestone places_seen stop_reason].freeze
 
       attr_reader :root, :registry
@@ -58,6 +64,68 @@ module Koholint
       def state(id) = readable(id) { registry.state(replay_dir(id)) }
 
       def control(id, **controls) = readable(id) { registry.control(replay_dir(id), **controls) }
+
+      def insight(id, kind) = readable(id) { registry.insight(replay_dir(id), kind) }
+
+      def header(id) = readable(id) { self.class.header(resolve(id), notes_run: id) }
+
+      def notes_run(dir)
+        id = File.basename(dir)
+        id if File.realpath(resolve(id)) == File.realpath(dir)
+      rescue NotFound, SystemCallError
+        nil
+      end
+
+      def self.header(dir, notes_run: nil)
+        summary = Summary.read_json(File.join(dir, Summary::FILE))
+        summary = recorded(dir).merge(summary) unless summary['v'].to_i >= Summary::VERSION
+        notes = File.file?(File.join(dir, NOTES)) ? File.read(File.join(dir, NOTES), MAX_NOTES).to_s : ''
+        HEADER.to_h { |key| [key, summary[key]] }.merge('run_id' => File.basename(dir), 'notes' => notes.scrub, 'notes_run' => notes_run)
+      end
+
+      def self.recorded(dir)
+        JSON.parse(JSON.generate(Summary.record(dir)))
+      rescue StandardError
+        {}
+      end
+
+      def save_notes(id, text)
+        raise BadRequest, "notes are longer than #{MAX_NOTES} bytes" if text.bytesize > MAX_NOTES
+        raise BadRequest, 'notes must not contain control characters' if text.match?(/[^\P{Cntrl}\n\r\t]/)
+
+        readable(id) do
+          path = File.join(resolve(id), NOTES)
+          if text.strip.empty?
+            FileUtils.rm_f(path)
+          else
+            File.write("#{path}.tmp", text)
+            File.rename("#{path}.tmp", path)
+          end
+        end
+        { run_id: id, saved: true, bytes: text.bytesize }
+      end
+
+      REFERENCE_CACHE = {}
+      REFERENCE_LOCK = Mutex.new
+
+      def reference(dir)
+        others = Archive.runs(@root).reject { |other| File.expand_path(other) == File.expand_path(dir) }
+                                    .select { |other| File.basename(other).match?(RUN_ID) }
+        before = others.select { |other| File.basename(other) < File.basename(dir) }
+        other = (before.empty? ? others : before).last or return nil
+        path = Trace.located(File.join(other, 'trace.jsonl'))
+        stat = File.stat(path)
+        key = [path, stat.size, stat.mtime]
+        REFERENCE_LOCK.synchronize do
+          REFERENCE_CACHE.clear unless REFERENCE_CACHE.key?(key)
+          REFERENCE_CACHE[key] ||= begin
+            trace = Trace.read(File.join(other, 'trace.jsonl'))
+            { run_id: File.basename(other), series: Insights.cost(trace)[:series], frames: trace.last&.fetch('frame', 0).to_i }
+          end
+        end
+      rescue Error, SystemCallError, Zlib::Error, JSON::ParserError
+        nil
+      end
 
       def runs
         Archive.runs(@root).filter_map { |dir| row(dir) if File.basename(dir).match?(RUN_ID) }.sort_by { |row| row['run_id'] }.reverse

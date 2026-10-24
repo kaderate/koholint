@@ -13,7 +13,8 @@ class ExplorerTest < Minitest::Test
   XSS = '<script>alert(1)</script>'.freeze
 
   class StubFollower
-    def frame = 0
+    def frame = @frame || 0
+    def seek(target) = target.between?(0, journal_frames) ? (@frame = target) : raise(ArgumentError, "frame must be between 0 and #{journal_frames}")
     def journal_frames = 100
     def lag = 100
     def sync = :unknown
@@ -70,6 +71,13 @@ class ExplorerTest < Minitest::Test
     socket.close
     status = response[%r{\AHTTP/1.1 (\d+)}, 1]
     [status, response.split("\r\n\r\n", 2).last]
+  end
+
+  def post_notes(port, run, text, host: "127.0.0.1:#{port}", origin: nil)
+    body = URI.encode_www_form(text:)
+    headers = ["Host: #{host}", 'Content-Type: application/x-www-form-urlencoded', "Content-Length: #{body.bytesize}"]
+    headers << "Origin: #{origin}" if origin
+    raw(port, "POST /notes?run=#{URI.encode_www_form_component(run)} HTTP/1.1\r\n#{headers.join("\r\n")}\r\n\r\n#{body}")
   end
 
   def post_star(port, run, why, host: "127.0.0.1:#{port}", origin: nil, length: nil)
@@ -166,9 +174,9 @@ class ExplorerTest < Minitest::Test
   def test_controls_are_validated_strictly
     with_root do |root|
       with_server(root) do |port, _|
-        assert_equal({ 'speed' => 4, 'paused' => false }, JSON.parse(get(port, "/control?run=#{A}&speed=4").body))
-        assert_equal({ 'speed' => 4, 'paused' => true }, JSON.parse(get(port, "/control?run=#{A}&pause=1").body))
-        assert_equal({ 'speed' => 16, 'paused' => false }, JSON.parse(get(port, "/control?run=#{A}&pause=0&speed=16").body))
+        assert_equal({ 'speed' => 4, 'paused' => false, 'frame' => 0 }, JSON.parse(get(port, "/control?run=#{A}&speed=4").body))
+        assert_equal({ 'speed' => 4, 'paused' => true, 'frame' => 0 }, JSON.parse(get(port, "/control?run=#{A}&pause=1").body))
+        assert_equal({ 'speed' => 16, 'paused' => false, 'frame' => 0 }, JSON.parse(get(port, "/control?run=#{A}&pause=0&speed=16").body))
         ["/control?run=#{A}", "/control?run=#{A}&speed=2", "/control?run=#{A}&speed=4.0", "/control?run=#{A}&pause=yes",
          "/control?run=#{A}&speed=4&x=1", "/control?run=#{A}&speed=4&speed=16", '/control?speed=4'].each do |path|
           assert_equal '400', code(port, path), path
@@ -325,5 +333,80 @@ class ExplorerTest < Minitest::Test
         assert_equal 5, built.size
       end
     end
+  end
+
+  def test_map_timeline_stats_and_header_of_a_run
+    with_root do |root|
+      with_server(root) do |port, _|
+        assert_empty JSON.parse(get(port, "/map.json?run=#{B}").body)['places']
+        get(port, "/control?run=#{B}&seek=100")
+        map = JSON.parse(get(port, "/map.json?run=#{B}").body)
+        assert_equal [[3, 1], [4, 1]], map['places'].map { |n| n['place'] }
+        assert_equal [4, 1], map['current']
+        timeline = JSON.parse(get(port, "/timeline.json?run=#{B}").body)
+        assert_equal [100, B], timeline.values_at('frames', 'run_id')
+        assert_equal %w[place], timeline['markers'].map { |m| m['kind'] }
+        stats = JSON.parse(get(port, "/stats.json?run=#{B}").body)
+        assert_equal %w[series by_skill total decisions usage run_id frames reference], stats.keys
+        assert_equal A, stats.dig('reference', 'run_id')
+        assert_equal B, JSON.parse(get(port, "/stats.json?run=#{A}").body).dig('reference', 'run_id')
+        header = JSON.parse(get(port, "/header.json?run=#{A}").body)
+        assert_equal [A, XSS, '', A], header.values_at('run_id', 'tag', 'notes', 'notes_run')
+        %w[/map.json /timeline.json /stats.json /header.json].each do |path|
+          assert_equal '404', code(port, "#{path}?run=nope"), path
+          assert_equal '404', code(port, "#{path}?run=..%2F#{A}"), path
+          assert_equal '400', code(port, "#{path}?run=#{A}&x=1"), path
+          assert_equal '404', code(port, path), path
+        end
+      end
+    end
+  end
+
+  def test_seek_is_validated_and_moves_the_replay
+    with_root do |root|
+      with_server(root) do |port, _|
+        assert_equal({ 'speed' => 1, 'paused' => false, 'frame' => 60 }, JSON.parse(get(port, "/control?run=#{A}&seek=60").body))
+        assert_equal 60, JSON.parse(get(port, "/state.json?run=#{A}").body).dig('replay', 'frame')
+        ['-1', '1.5', 'abc', '', '1e3', '9999999999', '101', '%2060'].each do |seek|
+          status, body = raw(port, "GET /control?run=#{A}&seek=#{seek} HTTP/1.1\r\nHost: x\r\n\r\n")
+          assert_equal '400', status, seek
+          refute_includes body, root
+        end
+        assert_equal '404', code(port, '/control?run=nope&seek=1')
+        assert_equal '404', code(port, '/control?run=..&seek=1')
+      end
+    end
+  end
+
+  def test_notes_are_a_same_origin_post_capped_and_confined_to_the_runs_root
+    with_root do |root|
+      with_server(root) do |port, _|
+        path = File.join(root, A, 'notes.md')
+        assert_equal '405', get(port, "/notes?run=#{A}&text=x").code
+        status, body = post_notes(port, A, "first exit <b>found</b>\nline two", origin: "http://127.0.0.1:#{port}")
+        assert_equal '200', status
+        assert_equal({ 'run_id' => A, 'saved' => true, 'bytes' => 32 }, JSON.parse(body))
+        assert_equal "first exit <b>found</b>\nline two", File.read(path)
+        assert_equal "first exit <b>found</b>\nline two", JSON.parse(get(port, "/header.json?run=#{A}").body)['notes']
+        assert_equal '403', post_notes(port, A, 'x', host: "evil.example:#{port}").first
+        assert_equal '403', post_notes(port, A, 'x', origin: 'http://evil.example').first
+        assert_equal '400', post_notes(port, A, 'x' * 8193).first
+        assert_equal '400', post_notes(port, A, "a\u0000b").first
+        assert_equal '200', post_notes(port, A, 'é' * 4096).first
+        assert_equal '400', post_notes(port, A, 'é' * 4097).first
+        ['../x', '..', "#{A}/../#{B}", '.hidden', 'nope'].each { |id| assert_equal '404', post_notes(port, id, 'x').first, id }
+        assert_equal '200', post_notes(port, A, '  ').first
+        refute File.exist?(path)
+        refute File.exist?(File.join(File.dirname(root), 'x', 'notes.md'))
+      end
+    end
+  end
+
+  def test_live_insight_routes_need_a_live_run
+    server = Koholint::Viewer::Server.new(follower: StubFollower.new, feed: -> { {} })
+    port = server.start
+    %w[/map.json /timeline.json /stats.json /header.json].each { |path| assert_equal '404', get(port, path).code, path }
+  ensure
+    server&.stop
   end
 end

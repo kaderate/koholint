@@ -10,7 +10,7 @@ require 'koholint/trace'
 
 module Koholint
   module Archive
-    LIGHT = %w[manifest.json inputs.log world.json suggestions.md summary.json star.json trace.jsonl.gz].freeze
+    LIGHT = %w[manifest.json inputs.log world.json suggestions.md summary.json star.json notes.md trace.jsonl.gz].freeze
     HEAVY = %w[prompts keyframes].freeze
     TRACE = 'trace.jsonl'.freeze
     INDEX = File.join('docs', 'runs', 'index.md')

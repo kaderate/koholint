@@ -22,6 +22,7 @@ module Koholint
       follower = Follower.new(run_dir, from: from)
       server.follower = follower
       server.feed = -> { Feed.for(run_dir, follower) }
+      server.run_dir = run_dir
       registry = Registry.new(err:).start
       server.explorer = Explorer.new(root: runs_root || Explorer.default_root(run_dir), registry:)
       out.puts announce(host, server.start)

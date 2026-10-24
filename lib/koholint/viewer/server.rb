@@ -4,6 +4,7 @@ require 'socket'
 require 'uri'
 require 'koholint'
 require 'koholint/viewer/explorer'
+require 'koholint/viewer/feed'
 require 'koholint/viewer/registry'
 
 module Koholint
@@ -13,11 +14,12 @@ module Koholint
       PAGES = { runs: File.join(__dir__, 'runs.html'), compare: File.join(__dir__, 'compare.html') }.freeze
       MAX_LINE = 8192
       MAX_HEADERS = 100
-      MAX_BODY = 4096
+      MAX_BODY = 32_768
+      INSIGHTS = { '/map.json' => :map, '/timeline.json' => :timeline, '/stats.json' => :stats }.freeze
       READ_TIMEOUT = 5
 
       attr_reader :listener
-      attr_writer :follower, :feed, :explorer
+      attr_writer :follower, :feed, :explorer, :run_dir
 
       def initialize(follower: nil, feed: nil, explorer: nil, port: 0, host: '127.0.0.1', read_timeout: READ_TIMEOUT)
         @follower = follower
@@ -146,8 +148,10 @@ module Koholint
         when '/runs' then html(@pages[:runs])
         when '/runs.json' then json(explorer.runs)
         when '/compare.json' then json(explorer.compare(*only(params, %w[a b], required: %w[a b]).values_at('a', 'b')))
-        when '/control' then json(control(only(params, %w[run speed pause], required: %w[run])))
-        when '/star' then not_allowed('POST')
+        when *INSIGHTS.keys then json(insight(INSIGHTS[path], only(params, %w[run])['run']))
+        when '/header.json' then json(header(only(params, %w[run])['run']))
+        when '/control' then json(control(only(params, %w[run speed pause seek], required: %w[run])))
+        when '/star', '/notes' then not_allowed('POST')
         when %r{\A/run/([^/]+)\z}
           explorer.open(segment(::Regexp.last_match(1)))
           html(@page)
@@ -159,22 +163,40 @@ module Koholint
       end
 
       def post(path, query, headers, body)
-        return not_allowed('GET') unless path == '/star'
+        return not_allowed('GET') unless %w[/star /notes].include?(path)
         return ['403 Forbidden', 'text/plain', "cross-origin request refused\n", {}] unless same_origin?(headers)
 
         run = only(params(query), %w[run], required: %w[run])['run']
-        why = only(params(body), %w[why], required: %w[why])['why']
-        json(explorer.star(run, why))
+        return json(explorer.star(run, only(params(body), %w[why], required: %w[why])['why'])) if path == '/star'
+
+        json(explorer.save_notes(run, only(params(body), %w[text], required: %w[text])['text']))
       end
 
       def control(params)
         speed = params['speed']
         pause = params['pause']
-        raise Explorer::BadRequest, 'give speed or pause' unless speed || pause
+        seek = params['seek']
+        raise Explorer::BadRequest, 'give speed, pause or seek' unless speed || pause || seek
         raise Explorer::BadRequest, 'speed must be 1, 4 or 16' unless speed.nil? || Registry::SPEEDS.map(&:to_s).include?(speed)
         raise Explorer::BadRequest, 'pause must be 0 or 1' unless pause.nil? || %w[0 1].include?(pause)
+        raise Explorer::BadRequest, 'seek must be a frame number' unless seek.nil? || seek.match?(/\A\d{1,9}\z/)
 
-        explorer.control(params['run'], speed: speed&.to_i, paused: pause && pause == '1')
+        explorer.control(params['run'], speed: speed&.to_i, paused: pause && pause == '1', seek: seek&.to_i)
+      end
+
+      def insight(kind, run)
+        return explorer.insight(run, kind).merge(kind == :stats ? { reference: explorer.reference(run_dir(run)) } : {}) if run
+        raise Explorer::NotFound, 'no live run' unless @run_dir
+
+        value = Feed.insight(kind, @run_dir, @follower)
+        kind == :stats ? value.merge(reference: @explorer&.reference(@run_dir)) : value
+      end
+
+      def header(run)
+        return explorer.header(run) if run
+        raise Explorer::NotFound, 'no live run' unless @run_dir
+
+        Explorer.header(@run_dir, notes_run: @explorer&.notes_run(@run_dir))
       end
 
       def params(query)
