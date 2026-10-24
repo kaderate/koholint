@@ -1,47 +1,56 @@
+require 'koholint/perception'
+
 module Koholint
   class Revisit
     ROUND_CAP = 6
     CYCLE_FRAMES = 1800
     FAILURE_CAP = 2
+    VISIT_STAMPS = 3
+    DANGER_PIXELS = 48
     PHASES = %i[playing].freeze
 
     attr_reader :open
 
     def initialize(talk_log:)
       @talk_log = talk_log
-      @npcs = Hash.new { |hash, key| hash[key] = { rounds: 0, failures: 0 } }
-      @cycle = nil
-      @capped = {}
+      @npcs = Hash.new { |hash, key| hash[key] = { rounds: 0, slots: [] } }
+      @failures = Hash.new(0)
+      @visit = nil
+      @visits = 0
       @open = nil
       @notes = []
     end
 
-    def candidate(state:, entities:, stamp:, budget_low: false)
-      return if budget_low || !PHASES.include?(state.phase(booted: true))
+    def candidate(state:, entities:, stamp:, budget_low: false, danger: false)
+      return if budget_low || danger || !PHASES.include?(state.phase(booted: true)) || hurt?(state) || threatened?(state, entities)
 
       place = [state.room_id, state.map_id]
-      return if @capped[[place, stamp]]
+      visit = visit_for(place)
+      cap(visit, stamp, state) if over_frames?(visit, stamp, state.frame)
+      return if blocked?(visit, stamp, state.frame)
 
-      pending = entities.select { |entity| entity[:kind].to_s == 'npc' && entity[:cell] && pending?(place, entity[:type], stamp) }
+      people = entities.select { |entity| npc?(entity) }
+      pending = people.select { |entity| pending?(place, entity, stamp, people, visit) }
       return if pending.empty?
 
-      current = @cycle && @cycle[:place] == place && @cycle[:stamp] == stamp ? @cycle[:npc] : nil
-      pending.find { |entity| entity[:type] == current } || pending.min_by { |entity| [distance(state.cell, entity[:cell]), entity[:slot]] }
+      tried = @npcs[[place, visit[:current], stamp]][:slots] if visit[:current]
+      same = pending.select { |entity| entity[:type] == visit[:current] }
+      (same.reject { |entity| tried.include?(entity[:slot]) }.first || same.first) ||
+        pending.min_by { |entity| [distance(state, entity), entity[:slot]] }
     end
 
-    def next_action(state:, entities:, stamp:, budget_low: false)
+    def next_action(state:, entities:, stamp:, budget_low: false, danger: false)
       close(:no_text) if @open
       place = [state.room_id, state.map_id]
-      @cycle = nil if @cycle && (@cycle[:place] != place || @cycle[:stamp] != stamp)
-      npc = candidate(state:, entities:, stamp:, budget_low:)
-      return @cycle = nil unless npc
-      return cap(place, stamp, state) if @cycle && state.frame - @cycle[:started] >= CYCLE_FRAMES
+      visit = visit_for(place)
+      npc = candidate(state:, entities:, stamp:, budget_low:, danger:) or return
 
-      @cycle ||= { place:, stamp:, started: state.frame }
-      @cycle[:npc] = npc[:type]
+      visit[:cycles][stamp] ||= state.frame
+      visit[:current] = npc[:type]
       entry = @npcs[[place, npc[:type], stamp]]
       entry[:rounds] += 1
-      @open = { place:, type: npc[:type], cell: npc[:cell], round: entry[:rounds], stamp: }
+      entry[:slots] |= [npc[:slot]]
+      @open = { place:, type: npc[:type], cell: npc[:cell], round: entry[:rounds], stamp:, visit: visit[:id] }
       { skill: 'talk_to', params: { row: npc[:cell][0], col: npc[:cell][1] }, npc: @open.slice(:place, :type, :cell), round: entry[:rounds] }
     end
 
@@ -49,9 +58,9 @@ module Koholint
       return unless @open
       return if outcome[:talked] == true || outcome['talked'] == true
 
-      entry = @npcs[[@open[:place], @open[:type], @open[:stamp]]]
-      entry[:failures] += 1
-      close(entry[:failures] >= FAILURE_CAP ? :unreachable : :no_dialogue)
+      key = [@open[:visit], @open[:type]]
+      @failures[key] += 1
+      close(@failures[key] >= FAILURE_CAP ? :unreachable : :no_dialogue)
     end
 
     def read
@@ -68,15 +77,44 @@ module Koholint
 
     private
 
-    def pending?(place, type, stamp)
-      entry = @npcs[[place, type, stamp]]
-      entry[:rounds] < ROUND_CAP && entry[:failures] < FAILURE_CAP && @talk_log.status(place:, entity: type, stamp:) != :exhausted
+    def npc?(entity) = entity[:kind].to_s == 'npc' && entity[:verified] == true && entity[:cell]
+
+    def hurt?(state) = state.hp && state.max_hp && state.hp < state.max_hp - Perception::HP_PER_HEART
+
+    def threatened?(state, entities)
+      entities.any? do |entity|
+        risky = entity[:kind].to_s == 'enemy' || (entity[:kind].to_s == 'unknown' && entity[:moves] != false)
+        risky && (entity[:x] - state.x.to_i).abs <= DANGER_PIXELS && (entity[:y] - state.y.to_i).abs <= DANGER_PIXELS
+      end
     end
 
-    def cap(place, stamp, state)
-      @capped[[place, stamp]] = true
-      @notes << { kind: 'revisit', detail: { npc: { place:, type: @cycle[:npc] }, round: 0, outcome: 'cycle_frame_cap', frames: state.frame - @cycle[:started] } }
-      @cycle = nil
+    def visit_for(place)
+      return @visit if @visit && @visit[:place] == place
+
+      @visits += 1
+      @visit = { place:, id: @visits, cycles: {}, capped: [], current: nil }
+    end
+
+    def blocked?(visit, stamp, frame)
+      visit[:capped].include?(stamp) || over_frames?(visit, stamp, frame) || (!visit[:cycles].key?(stamp) && visit[:cycles].size >= VISIT_STAMPS)
+    end
+
+    def over_frames?(visit, stamp, frame) = visit[:cycles].key?(stamp) && frame - visit[:cycles][stamp] >= CYCLE_FRAMES
+
+    def pending?(place, entity, stamp, people, visit)
+      entry = @npcs[[place, entity[:type], stamp]]
+      return false if entry[:rounds] >= ROUND_CAP || @failures[[visit[:id], entity[:type]]] >= FAILURE_CAP
+      return true unless @talk_log.status(place:, entity: entity[:type], stamp:) == :exhausted
+
+      people.count { |other| other[:type] == entity[:type] } > 1 && !entry[:slots].include?(entity[:slot])
+    end
+
+    def cap(visit, stamp, state)
+      return if visit[:capped].include?(stamp)
+
+      visit[:capped] << stamp
+      @notes << { kind: 'revisit', detail: { npc: { place: visit[:place], type: visit[:current] }, round: 0, outcome: 'cycle_frame_cap',
+                                             frames: state.frame - visit[:cycles][stamp] } }
     end
 
     def close(outcome)
@@ -84,6 +122,9 @@ module Koholint
       @open = nil
     end
 
-    def distance(from, to) = from ? (from[0] - to[0]).abs + (from[1] - to[1]).abs : 0
+    def distance(state, entity)
+      from = state.cell
+      from ? (from[0] - entity[:cell][0]).abs + (from[1] - entity[:cell][1]).abs : 0
+    end
   end
 end

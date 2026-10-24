@@ -47,6 +47,7 @@ module Koholint
       WAIT_PHASES = %i[locked cutscene].freeze
       SPEAKER_LIMIT = Trace::SPEAKER_MAX
       REVISIT_BUDGET_SHARE = 0.05
+      HURT_FRAMES = 300
 
       def initialize(client:, registry:, objectives:, manual: '', on_step: nil, on_activity: nil, ledger: nil, triggers: nil, talk_log: nil, leads: nil, explore_log: nil, revisit: nil,
                      budget: nil)
@@ -94,6 +95,8 @@ module Koholint
         @screen_since = nil unless screen(state)
         release_hemmed(state)
         track_locked(state)
+        @hurt_at = state.frame if @last_hp && state.hp.to_i < @last_hp && !state.loading?
+        @last_hp = state.hp.to_i
         track { @objectives.update(state, frame:) }
       end
 
@@ -170,18 +173,19 @@ module Koholint
           @auto = @locked_wait = false
           return track { @objectives.update(state, frame:) }
         end
-        @revisit.talked(outcome) if @revisit_acting && choice[:skill] == 'talk_to'
+        revisiting = @revisit_acting && choice[:skill] == 'talk_to'
+        @revisit.talked(outcome) if revisiting
         @revisit_acting = false
         @last_results << outcome
         @last_results.shift while @last_results.size > RESULT_LIMIT
         note_lock(choice, outcome, state)
         note_talk_source(choice, outcome)
-        feed_ledger(choice, outcome, state, frame)
+        feed_ledger(choice, outcome, state, frame, objective: !revisiting)
         opened = feed_triggers(choice, outcome, state)
         feed_talk_log(choice, outcome, state)
         @explore_log.absorb(outcome) if choice[:skill] == 'explore'
-        note_no_path(choice, outcome, frame)
-        unless @waiting
+        note_no_path(choice, outcome, frame) unless revisiting
+        unless @waiting || revisiting
           @objectives.record_attempt(skill: choice[:skill], params: choice[:params], result_summary: summary(outcome, opened))
         end
         @waiting = false
@@ -317,12 +321,12 @@ module Koholint
         Navigation::Planner.new(grid:, ledger: @ledger, place:).path(from: state.cell, to: [predicate[:row], predicate[:col]], mode: :free_only) != nil
       end
 
-      def feed_ledger(choice, outcome, state, frame)
+      def feed_ledger(choice, outcome, state, frame, objective: true)
         from = outcome[:from].is_a?(Hash) ? outcome[:from] : {}
         place = from[:room] && from[:map] ? [from[:room], from[:map]] : [state.room_id, state.map_id]
         Ledger.edges_of(outcome).each { |edge| @ledger.record(place:, blocked_at: edge) }
         blocked_at = outcome[:blocked_at]
-        if blocked_at
+        if blocked_at && objective
           track { @objectives.note_blocked(blocked_at:, target: @objectives.current&.dig(:predicate), frame:) } if @objectives.current
         end
         note_entered(choice, outcome, place)
@@ -605,16 +609,18 @@ module Koholint
 
       def revisit_low? = @budget ? @budget.nearly_exhausted?(frames: Revisit::CYCLE_FRAMES, share: REVISIT_BUDGET_SHARE) : false
 
+      def revisit_danger?(state) = hemmed?(state) || (@hurt_at && state.frame - @hurt_at < HURT_FRAMES)
+
       def revisit_candidate(state)
         return unless @entities_reader
 
-        @revisit.candidate(state:, entities: entities_now, stamp: stamp(state), budget_low: revisit_low?)
+        @revisit.candidate(state:, entities: entities_now, stamp: stamp(state), budget_low: revisit_low?, danger: revisit_danger?(state))
       end
 
       def revisit_choice(decision_point, state)
         return unless decision_point.name == :choose_skill && !@sequence
 
-        action = @revisit.next_action(state:, entities: entities_now, stamp: stamp(state), budget_low: revisit_low?)
+        action = @revisit.next_action(state:, entities: entities_now, stamp: stamp(state), budget_low: revisit_low?, danger: revisit_danger?(state))
         return unless action
 
         @revisit_acting = true

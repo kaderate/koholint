@@ -8,7 +8,7 @@ class RevisitPolicyTest < Minitest::Test
   PAGE = DelegatedPolicyTest::PAGE
   DARK = [27, 42, 9].pack('C3')
   LIGHT = [154, 158, 63].pack('C3')
-  TARKIN = { slot: 1, type: 63, x: 120, y: 80, cell: [4, 7], kind: :npc }.freeze
+  TARKIN = { slot: 1, type: 63, x: 120, y: 80, cell: [4, 7], kind: :npc, verified: true, moves: false }.freeze
 
   def text_page(width)
     rows = Array.new(96) { |y| y < 48 ? [DARK * 0, LIGHT * 160].join : Array.new(160) { |x| y == 60 && x.between?(20, 20 + width - 1) ? LIGHT : DARK }.join }
@@ -113,5 +113,19 @@ class RevisitPolicyTest < Minitest::Test
     @people = [TARKIN]
     step(p, state)
     assert_equal 'claude', step(p, state(frame: 200))[:agent]
+  end
+
+  def test_no_revisit_after_a_hit_or_while_hemmed_and_no_objective_bookkeeping
+    p = setup_revisit(skill: [walk, walk, walk])
+    step(p, state)
+    p.observe(state(frame: 150), frame: 150)
+    p.observe(state(frame: 160, hp: 20), frame: 160)
+    assert_equal 'claude', step(p, state(frame: 200, hp: 20))[:agent]
+    revisit = step(p, state(frame: 500, hp: 20))
+    assert_equal 'delegated', revisit[:agent]
+    attempts = @objectives.attempts_for_prompt.dup
+    p.after_action(choice: revisit[:choice], outcome: { stopped_by: 'no_path', talked: false, blocked_at: { row: 4, col: 6, direction: :right } },
+                   state: state(frame: 520, hp: 20), frame: 520)
+    assert_equal attempts, @objectives.attempts_for_prompt
   end
 end

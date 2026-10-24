@@ -17,7 +17,7 @@ class RevisitTest < Minitest::Test
                             game_submode: 7, dialog_state: 0, **over)
   end
 
-  def npc(type, cell, slot: type, kind: :npc) = { slot:, type:, x: (cell[1] * 16) + 8, y: (cell[0] * 16) + 16, cell:, kind: }
+  def npc(type, cell, slot: type, kind: :npc, verified: true, moves: false) = { slot:, type:, x: (cell[1] * 16) + 8, y: (cell[0] * 16) + 16, cell:, kind:, verified:, moves: }
 
   def people = [npc(62, [3, 5], slot: 0), npc(63, [4, 7], slot: 1)]
 
@@ -75,6 +75,8 @@ class RevisitTest < Minitest::Test
     @revisit.talked({ talked: false, stopped_by: 'target_free' })
     assert_nil act(entities: [people.last])
     assert_equal %w[no_dialogue unreachable], @revisit.notes.map { |note| note[:detail][:outcome] }
+    assert_nil act(entities: [people.last], stamp: ['shield', 3])
+    @revisit.next_action(state: state(room_id: 162), entities: [], stamp: STAMP)
     refute_nil act(entities: [people.last], stamp: ['shield', 3])
   end
 
@@ -90,6 +92,7 @@ class RevisitTest < Minitest::Test
 
   def test_only_npcs_on_screen_in_free_play_and_never_when_the_budget_is_low
     assert_nil act(entities: [npc(45, [6, 1], kind: :unknown), npc(110, [2, 2], kind: :enemy)])
+    assert_nil act(entities: [npc(117, [5, 7], verified: false)])
     assert_nil act(entities: [{ slot: 3, type: 63, x: 250, y: 20, cell: nil, kind: :npc }])
     assert_nil @revisit.next_action(state: state(dialog_state: 3), entities: people, stamp: STAMP)
     assert_nil @revisit.next_action(state: state(game_mode: 0x0C, game_submode: 8), entities: people, stamp: STAMP)
@@ -106,5 +109,43 @@ class RevisitTest < Minitest::Test
   def test_candidate_does_not_count_a_round
     assert_equal 62, @revisit.candidate(state: state, entities: people, stamp: STAMP)[:type]
     assert_equal 1, act[:round]
+  end
+
+  def test_a_visit_serves_at_most_three_stamps
+    [1, 2, 3].each { |places| assert act(entities: [people.first], stamp: ['shield', places]) }
+    assert_nil act(entities: [people.first], stamp: ['shield', 4])
+    @revisit.next_action(state: state(room_id: 162), entities: [], stamp: STAMP)
+    assert act(entities: [people.first], stamp: ['shield', 4])
+  end
+
+  def test_the_candidate_applies_the_frame_cap_like_next_action
+    act(frame: 100)
+    say(62, 'One.')
+    assert_nil @revisit.candidate(state: state(frame: 100 + Koholint::Revisit::CYCLE_FRAMES), entities: people, stamp: STAMP)
+    assert_nil act(frame: 100 + Koholint::Revisit::CYCLE_FRAMES)
+    assert_equal ['new', 'cycle_frame_cap'], @revisit.notes.map { |note| note[:detail][:outcome] }
+  end
+
+  def test_two_people_of_one_type_are_each_tried_once_per_stamp
+    twins = [npc(115, [5, 2], slot: 6), npc(115, [2, 8], slot: 7)]
+    first = act(entities: twins)
+    say(115, 'Same words.')
+    second = act(entities: twins)
+    say(115, 'Same words.')
+    assert_equal [[2, 8], [5, 2]], [first, second].map { |a| a[:params].values_at(:row, :col) }
+    assert_nil act(entities: twins)
+    assert_nil act(entities: [twins.first])
+  end
+
+  def test_danger_gates_the_revisit
+    near = npc(110, [3, 5], slot: 9, kind: :unknown, moves: true)
+    assert_nil act(entities: people + [near])
+    assert_nil act(entities: people + [near.merge(kind: :enemy, moves: false)])
+    assert_nil act(entities: people + [near.merge(moves: nil)])
+    refute_nil @revisit.candidate(state: state, entities: people + [near.merge(moves: false)], stamp: STAMP)
+    refute_nil @revisit.candidate(state: state, entities: people + [near.merge(x: 150, y: 130)], stamp: STAMP)
+    assert_nil @revisit.next_action(state: state(hp: 15), entities: people, stamp: STAMP)
+    assert_nil act(danger: true)
+    assert act
   end
 end
