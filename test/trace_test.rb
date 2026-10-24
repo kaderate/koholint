@@ -98,6 +98,18 @@ class TraceTest < Minitest::Test
     end
   end
 
+  def test_dialogue_speaker_conversation_and_cached_are_optional_but_validated
+    Dir.mktmpdir do |dir|
+      trace = Koholint::Trace.new(File.join(dir, 'trace.jsonl'))
+      base = { place: [1, 0], text: 'Hi', source: 'agent', page: 1 }
+      trace.emit(:dialogue, frame: 1, **base, speaker: 'Tarkin', conversation: 'ab' * 8, cached: true)
+      [{ speaker: '' }, { speaker: 'x' * 41 }, { speaker: "a\nb" }, { speaker: 3 }, { conversation: 'xyz' }, { cached: 'yes' }].each do |bad|
+        assert_raises(Koholint::Trace::InvalidEvent, bad.inspect) { trace.emit(:dialogue, frame: 2, **base, **bad) }
+      end
+      assert_equal %w[Tarkin abababababababab], Koholint::Trace.read(File.join(dir, 'trace.jsonl')).last.values_at('speaker', 'conversation')
+    end
+  end
+
   def test_decision_prompt_fields_are_optional_but_validated
     Dir.mktmpdir do |dir|
       trace = Koholint::Trace.new(File.join(dir, 'trace.jsonl'))

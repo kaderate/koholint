@@ -24,7 +24,7 @@ require 'koholint/viewer'
 module Koholint
   module CLI
     USAGE = 'usage: koholint run|resume <run_dir>|fork <run_dir> --at-frame N|verify <run_dir>|summary <run_dir>|watch <run_dir>|' \
-            'archive|star <run_dir> WHY|prune-heavy|census boot|<run_dir> FRAME... ' \
+            'archive|star <run_dir> WHY|prune-heavy|census boot|<run_dir> FRAME...|entities <run_dir> FRAME...|npcs ' \
             '[--frames N --minutes N --steps N --dollars X --root DIR --runs-root DIR --tag NAME --realtime --grid --port N --host H --from live|start|DIR ' \
             '--speed X --agent --model M --max-dollars X --claude-command PATH --commit --full --keep N --yes]'.freeze
 
@@ -101,6 +101,10 @@ module Koholint
         Archive.star(run_dir(args), args[1] || raise(OptionParser::MissingArgument, 'why'), out:)
       when 'prune-heavy' then Archive.prune_heavy(root: options.fetch(:root, 'runs'), **options.slice(:keep, :yes), out:)
       when 'census' then census(args, out)
+      when 'npcs'
+        require 'koholint/npc_catalogue'
+        out.print NpcCatalogue.markdown(options.fetch(:root, 'runs'))
+        0
       when 'verify' then verify(Run.open(run_dir(args), flow_version: flow), out)
       when 'summary'
         out.puts JSON.pretty_generate(Summary.for(Run.open(run_dir(args), flow_version: flow)))
@@ -111,12 +115,24 @@ module Koholint
     end
 
     def census(args, out)
+      return census_entities(args.drop(1), out) if args.first == 'entities'
+
       require 'koholint/probes/mode_census'
       raise OptionParser::MissingArgument, 'boot or <run_dir> FRAME...' unless args.first == 'boot' || args.size > 1
 
       census = Probes::ModeCensus
       paths = args.first == 'boot' ? [census.census_boot] : census.census(run_dir(args), args.drop(1).map { |frame| Integer(frame) })
       paths.each { |path| out.puts "census #{path}" }
+      0
+    rescue ArgumentError => e
+      raise OptionParser::InvalidArgument, e.message
+    end
+
+    def census_entities(args, out)
+      require 'koholint/probes/entity_census'
+      raise OptionParser::MissingArgument, 'entities <run_dir> FRAME...' unless args.size > 1
+
+      Probes::EntityCensus.census(run_dir(args), args.drop(1).map { |frame| Integer(frame) }).each { |path| out.puts "census #{path}" }
       0
     rescue ArgumentError => e
       raise OptionParser::InvalidArgument, e.message
@@ -145,7 +161,7 @@ module Koholint
       lambda do |run|
         events = events_for(run)
         delegated = Policies::Delegated.new(client:, registry: Skills::Registry.default, objectives: objectives_for(run, events), ledger: ledger_for(run, events),
-                                            triggers: Triggers.from_events(events), talk_log: TalkLog.from_events(events), explore_log: ExploreLog.from_events(events), leads: Leads.from_events(events), manual:, on_step: budget.method(:step_done),
+                                            triggers: Triggers.from_events(events), talk_log: TalkLog.from_events(events), explore_log: ExploreLog.from_events(events), leads: Leads.from_events(events), manual:, on_step: budget.method(:step_done), budget:,
                                             on_activity: run.method(:write_activity))
         Policies::StartGame.new(delegated, ready: ->(state) { %i[playing dialogue].include?(state.phase) }, probe:, played: GameState.played?(events))
       end

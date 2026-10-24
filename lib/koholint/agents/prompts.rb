@@ -38,7 +38,9 @@ module Koholint
         menu_assign swaps the item under the inventory cursor with the item on the A or B button.
         open_map opens the map with SELECT during free play; close_map closes it.
         choose_option moves the arrow of a save or game-over screen to one of the listed options (0 = top) and confirms it with A; quitting to the title is refused.
-        People may say more when talked to again: talk to the same person again while each talk gives a new text, and stop when the listing says exhausted. Come back to people when the listing says worth retrying after something changed (a new place reached, a new lead). Texts from people can name places or tasks: treat them as leads.
+        People may say more when talked to again: talk to the same person again while each talk gives a new text, and stop when the listing says exhausted. Come back to people when the listing says worth retrying after something changed (an item obtained, a new place reached). Texts from people can name places or tasks: treat them as leads.
+        The listing of things on screen names the entities the game itself tracks, with a type id and a kind the harness measured (npc: it answers when talked to; kind unknown: not measured); an entity keeps its type when it moves. Things listed without a type are sprites only.
+        People are talked to again by the harness itself until they repeat themselves, after anything changed (an item obtained, a new place reached); a dialogue already read is not sent to you again.
         A dialogue that opens by itself is triggered by the game and may repeat while you stay where it triggers. The context lists the things on screen with how many times you talked to each: people or objects you have never tried to talk to are worth trying before repeating an action that keeps failing.
         Do not repeat a skill that just stopped the same way from the same state; try something different or gather information. When on-screen text matters, transcribe it in the optional transcription field. When an image is attached it shows the top and the bottom of the screen stacked; a dialogue box may be in either.
         Texts are what people say and what signs or objects you read show. When you transcribe a text, you may also extract leads: up to five, each with a quote copied word for word from your transcription, a short claim saying what it tells you, and an importance. high: it states a goal, a destination, an item to obtain, a condition or obstacle, or a danger. normal: a local hint, such as a passage or what a room is for. low: flavour, small talk, shop prices. A lead whose quote is not in the transcription is dropped.
@@ -49,6 +51,7 @@ module Koholint
 
       SHEETS = <<~TEXT.freeze
         The attached images are the pages of the dialogue that just closed, oldest first: each page shows the top and the bottom of the screen stacked, and the pages are stacked vertically in sheets. Give the full transcription of all the pages, in order, in transcription, one paragraph per page separated by a blank line, then extract its leads.
+        If the speaker names themself or is named in these pages, give that name in speaker (the name only).
       TEXT
 
       def self.system_for(decision_point, sheets: false)

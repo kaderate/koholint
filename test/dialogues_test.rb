@@ -95,9 +95,9 @@ class DialoguesTest < Minitest::Test
       { 'type' => 'dialogue', 'frame' => 7, 'place' => [1, 0], 'text' => 'A sign.' }
     ]
     first, second = Koholint::Dialogues.from_events(events)
-    assert_equal({ frame: 2, place: [1, 0], source: { row: 3, col: 4 }, text: "M' sieu! Pour sauvegarder,", stamp: ['none', 1, 0] },
+    assert_equal({ frame: 2, place: [1, 0], source: { row: 3, col: 4 }, text: "M' sieu! Pour sauvegarder,", stamp: ['none', 1] },
                  first.except(:pages))
-    assert_equal [nil, 'A sign.', ['none', 1, 1]], second.values_at(:source, :text, :stamp)
+    assert_equal [nil, 'A sign.', ['none', 1]], second.values_at(:source, :text, :stamp)
   end
 
   def test_an_explore_between_a_talk_and_a_text_clears_the_source
@@ -107,5 +107,16 @@ class DialoguesTest < Minitest::Test
       { 'type' => 'dialogue', 'frame' => 7, 'place' => [1, 0], 'text' => 'A sign.' }
     ]
     assert_nil Koholint::Dialogues.from_events(events).first[:source]
+  end
+
+  def test_a_group_carries_the_entity_talked_to_its_signature_and_speaker
+    events = [
+      { 'type' => 'action', 'frame' => 2, 'skill' => 'talk_to', 'params' => { 'row' => 4, 'col' => 7 }, 'result' => { 'talked' => true, 'entity' => { 'type' => 63, 'slot' => 1 } } },
+      { 'type' => 'dialogue', 'frame' => 2, 'place' => [1, 0], 'text' => 'Hi.', 'conversation' => 'ab' * 8 },
+      { 'type' => 'dialogue', 'frame' => 2, 'place' => [1, 0], 'text' => 'I am Bob.', 'conversation' => 'ab' * 8, 'speaker' => 'Bob', 'cached' => true }
+    ]
+    group = Koholint::Dialogues.from_events(events).first
+    assert_equal({ row: 4, col: 7, entity: 63 }, group[:source])
+    assert_equal ['ab' * 8, 'Bob', true], group.values_at(:conversation, :speaker, :cached)
   end
 end

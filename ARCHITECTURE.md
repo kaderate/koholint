@@ -31,6 +31,12 @@ pacing (`pacer.rb`) and observability.
 **Perception** — `perception.rb`, `addresses.rb`, `game_state.rb`, `data/addresses.json`: a typed `GameState`
 (position, room/map, HP, phase such as dialogue or locked, milestone, inventory cursor, menu option, A/B items) read from RAM. Every address carries
 provenance and a `verified_count`; `verified` needs two independent checks. No RAM writes to gameplay state.
+`entities.rb` reads the game's entity table (16 slots: status, type, x, y, state) into `{ slot, type, x, y, status, state,
+cell, kind }` for the active slots; the kind per type id (`npc`, `enemy`, `object`, `unknown`) comes from
+`data/entities.json`, measured by `probes/entity_census.rb` (`bin/koholint census entities`): A pressed next to the
+entity opens a dialogue that does not open with its slot cleared in a control copy (`npc`); contact damage against the
+same control (`enemy`, never observed so far); otherwise `unknown`. The engine passes `Entities.read` to the policy and
+skills as the `entities` context entry.
 
 **Game modes** — `modes.rb`, `data/modes.json`: the catalogue of the game's screens (intro, file select, name entry,
 loading, play, dialogue, locks, dying, game over, inventory, map, save screen). Each entry has a kind, the engine phase it
@@ -42,7 +48,7 @@ entries that match the same tuple unless one strictly refines the other (the mos
 resolves the entry; `GameState#phase` is `boot` for anything outside play mode before the run first played, else the
 entry's phase (`loading`, `playing`, `locked`, `dialogue`, `cutscene`, `menu`, `map`, `save`, `game_over`, `boot` for
 the title screens) or `unknown`; the engine emits a `notable` `unknown_mode` once per unknown tuple (rebuilt from the
-trace on resume). `probes/mode_census.rb` (`bin/koholint census`, the only code allowed to write RAM, in throwaway copies, and used by the CLI only) is the probe that measures them: from a replayed
+trace on resume). `probes/mode_census.rb` (`bin/koholint census`; the probes are the only code allowed to write RAM, in throwaway copies, and are used by the CLI only) is the probe that measures them: from a replayed
 state it plays scenarios on throwaway copies (START, SELECT, the four-button save combination, health drained to zero
 by a RAM write in the copy only) and diffs RAM while moving cursors; reports go to `tmp/census/`.
 
@@ -63,16 +69,32 @@ attempts that walked no new cell, `no_frontier`, `locked`, `budget` at 600 frame
 tried (left, or blocked twice) and the things already offered, rebuilt from its `action` events on resume. A skill is a bounded, deterministic action with
 validated parameters; it reports how it stopped (`done`, `blocked`, `no_path`, `no_response`…). `ledger.rb`
 counts blocked edges per place (doubtful edges), `triggers.rb` forbids inputs that re-fire a scripted event,
-`talk_log.rb` remembers which sides of a person gave no response and, per person (the last `talk_to` target), the key (letters
-and digits only, as for `new_text`) of each stitched text read and a world stamp (milestone, places visited, leads): the context says whether the last talk gave
+`talk_log.rb` remembers which sides of a person gave no response and, per person (the entity type that `talk_to` faced when the
+dialogue opened, reported in its result, else the last `talk_to` target cell), the key (letters
+and digits only, as for `new_text`) of each stitched text read, its conversation signature and speaker name, and a world stamp (milestone, places visited): the context says whether the last talk gave
 new text, how many talks in a row gave nothing new, and `worth retrying` (the stamp changed or the last talk was new) or
-`exhausted` (the last two talks repeated under the same stamp).
+`exhausted` (the last two talks repeated under the same stamp, by text or by signature). It also keeps the page texts per
+conversation signature. The listing of things on screen shows entities first (cell, type, kind, name) and the sprite
+objects that hold no entity as a fallback.
+`revisit.rb` is the deterministic revisit: for the `npc` entities of a `verified` kind in the current place that are not
+exhausted for the current stamp, it gives the next `talk_to` (nearest person first, the same person until exhausted, each
+person of a type shared by several tried once per stamp), with caps of 6 rounds per person and stamp, 1800 frames per
+stamp, 3 stamps per visit of the place and 2 failed talks per person and visit (then unreachable); it never acts outside
+free play, with health below the maximum minus one heart, within 300 frames of a hit, while hemmed, or with an `enemy`
+or a moving or unmeasured `unknown` entity within 3 cells. Its talks are not objective attempts. It records one
+`notable` `revisit` `{npc, round, outcome}` per round.
+`vision/dialogue_shot.rb` also reduces a captured page to the text pixel rows of its dialogue box; a conversation's
+signature hashes the rows that are not the partial form of a longer row (pages are captured mid-typing at a phase that
+varies, so raw page hashes are not stable; the signature was measured identical across phases and runs).
 `dialogues.rb` groups `dialogue` events (same frame and place) into one dialogue and stitches the overlapping pages of a
 scrolling text box into the full text without losing a word; the stored events stay raw.
 
 **Decision points and policies** — `decision.rb` defines the points (`choose_objective`, `choose_skill`,
 `move`, macros) with their output schema and validation. A policy answers them: `policies/delegated.rb`
-(agent-driven; owns the context, plan memory, automatic dialogue pages, lock/hemmed handling),
+(agent-driven; owns the context, plan memory, automatic dialogue pages, lock/hemmed handling, and before asking the model
+the revisit of people and the reuse of conversations already read: a dialogue closed when read (dialog state back to 0) whose signature (at least 2 full rows) is known is not sent
+as sheets, its stored text is emitted again with `cached: true`; when a revisit is due it replaces the model's skill choice,
+also right after a sheet reading),
 `policies/walk_and_talk.rb` and `start_game.rb` (deterministic baselines and the intro), `with_fallback.rb`
 (an invalid answer falls back deterministically, 5 consecutive fallbacks stop the run). Phases come from the mode
 catalogue (see Game modes): the boot script owns `boot` and `loading`; once the run has played (a `perception` in play
@@ -95,7 +117,7 @@ agent extracts from texts it read (dialogue, signs, objects), each with a verbat
 `lead_rejected`), duplicates are dropped by quote. Goal and leads are rebuilt from the `goal` and `lead` trace events on
 resume.
 
-**Agents** (`agents/`) — `context.rb` renders state for the model (grid map, neighbours, objects on screen,
+**Agents** (`agents/`) — `context.rb` renders state for the model (grid map, neighbours, entities and objects on screen, people's names,
 goal, leads — every `high` one, `normal` ones of the current place, never `low` ones —, recent results, plan), `prompts.rb` holds the system prompts, `claude_cli.rb` calls `claude -p` with a JSON
 schema and reports cost and latency. Jev (tactical choices) is planned, not wired.
 
@@ -103,7 +125,7 @@ schema and reports cost and latency. Jev (tactical choices) is planned, not wire
 sha, model), `inputs.log`, `trace.jsonl` (events validated by `trace.rb`), `keyframes/`, `save/`, `prompts/`,
 `world.json` (`{ goal, leads }`, rewritten from the trace at every stop), `summary.json` (written at every stop by
 `summary.rb` from the trace only, versioned by `Summary::VERSION`: totals, cost by skill, decisions by agent and
-feature usage; `archive` rewrites an outdated one), `star.json`, `notes.md` (owner notes from the viewer). Trace events: `perception`, `decision`, `action`, `objective`, `dialogue`, `lead`, `goal`,
+feature usage; `archive` rewrites an outdated one), `star.json`, `notes.md` (owner notes from the viewer). Trace events (`dialogue` may carry `speaker`, `conversation` and `cached`; a `talk_to` result may carry `entity`): `perception`, `decision`, `action`, `objective`, `dialogue`, `lead`, `goal`,
 `notable`, `screen`, `screen_changed`, `affordance`, `grid_contradiction`, `keyframe`, `save`, `budget_stop`, `stop`. `budget.rb` enforces frames,
 minutes, dollars and objective steps. `archive.rb` keeps a light bundle per run in git (trace gzipped);
 heavy artifacts stay local. A run resumes only with the same `flow_version` and ROM hash; a change to the
@@ -119,7 +141,8 @@ read-only replays with pacing and seek, comparison via `run_compare.rb`, star, t
 never writes game state; the only files it writes are `star.json`, `summary.json`'s `starred` and `notes.md`.
 
 **CLI** — `cli.rb`, `bin/koholint`: `run`, `resume`, `fork`, `verify`, `summary`, `watch`, `archive`, `star`,
-`prune-heavy`, `census`.
+`prune-heavy`, `census` (modes, or `census entities`), `npcs` (`npc_catalogue.rb`: a markdown table of the people of all
+runs, their names and the distinct texts read with the milestone and the number of runs; writes nothing).
 
 ## Data flow of one decision
 
@@ -137,7 +160,7 @@ never writes game state; the only files it writes are `star.json`, `summary.json
 - Only the engine writes `trace.jsonl`, `inputs.log` and `save/`; `verify` replays the journal and compares hashes.
 - Determinism: the same journal on the same ROM gives the same states. Agents are never called in replay.
 - No walkthrough in code or prompts (how-to-play knowledge is allowed, see `AGENTS.md`); facts live in `data/addresses.json`,
-  `data/modes.json` and a run's `world.json`, with provenance.
+  `data/modes.json`, `data/entities.json` and a run's `world.json`, with provenance.
 - A rule a script can check is a validator, not a paragraph.
 - Playing and evolving the flow are separate: a run only emits `suggestions.md`.
 

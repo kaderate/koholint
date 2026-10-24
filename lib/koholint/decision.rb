@@ -3,6 +3,7 @@ require 'json'
 require 'koholint/skills/registry'
 require 'koholint/objectives'
 require 'koholint/leads'
+require 'koholint/trace'
 
 module Koholint
   class DecisionPoint
@@ -51,7 +52,7 @@ module Koholint
       { type: 'object',
         properties: registry.schema.merge(justification: { type: 'string' },
                                            confidence: { type: 'number', minimum: 0, maximum: 1 },
-                                           transcription: { type: 'string' },
+                                           transcription: { type: 'string' }, speaker: { type: 'string', maxLength: Trace::SPEAKER_MAX },
                                            leads: LEADS_SCHEMA, goal: GOAL_SCHEMA, plan: PLAN_SCHEMA),
         required: %w[skill params justification confidence plan], additionalProperties: false }
     end

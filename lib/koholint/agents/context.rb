@@ -21,12 +21,12 @@ module Koholint
       NORMAL_LEADS = 5
       QUOTE_LIMIT = 80
 
-      def self.build(state:, grid:, objective:, history:, attempts:, manual:, last_results:, max_chars: 9000, ledger: nil, refusals: [], plan: nil, triggers: nil, talk_log: nil, locked: nil, locked_frames: nil, goal: nil, leads: [], stamp: nil)
+      def self.build(state:, grid:, objective:, history:, attempts:, manual:, last_results:, max_chars: 9000, ledger: nil, refusals: [], plan: nil, triggers: nil, talk_log: nil, locked: nil, locked_frames: nil, goal: nil, leads: [], stamp: nil, entities: [])
         link = state.cell
         place = [state.room_id, state.map_id]
         results = last_results.last(RESULT_LIMIT).map { |r| r.transform_keys(&:to_sym) }
         fixed = [header(state, link, triggers, place, locked, locked_frames), grid_block(grid, link, ledger, place), neighbours(grid, link, results, ledger, place),
-                 *things_block(grid, talk_log, place, stamp), objective_block(objective, attempts, plan, goal), *leads_block(leads, place)]
+                 *things_block(grid, talk_log, place, stamp, entities), objective_block(objective, attempts, plan, goal), *leads_block(leads, place)]
         finished = history.map { |h| "- #{h[:id]} #{h[:outcome]}#{h[:reason] ? " (#{h[:reason]})" : ''}: #{h[:title]}" }
         refused = refusals.last(KEEP_REFUSALS).map { |r| "- #{r[:title]} #{r[:predicate].to_json}: #{r[:reason]}" }
         lines = results.map { |r| "- #{result_line(r)}" }
@@ -106,10 +106,12 @@ module Koholint
       end
       private_class_method :screen_lines
 
-      def self.things_block(grid, talk_log, place, stamp = nil)
+      def self.things_block(grid, talk_log, place, stamp = nil, entities = [])
         return [] unless talk_log
 
-        lines = talk_log.lines(grid, place, limit: THINGS_LIMIT, stamp:)
+        lines = talk_log.lines(grid, place, limit: THINGS_LIMIT, stamp:, entities:)
+        people = talk_log.people(place, entities)
+        lines.unshift("People on screen: #{people.join(', ')}") if people.any?
         lines.empty? ? [] : ["Things on screen you can interact with:\n#{lines.join("\n")}"]
       end
       private_class_method :things_block

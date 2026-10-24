@@ -71,4 +71,15 @@ class BudgetTest < Minitest::Test
     other.stop!
     assert_equal :stopped, other.exhausted
   end
+
+  def test_nearly_exhausted_by_a_share_or_a_frame_margin
+    budget = Koholint::Budget.new(frames: 10_000, dollars: 1.0, clock: ->(*) { 0 })
+    refute budget.nearly_exhausted?(frames: 1800, share: 0.05)
+    budget.tick(frames: 8300)
+    assert budget.nearly_exhausted?(frames: 1800, share: 0.05)
+    refute budget.nearly_exhausted?(share: 0.05)
+    budget.tick(cost: 0.96)
+    assert budget.nearly_exhausted?(share: 0.05)
+    refute Koholint::Budget.new.nearly_exhausted?(frames: 1800, share: 0.05)
+  end
 end

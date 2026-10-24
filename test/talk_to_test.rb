@@ -31,10 +31,10 @@ class TalkToTest < Minitest::Test
   def centre(row, col) = Koholint::Geometry.center_of(row, col)
 
   def talk(row, col, from: [4, 5], grid: FakeGrid.new(sprites: [[row, col]]), ledger: nil, solid: [row, col], opens_after: 1, free: false,
-           dialogue_at: nil, room_change_at: nil, damage_at: nil, limit: 600, blocked: [], triggers: nil, open_cells: nil, talk_log: nil)
+           dialogue_at: nil, room_change_at: nil, damage_at: nil, limit: 600, blocked: [], triggers: nil, open_cells: nil, talk_log: nil, entities: nil)
     x, y = centre(*from)
     start = state(x:, y:)
-    execution = registry.start('talk_to', start, { row:, col: }, { grid:, ledger:, triggers:, talk_log: }.compact)
+    execution = registry.start('talk_to', start, { row:, col: }, { grid:, ledger:, triggers:, talk_log:, entities: }.compact)
     inputs = []
     a_presses = 0
     dialog = 0
@@ -98,6 +98,20 @@ class TalkToTest < Minitest::Test
     assert_equal :right, result[:facing]
     assert_includes inputs, [:a]
     assert result[:dialog_after]
+  end
+
+  def test_the_entity_faced_when_the_dialogue_opens_is_reported
+    people = [{ slot: 1, type: 63, x: 136, y: 80, cell: [4, 8], kind: :npc }, { slot: 0, type: 62, x: 40, y: 32, cell: [1, 2], kind: :npc }]
+    result, = talk(4, 8, entities: -> { people })
+    assert_equal({ type: 63, slot: 1, kind: 'npc' }, result[:entity])
+    result, = talk(4, 8, entities: -> { [people.last] })
+    refute result.key?(:entity)
+    result, = talk(4, 8, entities: -> { [people.first.merge(cell: [4, 9])] })
+    refute result.key?(:entity)
+    result, = talk(4, 8, entities: -> { [people.first.merge(kind: :unknown), people.first.merge(type: 45, slot: 2, kind: :unknown)] })
+    refute result.key?(:entity)
+    result, = talk(4, 8)
+    refute result.key?(:entity)
   end
 
   def test_already_standing_next_to_the_person_skips_walking

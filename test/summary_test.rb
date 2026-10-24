@@ -188,7 +188,7 @@ class SummaryTest < Minitest::Test
   end
 
   def test_diagnostic_notables_are_not_progress
-    %w[grid_overlay_stuck lead_rejected unknown_mode].each { |kind| refute Koholint::Summary.progress?({ 'type' => 'notable', 'kind' => kind }), kind }
+    %w[grid_overlay_stuck lead_rejected revisit unknown_mode].each { |kind| refute Koholint::Summary.progress?({ 'type' => 'notable', 'kind' => kind }), kind }
     assert Koholint::Summary.progress?({ 'type' => 'notable', 'kind' => 'other' })
   end
 end

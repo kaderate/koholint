@@ -927,9 +927,12 @@ class DelegatedEngineTest < Minitest::Test
   def leave_house = ok('title' => 'leave', 'predicate' => { 'kind' => 'leave_place', 'place' => [163, 16] })
   def down = Reply.new(nil, 0.0, nil, nil, 'transport down')
 
+  QuietRevisit = Class.new(Koholint::Revisit) { def candidate(**) = nil }
+
   def agent_engine(run, client, emulator: nil, **limits)
     delegated = Koholint::Policies::Delegated.new(client:, registry: Koholint::Skills::Registry.default,
-                                                  objectives: Koholint::Objectives.new(trace: run.trace), manual: '')
+                                                  objectives: Koholint::Objectives.new(trace: run.trace), manual: '',
+                                                  revisit: QuietRevisit.new(talk_log: Koholint::TalkLog.new))
     policy = Koholint::Policies::StartGame.new(delegated, ready: ->(s) { %i[playing dialogue].include?(s.phase) })
     Koholint::Engine.new(run:, policy:, budget: Koholint::Budget.new(**limits), grid: true, emulator:)
   end

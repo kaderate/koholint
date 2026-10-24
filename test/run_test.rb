@@ -162,11 +162,12 @@ class RunTest < Minitest::Test
         run.trace.emit(:lead, frame:, id: "lead-#{frame}", place: [1, 2], source: nil, quote: 'q', claim: 'c', importance: 'high')
         run.trace.emit(:goal, frame:, text: 'g')
         run.trace.emit(:notable, frame:, kind: 'lead_rejected', detail: '1')
+        run.trace.emit(:notable, frame:, kind: 'revisit', detail: { round: 1 })
       end
       run.trace.emit(:notable, frame: 5, kind: 'grid_overlay_stuck', detail: [1, 2])
       run.truncate_trace!(5)
       kept = Koholint::Trace.read(File.join(run.dir, 'trace.jsonl')).map { |e| [e['frame'], e['type']] }
-      assert_equal [[4, 'lead'], [4, 'goal'], [4, 'notable'], [5, 'notable']], kept
+      assert_equal [[4, 'lead'], [4, 'goal'], [4, 'notable'], [4, 'notable'], [5, 'notable']], kept
     end
   end
   def test_truncation_drops_the_dialogue_of_the_discarded_decision_even_at_an_earlier_frame
