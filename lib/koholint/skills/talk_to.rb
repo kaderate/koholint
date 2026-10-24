@@ -197,7 +197,8 @@ module Koholint
           return unless @entities && @standing
 
           delta = Navigation::Planner::DELTAS.fetch(@facing, [0, 0])
-          found = Entities.near(@entities.call, [@standing[0] + delta[0], @standing[1] + delta[1]])
+          faced = [@standing[0] + delta[0], @standing[1] + delta[1]]
+          found = @entities.call.select { |entity| entity[:cell] == faced && entity[:kind].to_s == 'npc' }.min_by { |entity| entity[:slot] }
           found&.slice(:type, :slot, :kind)&.transform_values { |v| v.is_a?(Symbol) ? v.to_s : v }
         end
 

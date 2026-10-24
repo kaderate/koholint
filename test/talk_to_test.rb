@@ -106,6 +106,10 @@ class TalkToTest < Minitest::Test
     assert_equal({ type: 63, slot: 1, kind: 'npc' }, result[:entity])
     result, = talk(4, 8, entities: -> { [people.last] })
     refute result.key?(:entity)
+    result, = talk(4, 8, entities: -> { [people.first.merge(cell: [4, 9])] })
+    refute result.key?(:entity)
+    result, = talk(4, 8, entities: -> { [people.first.merge(kind: :unknown), people.first.merge(type: 45, slot: 2, kind: :unknown)] })
+    refute result.key?(:entity)
     result, = talk(4, 8)
     refute result.key?(:entity)
   end
