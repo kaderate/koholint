@@ -11,7 +11,7 @@ require 'koholint/modes'
 require 'koholint/perception'
 
 module Koholint
-  module Calibration
+  module Probes
     module ModeCensus
       TUPLE = Modes::FIELDS
       WATCH = %i[inventory_cursor menu_option inventory_slot_a inventory_slot_b hp].freeze

@@ -10,7 +10,7 @@ class CalibrationBoundaryTest < Minitest::Test
 
   def test_agent_side_code_never_references_calibration
     refute_empty AGENT_SIDE
-    offenders = AGENT_SIDE.select { |path| File.read(path).match?(%r{Calibration|calibration/}) }
+    offenders = AGENT_SIDE.select { |path| File.read(path).match?(%r{Calibration|calibration/|Probes|probes/}) }
     assert_empty offenders
   end
 
@@ -18,6 +18,11 @@ class CalibrationBoundaryTest < Minitest::Test
     outside = Dir[File.join(ROOT, 'lib/**/*.rb')].reject { |path| path.start_with?(File.join(ROOT, 'lib/koholint/calibration/')) }
     users = outside.select { |path| File.read(path).match?(%r{Calibration|calibration/}) }
     assert_equal [File.join(ROOT, 'lib/koholint/vision/grid_builder.rb')], users
+  end
+
+  def test_only_the_cli_uses_the_probes
+    outside = Dir[File.join(ROOT, 'lib/**/*.rb')].reject { |path| path.start_with?(File.join(ROOT, 'lib/koholint/probes/')) }
+    assert_equal [File.join(ROOT, 'lib/koholint/cli.rb')], outside.select { |path| File.read(path).match?(%r{Probes|probes/}) }
   end
 
   def test_calibration_code_never_writes_emulator_memory

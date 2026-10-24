@@ -111,10 +111,10 @@ module Koholint
     end
 
     def census(args, out)
-      require 'koholint/calibration/mode_census'
+      require 'koholint/probes/mode_census'
       raise OptionParser::MissingArgument, 'boot or <run_dir> FRAME...' unless args.first == 'boot' || args.size > 1
 
-      census = Calibration::ModeCensus
+      census = Probes::ModeCensus
       paths = args.first == 'boot' ? [census.census_boot] : census.census(run_dir(args), args.drop(1).map { |frame| Integer(frame) })
       paths.each { |path| out.puts "census #{path}" }
       0

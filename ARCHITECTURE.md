@@ -42,7 +42,7 @@ entries that match the same tuple unless one strictly refines the other (the mos
 resolves the entry; `GameState#phase` is `boot` for anything outside play mode before the run first played, else the
 entry's phase (`loading`, `playing`, `locked`, `dialogue`, `cutscene`, `menu`, `map`, `save`, `game_over`, `boot` for
 the title screens) or `unknown`; the engine emits a `notable` `unknown_mode` once per unknown tuple (rebuilt from the
-trace on resume). `calibration/mode_census.rb` (`bin/koholint census`) is the probe that measures them: from a replayed
+trace on resume). `probes/mode_census.rb` (`bin/koholint census`, the only code allowed to write RAM, in throwaway copies, and used by the CLI only) is the probe that measures them: from a replayed
 state it plays scenarios on throwaway copies (START, SELECT, the four-button save combination, health drained to zero
 by a RAM write in the copy only) and diffs RAM while moving cursors; reports go to `tmp/census/`.
 
