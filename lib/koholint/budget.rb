@@ -27,6 +27,17 @@ module Koholint
 
     def stop!(reason = :stopped) = @stopped ||= reason
 
+    def nearly_exhausted?(frames: 0, share: 0.0)
+      return true if exhausted
+
+      @limits.any? do |kind, limit|
+        next false unless limit
+
+        left = limit - @used[kind]
+        left < limit * share || (kind == :frames && left < frames)
+      end
+    end
+
     def exhausted
       return @stopped if @stopped
 

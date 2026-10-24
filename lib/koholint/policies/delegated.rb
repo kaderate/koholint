@@ -6,6 +6,7 @@ require 'koholint/explore_log'
 require 'koholint/leads'
 require 'koholint/ledger'
 require 'koholint/navigation/planner'
+require 'koholint/revisit'
 require 'koholint/talk_log'
 require 'koholint/triggers'
 require 'koholint/vision/beliefs'
@@ -44,13 +45,19 @@ module Koholint
       SCREEN_WAIT = { skill: 'wait', params: { frames: 5 } }.freeze
       SCREEN_WAIT_LIMIT_FRAMES = 300
       WAIT_PHASES = %i[locked cutscene].freeze
+      SPEAKER_LIMIT = Trace::SPEAKER_MAX
+      REVISIT_BUDGET_SHARE = 0.05
 
-      def initialize(client:, registry:, objectives:, manual: '', on_step: nil, on_activity: nil, ledger: nil, triggers: nil, talk_log: nil, leads: nil, explore_log: nil)
+      def initialize(client:, registry:, objectives:, manual: '', on_step: nil, on_activity: nil, ledger: nil, triggers: nil, talk_log: nil, leads: nil, explore_log: nil, revisit: nil,
+                     budget: nil)
+        @budget = budget
         @explore_log = explore_log || ExploreLog.new
         @leads = leads || Leads.new
         @ledger = hook_doubt(ledger || Ledger.new)
         @triggers = triggers || Triggers.new
         @talk_log = talk_log || TalkLog.new
+        @revisit = revisit || Revisit.new(talk_log: @talk_log)
+        @entities = []
         @refusals = []
         @plan = nil
         @frame = 0
@@ -74,6 +81,7 @@ module Koholint
       def decision_point_for(state)
         return @screen_points.fetch(screen(state)) if screen(state)
         return @skill_point if locked_waiting?(state)
+        return @skill_point if revisit_candidate(state)
 
         @objectives.current ? @skill_point : DecisionPoint.choose_objective
       end
@@ -92,7 +100,15 @@ module Koholint
       def cancel = (@client.cancel if @client.respond_to?(:cancel))
 
       def decide(decision_point, state, context)
-        @prompt = @image = @images = nil
+        result = decide_with(decision_point, state, context)
+        notes = @revisit.notes
+        notes.empty? ? result : result.merge(notables: notes)
+      end
+
+      def decide_with(decision_point, state, context)
+        @prompt = @image = @images = @reading = nil
+        @revisit_acting = false
+        @entities_reader = context[:entities] if context[:entities]
         context[:ledger] = @ledger
         context[:triggers] = @triggers
         context[:talk_log] = @talk_log
@@ -108,7 +124,11 @@ module Koholint
           reopen = reopen_wait(decision_point, state)
           return reopen if reopen
 
-          return locked_wait if locked_waiting?(state)
+          @reading = cached_reading(decision_point, state)
+          return locked_wait.merge(@reading || {}) if locked_waiting?(state)
+
+          revisit = revisit_choice(decision_point, state)
+          return revisit.merge(@reading || {}) if revisit
 
           if decision_point.name == :choose_skill && !@sequence && hemmed?(state)
             return hemmed_wait if @hemmed[:waits] < HEMMED_WAIT_LIMIT
@@ -123,9 +143,11 @@ module Koholint
         choice = decision_point.validate(reply.output).slice(*decision_point.output_schema)
         start_objective(choice, state, context, reply.output['because']) if decision_point.name == :choose_objective
         plan = remember_plan(reply.output)
-        transcription = transcription_for(reply.output, state, decision_point)
-        remember_text(transcription[:transcription], state)
-        answer(choice, reply, reply.output).merge(plan ? { plan: } : {}).merge(transcription).merge(notes_for(reply.output, transcription[:transcription], state))
+        transcription = @reading || transcription_for(reply.output, state, decision_point)
+        remember_text(transcription[:transcription], state) unless @reading
+        notes = notes_for(reply.output, transcription[:transcription], state)
+        result = answer(choice, reply, reply.output).merge(plan ? { plan: } : {}).merge(transcription).merge(notes)
+        @images ? override_for_revisit(result, decision_point, state) : result
       rescue NameError, TypeError
         raise
       rescue StandardError => e
@@ -148,6 +170,8 @@ module Koholint
           @auto = @locked_wait = false
           return track { @objectives.update(state, frame:) }
         end
+        @revisit.talked(outcome) if @revisit_acting && choice[:skill] == 'talk_to'
+        @revisit_acting = false
         @last_results << outcome
         @last_results.shift while @last_results.size > RESULT_LIMIT
         note_lock(choice, outcome, state)
@@ -207,7 +231,9 @@ module Koholint
       def note_talk_source(choice, outcome)
         return unless LOCK_SKILLS.include?(choice[:skill])
 
-        @talk_source = choice[:skill] == 'talk_to' && outcome[:talked] == true ? choice[:params].transform_keys(&:to_sym).slice(:row, :col) : nil
+        talked = choice[:skill] == 'talk_to' && outcome[:talked] == true
+        entity = outcome[:entity].is_a?(Hash) ? outcome[:entity][:type] || outcome[:entity]['type'] : nil
+        @talk_source = talked ? choice[:params].transform_keys(&:to_sym).slice(:row, :col).merge(entity ? { entity: } : {}) : nil
       end
 
       def note_no_path(choice, outcome, frame)
@@ -324,7 +350,7 @@ module Koholint
 
         params = choice[:params]
         @talk_log.record(place: place_of(outcome, :from, state), row: params[:row] || params['row'], col: params[:col] || params['col'], talked: outcome[:talked] == true,
-                         standing: TalkLog.standing_of(outcome))
+                         standing: TalkLog.standing_of(outcome), entity: TalkLog.entity_of(outcome))
       end
 
       def note_entered(choice, outcome, place)
@@ -394,12 +420,13 @@ module Koholint
         end
         rgb = context[:dialogue_rgb]&.call or return
         unless @sequence
-          @sequence = { pages: [], start: state.frame, place: [state.room_id, state.map_id], source: @talk_source }
+          @sequence = { pages: [], rows: [], start: state.frame, place: [state.room_id, state.map_id], source: @talk_source }
           @objectives.touch(frame: state.frame)
         end
         @sequence[:last] = state.frame
         @sequence[:waited] = false
         @sequence[:pages] << rgb
+        @sequence[:rows] << Vision::DialogueShot.text_rows(rgb)
         @auto = true
         announce(:acting, "automatic dialogue advance, page #{@page + 1}", state, skill: ADVANCE[:skill], page: @page + 1)
         { choice: ADVANCE, justification: 'automatic dialogue advance', confidence: 1.0, agent: 'delegated', latency_ms: 0, cost_usd: 0.0,
@@ -444,18 +471,22 @@ module Koholint
       end
 
       def ask(decision_point, state, context)
-        @prompt = Agents::Context.build(state:, grid: grid_for(state, context), objective: @objectives.current, history: @objectives.history,
+        @prompt = Agents::Context.build(state:, grid: grid_for(state, context), objective: @objectives.current, history: @objectives.history, entities: entities_now,
                                        attempts: @objectives.attempts_for_prompt, manual: @manual, last_results: @last_results, ledger: @ledger, refusals: @refusals, plan: @plan,
                                        triggers: @triggers, talk_log: @talk_log, locked: (@hemmed[:attempts] if @hemmed && hemmed?(state)),
                                        locked_frames: (locked_frames(state) if WAIT_PHASES.include?(state.phase)), goal: goal_line, leads: @leads.all, stamp: stamp(state))
-        if decision_point.name == :choose_skill && @sequence
+        if @reading
+          text = Dialogues.text(@reading[:transcription].map { |entry| entry[:text] })
+          @prompt += "\nThe dialogue that just closed repeated a text already read (not sent again): #{clean(text.tr("\n", ' '), cap: TRANSCRIPTION_LIMIT)}"
+        elsif decision_point.name == :choose_skill && @sequence
           @pages_read = @sequence[:pages].size
           @images = Vision::DialogueShot.sheets(@sequence[:pages], per_sheet: SHEET_PAGES)
-          @read_at = @sequence.slice(:start, :place, :source)
+          @read_at = @sequence.slice(:start, :place, :source).merge(conversation: Vision::DialogueShot.signature(@sequence[:rows]))
           @sequence = nil
           @page = @pages_read
           @objectives.touch(frame: state.frame)
           @prompt += "\nDialogue pages attached: #{@pages_read} pages. Transcribe them in transcription, one paragraph per page separated by a blank line."
+          @prompt += "\nThe harness is talking to the people here again until they repeat themselves: your skill choice is replaced by the next talk." if revisit_candidate(state)
         elsif state.phase == :dialogue && decision_point.name == :choose_skill
           @image = context[:dialogue_shot]&.call
         end
@@ -478,9 +509,13 @@ module Koholint
 
         text = Dialogues.text(pages)
         @objectives.note_text(text)
-        source = @images ? @read_at[:source] : @talk_source
-        place = @images ? @read_at[:place] : [state.room_id, state.map_id]
-        @talk_log.remember(place:, cell: [source[:row], source[:col]], text:, stamp: stamp(state)) if source
+        source = @images || @reading ? @read_at[:source] : @talk_source
+        place = @images || @reading ? @read_at[:place] : [state.room_id, state.map_id]
+        conversation = @read_at[:conversation] if @images || @reading
+        first = [transcription].flatten(1).compact.first
+        @talk_log.store_pages(conversation, pages) if conversation && @images
+        @talk_log.remember(place:, cell: [source[:row], source[:col]], text:, stamp: stamp(state), entity: source[:entity], conversation:, speaker: first[:speaker]) if source
+        @revisit.read if @images || @reading
       end
 
       def stamp(state) = Dialogues.stamp(milestone: state.milestone, places: @objectives.visited.size, leads: @leads.all.size)
@@ -523,6 +558,7 @@ module Koholint
       def transcription_for(output, state, decision_point)
         text = output['transcription']
         return {} unless decision_point.name == :choose_skill && text.is_a?(String)
+        @speaker = speaker_of(output)
         return { transcription: sequence_pages(text) }.reject { |_, v| v.empty? } if @images
         return {} unless state.phase == :dialogue && !clean(text).empty?
 
@@ -532,7 +568,65 @@ module Koholint
       def sequence_pages(text)
         paragraphs = text.split(/\n[^\S\n]*\n/).map { |chunk| clean(chunk, cap: nil) }.reject(&:empty?)
         chunks = paragraphs.flat_map { |paragraph| paragraph.scan(/.{1,#{TRANSCRIPTION_LIMIT}}/m) }
-        chunks.first(DIALOGUE_PAGE_LIMIT).each_with_index.map { |t, i| { text: t, page: i + 1, frame: @read_at[:start], place: @read_at[:place] } }
+        chunks.first(DIALOGUE_PAGE_LIMIT).each_with_index.map { |t, i| page_entry(t, i + 1, speaker: @speaker) }
+      end
+
+      def page_entry(text, page, speaker: nil, cached: nil)
+        { text:, page:, frame: @read_at[:start], place: @read_at[:place], conversation: @read_at[:conversation], speaker:, cached: }.compact
+      end
+
+      def speaker_of(output)
+        name = output['speaker']
+        name = name.is_a?(String) ? clean(name.tr("\n", ' '), cap: SPEAKER_LIMIT) : ''
+        name.empty? ? nil : name
+      end
+
+      def cached_reading(decision_point, state)
+        return unless decision_point.name == :choose_skill && @sequence && state.phase != :dialogue
+
+        conversation = Vision::DialogueShot.signature(@sequence[:rows])
+        pages = conversation && @talk_log.pages_for(conversation)
+        return unless pages
+
+        @read_at = @sequence.slice(:start, :place, :source).merge(conversation:)
+        speaker = @talk_log.speaker_for(conversation)
+        @page = @sequence[:pages].size
+        @sequence = nil
+        @objectives.touch(frame: state.frame)
+        entries = pages.each_with_index.map { |text, i| page_entry(text, i + 1, speaker:, cached: true) }
+        @reading = { transcription: entries }
+        remember_text(entries, state)
+        @reading
+      end
+
+      def entities_now
+        @entities = @entities_reader ? Array(@entities_reader.call) : []
+      end
+
+      def revisit_low? = @budget ? @budget.nearly_exhausted?(frames: Revisit::CYCLE_FRAMES, share: REVISIT_BUDGET_SHARE) : false
+
+      def revisit_candidate(state)
+        return unless @entities_reader
+
+        @revisit.candidate(state:, entities: entities_now, stamp: stamp(state), budget_low: revisit_low?)
+      end
+
+      def revisit_choice(decision_point, state)
+        return unless decision_point.name == :choose_skill && !@sequence
+
+        action = @revisit.next_action(state:, entities: entities_now, stamp: stamp(state), budget_low: revisit_low?)
+        return unless action
+
+        @revisit_acting = true
+        npc = action[:npc]
+        { choice: action.slice(:skill, :params), justification: "revisit npc: entity type #{npc[:type]} at (#{npc[:cell][0]},#{npc[:cell][1]}), round #{action[:round]}",
+          confidence: 1.0, agent: 'delegated', latency_ms: 0, cost_usd: 0.0, fallback: false, prompt: nil, image: nil }
+      end
+
+      def override_for_revisit(result, decision_point, state)
+        revisit = revisit_choice(decision_point, state) or return result
+
+        result.merge(choice: revisit[:choice], justification: "#{revisit[:justification]} (replaces the model's choice #{result[:choice][:skill]})")
       end
 
       def grid_for(_state, _context)
