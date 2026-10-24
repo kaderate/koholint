@@ -34,7 +34,13 @@ module Koholint
         motherboard = Motherboard.load(data[:motherboard], rom_bytes: @roms.fetch(rom_path))
         driver = Driver.new(motherboard)
         detach_battery(driver)
+        restore_pending_ime(motherboard.cpu, data.fetch(:pending_ime, 0))
         new(driver, data[:frame])
+      end
+
+      def restore_pending_ime(cpu, count)
+        pending = cpu.instance_variable_get(:@pending_operations)
+        count.times { pending << cpu.instance_exec { -> { @ime = true } } }
       end
 
       private
@@ -83,7 +89,14 @@ module Koholint
       digest.hexdigest
     end
 
-    def dump = Marshal.dump(frame: @frame, motherboard: @driver.motherboard.dump(with_rom: false))
+    def dump
+      pending = @driver.motherboard.cpu.instance_variable_get(:@pending_operations)
+      held = pending.dup
+      pending.clear
+      Marshal.dump(frame: @frame, motherboard: @driver.motherboard.dump(with_rom: false), pending_ime: held.size)
+    ensure
+      pending&.replace(held)
+    end
 
     def frame_rgb
       @driver.motherboard.ppu.framebuffer.pixels_frame.pack('V*').unpack(RGB_UNPACK).join

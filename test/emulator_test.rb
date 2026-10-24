@@ -14,6 +14,19 @@ class EmulatorTest < Minitest::Test
     emulator
   end
 
+  def test_dump_survives_a_pending_interrupt_enable_and_restores_it
+    skip_without_rom!
+    original = run_script(Koholint::Emulator.boot, [[]] * 120)
+    cpu = original.instance_variable_get(:@driver).motherboard.cpu
+    cpu.instance_exec { @pending_operations << -> { @ime = true } }
+    copy = Koholint::Emulator.restore(original.dump)
+    assert_equal 1, cpu.instance_variable_get(:@pending_operations).size
+    assert_equal 1, copy.instance_variable_get(:@driver).motherboard.cpu.instance_variable_get(:@pending_operations).size
+    run_script(original, [[]] * 5)
+    run_script(copy, [[]] * 5)
+    assert_equal original.state_hash, copy.state_hash
+  end
+
   def test_two_boots_with_same_inputs_have_equal_state_hash
     skip_without_rom!
     a = run_script(Koholint::Emulator.boot, SCRIPT)
