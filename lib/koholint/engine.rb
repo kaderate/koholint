@@ -3,6 +3,7 @@ require 'set'
 require 'fileutils'
 require 'koholint/budget'
 require 'koholint/canonical_save'
+require 'koholint/entities'
 require 'koholint/decision'
 require 'koholint/emulator'
 require 'koholint/keyframes'
@@ -123,7 +124,8 @@ module Koholint
 
     def context_for(grid)
       context = @builder ? { grid: } : {}
-      context.merge(dialogue_shot: -> { Vision::DialogueShot.crop(@emulator) }, dialogue_rgb: -> { Vision::DialogueShot.rgb(@emulator) })
+      context.merge(dialogue_shot: -> { Vision::DialogueShot.crop(@emulator) }, dialogue_rgb: -> { Vision::DialogueShot.rgb(@emulator) },
+                    entities: -> { Entities.read(@emulator) })
     end
 
     def record_prompt(result, frame, name)
@@ -141,7 +143,7 @@ module Koholint
     def emit_dialogue(transcription, state)
       [transcription].flatten(1).compact.each do |entry|
         @run.trace.emit(:dialogue, frame: entry[:frame] || state.frame, place: entry[:place] || [state.room_id, state.map_id], text: entry[:text],
-                                   source: 'agent', page: entry[:page])
+                                   source: 'agent', page: entry[:page], **entry.slice(:conversation, :speaker, :cached))
       end
     end
 
@@ -150,6 +152,7 @@ module Koholint
       rejected = result[:leads_rejected].to_i
       @run.trace.emit(:notable, frame: state.frame, kind: 'lead_rejected', detail: "#{rejected} leads whose quote is not in the transcription") if rejected.positive?
       @run.trace.emit(:goal, frame: state.frame, text: result[:goal]) if result[:goal]
+      Array(result[:notables]).each { |note| @run.trace.emit(:notable, frame: state.frame, kind: note[:kind], detail: note[:detail]) }
     end
 
     def note_unknown_mode(state)

@@ -108,4 +108,15 @@ class DialoguesTest < Minitest::Test
     ]
     assert_nil Koholint::Dialogues.from_events(events).first[:source]
   end
+
+  def test_a_group_carries_the_entity_talked_to_its_signature_and_speaker
+    events = [
+      { 'type' => 'action', 'frame' => 2, 'skill' => 'talk_to', 'params' => { 'row' => 4, 'col' => 7 }, 'result' => { 'talked' => true, 'entity' => { 'type' => 63, 'slot' => 1 } } },
+      { 'type' => 'dialogue', 'frame' => 2, 'place' => [1, 0], 'text' => 'Hi.', 'conversation' => 'ab' * 8 },
+      { 'type' => 'dialogue', 'frame' => 2, 'place' => [1, 0], 'text' => 'I am Bob.', 'conversation' => 'ab' * 8, 'speaker' => 'Bob', 'cached' => true }
+    ]
+    group = Koholint::Dialogues.from_events(events).first
+    assert_equal({ row: 4, col: 7, entity: 63 }, group[:source])
+    assert_equal ['ab' * 8, 'Bob', true], group.values_at(:conversation, :speaker, :cached)
+  end
 end

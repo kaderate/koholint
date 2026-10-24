@@ -25,9 +25,12 @@ module Koholint
       lead: %i[id place source quote claim importance],
       goal: %i[text]
     }.freeze
+    SPEAKER_MAX = 40
     ALLOWED = { dialogue: { source: %w[agent] }, lead: { importance: %w[high normal low] } }.freeze
     OPTIONAL = { decision: { prompt_sha: ->(v) { v.is_a?(String) && v.match?(/\A\h{64}\z/) }, image: ->(v) { [true, false].include?(v) },
                               plan: ->(v) { v.is_a?(String) && v.length <= 200 && !v.match?(/[[:cntrl:]]/) } },
+                 dialogue: { speaker: ->(v) { v.is_a?(String) && v.length.between?(1, SPEAKER_MAX) && !v.match?(/[[:cntrl:]]/) },
+                             conversation: ->(v) { v.is_a?(String) && v.match?(/\A\h{16}\z/) }, cached: ->(v) { [true, false].include?(v) } },
                  objective: { because: ->(v) { v.is_a?(String) && v.match?(/\Alead-\d+\z/) },
                               predicate: ->(v) { (kind = v.is_a?(Hash) && (v[:kind] || v['kind'])) ? Objectives::PREDICATES.key?(kind.to_s) : true } } }.freeze
 

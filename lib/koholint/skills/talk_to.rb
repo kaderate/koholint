@@ -1,3 +1,4 @@
+require 'koholint/entities'
 require 'koholint/skills/goto'
 
 module Koholint
@@ -30,6 +31,8 @@ module Koholint
           @response_frames = 0
           @replans = 0
           @failed = []
+          @entities = context[:entities]
+          @entity = nil
           super(target: nil, context:, **rest)
           @facing = Navigation::Planner.direction_between(@standing, @person) if @standing
         end
@@ -48,6 +51,7 @@ module Koholint
         def result(state = @last)
           merged = super.merge(talked: @talked, standing_cell: (@standing && { row: @standing[0], col: @standing[1] }), facing: @facing, replans: @replans, standing_cells_tried: @tried.map(&:dup))
           merged[:cause] = FREE_CAUSE if @stopped_by == :target_free
+          merged[:entity] = @entity if @entity
           merged
         end
 
@@ -189,6 +193,14 @@ module Koholint
           @grid && !@grid.static_sprite(*@person) && @grid.passable(*@person, @facing) == :yes
         end
 
+        def faced_entity
+          return unless @entities && @standing
+
+          delta = Navigation::Planner::DELTAS.fetch(@facing, [0, 0])
+          found = Entities.near(@entities.call, [@standing[0] + delta[0], @standing[1] + delta[1]])
+          found&.slice(:type, :slot, :kind)&.transform_values { |v| v.is_a?(Symbol) ? v.to_s : v }
+        end
+
         def begin_talk(state)
           @phase = :talk
           talk(state)
@@ -197,6 +209,7 @@ module Koholint
         def talk(state)
           if state.dialog_open? && !@start.dialog_open?
             @talked = true
+            @entity = faced_entity
             note_tried(:done)
             return finish(:done)
           end
