@@ -44,7 +44,9 @@ class InsightsTest < Minitest::Test
       assert_equal [1, 2, 3], map[:places].map { |n| n[:order] }
       assert_equal [7, 0], map[:current]
       assert_equal [false, false, true], map[:places].map { |n| n[:current] }
-      assert_equal [[0, 1], [1, 1], [0, 0]], map[:places].map { |n| [n[:x], n[:y]] }
+      assert_equal [[0, 0], [1, 0], [2, 0]], map[:places].map { |n| [n[:x], n[:y]] }
+      assert_equal [[5, 0], [6, 0], [7, 0]], map[:places].map { |n| n[:cell] }
+      assert_equal %w[world world world], map[:places].map { |n| n[:kind] }
       assert_equal [100, nil, nil], map[:places].map { |n| n[:coverage] }
       assert_equal 'yes', map[:places].first[:cells][0][0]
       assert_equal [{ a: [5, 0], b: [6, 0], count: 2, first_frame: 20 }, { a: [5, 0], b: [7, 0], count: 1, first_frame: 40 }], map[:links]
@@ -64,13 +66,23 @@ class InsightsTest < Minitest::Test
     end
   end
 
-  def test_a_door_to_another_map_is_placed_off_axis_and_collisions_find_a_free_spot
-    moves = [{ from: [1, 0], to: [2, 16], direction: nil }, { from: [1, 0], to: [3, 0], direction: 'right' }, { from: [2, 16], to: [4, 0], direction: 'left' }]
-    spots = Insights.layout([[1, 0], [2, 16], [3, 0], [4, 0]], moves)
-    assert_equal [0, 0], spots[[1, 0]]
-    assert_equal [1, 1], spots[[2, 16]]
-    assert_equal [1, 0], spots[[3, 0]]
-    assert_equal 4, spots.values.uniq.size
+  def test_world_places_sit_on_the_room_grid_and_interiors_hang_under_their_door
+    house = [163, 16]
+    other = [167, 16]
+    order = [house, [162, 0], [163, 0], [179, 0], [146, 0], other, [9, 99]]
+    moves = [{ from: house, to: [162, 0] }, { from: [162, 0], to: [163, 0] }, { from: [163, 0], to: [179, 0] }, { from: [179, 0], to: [163, 0] },
+             { from: [162, 0], to: [146, 0] }, { from: [146, 0], to: other }, { from: other, to: [146, 0] }, { from: [146, 0], to: [9, 99] }]
+    placed = Insights.layout(order, moves)
+    spots = placed[:spots]
+    assert_equal [0, 1], spots[[162, 0]]
+    assert_equal [1, 1], spots[[163, 0]]
+    assert_equal [1, 2], spots[[179, 0]]
+    assert_equal [0, 0], spots[[146, 0]]
+    assert_equal 4, placed[:lane]
+    assert_equal [[0, 4], [0, 5], [0, 6]], [spots[house], spots[other], spots[[9, 99]]]
+    assert_equal({ house => [162, 0], other => [146, 0], [9, 99] => [146, 0] }, placed[:parents])
+    assert_equal %w[interior world other], [house, [162, 0], [9, 99]].map { |p| Koholint::PlaceKinds.kind(p) }
+    assert_equal({ spots: {}, parents: {}, lane: nil, width: 0 }, Insights.layout([], []))
   end
 
   def test_people_and_dialogues_carry_the_npc_state

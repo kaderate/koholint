@@ -2,6 +2,7 @@ require 'koholint'
 require 'koholint/dialogues'
 require 'koholint/game_state'
 require 'koholint/modes'
+require 'koholint/place_kinds'
 require 'koholint/summary'
 require 'koholint/vision/capabilities'
 require 'koholint/vision/grid'
@@ -19,11 +20,6 @@ module Koholint
       LABEL = 160
       SERIES = 200
       ALERT_STOPS = %w[stuck_boot unknown_mode_stuck].freeze
-      EDGE_LEFT = 8
-      EDGE_RIGHT = 152
-      EDGE_TOP = 16
-      EDGE_BOTTOM = 128
-      STEPS = { 'up' => [0, -1], 'down' => [0, 1], 'left' => [-1, 0], 'right' => [1, 0] }.freeze
 
       module_function
 
@@ -31,26 +27,26 @@ module Koholint
         current = nil
         seen = {}
         moves = []
-        observe = lambda do |place, frame, entry|
+        observe = lambda do |place, frame|
           next if place == current
 
           seen[place] ||= { place:, order: seen.size + 1, first_frame: frame, arrivals: 0 }
           seen[place][:arrivals] += 1
           seen[place][:last_frame] = frame
-          moves << { from: current, to: place, frame:, direction: current && entry && current[1] == place[1] ? entered(entry) : nil } if current
+          moves << { from: current, to: place, frame: } if current
           current = place
         end
         trace.each do |event|
           if event['type'] == 'perception'
             place = Summary.perceived_place(event)
-            observe.call(place, event['frame'], nil) if place
+            observe.call(place, event['frame']) if place
           elsif event['type'] == 'action' && event['result'].is_a?(Hash)
             from = spot(event['result']['from'])
             to = spot(event['result']['to'])
             next unless from && to && from[:place] != to[:place]
 
-            observe.call(from[:place], event['frame'], nil)
-            observe.call(to[:place], event['frame'], to[:at])
+            observe.call(from[:place], event['frame'])
+            observe.call(to[:place], event['frame'])
           end
         end
         { places: seen, moves:, current: }
@@ -59,47 +55,44 @@ module Koholint
       def spot(value)
         return nil unless value.is_a?(Hash) && value['room'].is_a?(Integer) && value['map'].is_a?(Integer)
 
-        at = [value['x'], value['y']] if value['x'].is_a?(Integer) && value['y'].is_a?(Integer)
-        { place: [value['room'], value['map']], at: }
+        { place: [value['room'], value['map']] }
       end
 
-      def entered((x, y))
-        return 'up' if y >= EDGE_BOTTOM
-        return 'down' if y <= EDGE_TOP
-        return 'left' if x >= EDGE_RIGHT
-
-        'right' if x <= EDGE_LEFT
-      end
-
-      def layout(order, moves)
-        spots = {}
+      def layout(order, moves, kinds = PlaceKinds.catalogue)
+        grid = ->(place) { PlaceKinds.grid?(place, kinds) }
+        cells = order.select(&grid).to_h { |place| [place, PlaceKinds.cell(place)] }
+        min_x, max_x = cells.values.map(&:first).minmax
+        min_y, max_y = cells.values.map(&:last).minmax
+        spots = cells.transform_values { |(x, y)| [x - min_x, y - min_y] }
+        lane = cells.empty? ? 0 : max_y - min_y + 2
+        parents = parents(order, moves, grid)
         taken = {}
-        put = ->(place, at) { taken[spots[place] = free(taken, at)] = place }
         order.each do |place|
           next if spots[place]
 
-          move = moves.find { |m| m[:to] == place && m[:from] && spots[m[:from]] }
-          if move
-            x, y = spots[move[:from]]
-            dx, dy = STEPS.fetch(move[:direction], [1, 1])
-            put.call(place, [x + dx, y + dy])
-          else
-            put.call(place, [taken.empty? ? 0 : taken.keys.map(&:first).max + 2, 0])
-          end
+          x = spots[parents[place]]&.first || 0
+          y = lane
+          y += 1 while taken[[x, y]]
+          taken[[x, y]] = true
+          spots[place] = [x, y]
         end
-        min_x = spots.values.map(&:first).min || 0
-        min_y = spots.values.map(&:last).min || 0
-        spots.transform_values { |(x, y)| [x - min_x, y - min_y] }
+        { spots:, parents:, lane: cells.empty? ? nil : lane, width: cells.empty? ? 0 : max_x - min_x + 1 }
       end
 
-      def free(taken, (x, y))
-        (0..).each do |radius|
-          ring = (-radius..radius).to_a.product((-radius..radius).to_a).select { |dx, dy| [dx.abs, dy.abs].max == radius }
-          ring.sort_by { |dx, dy| [dx.abs + dy.abs, dy, dx] }.each do |dx, dy|
-            spot = [x + dx, y + dy]
-            return spot unless taken.key?(spot)
-          end
+      def parents(order, moves, grid)
+        last = nil
+        found = {}
+        moves.each do |move|
+          last = move[:from] if grid.call(move[:from])
+          found[move[:to]] ||= last unless grid.call(move[:to])
         end
+        order.each do |place|
+          next if grid.call(place) || found[place]
+
+          out = moves.find { |move| move[:from] == place && grid.call(move[:to]) }
+          found[place] = out[:to] if out
+        end
+        found.compact
       end
 
       def map(trace, screens:, affordances:, frame:)
@@ -107,7 +100,8 @@ module Koholint
         places = found[:places].values.first(MAX_PLACES)
         keep = places.to_h { |entry| [entry[:place], true] }
         moves = found[:moves].select { |m| keep[m[:from]] && keep[m[:to]] }
-        spots = layout(places.map { |entry| entry[:place] }, moves)
+        placed = layout(places.map { |entry| entry[:place] }, moves)
+        spots = placed[:spots]
         world = Vision::World.from_events(screens + affordances, at_frame: frame)
         capabilities = Vision::Capabilities.new
         people = people(trace)
@@ -115,7 +109,9 @@ module Koholint
         nodes = places.map do |entry|
           cells = cells(world.grid_for(entry[:place], capabilities))
           known = cells&.flatten&.count { |state| state != 'unknown' }
-          entry.merge(x: spots[entry[:place]][0], y: spots[entry[:place]][1], current: entry[:place] == found[:current],
+          entry.merge(x: spots[entry[:place]][0], y: spots[entry[:place]][1], kind: PlaceKinds.kind(entry[:place]),
+                      cell: PlaceKinds.grid?(entry[:place]) ? PlaceKinds.cell(entry[:place]) : nil, parent: placed[:parents][entry[:place]],
+                      current: entry[:place] == found[:current],
                       coverage: known && (known * 100.0 / (ROWS * COLS)).round, cells:,
                       people: people.fetch(entry[:place], []),
                       leads: leads.fetch(entry[:place], []).last(LEADS_PER_PLACE).map { |e| { id: e['id'], importance: e['importance'], claim: clip(e['claim']) } })
@@ -123,7 +119,7 @@ module Koholint
         links = moves.group_by { |m| [m[:from], m[:to]].sort }.map do |(a, b), group|
           { a:, b:, count: group.size, first_frame: group.first[:frame] }
         end
-        { frame:, current: found[:current], places: nodes, links:, truncated: found[:places].size > MAX_PLACES }
+        { frame:, current: found[:current], places: nodes, links:, lane: placed[:lane], truncated: found[:places].size > MAX_PLACES }
       end
 
       def cells(grid)
