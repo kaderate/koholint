@@ -83,6 +83,7 @@ module Koholint
           @ledger.reset_unless([state.room_id, state.map_id])
           @triggers.reset_unless([state.room_id, state.map_id])
         end
+        @screen_since = nil unless screen(state)
         release_hemmed(state)
         track_locked(state)
         track { @objectives.update(state, frame:) }

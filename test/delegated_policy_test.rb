@@ -763,6 +763,20 @@ class DelegatedPolicyTest < Minitest::Test
     assert_empty client.calls
   end
 
+  def test_the_screen_settling_clock_restarts_after_leaving_the_screen
+    client = ScriptedClient.new
+    p = policy(client)
+    opening = ->(frame) { state(frame:, game_mode: 0x0C, game_submode: 1) }
+    p.observe(opening.(100), frame: 100)
+    decide(p, opening.(100))
+    p.observe(state(frame: 2000), frame: 2000)
+    assert_nil p.instance_variable_get(:@screen_since)
+    p.observe(opening.(2100), frame: 2100)
+    _point, result = decide(p, opening.(2100))
+    assert_equal 'delegated', result[:agent]
+    assert_empty client.calls
+  end
+
   def test_each_screen_offers_its_own_skills_and_play_offers_no_screen_only_skill
     p = policy(ScriptedClient.new)
     assert_equal %w[close_map press wait], p.decision_point_for(state(game_mode: 7, game_submode: 5)).registry.names
