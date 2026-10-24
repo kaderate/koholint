@@ -16,6 +16,9 @@ Only what is left to do. When something lands, delete it here (git is the histor
 9. **Live view, layout C** — fork from the UI, pause/stop of the live engine.
 10. **Real-time play** — the emulator stays paused between decisions; an optional `--live-clock` with pause-on-danger and a reflex layer (Jev or deterministic) is undecided.
 
+12. **Explore autopilot (A/B).** Replay data (`docs/runs/2026-10-jev-spike.md`) shows the direction chosen for `explore` carries almost no measurable signal (same outcome whether the nearest-frontier rule agrees: 49 % vs 50 %), yet `explore` is ~47 % of paid calls. Let `explore` relaunch itself with no direction after benign stops (new place, offered object handled) and call the model only on events that matter (dialogue, `no_frontier`, `blocked`, `stalled`, new leads). Measure A/B from the same keyframes (>= 3 forks per arm): new places and cells per 1000 frames, stalls, cost per 1000 frames; success if cost drops ~2x with no loss of coverage.
+13. **Jev, later and only for combat.** The spike (`docs/runs/2026-10-jev-spike.md`) failed on exploration direction (top-1 agreement 18 % vs 21 % random, rule 31 %); latency 0.21 s and 0.00003 USD per call are fine. Revisit for combat reflexes once entity kinds enemy/object are measured and a deterministic fight baseline exists.
+
 ## Open decisions and loose ends
 - Addresses at `verified_count: 1` need a second independent check (`name_length`, `max_hearts`, `dialog_state`).
 - Ladder beyond shield and sword; whether a run may inherit a map, a goal or leads from a previous run.
