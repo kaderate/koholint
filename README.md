@@ -101,18 +101,36 @@ start states for `verified`).
 finished run or one being written; Ctrl-C stops it. It listens on 127.0.0.1 only; `--host 0.0.0.0` opens it to other
 devices on the same network (no authentication: use it on a network you trust).
 
+Every page has the same top bar (Live, Runs, Compare once two runs are picked on `/runs`, the current run, a replay badge).
+The live page and a replay share one layout, in equal columns on a desktop and one column on a phone: the game screen
+with the mode badge (phase and mode name from the last perception; `unknown_mode` notables and `stuck_boot` or
+`unknown_mode_stuck` stops raise a red alert), the activity banner and the grid toggle; the objective, goal and plan; the
+reasoning and the event feed; the leads; the dialogues (with the person's state when the text came from a `talk_to`:
+which talk it was, new text or not, and for the latest one exhausted or worth retrying); budget and agent stats
+(cumulative dollars by frame, the previous run's curve in grey, cost split by skill, decisions paid and free and the
+`summary.json` usage counters); a timeline of the whole run (places, objectives, agent calls coloured by skill,
+dialogues, leads, explore stops, notables, stop; clustered past 300 markers; a click seeks a replay, or scrolls the
+feed live); the world map of the places seen up to the shown frame (overworld screens on the 16-wide `room_id` grid,
+interiors and other places in a lane below, under the overworld screen they were entered from, kinds from
+`data/place_kinds.json`; visit order, exits taken, the current place, known cells, people and leads; a click shows
+that place's belief grid); and, folded at the bottom, the run header with a
+notes box. The map, timeline and stats are derived from the trace and cached by the shown frame.
+
 ### Past runs
 
 `watch` also explores the runs under `--runs-root DIR` (default: the watched run's parent directory when it holds other
-runs, else `runs`). Routes besides `/`, `/frame.png` and `/state.json`:
+runs, else `runs`). Routes besides `/`, `/frame.png` and `/state.json` (each JSON route takes `?run=<id>` for a past
+run and serves the watched run without it):
 
 | Route | What it does |
 |---|---|
 | `/runs`, `/runs.json` | Table of runs with a `summary.json`: sort by column; filter by minimum milestone, maximum dollars, tag, starred only; `$/call` and `free` (decisions not made by Claude); pick two runs to compare |
 | `/run/<id>` | The live page as a read-only replay of that run, from boot; `/frame.png?run=<id>` and `/state.json?run=<id>` serve it |
-| `/control?run=<id>&speed=1\|4\|16` and `&pause=0\|1` | Drive a replay |
+| `/control?run=<id>&speed=1\|4\|16`, `&pause=0\|1` and `&seek=<frame>` | Drive a replay; `seek` restores the nearest keyframe at or before the frame (or replays from boot) and steps to it |
+| `/map.json`, `/timeline.json`, `/stats.json`, `/header.json` | World map, run timeline, cost series and usage (with `reference`, the previous run's cost series), run header and notes |
 | `/compare/<a>/<b>`, `/compare.json?a=&b=` | Summaries, usage and cost by skill side by side with differing fields marked, and the first frame at which each run reached each milestone and place |
 | `POST /star?run=<id>` (form body `why=...`) | Same as `bin/koholint star`; the `Host` header must name the viewer itself and an `Origin` header, if sent, must match |
+| `POST /notes?run=<id>` (form body `text=...`) | Writes `runs/<id>/notes.md` (at most 8 KB, no control characters but newlines and tabs; empty text deletes it), same origin check; only for runs under the runs root |
 
 At most 3 replays are kept (least recently used evicted, idle ones dropped after 5 minutes). An evicted replay answers
 410 until its page is reloaded; a run that cannot be replayed answers 404 or 422. Run ids are plain names directly
@@ -122,7 +140,7 @@ under the runs root (`[A-Za-z0-9_.-]`, no leading dot, no `..`); anything else i
 
 Every finished run is kept in git as a light bundle under `runs/<id>/` (about 60 KB): `manifest.json` (with `tag`,
 `harness_sha`, `prompts_sha`, `model`), `inputs.log`, `trace.jsonl.gz`, `world.json`, `suggestions.md`, `summary.json`
-(written by the engine at every stop) and `star.json` when starred. `summary.json` (`v: 2`) also holds `cost_by_skill`
+(written by the engine at every stop), `star.json` when starred and `notes.md` when the owner wrote notes in the viewer. `summary.json` (`v: 2`) also holds `cost_by_skill`
 (model calls and dollars per skill), `decisions_by_agent` (free decisions included) and `usage` (goal changes, leads
 by importance, rejected leads, objectives by kind, `because` uses, talks, talks to a known target, dialogues). `prompts/`, `keyframes/`, `save/`, `video/`,
 `activity.json`, `run.lock` and the plain `trace.jsonl` are gitignored: saves and keyframes are derivable by replay.

@@ -7,6 +7,7 @@ require 'koholint/trace'
 require 'koholint/vision/capabilities'
 require 'koholint/vision/grid_builder'
 require 'koholint/vision/world'
+require 'koholint/viewer/insights'
 
 module Koholint
   module Viewer
@@ -39,7 +40,8 @@ module Koholint
         {
           status: summary.merge(run_id: File.basename(run_dir), flow_version: manifest['flow_version'],
                                 manifest_status: manifest['status'], budget: manifest['budget'], calls: calls(trace),
-                                objective_title: objective_title(trace, summary[:objective])).merge(objective_view(trace, summary[:objective]), memory(trace)),
+                                objective_title: objective_title(trace, summary[:objective]), mode: Insights.mode(trace),
+                                alerts: Insights.alerts(trace)).merge(objective_view(trace, summary[:objective]), memory(trace)),
           replay: { frame: follower.frame, journal_frames: follower.journal_frames, lag: follower.lag, sync: follower.sync },
           events: events(trace, limit),
           grid: grid(run_dir, full, follower.frame),
@@ -90,7 +92,47 @@ module Koholint
 
       def dialogues(trace)
         found = Dialogues.from_events(trace.select { |e| DIALOGUE_TYPES.include?(e['type']) })
-        found.last(DIALOGUES_SHOWN).reverse.map { |dialogue| dialogue.slice(:frame, :place, :source, :text) }
+        states = Insights.dialogue_states(trace)
+        found.last(DIALOGUES_SHOWN).reverse.map do |dialogue|
+          npc = states[[dialogue[:frame], dialogue[:place]]]
+          dialogue.slice(:frame, :place, :source, :text).merge(npc: npc&.except(:frame))
+        end
+      end
+
+      INSIGHTS = %i[map timeline stats].freeze
+      INSIGHT_CACHE = {}
+      INSIGHT_LIMIT = MAX_RUNS * INSIGHTS.size
+
+      def insight(kind, run_dir, follower, upto: nil)
+        raise ArgumentError, "unknown insight #{kind}" unless INSIGHTS.include?(kind)
+
+        full = trace_events(run_dir)
+        shown = kind == :timeline ? full.size : visible(full, kind == :map ? follower.frame : upto)
+        frames = kind == :timeline ? follower.journal_frames : nil
+        CACHE_LOCK.synchronize do
+          entry = INSIGHT_CACHE[[run_dir, kind]]
+          return remember(INSIGHT_CACHE, [run_dir, kind], entry, limit: INSIGHT_LIMIT)[:value] if entry && same_trace?(entry[:source], full) && entry[:key] == [shown, frames]
+        end
+        value = compute(kind, run_dir, full, shown, follower, frames)
+        CACHE_LOCK.synchronize { remember(INSIGHT_CACHE, [run_dir, kind], { source: WeakRef.new(full), key: [shown, frames], value: }, limit: INSIGHT_LIMIT) }
+        value
+      end
+
+      def visible(full, upto)
+        return full.size unless upto
+
+        full.bsearch_index { |e| !e['frame'].is_a?(Integer) || e['frame'] > upto } || full.size
+      end
+
+      def compute(kind, run_dir, full, shown, follower, frames)
+        trace = full.first(shown)
+        case kind
+        when :map
+          lists = grid_events(trace)
+          Insights.map(trace, screens: lists[:screens], affordances: lists[:affordances], frame: follower.frame)
+        when :timeline then Insights.timeline(trace, frames:).merge(run_id: File.basename(run_dir))
+        when :stats then Insights.stats(trace).merge(run_id: File.basename(run_dir), frames: [follower.journal_frames.to_i, trace.last&.fetch('frame', 0).to_i].max)
+        end
       end
 
       AUTOMATIC = ['automatic dialogue advance', 'deterministic hemmed-in', 'locked: waiting'].freeze
@@ -125,10 +167,10 @@ module Koholint
         []
       end
 
-      def remember(cache, key, value)
+      def remember(cache, key, value, limit: MAX_RUNS)
         cache.delete(key)
         cache[key] = value
-        cache.shift while cache.size > MAX_RUNS
+        cache.shift while cache.size > limit
         value
       end
 

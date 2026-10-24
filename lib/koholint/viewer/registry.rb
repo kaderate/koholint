@@ -44,10 +44,22 @@ module Koholint
         feed.merge(replay: feed[:replay].merge(controls(entry)))
       end
 
-      def control(dir, speed: nil, paused: nil)
+      def insight(dir, kind)
+        entry = fetch(dir)
+        Feed.insight(kind, dir, entry.follower, upto: entry.follower.frame)
+      end
+
+      def control(dir, speed: nil, paused: nil, seek: nil)
         raise ArgumentError, "speed must be one of #{SPEEDS.join(', ')}" unless speed.nil? || SPEEDS.include?(speed)
 
         entry = fetch(dir)
+        if seek
+          entry.follower.seek(seek)
+          @lock.synchronize do
+            entry.owed = 0.0
+            entry.ticked_at = @clock.call
+          end
+        end
         @lock.synchronize do
           entry.speed = speed if speed
           entry.paused = paused unless paused.nil?
@@ -108,7 +120,7 @@ module Koholint
         @expired.shift while @expired.size > MAX_EXPIRED
       end
 
-      def controls(entry) = { speed: entry.speed, paused: entry.paused }
+      def controls(entry) = { speed: entry.speed, paused: entry.paused, frame: entry.follower.frame }
 
       def owe(entry, now)
         elapsed = now - entry.ticked_at

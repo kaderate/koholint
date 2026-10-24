@@ -36,12 +36,17 @@ class PageTest < Minitest::Test
     assert_equal 'f8 · press start 3f', evaluate("formatEventPretty(#{JSON.generate(event)})")
   end
 
-  def test_the_phone_layout_overrides_the_base_left_column_width
-    base = PAGE.index("#left { flex: none; width: 480px")
-    media = PAGE.index('@media (max-width: 800px)')
-    phone = PAGE.index('#left { width: auto', media)
-    assert base < media, 'the base #left rule must come before the media query'
+  def test_blocks_are_equal_columns_on_desktop_and_one_column_in_reading_order_on_a_phone
+    base = PAGE.index('#blocks { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr))')
+    media = PAGE.index('@media (max-width: 900px)')
+    phone = PAGE.index('#blocks { grid-template-columns: minmax(0, 1fr)', media)
+    assert base < media, 'the base #blocks rule must come before the media query'
     assert media < phone
+    ids = %w[game objective reasoning leads-block dialogues-block stats timeline-block map-block header-block]
+    positions = ids.map { |id| PAGE.index(%(id="#{id}")) }
+    assert(positions.all?, 'every block is on the page')
+    assert_equal positions.sort, positions
+    %w[timeline-block map-block header-block].each { |id| assert_match(/class="block wide" id="#{id}"/, PAGE) }
   end
 
   def test_a_decision_shows_its_reasoning_as_visible_text
@@ -54,10 +59,18 @@ class PageTest < Minitest::Test
 
   def test_dialogues_are_listed_with_frame_place_and_source_as_plain_text
     list = [{ frame: 40, place: [1, 2], source: nil, text: 'A <b>sign</b>' }, { frame: 5, place: [1, 2], source: { row: 2, col: 3 }, text: 'Hi' }, { frame: 1 }]
-    assert_equal [{ 'head' => 'f40 · [1,2]', 'text' => 'A <b>sign</b>' }, { 'head' => 'f5 · [1,2] · from (2, 3)', 'text' => 'Hi' }],
+    assert_equal [{ 'head' => 'f40 · [1,2]', 'npc' => '', 'text' => 'A <b>sign</b>' }, { 'head' => 'f5 · [1,2] · from (2, 3)', 'npc' => '', 'text' => 'Hi' }],
                  evaluate("dialoguesView(#{JSON.generate(list)})")
     assert_equal [], evaluate('dialoguesView(undefined)')
-    assert_includes PAGE, '<details id="dialogues-panel"><summary>Dialogues</summary><ul id="dialogues"></ul></details>'
+    assert_includes PAGE, '<section class="block" id="dialogues-block"><h2>Dialogues</h2><ul id="dialogues"></ul></section>'
+  end
+
+  def test_a_dialogue_shows_the_npc_state_when_known
+    npc = { talk: 3, new_text: false, state: 'exhausted' }
+    assert_equal 'talk 3 · nothing new · exhausted', evaluate("dialoguesView([{frame: 1, place: [1, 2], text: 'x', npc: #{JSON.generate(npc)}}])[0].npc")
+    assert_equal 'talk 1 · new text', evaluate("npcText({talk: 1, new_text: true, state: null})")
+    assert_equal '', evaluate('npcText(null)')
+    assert_equal '', evaluate("npcText({talk: 'x'})")
   end
 
   def test_the_goal_and_the_leads_are_shown_as_plain_lines
@@ -66,7 +79,8 @@ class PageTest < Minitest::Test
     assert_equal 'goal: find <b>it</b>', view['goal']
     assert_equal ["[high] #{'x' * 159}…", '[normal] go up'], view['leads']
     assert_equal({ 'goal' => 'goal: none yet', 'leads' => [] }, evaluate('memoryView({})'))
-    assert_includes PAGE, '<div id="goal"></div><ul id="leads"></ul>'
+    assert_includes PAGE, '<div id="goal"></div><div id="plan"></div>'
+    assert_includes PAGE, '<ul id="leads"></ul>'
     assert_includes PAGE, 'item.textContent = text;'
   end
 
@@ -363,7 +377,7 @@ class PageTest < Minitest::Test
   def test_bar_items_are_assigned_to_a_group
     items = evaluate("barItems(#{JSON.generate(BAR_STATE)})")
     groups = items.to_h { |i| [i['name'], i['group']] }
-    assert_equal %w[run flow health frame lag sync budget manifest], groups.select { |_, g| g == 'harness' }.keys
+    assert_equal %w[flow health frame lag sync budget manifest], groups.select { |_, g| g == 'harness' }.keys
     assert_equal %w[hearts objective last], groups.select { |_, g| g == 'game' }.keys
   end
 
@@ -375,7 +389,6 @@ class PageTest < Minitest::Test
 
   def test_bar_item_formats_are_unchanged
     texts = evaluate("barItems(#{JSON.generate(BAR_STATE)})").to_h { |i| [i['name'], i['text']] }
-    assert_equal 'r1', texts['run']
     assert_equal '2/3', texts['hearts']
     assert_equal 'Find the sword', texts['objective']
     assert_equal '120', texts['frame']
@@ -415,10 +428,114 @@ class PageTest < Minitest::Test
     assert_equal 'Replay playing at 1x, f0', evaluate('replayLabel(null)')
   end
 
-  def test_the_live_page_links_to_the_runs_and_the_replay_links_back
-    assert_includes PAGE, "runs.href = '/runs'"
-    assert_match(%r{<div id="replay">.*<a href="/">back to live</a>}, PAGE)
-    assert_includes PAGE, "'Replay of ' + runId"
+  def test_every_page_has_the_same_top_navigation
+    [PAGE, RUNS, COMPARE].each do |html|
+      nav = html[%r{<nav id="nav">.*?</nav>}m] or flunk 'page has no nav'
+      assert_match(%r{<a[^>]*href="/">Live</a>}, nav)
+      assert_match(%r{<a[^>]*href="/runs">Runs</a>}, nav)
+      assert_match(/id="compare"|id="nav-compare"/, nav)
+      assert_includes nav, 'Compare</a>'
+      assert_match(/name="viewport"/, html)
+    end
+    assert_includes PAGE, '<span id="nav-badge" class="badge">replay</span>'
+    assert_match(/compare\.hidden = !href/, PAGE)
+    assert_match(/compareLink\.hidden = !href/, RUNS)
+    assert_includes RUNS, "localStorage.setItem('koholint.picked'"
+    assert_includes PAGE, "stored('koholint.picked')"
+  end
+
+  def test_compare_href_needs_two_string_ids
+    assert_equal '/compare/a/b%2Fc', evaluate("compareHref(['a', 'b/c'])")
+    assert_nil evaluate("compareHref(['a'])")
+    assert_nil evaluate('compareHref(null)')
+    assert_nil evaluate("compareHref(['a', 3])")
+  end
+
+  def test_mode_badge_and_alerts
+    assert_equal({ 'text' => 'mode: dialogue', 'className' => 'badge phase-dialogue' }, evaluate("modeBadge({phase: 'dialogue', name: 'dialogue'})"))
+    assert_equal 'mode: playing (play)', evaluate("modeBadge({phase: 'playing', name: 'play'}).text")
+    assert_equal 'badge phase-unknown', evaluate(%q(modeBadge({phase: '" onclick="x'}).className))
+    assert_equal 'mode: unknown', evaluate('modeBadge(null).text')
+    alerts = [{ kind: 'unknown_mode', frame: 5, detail: 'game_mode=9' }, { kind: 'stuck_boot', frame: 9, detail: 'run stopped: stuck_boot' }, { frame: 1 }]
+    assert_equal ['f5 · unknown mode: game_mode=9', 'f9 · stuck at boot: run stopped: stuck_boot'], evaluate("alertsView({alerts: #{JSON.generate(alerts)}})")
+    assert_equal [], evaluate('alertsView({})')
+    assert_match(/id="mode-badge"/, PAGE)
+    assert_match(/id="alerts"/, PAGE)
+  end
+
+  def test_timeline_marks_are_laid_out_by_frame_and_lane
+    timeline = { frames: 1000, markers: [{ frame: 500, kind: 'call', skill: 'walk', label: '<b>x</b>', count: 1 },
+                                         { frame: 1000, kind: 'objective', status: 'failed', label: 'o', count: 3 },
+                                         { frame: 10, kind: 'bogus' }, { kind: 'call' }] }
+    marks = evaluate("timelineMarks(#{JSON.generate(timeline)}, 1000, 130)")
+    assert_equal [500, 1000], marks.map { |m| m['x'] }
+    assert_equal ['f500 · <b>x</b>', 'f1000 · o'], marks.map { |m| m['label'] }
+    assert_equal [evaluate("skillColor('walk')"), '#f44'], marks.map { |m| m['color'] }
+    assert_equal [2, 4], marks.map { |m| m['w'] }
+    assert_operator marks[0]['y'], :>, marks[1]['y']
+    assert_equal evaluate("skillColor('explore')"), evaluate("skillColor('explore')")
+    assert_equal 0, evaluate('markerX(5, 0, 100)')
+    assert_equal 100, evaluate('markerX(500, 100, 100)')
+    assert_match(/control\('seek=' \+/, PAGE)
+  end
+
+  def test_cost_chart_points_split_and_usage
+    assert_equal '0,160 150,80 300,0', evaluate('seriesPoints([[0, 0], [50, 0.5], [100, 1]], 100, 1, 300, 160)')
+    assert_equal '', evaluate('seriesPoints([[0, 0]], 0, 1, 300, 160)')
+    assert_equal '0,160', evaluate("seriesPoints([[0, 0], ['x', 1], null], 100, 1, 300, 160)")
+    assert_equal({ 'frames' => 200, 'usd' => 2 }, evaluate('chartScale({frames: 100, series: [[0, 0], [90, 1]], reference: {frames: 200, series: [[0, 0], [150, 2]]}})'))
+    assert_equal({ 'frames' => 1, 'usd' => 0.01 }, evaluate('chartScale(null)'))
+    split = evaluate("splitView({walk: {calls: 1, usd: 0.25}, explore: {calls: 3, usd: 0.75}})")
+    assert_equal [%w[explore 75], %w[walk 25]], split.map { |r| [r['skill'], r['percent'].to_i.to_s] }
+    assert_equal 'explore $0.750 · 3 calls', split.first['text']
+    stats = { decisions: { paid: 2, free: 5 }, usage: { goal_changes: 1, leads: { high: 1, normal: 0, low: 2 }, because_used: 1,
+                                                      objectives_by_kind: { new_place: 3 }, talks: 4, talks_to_known: 1, lead_rejected: 0 } }
+    assert_equal ['decisions: 2 paid, 5 free', 'goal changes: 1', 'leads: high 1, normal 0, low 2', 'because used: 1', 'objective new_place: 3', 'talks: 4 (1 to known)'],
+                 evaluate("usageRows(#{JSON.generate(stats)})")
+    assert_equal 'decisions: 0 paid, 0 free', evaluate('usageRows(null)[0]')
+  end
+
+  def test_map_view_places_nodes_and_links
+    map = { current: [2, 0], places: [{ place: [1, 0], order: 1, x: 0, y: 0, coverage: 40, people: [{}], leads: [] },
+                                     { place: [2, 0], order: 2, x: 1, y: 0, coverage: nil, people: [], leads: [{}, {}] }, { place: 'bad' }],
+            links: [{ a: [1, 0], b: [2, 0], count: 2 }, { a: [1, 0], b: [9, 9] }] }
+    view = evaluate("mapView(#{JSON.generate(map)})")
+    assert_equal 2, view['nodes'].size
+    assert_equal [{ 'x1' => 64, 'y1' => 37, 'x2' => 184, 'y2' => 37, 'count' => 2 }], view['lines']
+    assert_equal [248, 74, nil], view.values_at('width', 'height', 'lane')
+    assert_equal 103, evaluate("mapView({lane: 2, places: []}).lane")
+    assert_equal({ 'title' => '#1 [1,0]', 'detail' => '40% known · 1 person' }, evaluate("nodeLines(#{JSON.generate(map[:places][0])})"))
+    assert_equal({ 'title' => '#2 [2,0]', 'detail' => 'no grid · 2 leads' }, evaluate("nodeLines(#{JSON.generate(map[:places][1])})"))
+    house = { place: [163, 16], order: 1, kind: 'interior', parent: [162, 0], first_frame: 260, arrivals: 1, coverage: 23 }
+    assert_equal 'interior #1 [163,16]', evaluate("nodeLines(#{JSON.generate(house)}).title")
+    assert_equal 'visit #1 [163,16] · interior · entered from [162,0] · first f260 · 1 arrival', evaluate("nodeTip(#{JSON.generate(house)})")
+    world = { place: [162, 0], order: 2, kind: 'world', cell: [2, 10], first_frame: 9, arrivals: 3 }
+    assert_equal 'visit #2 [162,0] · world · world cell (2, 10) · first f9 · 3 arrivals', evaluate("nodeTip(#{JSON.generate(world)})")
+    assert_equal '#2 [162,0]', evaluate("nodeLines(#{JSON.generate(world)}).title")
+    assert_equal '(4, 7) · 2 talks, 1 text · exhausted', evaluate("personText({row: 4, col: 7, attempts: 2, texts: 1, state: 'exhausted'})")
+    assert_equal({ 'nodes' => [], 'boxes' => {}, 'lines' => [], 'width' => 0, 'height' => 0, 'lane' => nil }, evaluate('mapView(null)'))
+    assert_equal %w[free blocked mixed doubtful unknown], evaluate('legendEntries()').map { |e| e['word'] }
+  end
+
+  def test_run_header_rows_and_line
+    header = { run_id: 'r1', tag: '<i>t</i>', flow_version: 'flow-9', model: 'sonnet', harness_sha: 'b66f33e0fc91c96', highest_milestone: 'shield',
+               places_seen: 8, frames: 13_175, dollars: 1.51346, stop_reason: 'dollars' }
+    rows = evaluate("headerRows(#{JSON.generate(header)})")
+    assert_equal %w[tag flow model harness milestone places frames dollars stop], rows.map { |r| r['label'] }
+    assert_equal ['<i>t</i>', 'flow-9', 'sonnet', 'b66f33e0', 'shield', '8', '13175', '$1.5135', 'dollars'], rows.map { |r| r['text'] }
+    assert_equal 'Run r1 · <i>t</i> · flow-9 · $1.51 · stop: dollars', evaluate("headerLine(#{JSON.generate(header)})")
+    assert_equal '-', evaluate('headerRows({})[0].text')
+    assert_includes PAGE, '<textarea id="notes" maxlength="8192" disabled></textarea>'
+    assert_includes PAGE, "withRun('/notes', notesRun)"
+  end
+
+  SINKS = [/\.innerHTML\b/, /\.outerHTML\b/, /insertAdjacentHTML/, /document\.write/, /\beval\(/, /new Function/, /srcdoc/, /javascript:/,
+           /setAttribute\(\s*['"]on/, /\.on[a-z]+\s*=/].freeze
+
+  def test_no_page_puts_data_through_an_html_or_code_sink
+    { 'page.html' => PAGE, 'runs.html' => RUNS, 'compare.html' => COMPARE }.each do |name, html|
+      SINKS.each { |sink| refute_match sink, html, "#{name} uses #{sink.source}" }
+    end
   end
 
   RUNS = File.read(File.join(VIEWER, 'runs.html'))
@@ -452,6 +569,7 @@ class PageTest < Minitest::Test
   end
 
   def test_compare_link_needs_exactly_two_runs
+    assert_includes RUNS, '<a id="compare" href="#" hidden>Compare</a>'
     assert_nil runs_eval("compareHref(['a'])")
     assert_equal '/compare/a/b%2Fc', runs_eval("compareHref(['a', 'b/c'])")
   end

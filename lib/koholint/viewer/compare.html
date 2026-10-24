@@ -2,11 +2,16 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Koholint compare</title>
 <style>
   body { margin: 0; background: #111; color: #ddd; font: 13px/1.4 monospace; }
   a { color: #8cf; }
-  #nav { display: flex; flex-wrap: wrap; gap: 6px 18px; padding: 8px 12px; background: #222; }
+  #nav { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 16px; padding: 6px 12px; background: #1b1b1b; border-bottom: 1px solid #333; }
+  #nav a { text-decoration: none; }
+  #nav a.here { color: #fff; border-bottom: 2px solid #8cf; }
+  #nav-run { color: #fd8; overflow-wrap: anywhere; }
+  .scroll { overflow-x: auto; }
   #error { display: none; padding: 8px 12px; background: #a60; color: #fff; }
   h2 { margin: 16px 12px 4px; font-size: 0.85em; font-weight: normal; color: #888; text-transform: uppercase; letter-spacing: 0.08em; }
   table { border-collapse: collapse; margin: 0 12px; }
@@ -17,18 +22,18 @@
 </style>
 </head>
 <body>
-<div id="nav"><b>Compare</b><a href="/runs">Runs</a><a href="/">back to live</a></div>
+<nav id="nav"><b>Koholint</b><a href="/">Live</a><a href="/runs">Runs</a><a class="here" id="compare" href="#">Compare</a><span id="nav-run"></span></nav>
 <div id="error"></div>
 <h2>Summary</h2>
-<table><thead><tr><th>field</th><th id="head-a"></th><th id="head-b"></th></tr></thead><tbody id="summary"></tbody></table>
+<div class="scroll"><table><thead><tr><th>field</th><th id="head-a"></th><th id="head-b"></th></tr></thead><tbody id="summary"></tbody></table></div>
 <h2>Usage</h2>
-<table><thead><tr><th>field</th><th>a</th><th>b</th></tr></thead><tbody id="usage"></tbody></table>
+<div class="scroll"><table><thead><tr><th>field</th><th>a</th><th>b</th></tr></thead><tbody id="usage"></tbody></table></div>
 <h2>Cost by skill</h2>
-<table><thead><tr><th>skill</th><th>a</th><th>b</th></tr></thead><tbody id="cost"></tbody></table>
+<div class="scroll"><table><thead><tr><th>skill</th><th>a</th><th>b</th></tr></thead><tbody id="cost"></tbody></table></div>
 <h2>Milestones (first frame)</h2>
-<table><thead><tr><th>milestone</th><th>a</th><th>b</th></tr></thead><tbody id="milestones"></tbody></table>
+<div class="scroll"><table><thead><tr><th>milestone</th><th>a</th><th>b</th></tr></thead><tbody id="milestones"></tbody></table></div>
 <h2>Places visited (first frame)</h2>
-<table><thead><tr><th>place</th><th>a</th><th>b</th></tr></thead><tbody id="places"></tbody></table>
+<div class="scroll"><table><thead><tr><th>place</th><th>a</th><th>b</th></tr></thead><tbody id="places"></tbody></table></div>
 <script>
 (function () {
   // pure:begin
@@ -114,6 +119,10 @@
   }
 
   var ids = idsFromPath(window.location.pathname);
+  if (ids) {
+    document.getElementById('nav-run').textContent = ids[0] + ' vs ' + ids[1];
+    document.getElementById('compare').href = window.location.pathname;
+  }
   if (!ids) {
     errorEl.style.display = 'block';
     errorEl.textContent = 'Expected /compare/<run>/<run>.';

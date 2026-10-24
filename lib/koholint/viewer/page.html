@@ -2,101 +2,173 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Koholint live</title>
 <style>
   body { margin: 0; overflow-x: hidden; background: #111; color: #ddd; font: 13px/1.4 monospace; }
-  #bar { display: flex; flex-wrap: wrap; gap: 6px 24px; padding: 8px 12px; background: #222; }
-  #bar .group { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 18px; min-width: 0; overflow-wrap: anywhere; }
-  #bar .group-label { color: #777; font-size: 0.85em; text-transform: uppercase; letter-spacing: 0.08em; }
+  a { color: #8cf; }
+  #nav { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 16px; padding: 6px 12px; background: #1b1b1b; border-bottom: 1px solid #333; }
+  #nav a { text-decoration: none; }
+  #nav a.here { color: #fff; border-bottom: 2px solid #8cf; }
+  #nav-run { color: #fd8; overflow-wrap: anywhere; }
+  .badge { display: inline-block; padding: 0 8px; border: 1px solid #47a; border-radius: 9px; color: #cdf; background: #1a2233; font-size: 0.9em; }
+  #nav-badge { display: none; }
+  #bar { display: flex; flex-wrap: wrap; gap: 4px 20px; padding: 4px 12px; background: #1a1a1a; color: #999; }
+  #bar .group { display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 14px; min-width: 0; overflow-wrap: anywhere; }
+  #bar .group-label { color: #666; font-size: 0.85em; text-transform: uppercase; letter-spacing: 0.08em; }
   #bar b { color: #8f8; font-weight: normal; }
   #bar b.health-unknown { color: #aaa; }
   #banner, #lost { display: none; padding: 8px 12px; font-weight: bold; color: #fff; }
   #banner { background: #b00; }
   #lost { background: #a60; }
-  a { color: #8cf; }
-  #replay { display: none; flex-wrap: wrap; align-items: center; gap: 6px 14px; padding: 8px 12px; background: #1a2233; border-bottom: 1px solid #47a; }
-  #replay-title { font-size: 1.15em; color: #fff; }
-  #replay button { background: #333; color: #ddd; border: 1px solid #555; font: inherit; padding: 2px 10px; cursor: pointer; }
-  #replay button.on { border-color: #8cf; color: #fff; }
+  #alerts { display: none; padding: 6px 12px; background: #4a1414; color: #fcc; border-bottom: 1px solid #a44; }
+  #alerts div { overflow-wrap: anywhere; }
+  #replay { display: none; flex-wrap: wrap; align-items: center; gap: 6px 14px; padding: 6px 12px; background: #1a2233; border-bottom: 1px solid #47a; }
+  button { background: #333; color: #ddd; border: 1px solid #555; font: inherit; padding: 2px 10px; cursor: pointer; }
+  button.on { border-color: #8cf; color: #fff; }
+  button:disabled { color: #777; cursor: default; }
   #replay-note { color: #9ab; }
-  #main { display: flex; gap: 12px; padding: 12px; align-items: flex-start; }
-  #stage { position: relative; width: 480px; height: 432px; flex: none; }
-  #frame { width: 480px; height: 432px; image-rendering: pixelated; background: #000; display: block; }
-  #overlay { position: absolute; left: 0; top: 0; width: 480px; height: 384px; display: none; }
+  #blocks { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; padding: 10px; align-items: start; }
+  .block { background: #181818; border: 1px solid #2c2c2c; padding: 8px 10px; min-width: 0; overflow-wrap: anywhere; }
+  .block h2 { margin: 0 0 6px; font-size: 0.85em; font-weight: normal; color: #888; text-transform: uppercase; letter-spacing: 0.08em; }
+  .wide { grid-column: 1 / -1; }
+  .muted { color: #9ab; }
+  @media (max-width: 900px) {
+    #blocks { grid-template-columns: minmax(0, 1fr); padding: 6px; gap: 6px; }
+    #bar { flex-direction: column; }
+  }
+  #game-head { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 10px; margin-bottom: 6px; }
+  #mode-badge.phase-unknown, #mode-badge.phase-boot { border-color: #a60; color: #fd8; background: #2a2010; }
+  #mode-badge.phase-dialogue { border-color: #49c; color: #9cf; }
+  #mode-badge.phase-menu, #mode-badge.phase-map, #mode-badge.phase-save { border-color: #a8c; color: #dcf; background: #261a2e; }
+  #mode-badge.phase-game_over { border-color: #c44; color: #fcc; background: #2e1414; }
+  #stage { position: relative; width: 100%; max-width: 480px; aspect-ratio: 10 / 9; margin-bottom: 6px; }
+  #frame { width: 100%; height: 100%; image-rendering: pixelated; background: #000; display: block; }
+  #overlay { position: absolute; left: 0; top: 0; width: 480px; height: 384px; display: none; transform-origin: 0 0; }
   #overlay div { position: absolute; box-sizing: border-box; width: 48px; height: 48px; border: 1px solid rgba(0, 0, 0, 0.25); }
   #overlay div.link { border: 3px solid #fff; }
-  #legend { display: none; gap: 10px; padding: 4px 6px; background: #222; }
-  #legend i { display: inline-block; width: 10px; height: 10px; margin-right: 4px; }
-  #grid { background: #333; color: #ddd; border: 1px solid #555; font: inherit; padding: 2px 10px; cursor: pointer; }
-  #grid:disabled { color: #777; cursor: default; }
-  #activity { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 14px; padding: 10px 12px; background: #1a2a22; border-bottom: 1px solid #2c4; }
+  #legend, #map-legend { display: none; flex-wrap: wrap; gap: 4px 10px; padding: 2px 0; color: #aaa; }
+  #map-legend { display: flex; }
+  #legend i, #map-legend i, .swatch { display: inline-block; width: 10px; height: 10px; margin-right: 4px; vertical-align: middle; }
+  #tools { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+  #activity { display: flex; flex-wrap: wrap; align-items: center; gap: 2px 10px; padding: 6px 8px; margin-bottom: 6px; background: #1a2a22; border: 1px solid #2c4; }
   #activity.stopped { background: #2a1a1a; border-color: #a44; }
   #activity.idle { background: #1d1d1d; border-color: #444; }
-  #dot { width: 12px; height: 12px; border-radius: 50%; background: #2c4; flex: none; animation: pulse 1.2s ease-in-out infinite; }
+  #dot { width: 10px; height: 10px; border-radius: 50%; background: #2c4; flex: none; animation: pulse 1.2s ease-in-out infinite; }
   #activity.stopped #dot, #activity.idle #dot { animation: none; background: #777; }
   @keyframes pulse { 0%, 100% { opacity: 1; transform: scale(1); } 50% { opacity: 0.35; transform: scale(0.7); } }
   @media (prefers-reduced-motion: reduce) { #dot { animation: none; } }
-  #activity-label { font-size: 1.25em; color: #fff; }
-  #activity-timer { font-size: 1.25em; color: #8f8; font-variant-numeric: tabular-nums; }
-  #activity, #activity-detail { overflow-wrap: anywhere; }
+  #activity-label { font-size: 1.1em; color: #fff; }
+  #activity-timer { font-size: 1.1em; color: #8f8; font-variant-numeric: tabular-nums; }
   #activity-detail { color: #9ab; flex-basis: 100%; }
-  .panel { background: #181818; border: 1px solid #333; padding: 8px 10px; margin-bottom: 10px; overflow-wrap: anywhere; }
-  .panel h2 { margin: 0 0 4px; font-size: 0.85em; font-weight: normal; color: #888; text-transform: uppercase; letter-spacing: 0.08em; }
-  #reasoning-text { font-size: 1.25em; line-height: 1.5; color: #eef; white-space: pre-wrap; }
-  #reasoning-head, #reasoning-plan, #objective-predicate, #objective-attempts, #budget-line { color: #9ab; }
-  #reasoning-plan { margin-top: 6px; color: #dfe; }
   #objective-title { font-size: 1.15em; color: #fd8; }
-  #goal { margin-top: 6px; color: #dfe; }
-  #leads { margin: 2px 0 0; padding-left: 16px; color: #9cf; }
-  #dialogues-panel { margin-top: 6px; color: #9ab; }
-  #dialogues { margin: 2px 0 0; padding-left: 16px; max-height: 320px; overflow-y: auto; }
-  #dialogues li { margin-bottom: 4px; }
-  #dialogues .text { color: #eef; white-space: pre-wrap; }
-  #meter { height: 6px; background: #333; margin: 4px 0; }
-  #meter-fill { height: 100%; width: 0; background: #2c4; }
-  #meter-fill.high { background: #e83; }
-  #left { flex: none; width: 480px; min-width: 0; }
-  @media (max-width: 800px) {
-    #main { flex-direction: column; align-items: stretch; }
-    #bar { flex-direction: column; }
-    #left { width: auto; max-width: 480px; }
-    #stage { width: 100%; max-width: 480px; height: auto; aspect-ratio: 10 / 9; }
-    #frame { width: 100%; height: 100%; }
-    #overlay { transform-origin: 0 0; }
-    #events { height: 300px; }
-  }
-  #left .panel:last-child { margin-bottom: 0; }
-  #stage { margin-bottom: 10px; }
-  #side { flex: 1; min-width: 0; display: flex; flex-direction: column; }
-  #sidebar { display: flex; justify-content: space-between; align-items: center; padding: 4px 6px; background: #222; }
-  #mode { background: #333; color: #ddd; border: 1px solid #555; font: inherit; padding: 2px 10px; cursor: pointer; }
-  #events { height: 400px; overflow-y: auto; background: #181818; padding: 6px; margin: 0; white-space: pre-wrap; }
+  #goal, #plan { margin-top: 6px; color: #dfe; }
+  #reasoning-text { font-size: 1.1em; line-height: 1.5; color: #eef; white-space: pre-wrap; }
+  #events-head { display: flex; justify-content: space-between; align-items: center; margin-top: 10px; color: #888; }
+  #events { height: 260px; overflow-y: auto; background: #141414; padding: 4px; margin-top: 4px; white-space: pre-wrap; }
   #events .action { color: #999; }
   #events .decision { color: #dfe; }
   #events .objective { color: #fd8; }
   #events .dialogue { color: #9cf; }
   #events .reason { display: block; color: #8a9; margin: 0 0 4px 14px; font-size: 0.92em; white-space: pre-wrap; }
+  #events .flash { background: #334; }
+  #leads, #dialogues { margin: 0; padding-left: 16px; }
+  #leads { color: #9cf; }
+  #dialogues { max-height: 420px; overflow-y: auto; }
+  #dialogues li { margin-bottom: 6px; }
+  #dialogues .head { color: #9ab; }
+  #dialogues .npc { color: #fd8; }
+  #dialogues .text { color: #eef; white-space: pre-wrap; }
+  #meter { height: 6px; background: #333; margin: 4px 0; }
+  #meter-fill { height: 100%; width: 0; background: #2c4; }
+  #meter-fill.high { background: #e83; }
+  svg text { fill: #999; font: 10px monospace; }
+  #cost-chart { width: 100%; height: 160px; display: block; margin-top: 6px; }
+  #split { display: flex; height: 10px; margin: 6px 0 2px; background: #222; }
+  #split span { display: block; height: 100%; }
+  #split-legend, #usage { margin: 4px 0 0; padding: 0; list-style: none; columns: 2; column-gap: 12px; }
+  #split-legend li, #usage li { break-inside: avoid; }
+  #timeline { width: 100%; height: 130px; display: block; cursor: pointer; }
+  #timeline-info { min-height: 1.4em; color: #dfe; }
+  #timeline-skills { display: flex; flex-wrap: wrap; gap: 2px 12px; color: #aaa; }
+  #map-wrap { display: grid; grid-template-columns: minmax(0, 2fr) minmax(0, 1fr); gap: 10px; }
+  @media (max-width: 900px) { #map-wrap { grid-template-columns: minmax(0, 1fr); } }
+  #map { position: relative; overflow: auto; min-height: 120px; max-height: 520px; background: #141414; }
+  #map-lines { position: absolute; left: 0; top: 0; }
+  #map-lines line { stroke: #557; stroke-width: 2; }
+  .node { position: absolute; box-sizing: border-box; width: 112px; height: 58px; padding: 3px 5px; background: #20232a; border: 1px solid #445;
+          color: #ccd; font: inherit; text-align: left; cursor: pointer; overflow: hidden; }
+  .node.current { border: 2px solid #fd8; }
+  .node.attached { border-style: dashed; background: #1d2620; }
+  #map-lines line.lane { stroke: #333; stroke-dasharray: 6 4; stroke-width: 1; }
+  .node.picked { background: #2a3550; }
+  .node small { display: block; color: #9ab; }
+  #place-grid { display: grid; grid-template-columns: repeat(10, 1fr); gap: 1px; max-width: 320px; aspect-ratio: 10 / 8; margin: 4px 0; }
+  #place-grid i { display: block; }
+  #place-people, #place-leads { margin: 2px 0; padding-left: 16px; }
+  #header-block summary { cursor: pointer; color: #aaa; }
+  #header-fields { display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: 2px 12px; margin: 6px 0; }
+  #header-fields dt { color: #888; }
+  #header-fields dd { margin: 0; }
+  #notes { width: 100%; box-sizing: border-box; min-height: 90px; background: #111; color: #ddd; border: 1px solid #444; font: inherit; }
 </style>
 </head>
 <body>
-<div id="replay"><span id="replay-title"></span><button id="play" type="button"></button><span id="speeds"></span><button id="star" type="button">★ Star</button><span id="replay-note"></span><a href="/runs">Runs</a><a href="/">back to live</a></div>
-<div id="activity" class="idle"><span id="dot"></span><span id="activity-label">Waiting for the engine...</span><span id="activity-timer"></span><span id="activity-detail"></span></div>
+<nav id="nav"><b>Koholint</b><a id="nav-live" href="/">Live</a><a id="nav-runs" href="/runs">Runs</a><a id="nav-compare" href="#" hidden>Compare</a><span id="nav-run"></span><span id="nav-badge" class="badge">replay</span></nav>
+<div id="replay"><button id="play" type="button"></button><span id="speeds"></span><button id="star" type="button">★ Star</button><span id="replay-note"></span></div>
 <div id="bar"></div>
 <div id="banner">Replay diverged: the follower no longer matches the run.</div>
 <div id="lost">Connection lost, retrying...</div>
-<div id="main">
-  <div id="left">
-  <div id="stage"><img id="frame" alt="game frame"><div id="overlay"></div></div>
-    <div class="panel" id="reasoning"><h2>Reasoning</h2><div id="reasoning-head"></div><div id="reasoning-text"></div><div id="reasoning-plan"></div></div>
-    <div class="panel" id="objective"><h2>Objective</h2><div id="objective-title"></div><div id="objective-predicate"></div><div id="objective-attempts"></div><div id="goal"></div><ul id="leads"></ul><details id="dialogues-panel"><summary>Dialogues</summary><ul id="dialogues"></ul></details></div>
-    <div class="panel" id="budget"><h2>Budget</h2><div id="meter"><div id="meter-fill"></div></div><div id="budget-line"></div></div>
-  </div>
-  <div id="side">
-    <div id="sidebar"><span>events</span><span><button id="grid" type="button"></button> <button id="mode" type="button"></button></span></div>
+<div id="alerts"></div>
+<main id="blocks">
+  <section class="block" id="game">
+    <div id="activity" class="idle"><span id="dot"></span><span id="activity-label">Waiting for the engine...</span><span id="activity-timer"></span><span id="activity-detail"></span></div>
+    <div id="game-head"><span id="mode-badge" class="badge phase-unknown">mode: unknown</span><span id="tools"><button id="grid" type="button"></button></span></div>
+    <div id="stage"><img id="frame" alt="game frame"><div id="overlay"></div></div>
     <div id="legend"></div>
+  </section>
+  <section class="block" id="objective">
+    <h2>Objective</h2>
+    <div id="objective-title"></div><div id="objective-predicate" class="muted"></div><div id="objective-attempts" class="muted"></div>
+    <div id="goal"></div><div id="plan"></div>
+  </section>
+  <section class="block" id="reasoning">
+    <h2>Reasoning</h2>
+    <div id="reasoning-head" class="muted"></div><div id="reasoning-text"></div>
+    <div id="events-head"><span>events</span><button id="mode" type="button"></button></div>
     <div id="events"></div>
-  </div>
-</div>
+  </section>
+  <section class="block" id="leads-block"><h2>Leads</h2><ul id="leads"></ul></section>
+  <section class="block" id="dialogues-block"><h2>Dialogues</h2><ul id="dialogues"></ul></section>
+  <section class="block" id="stats">
+    <h2>Budget &amp; agent stats</h2>
+    <div id="meter"><div id="meter-fill"></div></div><div id="budget-line" class="muted"></div>
+    <svg id="cost-chart" viewBox="0 0 300 160" preserveAspectRatio="none" role="img" aria-label="cumulative dollars by frame"></svg>
+    <div id="chart-note" class="muted"></div>
+    <div id="split"></div><ul id="split-legend"></ul>
+    <ul id="usage"></ul>
+  </section>
+  <section class="block wide" id="timeline-block">
+    <h2>Timeline</h2>
+    <svg id="timeline" viewBox="0 0 1000 130" preserveAspectRatio="none" role="img" aria-label="run timeline"></svg>
+    <div id="timeline-info"></div><div id="timeline-skills"></div>
+  </section>
+  <section class="block wide" id="map-block">
+    <h2>World map</h2>
+    <div id="map-note" class="muted"></div>
+    <div id="map-wrap">
+      <div id="map"><svg id="map-lines"></svg></div>
+      <div id="place"><div id="place-title"></div><div id="place-grid"></div><div id="map-legend"></div><ul id="place-people"></ul><ul id="place-leads"></ul></div>
+    </div>
+  </section>
+  <details class="block wide" id="header-block">
+    <summary id="header-line">Run</summary>
+    <dl id="header-fields"></dl>
+    <label for="notes">notes</label>
+    <textarea id="notes" maxlength="8192" disabled></textarea>
+    <div><button id="save-notes" type="button" disabled>Save notes</button> <span id="notes-status" class="muted"></span></div>
+  </details>
+</main>
 <script>
 (function () {
   // pure:begin
@@ -237,6 +309,7 @@
     stale: 'rgba(240, 150, 30, 0.45)', unknown: 'rgba(150, 150, 150, 0.30)'
   };
   var STATES = ['yes', 'no', 'mixed', 'stale', 'unknown'];
+  var STATE_WORDS = { yes: 'free', no: 'blocked', mixed: 'mixed', stale: 'doubtful', unknown: 'unknown' };
 
   function cellColor(state) { return COLORS[state] || COLORS.unknown; }
 
@@ -247,7 +320,7 @@
   function cellTitle(row, col, appearance, state) { return row + ',' + col + ' ' + appearance + ' ' + state; }
 
   function legendEntries() {
-    return STATES.map(function (state) { return { state: state, color: cellColor(state) }; });
+    return STATES.map(function (state) { return { state: state, color: cellColor(state), word: STATE_WORDS[state] }; });
   }
 
   function gridButtonLabel(on, grid) {
@@ -357,10 +430,16 @@
     };
   }
 
+  function npcText(npc) {
+    if (!npc || typeof npc !== 'object' || !Number.isInteger(npc.talk)) return '';
+    var line = 'talk ' + npc.talk + ' · ' + (npc.new_text ? 'new text' : 'nothing new');
+    return typeof npc.state === 'string' ? line + ' · ' + npc.state : line;
+  }
+
   function dialoguesView(list) {
     return (Array.isArray(list) ? list : []).filter(function (d) { return d && typeof d.text === 'string'; }).map(function (d) {
       var from = d.source && Number.isInteger(d.source.row) ? ' · from ' + formatCell(d.source) : '';
-      return { head: 'f' + d.frame + ' · ' + formatPlace(d.place) + from, text: d.text };
+      return { head: 'f' + d.frame + ' · ' + formatPlace(d.place) + from, npc: npcText(d.npc), text: d.text };
     });
   }
 
@@ -386,7 +465,6 @@
   }
 
   var BAR_ITEMS = [
-    { group: 'harness', name: 'run', value: function (s) { return s.status.run_id; } },
     { group: 'harness', name: 'flow', value: function (s) { return s.status.flow_version; } },
     { group: 'harness', name: 'health', value: function (s) { return s.status.health; } },
     { group: 'harness', name: 'frame', value: function (s) { return s.replay.frame; } },
@@ -429,6 +507,184 @@
       return { group: item.group, name: item.name, text: value };
     });
   }
+
+  function compareHref(ids) {
+    if (!Array.isArray(ids) || ids.length !== 2 || ids.some(function (id) { return typeof id !== 'string'; })) return null;
+    return '/compare/' + encodeURIComponent(ids[0]) + '/' + encodeURIComponent(ids[1]);
+  }
+
+  function modeBadge(mode) {
+    mode = mode && typeof mode === 'object' ? mode : {};
+    var phase = typeof mode.phase === 'string' && /^[a-z_]+$/.test(mode.phase) ? mode.phase : 'unknown';
+    var name = typeof mode.name === 'string' && mode.name && mode.name !== phase ? ' (' + mode.name + ')' : '';
+    return { text: 'mode: ' + phase + name, className: 'badge phase-' + phase };
+  }
+
+  var ALERT_WORDS = { unknown_mode: 'unknown mode', stuck_boot: 'stuck at boot', unknown_mode_stuck: 'stuck in an unknown mode' };
+
+  function alertsView(status) {
+    var list = status && Array.isArray(status.alerts) ? status.alerts : [];
+    return list.filter(function (a) { return a && typeof a.kind === 'string'; }).map(function (a) {
+      return 'f' + a.frame + ' · ' + (ALERT_WORDS[a.kind] || a.kind) + (a.detail ? ': ' + truncate(a.detail, 200) : '');
+    });
+  }
+
+  var PALETTE = ['#4e9de0', '#e0a040', '#5cc07a', '#d76a8e', '#a98be0', '#d0d050', '#50c8c8', '#e07050', '#8fa0b0', '#b0d080'];
+
+  function skillColor(skill) {
+    var text = String(skill || '');
+    var hash = 0;
+    for (var i = 0; i < text.length; i++) hash = (hash * 31 + text.charCodeAt(i)) >>> 0;
+    return PALETTE[hash % PALETTE.length];
+  }
+
+  var LANES = ['place', 'objective', 'call', 'dialogue', 'lead', 'explore', 'notable', 'stop'];
+  var LANE_COLORS = { place: '#fd8', objective: '#8f8', dialogue: '#9cf', lead: '#f9c', explore: '#aaa', notable: '#f84', stop: '#f44' };
+  var STATUS_COLORS = { started: '#8f8', achieved: '#4c8', abandoned: '#e83', failed: '#f44' };
+
+  function markerColor(m) {
+    if (m.kind === 'call') return skillColor(m.skill);
+    if (m.kind === 'objective' && STATUS_COLORS[m.status]) return STATUS_COLORS[m.status];
+    return LANE_COLORS[m.kind] || '#ccc';
+  }
+
+  function markerX(frame, frames, width) {
+    if (!(frames > 0)) return 0;
+    return Math.max(0, Math.min(width, Math.round(frame / frames * width * 10) / 10));
+  }
+
+  function timelineMarks(timeline, width, height) {
+    timeline = timeline || {};
+    var markers = Array.isArray(timeline.markers) ? timeline.markers : [];
+    var lane = (height - 14) / LANES.length;
+    return markers.filter(function (m) { return m && Number.isInteger(m.frame) && LANES.indexOf(m.kind) >= 0; }).map(function (m) {
+      var count = Number.isInteger(m.count) && m.count > 1 ? m.count : 1;
+      return {
+        frame: m.frame, x: markerX(m.frame, timeline.frames, width), y: Math.round(LANES.indexOf(m.kind) * lane * 10) / 10,
+        h: Math.max(2, Math.round(lane - 2)), w: count > 1 ? 4 : 2, color: markerColor(m),
+        label: 'f' + m.frame + ' · ' + String(m.label || m.kind)
+      };
+    });
+  }
+
+  function seriesPoints(series, frames, maxUsd, width, height) {
+    if (!Array.isArray(series) || !(frames > 0) || !(maxUsd > 0)) return '';
+    return series.filter(function (p) { return Array.isArray(p) && typeof p[0] === 'number' && typeof p[1] === 'number'; }).map(function (p) {
+      var x = Math.round(Math.min(p[0] / frames, 1) * width * 10) / 10;
+      var y = Math.round((height - Math.min(p[1] / maxUsd, 1) * height) * 10) / 10;
+      return x + ',' + y;
+    }).join(' ');
+  }
+
+  function lastValue(series) {
+    return Array.isArray(series) && series.length && Array.isArray(series[series.length - 1]) ? Number(series[series.length - 1][1]) || 0 : 0;
+  }
+
+  function chartScale(stats) {
+    stats = stats || {};
+    var ref = stats.reference && typeof stats.reference === 'object' ? stats.reference : null;
+    var frames = Math.max(Number(stats.frames) || 0, ref ? Number(ref.frames) || 0 : 0, 1);
+    var usd = Math.max(lastValue(stats.series), ref ? lastValue(ref.series) : 0, 0.01);
+    return { frames: frames, usd: usd };
+  }
+
+  function splitView(bySkill) {
+    var entries = bySkill && typeof bySkill === 'object' ? Object.keys(bySkill) : [];
+    var rows = entries.map(function (skill) {
+      var v = bySkill[skill] || {};
+      return { skill: skill, usd: typeof v.usd === 'number' ? v.usd : 0, calls: Number.isInteger(v.calls) ? v.calls : 0 };
+    }).sort(function (a, b) { return b.usd - a.usd || (a.skill < b.skill ? -1 : 1); });
+    var total = rows.reduce(function (sum, r) { return sum + r.usd; }, 0);
+    return rows.map(function (r) {
+      return { skill: r.skill, color: skillColor(r.skill), percent: total > 0 ? Math.round(r.usd / total * 1000) / 10 : 0,
+               text: r.skill + ' $' + r.usd.toFixed(3) + ' · ' + plural(r.calls, 'call') };
+    });
+  }
+
+  function usageRows(stats) {
+    stats = stats || {};
+    var u = stats.usage && typeof stats.usage === 'object' ? stats.usage : {};
+    var d = stats.decisions && typeof stats.decisions === 'object' ? stats.decisions : {};
+    var rows = [];
+    var leads = u.leads && typeof u.leads === 'object' ? u.leads : {};
+    rows.push('decisions: ' + (d.paid || 0) + ' paid, ' + (d.free || 0) + ' free');
+    rows.push('goal changes: ' + (u.goal_changes || 0));
+    rows.push('leads: ' + ['high', 'normal', 'low'].map(function (t) { return t + ' ' + (leads[t] || 0); }).join(', '));
+    rows.push('because used: ' + (u.because_used || 0));
+    var kinds = u.objectives_by_kind && typeof u.objectives_by_kind === 'object' ? u.objectives_by_kind : {};
+    Object.keys(kinds).sort().forEach(function (kind) { rows.push('objective ' + kind + ': ' + kinds[kind]); });
+    if (typeof u.talks === 'number') rows.push('talks: ' + u.talks + ' (' + (u.talks_to_known || 0) + ' to known)');
+    if (typeof u.lead_rejected === 'number' && u.lead_rejected) rows.push('leads rejected: ' + u.lead_rejected);
+    return rows;
+  }
+
+  var NODE_W = 112, NODE_H = 58, NODE_GAP_X = 8, NODE_GAP_Y = 8;
+
+  function nodeBox(node) {
+    return { left: node.x * (NODE_W + NODE_GAP_X) + 8, top: node.y * (NODE_H + NODE_GAP_Y) + 8, width: NODE_W, height: NODE_H };
+  }
+
+  function placeKey(place) { return Array.isArray(place) ? place.join(',') : ''; }
+
+  function nodeLines(node) {
+    var people = Array.isArray(node.people) ? node.people.length : 0;
+    var leads = Array.isArray(node.leads) ? node.leads.length : 0;
+    var kind = typeof node.kind === 'string' && node.kind !== 'world' ? node.kind + ' ' : '';
+    return {
+      title: kind + '#' + node.order + ' ' + formatPlace(node.place),
+      detail: (typeof node.coverage === 'number' ? node.coverage + '% known' : 'no grid') + (people ? ' · ' + plural(people, 'person') : '') + (leads ? ' · ' + plural(leads, 'lead') : '')
+    };
+  }
+
+  function mapView(map) {
+    map = map && typeof map === 'object' ? map : {};
+    var nodes = (Array.isArray(map.places) ? map.places : []).filter(function (n) {
+      return n && Array.isArray(n.place) && Number.isInteger(n.x) && Number.isInteger(n.y);
+    });
+    var boxes = {};
+    nodes.forEach(function (n) { boxes[placeKey(n.place)] = nodeBox(n); });
+    var lines = (Array.isArray(map.links) ? map.links : []).filter(function (l) { return l && boxes[placeKey(l.a)] && boxes[placeKey(l.b)]; }).map(function (l) {
+      var a = boxes[placeKey(l.a)], b = boxes[placeKey(l.b)];
+      return { x1: a.left + NODE_W / 2, y1: a.top + NODE_H / 2, x2: b.left + NODE_W / 2, y2: b.top + NODE_H / 2, count: l.count || 1 };
+    });
+    var width = 0, height = 0;
+    nodes.forEach(function (n) { var b = boxes[placeKey(n.place)]; width = Math.max(width, b.left + NODE_W + 8); height = Math.max(height, b.top + NODE_H + 8); });
+    var lane = Number.isInteger(map.lane) && map.lane > 0 ? (map.lane - 1) * (NODE_H + NODE_GAP_Y) + 8 + NODE_H / 2 : null;
+    return { nodes: nodes, boxes: boxes, lines: lines, width: width, height: height, lane: lane };
+  }
+
+  function nodeTip(node) {
+    var cell = Array.isArray(node.cell) ? ' · world cell (' + node.cell.join(', ') + ')' : '';
+    var parent = Array.isArray(node.parent) ? ' · entered from ' + formatPlace(node.parent) : '';
+    return 'visit #' + node.order + ' ' + formatPlace(node.place) + ' · ' + String(node.kind || 'other') + cell + parent +
+      ' · first f' + node.first_frame + ' · ' + plural(node.arrivals || 0, 'arrival');
+  }
+
+  function personText(p) {
+    return '(' + p.row + ', ' + p.col + ') · ' + plural(p.attempts || 0, 'talk') + ', ' + plural(p.texts || 0, 'text') + (p.state ? ' · ' + p.state : '');
+  }
+
+  var HEADER_FIELDS = [['tag', 'tag'], ['flow_version', 'flow'], ['model', 'model'], ['harness_sha', 'harness'], ['highest_milestone', 'milestone'],
+                       ['places_seen', 'places'], ['frames', 'frames'], ['dollars', 'dollars'], ['stop_reason', 'stop']];
+
+  function headerRows(h) {
+    h = h && typeof h === 'object' ? h : {};
+    return HEADER_FIELDS.map(function (f) {
+      var v = h[f[0]];
+      var text = v === null || v === undefined || v === '' ? '-' : f[0] === 'harness_sha' ? String(v).slice(0, 8) : f[0] === 'dollars' && typeof v === 'number' ? '$' + v.toFixed(4) : String(v);
+      return { label: f[1], text: text };
+    });
+  }
+
+  function headerLine(h) {
+    h = h && typeof h === 'object' ? h : {};
+    var parts = ['Run ' + (h.run_id || '?')];
+    if (h.tag) parts.push(String(h.tag));
+    if (h.flow_version) parts.push(String(h.flow_version));
+    if (typeof h.dollars === 'number') parts.push('$' + h.dollars.toFixed(2));
+    if (h.stop_reason) parts.push('stop: ' + h.stop_reason);
+    return parts.join(' · ');
+  }
   // pure:end
 
   var runId = runFromLocation(window.location.pathname, window.location.search);
@@ -441,38 +697,69 @@
   var gridButton = document.getElementById('grid');
   var overlay = document.getElementById('overlay');
   var legend = document.getElementById('legend');
+  var stage = document.getElementById('stage');
+  var SVG = document.getElementById('timeline').namespaceURI;
   var gridOn = storedGrid();
   var lastGrid = null, lastGridKey = null;
   var counter = 0, frameBusy = false, stateBusy = false, frameOk = true, stateOk = true;
   var frameError = null, stateError = null;
   var mode = normalizeMode(storedMode());
   var lastList = [];
+  var shownFrame = 0, journalFrames = null;
 
-  function storedMode() {
-    try { return window.localStorage.getItem('koholint.events.mode'); } catch (e) { return null; }
+  function stored(key) {
+    try { return window.localStorage.getItem(key); } catch (e) { return null; }
   }
 
-  function storeMode(value) {
-    try { window.localStorage.setItem('koholint.events.mode', value); } catch (e) { /* private mode */ }
+  function store(key, value) {
+    try { window.localStorage.setItem(key, value); } catch (e) { /* private mode */ }
   }
 
-  function storedGrid() {
-    try { return window.localStorage.getItem('koholint.grid') === 'on'; } catch (e) { return false; }
+  function storedMode() { return stored('koholint.events.mode'); }
+
+  function storedGrid() { return stored('koholint.grid') === 'on'; }
+
+  function svgNode(name, attrs) {
+    var node = document.createElementNS(SVG, name);
+    Object.keys(attrs || {}).forEach(function (key) { node.setAttribute(key, String(attrs[key])); });
+    return node;
   }
 
-  function storeGrid(value) {
-    try { window.localStorage.setItem('koholint.grid', value ? 'on' : 'off'); } catch (e) { /* private mode */ }
+  function swatch(color) {
+    var i = document.createElement('i');
+    i.className = 'swatch';
+    i.style.background = color;
+    return i;
+  }
+
+  function renderNav(status) {
+    var here = runId ? null : document.getElementById('nav-live');
+    if (here) here.className = 'here';
+    var picked = null;
+    try { picked = JSON.parse(stored('koholint.picked') || 'null'); } catch (e) { picked = null; }
+    var href = compareHref(picked);
+    var compare = document.getElementById('nav-compare');
+    compare.hidden = !href;
+    if (href) compare.href = href;
+    var name = runId || (status && status.run_id) || '';
+    document.getElementById('nav-run').textContent = name;
+    document.getElementById('nav-badge').style.display = runId ? 'inline-block' : 'none';
   }
 
   function renderLegend() {
-    legend.textContent = '';
-    legendEntries().forEach(function (entry) {
-      var item = document.createElement('span');
-      var swatch = document.createElement('i');
-      swatch.style.background = entry.color;
-      item.append(swatch, entry.state);
-      legend.appendChild(item);
+    [legend, document.getElementById('map-legend')].forEach(function (target) {
+      target.textContent = '';
+      legendEntries().forEach(function (entry) {
+        var item = document.createElement('span');
+        item.append(swatch(entry.color), entry.word);
+        target.appendChild(item);
+      });
     });
+  }
+
+  function fitOverlay() {
+    var scale = stage.clientWidth / 480;
+    overlay.style.transform = scale > 0 && scale !== 1 ? 'scale(' + scale + ')' : '';
   }
 
   function renderGrid(grid) {
@@ -482,6 +769,7 @@
     var visible = Boolean(grid) && gridOn;
     overlay.style.display = visible ? 'block' : 'none';
     legend.style.display = visible ? 'flex' : 'none';
+    fitOverlay();
     var key = visible ? JSON.stringify(grid) : null;
     if (key === lastGridKey) return;
     lastGridKey = key;
@@ -508,7 +796,7 @@
 
   gridButton.addEventListener('click', function () {
     gridOn = !gridOn;
-    storeGrid(gridOn);
+    store('koholint.grid', gridOn ? 'on' : 'off');
     renderGrid(lastGrid);
   });
   renderLegend();
@@ -529,10 +817,6 @@
       groups[name] = group;
       bar.appendChild(group);
     });
-    var runs = document.createElement('a');
-    runs.href = '/runs';
-    runs.textContent = 'Runs';
-    groups.harness.appendChild(runs);
     barItems(state).forEach(function (field) {
       var item = document.createElement('span');
       var value = document.createElement('b');
@@ -543,6 +827,22 @@
       groups[field.group].appendChild(item);
     });
     banner.style.display = (state.replay && state.replay.sync === 'diverged') ? 'block' : 'none';
+  }
+
+  function renderMode(status) {
+    var badge = modeBadge(status && status.mode);
+    var el = document.getElementById('mode-badge');
+    el.textContent = badge.text;
+    el.className = badge.className;
+    var alerts = alertsView(status);
+    var box = document.getElementById('alerts');
+    box.replaceChildren();
+    alerts.forEach(function (text) {
+      var line = document.createElement('div');
+      line.textContent = text;
+      box.appendChild(line);
+    });
+    box.style.display = alerts.length ? 'block' : 'none';
   }
 
   var lastEvents = null;
@@ -561,6 +861,7 @@
       var row = document.createElement('div');
       row.className = event.type;
       row.textContent = lines[index];
+      if (Number.isInteger(event.frame)) row.dataset.frame = String(event.frame);
       if (mode !== 'json') row.title = eventTitle(event);
       events.appendChild(row);
       var reason = mode === 'json' ? '' : formatReason(event);
@@ -587,7 +888,7 @@
 
   modeButton.addEventListener('click', function () {
     mode = nextMode(mode);
-    storeMode(mode);
+    store('koholint.events.mode', mode);
     renderModeButton();
     renderEvents(lastList);
   });
@@ -628,18 +929,34 @@
     stateBusy = true;
     fetch(withRun('/state.json', runId), { cache: 'no-store' })
       .then(checked).then(function (r) { return r.json(); })
-      .then(function (state) { renderBar(state); renderActivity(state); renderPanels(state); renderEvents(state.events || []); renderGrid(state.grid || null); stateOk = true; stateError = null; })
+      .then(function (state) {
+        shownFrame = state.replay && Number.isInteger(state.replay.frame) ? state.replay.frame : shownFrame;
+        journalFrames = state.replay && Number.isInteger(state.replay.journal_frames) ? state.replay.journal_frames : journalFrames;
+        renderNav(state.status); renderBar(state); renderMode(state.status); renderActivity(state); renderPanels(state);
+        renderEvents(state.events || []); renderGrid(state.grid || null); renderCursor();
+        stateOk = true; stateError = null;
+      })
       .catch(function (e) { stateOk = false; stateError = messageOf(e); })
       .then(function () { stateBusy = false; updateLost(); });
   }
 
+  var busy = {};
+
+  function poll(path, render) {
+    if (busy[path]) return;
+    busy[path] = true;
+    fetch(withRun(path, runId), { cache: 'no-store' })
+      .then(checked).then(function (r) { return r.json(); })
+      .then(render)
+      .catch(function () { /* the state poll reports connection problems */ })
+      .then(function () { busy[path] = false; });
+  }
 
   var activityState = { activity: null, serverNow: null, receivedAt: 0, latency: null };
   var activityEl = document.getElementById('activity');
   var activityLabelEl = document.getElementById('activity-label');
   var activityTimerEl = document.getElementById('activity-timer');
   var activityDetailEl = document.getElementById('activity-detail');
-  var stage = document.getElementById('stage');
 
   function renderActivity(state) {
     if (runId) {
@@ -665,35 +982,46 @@
     activityTimerEl.textContent = formatElapsed(elapsedSince(a, activityState.serverNow, activityState.receivedAt, Date.now()));
   }
 
+  function fillList(id, texts) {
+    var list = document.getElementById(id);
+    list.replaceChildren();
+    texts.forEach(function (text) {
+      var item = document.createElement('li');
+      item.textContent = text;
+      list.appendChild(item);
+    });
+  }
+
   function renderPanels(state) {
     var list = state.events || [];
     var reasoning = latestReasoning(list);
     document.getElementById('reasoning-head').textContent = reasoning ? reasoningHead(reasoning) : '';
     document.getElementById('reasoning-text').textContent = reasoning ? reasoning.justification.trim() : 'No agent decision yet.';
-    document.getElementById('reasoning-plan').textContent = reasoning && typeof reasoning.plan === 'string' ? 'plan: ' + reasoning.plan.trim() : '';
+    document.getElementById('plan').textContent = reasoning && typeof reasoning.plan === 'string' ? 'plan: ' + reasoning.plan.trim() : '';
     var objective = objectiveView(state.status);
     document.getElementById('objective-title').textContent = objective ? objective.title : 'none';
     document.getElementById('objective-predicate').textContent = objective ? objective.predicate : '';
     document.getElementById('objective-attempts').textContent = objective ? (objective.attempts === null ? '' : plural(objective.attempts, 'skill call') + ' so far') : '';
     var memory = memoryView(state.status);
     document.getElementById('goal').textContent = memory.goal;
-    var leadsEl = document.getElementById('leads');
-    leadsEl.replaceChildren();
-    memory.leads.forEach(function (text) {
-      var item = document.createElement('li');
-      item.textContent = text;
-      leadsEl.appendChild(item);
-    });
+    fillList('leads', memory.leads.length ? memory.leads : ['no lead yet']);
     var dialoguesEl = document.getElementById('dialogues');
     dialoguesEl.replaceChildren();
     dialoguesView(state.dialogues).forEach(function (d) {
       var item = document.createElement('li');
       var head = document.createElement('div');
+      head.className = 'head';
       head.textContent = d.head;
+      item.appendChild(head);
+      if (d.npc) {
+        var npc = document.createElement('div');
+        npc.className = 'npc';
+        npc.textContent = d.npc;
+        item.appendChild(npc);
+      }
       var text = document.createElement('div');
       text.className = 'text';
       text.textContent = d.text;
-      item.appendChild(head);
       item.appendChild(text);
       dialoguesEl.appendChild(item);
     });
@@ -706,6 +1034,204 @@
     document.getElementById('budget-line').textContent = formatBudgetLine(budget, state.latency);
   }
 
+  var CHART_W = 300, CHART_H = 160;
+
+  function renderStats(stats) {
+    var chart = document.getElementById('cost-chart');
+    chart.replaceChildren();
+    var scale = chartScale(stats);
+    var ref = stats.reference && typeof stats.reference === 'object' ? stats.reference : null;
+    [0.5, 1].forEach(function (f) {
+      chart.appendChild(svgNode('line', { x1: 0, x2: CHART_W, y1: CHART_H - f * CHART_H + 0.5, y2: CHART_H - f * CHART_H + 0.5, stroke: '#2a2a2a' }));
+    });
+    if (ref) chart.appendChild(svgNode('polyline', { points: seriesPoints(ref.series, scale.frames, scale.usd, CHART_W, CHART_H), fill: 'none', stroke: '#777', 'stroke-width': 1.5, 'stroke-dasharray': '4 3', 'vector-effect': 'non-scaling-stroke' }));
+    chart.appendChild(svgNode('polyline', { points: seriesPoints(stats.series, scale.frames, scale.usd, CHART_W, CHART_H), fill: 'none', stroke: '#8f8', 'stroke-width': 2, 'vector-effect': 'non-scaling-stroke' }));
+    var top = svgNode('text', { x: 2, y: 10 });
+    top.textContent = '$' + scale.usd.toFixed(2);
+    chart.appendChild(top);
+    var right = svgNode('text', { x: CHART_W - 2, y: CHART_H - 2, 'text-anchor': 'end' });
+    right.textContent = 'f' + scale.frames;
+    chart.appendChild(right);
+    document.getElementById('chart-note').textContent = 'cumulative $ by frame: $' + lastValue(stats.series).toFixed(3) + ' now' +
+      (ref ? ' · grey: ' + ref.run_id + ' ($' + lastValue(ref.series).toFixed(3) + ')' : '');
+    var split = document.getElementById('split');
+    split.replaceChildren();
+    var rows = splitView(stats.by_skill);
+    rows.forEach(function (r) {
+      var part = document.createElement('span');
+      part.style.width = r.percent + '%';
+      part.style.background = r.color;
+      part.title = r.text;
+      split.appendChild(part);
+    });
+    var legendEl = document.getElementById('split-legend');
+    legendEl.replaceChildren();
+    rows.forEach(function (r) {
+      var item = document.createElement('li');
+      item.append(swatch(r.color), r.text);
+      legendEl.appendChild(item);
+    });
+    fillList('usage', usageRows(stats));
+  }
+
+  var TL_W = 1000, TL_H = 130;
+  var lastTimeline = null;
+
+  function renderTimeline(timeline) {
+    lastTimeline = timeline;
+    var svg = document.getElementById('timeline');
+    svg.replaceChildren();
+    var lane = (TL_H - 14) / LANES.length;
+    LANES.forEach(function (name, i) {
+      var label = svgNode('text', { x: 2, y: Math.round(i * lane + lane - 3) });
+      label.textContent = name;
+      svg.appendChild(label);
+    });
+    var info = document.getElementById('timeline-info');
+    timelineMarks(timeline, TL_W, TL_H).forEach(function (m) {
+      var rect = svgNode('rect', { x: m.x, y: m.y, width: m.w, height: m.h, fill: m.color, tabindex: 0 });
+      var title = svgNode('title', {});
+      title.textContent = m.label;
+      rect.appendChild(title);
+      var show = function () { info.textContent = m.label; };
+      rect.addEventListener('mouseenter', show);
+      rect.addEventListener('focus', show);
+      rect.addEventListener('click', function (event) { event.stopPropagation(); jump(m.frame); });
+      rect.addEventListener('keydown', function (event) { if (event.key === 'Enter') jump(m.frame); });
+      svg.appendChild(rect);
+    });
+    svg.appendChild(svgNode('line', { id: 'cursor', x1: 0, x2: 0, y1: 0, y2: TL_H, stroke: '#fff', 'stroke-width': 1, 'vector-effect': 'non-scaling-stroke' }));
+    var axis = svgNode('text', { x: TL_W - 2, y: TL_H - 2, 'text-anchor': 'end' });
+    axis.textContent = 'f' + (timeline.frames || 0) + (timeline.total > (timeline.markers || []).length ? ' · ' + timeline.total + ' events clustered' : '');
+    svg.appendChild(axis);
+    var skills = document.getElementById('timeline-skills');
+    skills.replaceChildren();
+    var seen = {};
+    (timeline.markers || []).forEach(function (m) {
+      if (m && m.kind === 'call' && typeof m.skill === 'string' && !seen[m.skill]) {
+        seen[m.skill] = true;
+        var item = document.createElement('span');
+        item.append(swatch(skillColor(m.skill)), m.skill);
+        skills.appendChild(item);
+      }
+    });
+    renderCursor();
+  }
+
+  function renderCursor() {
+    var cursor = document.getElementById('cursor');
+    if (!cursor || !lastTimeline) return;
+    var x = markerX(shownFrame, lastTimeline.frames, TL_W);
+    cursor.setAttribute('x1', String(x));
+    cursor.setAttribute('x2', String(x));
+  }
+
+  document.getElementById('timeline').addEventListener('click', function (event) {
+    if (!lastTimeline || !(lastTimeline.frames > 0)) return;
+    var box = event.currentTarget.getBoundingClientRect();
+    if (!(box.width > 0)) return;
+    jump(Math.round((event.clientX - box.left) / box.width * lastTimeline.frames));
+  });
+
+  function jump(frame) {
+    if (runId) { control('seek=' + Math.max(0, Math.min(frame, journalFrames === null ? frame : journalFrames))); return; }
+    var rows = events.querySelectorAll('[data-frame]');
+    var best = null;
+    Array.prototype.forEach.call(rows, function (row) { if (Number(row.dataset.frame) <= frame) best = row; });
+    if (!best) best = rows[0];
+    if (!best) return;
+    events.scrollTop = best.offsetTop - events.offsetTop;
+    best.classList.add('flash');
+    setTimeout(function () { best.classList.remove('flash'); }, 1500);
+  }
+
+  var picked = null, lastMap = null;
+
+  function renderMap(map) {
+    lastMap = map;
+    var view = mapView(map);
+    var box = document.getElementById('map');
+    var lines = document.getElementById('map-lines');
+    Array.prototype.slice.call(box.querySelectorAll('.node')).forEach(function (node) { node.remove(); });
+    lines.replaceChildren();
+    lines.setAttribute('width', String(view.width));
+    lines.setAttribute('height', String(view.height));
+    box.style.height = view.height ? Math.min(view.height, 520) + 'px' : '';
+    if (view.lane !== null) lines.appendChild(svgNode('line', { x1: 0, x2: view.width, y1: view.lane, y2: view.lane, class: 'lane' }));
+    view.lines.forEach(function (l) {
+      var line = svgNode('line', { x1: l.x1, y1: l.y1, x2: l.x2, y2: l.y2 });
+      if (l.count > 1) line.setAttribute('stroke-width', String(Math.min(2 + l.count, 6)));
+      lines.appendChild(line);
+    });
+    if (picked === null && map.current) picked = placeKey(map.current);
+    view.nodes.forEach(function (n) {
+      var b = view.boxes[placeKey(n.place)];
+      var node = document.createElement('button');
+      node.type = 'button';
+      node.className = 'node' + (n.kind && n.kind !== 'world' ? ' attached' : '') + (n.current ? ' current' : '') + (placeKey(n.place) === picked ? ' picked' : '');
+      node.style.left = b.left + 'px';
+      node.style.top = b.top + 'px';
+      var text = nodeLines(n);
+      var detail = document.createElement('small');
+      detail.textContent = text.detail;
+      node.append(text.title, detail);
+      node.title = nodeTip(n);
+      node.addEventListener('click', function () { picked = placeKey(n.place); renderMap(lastMap); });
+      box.appendChild(node);
+    });
+    document.getElementById('map-note').textContent = view.nodes.length ? plural(view.nodes.length, 'place') + ' at f' + map.frame + (map.truncated ? ' (first places only)' : '') : 'No place visited yet.';
+    renderPlace(view.nodes.filter(function (n) { return placeKey(n.place) === picked; })[0]);
+  }
+
+  function renderPlace(node) {
+    var grid = document.getElementById('place-grid');
+    grid.replaceChildren();
+    document.getElementById('place-title').textContent = node ? nodeLines(node).title + ' · ' + nodeLines(node).detail : 'Pick a place.';
+    if (node && Array.isArray(node.cells)) {
+      node.cells.forEach(function (cells, row) {
+        (Array.isArray(cells) ? cells : []).forEach(function (state, col) {
+          var cell = document.createElement('i');
+          cell.style.background = cellColor(state);
+          cell.title = row + ',' + col + ' ' + (STATE_WORDS[state] || 'unknown');
+          grid.appendChild(cell);
+        });
+      });
+    }
+    fillList('place-people', node && Array.isArray(node.people) ? node.people.map(personText) : []);
+    fillList('place-leads', node && Array.isArray(node.leads) ? node.leads.map(function (l) { return '[' + String(l.importance || '?') + '] ' + truncate(l.claim, 160); }) : []);
+  }
+
+  var notesRun = null, notesLoaded = false;
+  var notesEl = document.getElementById('notes');
+  var saveButton = document.getElementById('save-notes');
+  var notesStatus = document.getElementById('notes-status');
+
+  function renderHeader(h) {
+    document.getElementById('header-line').textContent = headerLine(h);
+    var dl = document.getElementById('header-fields');
+    dl.replaceChildren();
+    headerRows(h).forEach(function (row) {
+      var dt = document.createElement('dt');
+      dt.textContent = row.label;
+      var dd = document.createElement('dd');
+      dd.textContent = row.text;
+      dl.append(dt, dd);
+    });
+    notesRun = typeof h.notes_run === 'string' ? h.notes_run : null;
+    notesEl.disabled = !notesRun;
+    saveButton.disabled = !notesRun;
+    if (!notesRun) notesStatus.textContent = 'notes are kept only for runs under the runs root';
+    if (!notesLoaded) { notesEl.value = typeof h.notes === 'string' ? h.notes : ''; notesLoaded = true; }
+  }
+
+  saveButton.addEventListener('click', function () {
+    if (!notesRun) return;
+    notesStatus.textContent = 'saving...';
+    fetch(withRun('/notes', notesRun), { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body: 'text=' + encodeURIComponent(notesEl.value) })
+      .then(checked).then(function () { notesStatus.textContent = 'saved'; })
+      .catch(function (e) { notesStatus.textContent = 'save failed: ' + (messageOf(e) || 'connection lost'); });
+  });
+
   var replayEl = document.getElementById('replay');
   var playButton = document.getElementById('play');
   var speedsEl = document.getElementById('speeds');
@@ -715,7 +1241,11 @@
   function control(query) {
     fetch(withRun('/control?' + query, runId), { cache: 'no-store' })
       .then(checked).then(function (r) { return r.json(); })
-      .then(function (controls) { renderReplay(controls); replayNote.textContent = ''; })
+      .then(function (controls) {
+        renderReplay(controls);
+        if (Number.isInteger(controls.frame)) { shownFrame = controls.frame; renderCursor(); }
+        replayNote.textContent = '';
+      })
       .catch(function (e) { replayNote.textContent = 'control failed: ' + (messageOf(e) || 'connection lost'); });
   }
 
@@ -739,7 +1269,6 @@
   if (runId) {
     document.title = 'Koholint replay';
     replayEl.style.display = 'flex';
-    document.getElementById('replay-title').textContent = 'Replay of ' + runId;
     SPEEDS.forEach(function (speed) {
       var button = document.createElement('button');
       button.type = 'button';
@@ -752,20 +1281,30 @@
     document.getElementById('star').addEventListener('click', starRun);
     renderReplay(replayControls);
   }
-
-  function fitOverlay() {
-    var scale = stage.clientWidth / 480;
-    overlay.style.transform = scale < 1 ? 'scale(' + scale + ')' : '';
-  }
+  renderNav(null);
 
   setInterval(tickActivity, 100);
   window.addEventListener('resize', fitOverlay);
+  if (window.ResizeObserver) new window.ResizeObserver(fitOverlay).observe(stage);
   fitOverlay();
+
+  function pollMap() { poll('/map.json', renderMap); }
+  function pollStats() { poll('/stats.json', renderStats); }
+  function pollTimeline() { poll('/timeline.json', renderTimeline); }
+  function pollHeader() { poll('/header.json', renderHeader); }
 
   setInterval(pollFrame, 100);
   setInterval(pollState, 500);
+  setInterval(pollMap, 2000);
+  setInterval(pollStats, 3000);
+  setInterval(pollTimeline, 5000);
+  setInterval(pollHeader, 10000);
   pollFrame();
   pollState();
+  pollMap();
+  pollStats();
+  pollTimeline();
+  pollHeader();
 })();
 </script>
 </body>

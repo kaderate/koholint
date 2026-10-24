@@ -23,6 +23,12 @@ class RegistryTest < Minitest::Test
     def sync = :unknown
     def frame_png = "png#{@frame}"
 
+    def seek(target)
+      raise ArgumentError, 'out of range' unless target.between?(0, @total)
+
+      @frame = target
+    end
+
     def step_available(max_frames:)
       raise Koholint::Error, 'replay broke' if @fail
 
@@ -104,7 +110,7 @@ class RegistryTest < Minitest::Test
   def test_a_paused_replay_does_not_advance_and_resumes_from_now
     reg = registry
     follower = reg.fetch('a').follower
-    assert_equal({ speed: 1, paused: true }, reg.control('a', paused: true))
+    assert_equal({ speed: 1, paused: true, frame: 0 }, reg.control('a', paused: true))
     @now = 1.0
     reg.tick
     assert_equal 0, follower.frame
@@ -112,6 +118,16 @@ class RegistryTest < Minitest::Test
     @now = 1.5
     reg.tick
     assert_equal 30, follower.frame
+  end
+
+  def test_seek_moves_the_follower_and_drops_owed_frames
+    reg = registry
+    follower = reg.fetch('a').follower
+    @now = 0.5
+    assert_equal({ speed: 1, paused: false, frame: 4000 }, reg.control('a', seek: 4000))
+    reg.tick
+    assert_equal 4000, follower.frame
+    assert_raises(ArgumentError) { reg.control('a', seek: 20_000) }
   end
 
   def test_an_unknown_speed_is_refused

@@ -32,7 +32,7 @@ class FeedTest < Minitest::Test
       assert_equal File.basename(dir), doc[:status][:run_id]
       assert_equal({ flow_version: 'f', manifest_status: 'running', budget: { 'frames' => 9 }, health: 'unknown',
                      hearts: 2.0, max_hearts: 3.0, objective: nil, last_notable: nil, highest_milestone: 'none',
-                     frames: 3, cost_usd: 0.1, calls: 1, objective_title: nil, objective_predicate: nil, objective_attempts: nil, goal: nil, leads: [], run_id: File.basename(dir) }, doc[:status])
+                     frames: 3, cost_usd: 0.1, calls: 1, objective_title: nil, mode: { phase: 'boot', name: 'intro', frame: 1 }, alerts: [], objective_predicate: nil, objective_attempts: nil, goal: nil, leads: [], run_id: File.basename(dir) }, doc[:status])
       assert_equal({ frame: 90, journal_frames: 100, lag: 10, sync: :in_sync }, doc[:replay])
       assert_equal [{ frame: 2, type: 'decision', decision_point: 'move', agent: 'a', choice: { 'to' => 2 }, confidence: 0.5,
                       justification: 'j' },
@@ -74,7 +74,8 @@ class FeedTest < Minitest::Test
       ['Go to the', 'Go to the north cave'].each_with_index { |text, i| trace.emit(:dialogue, frame: 5, place: [1, 2], text:, source: 'agent', page: i + 1) }
       trace.emit(:action, frame: 30, skill: 'walk', params: {}, result: {})
       trace.emit(:dialogue, frame: 40, place: [1, 2], text: 'A sign <b>', source: 'agent', page: 1)
-      assert_equal [{ frame: 40, place: [1, 2], source: nil, text: 'A sign <b>' }, { frame: 5, place: [1, 2], source: { row: 2, col: 3 }, text: 'Go to the north cave' }],
+      assert_equal [{ frame: 40, place: [1, 2], source: nil, text: 'A sign <b>', npc: nil },
+                    { frame: 5, place: [1, 2], source: { row: 2, col: 3 }, text: 'Go to the north cave', npc: { talk: 1, new_text: true, state: 'worth retrying' } }],
                    Koholint::Viewer::Feed.for(dir, FOLLOWER)[:dialogues]
       assert_equal [5], Koholint::Viewer::Feed.for(dir, FOLLOWER, upto: 10)[:dialogues].map { |d| d[:frame] }
     end
