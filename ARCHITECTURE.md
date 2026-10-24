@@ -109,7 +109,14 @@ scrolling text box into the full text without losing a word; the stored events s
 (agent-driven; owns the context, plan memory, automatic dialogue pages, lock/hemmed handling, and before asking the model
 the revisit of people and the reuse of conversations already read: a dialogue closed when read (dialog state back to 0) whose signature (at least 2 full rows) is known is not sent
 as sheets, its stored text is emitted again with `cached: true`; when a revisit is due it replaces the model's skill choice,
-also right after a sheet reading),
+also right after a sheet reading; and the explore autopilot, `autopilot.rb`: after an `explore` that stopped with
+`new_place` or `budget`, the policy issues the next `explore` with no direction itself (agent `delegated`, cost 0,
+`decision` event with `autopilot: true`), after the revisit, the hemmed wait and pending dialogue pages; the model is called again
+on any other stop (`untried_object` included) or action, a new lead or goal from the last call, a phase other than `playing`, health lower than at the
+last call, an objective that changed or whose kind is not `new_place`, `leave_place` or `new_text`, and after 6 autopilot
+explores or 2400 frames since the last call. Autopilot explores are objective attempts like any other (loop and stall
+abandonment still apply) and leave the engine's consecutive failure and refusal counters untouched; `--autopilot off`
+(manifest `autopilot`) disables it),
 `policies/walk_and_talk.rb` and `start_game.rb` (deterministic baselines and the intro), `with_fallback.rb`
 (an invalid answer falls back deterministically, 5 consecutive fallbacks stop the run). Phases come from the mode
 catalogue (see Game modes): the boot script owns `boot` and `loading`; once the run has played (a `perception` in play
@@ -138,11 +145,11 @@ goal, leads — every `high` one, `normal` ones of the current place, never `low
 schema and reports cost and latency. Jev (tactical choices) is planned, not wired.
 
 **Run storage** — `run.rb`: `runs/<id>/` with `manifest.json` (flow version, ROM hash, tag, harness/prompts
-sha, model), `inputs.log`, `trace.jsonl` (events validated by `trace.rb`), `keyframes/`, `save/`, `prompts/`, `screens/` (one PNG per place, written by `place_shots.rb`:
+sha, model, `autopilot` for agent runs; `resume` keeps it), `inputs.log`, `trace.jsonl` (events validated by `trace.rb`), `keyframes/`, `save/`, `prompts/`, `screens/` (one PNG per place, written by `place_shots.rb`:
 observability only, no trace event, the set of captured places is rebuilt from the directory; `screens <run_dir>` backfills older runs by replay),
 `world.json` (`{ goal, leads }`, rewritten from the trace at every stop), `summary.json` (written at every stop by
 `summary.rb` from the trace only, versioned by `Summary::VERSION`: totals, cost by skill, decisions by agent and
-feature usage; `archive` rewrites an outdated one), `star.json`, `notes.md` (owner notes from the viewer). Trace events (`dialogue` may carry `speaker`, `conversation` and `cached`; a `talk_to` result may carry `entity`; a `perception` may carry `not_ready_frames`): `perception`, `decision`, `action`, `objective`, `dialogue`, `lead`, `goal`,
+feature usage, with `autopilot_decisions` and `chain_max`; `archive` rewrites an outdated one), `star.json`, `notes.md` (owner notes from the viewer). Trace events (`dialogue` may carry `speaker`, `conversation` and `cached`; a `talk_to` result may carry `entity`; a `perception` may carry `not_ready_frames`; a `decision` may carry `autopilot`): `perception`, `decision`, `action`, `objective`, `dialogue`, `lead`, `goal`,
 `notable`, `screen`, `screen_changed`, `affordance`, `grid_contradiction`, `keyframe`, `save`, `budget_stop`, `stop`. `budget.rb` enforces frames,
 minutes, dollars and objective steps. `archive.rb` keeps a light bundle per run in git (trace gzipped, `screens/` included);
 heavy artifacts stay local. A run resumes only with the same `flow_version` and ROM hash; a change to the
@@ -159,7 +166,11 @@ never writes game state; the only files it writes are `star.json`, `summary.json
 
 **CLI** — `cli.rb`, `bin/koholint`: `run`, `resume`, `fork`, `verify`, `summary`, `screens`, `watch`, `archive`, `star`,
 `prune-heavy`, `census` (modes, `census entities` or `census ready`), `npcs` (`npc_catalogue.rb`: a markdown table of the people of all
-runs, their names and the distinct texts read with the milestone and the number of runs; writes nothing).
+runs, their names and the distinct texts read with the milestone and the number of runs; writes nothing), `ab-plan` and
+`ab-report` (`ab.rb`: the fork and resume commands of an A/B between autopilot arms from one frame of a run, written to
+`tmp/ab/plan.json` and `tmp/ab/run.sh`; then a table per arm measured from the fork frame on: cost, paid calls, new places and
+new cells per 1000 frames, stalls, autopilot decisions, and the pre-registered criterion). `fork` opens a parent of any flow
+version, and may set the child's `--tag`, `--autopilot` and `--root`.
 
 ## Data flow of one decision
 

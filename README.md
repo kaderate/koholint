@@ -32,7 +32,7 @@ bin/koholint archive --from /tmp/koholint-live --commit
 
 Commands: `run`, `resume <run_dir>`, `fork <run_dir> --at-frame N`, `verify <run_dir>`, `summary <run_dir>`,
 `screens <run_dir>`, `watch <run_dir>`, `archive`, `star <run_dir> WHY`, `prune-heavy`, `census boot|<run_dir> FRAME...|entities <run_dir> FRAME...|ready <run_dir>`,
-`npcs [--root DIR]`.
+`npcs [--root DIR]`, `ab-plan <run_dir> --at-frame N`, `ab-report PREFIX`.
 
 ## Running
 
@@ -45,6 +45,21 @@ consecutive fallbacks stop a run the same way.
 agent saw to `runs/<id>/prompts/<frame>-<decision_point>.txt` (and `.png` when an image was sent; gitignored, not part
 of replay); the `decision` trace event carries its `prompt_sha`. `--tag NAME` labels a run.
 
+**Autopilot.** `--autopilot on|off` (default `on`, agent runs only) is recorded in the manifest (`autopilot`); `resume`
+keeps the recorded value and refuses a different one. With it on, an `explore` that stops at a new place or at its frame
+budget is followed by another `explore` with no direction that the harness issues itself (agent `delegated`, cost 0, the
+`decision` event carries `autopilot: true`); the model decides again on any other stop or action, after a new lead or goal,
+outside free play, after damage, when the objective changes or is not `new_place`, `leave_place` or `new_text`, and after
+6 such explores or 2400 frames since its last call.
+
+**A/B.** `ab-plan <run_dir> --at-frame N [--arms autopilot,off] [--forks 3] [--max-dollars 0.8] [--frames 3000] [--tag ab]
+[--root tmp/ab/runs] [--model M]` checks the frame and writes `tmp/ab/plan.json` and `tmp/ab/run.sh`, the `fork` and
+`resume --agent` commands of every arm and fork (tags `<tag>-<arm>-<k>`), and prints the script; it runs nothing.
+`ab-report PREFIX [--root DIR]` reads the runs tagged `PREFIX-<arm>-<k>` and prints a table per arm measured from the fork
+frame on (cost, paid calls, new places and new cells per 1000 frames, stalls: explore `stalled` stops and objectives
+abandoned for stall or loop, autopilot decisions) with the pre-registered criterion: autopilot cost per 1000 frames at
+most 50 % of `off` with places per 1000 frames at least 90 % of `off`.
+
 **Pacing.** `--realtime` paces the engine at about 60 fps of wall time so the viewer can keep up; it never changes the
 journal or the game state.
 
@@ -54,15 +69,15 @@ trace gains `screen` and `screen_changed`, `affordance` (walk evidence per tile 
 place, so the grid went dark). The live view has a grid toggle that overlays the believed passability.
 
 **Resume and fork.** `resume` continues a run with the same `flow_version` and ROM hash and rebuilds the ledger and
-visited places from the trace; `fork` branches a run at a frame. Both work on an archived run, also on a fresh clone
+visited places from the trace; `fork` branches a run at a frame (the parent may be of an older flow; `--tag`, `--autopilot` and `--root` set the child's). Both work on an archived run, also on a fresh clone
 (see Run storage).
 
-## Agent skills (`flow-12`)
+## Agent skills (`flow-13`)
 
 - Between decisions the engine waits, with no input, until Link is ready (no screen scroll, door walk, jump or
   knockback, then 2 settled frames): the screen is never mapped and the model never called mid-scroll or mid-jump
   (`notable` `not_ready_wait` for waits over 5 frames; the run stops with `not_ready_stuck` after 600 frames).
-- `explore [direction]` explores by itself: it walks to the nearest frontier (a known cell next to an unknown one) or
+- `explore [direction]` (relaunched by the autopilot after benign stops, see Running) explores by itself: it walks to the nearest frontier (a known cell next to an unknown one) or
   untried border exit (`direction` prefers that side), steps out, re-plans, and returns to the model only at an event:
   `new_place`, `dialogue`, `untried_object` (once per thing never talked to within 3 cells), `blocked`, `stalled` (3
   attempts in a row walked no new cell), `no_frontier` (with the exits already tried), `locked`, `damage` or `budget` (600 frames). What it walked, the walls it found, the
@@ -182,7 +197,7 @@ Every finished run is kept in git as a light bundle under `runs/<id>/` (about 60
 `harness_sha`, `prompts_sha`, `model`), `inputs.log`, `trace.jsonl.gz`, `world.json`, `suggestions.md`, `summary.json`
 (written by the engine at every stop), `star.json` when starred and `notes.md` when the owner wrote notes in the viewer, and `screens/<room>-<map>.png` (one 160x144 screenshot per place, about 3-8 KB each, taken by the engine 20 frames after the place became playable and ready). `bin/koholint screens <run_dir>` writes the missing ones for an older run by replaying its journal from boot (about one minute per 6000 frames; idempotent). `prune-heavy` keeps `screens/`. `summary.json` (`v: 3`) also holds `cost_by_skill`
 (model calls and dollars per skill), `decisions_by_agent` (free decisions included) and `usage` (goal changes, leads
-by importance, rejected leads, objectives by kind, `because` uses, talks, talks to a known target, dialogues, `not_ready_frames` waited by the readiness gate and `not_ready_waits` longer than 5 frames). `prompts/`, `keyframes/`, `save/`, `video/`,
+by importance, rejected leads, objectives by kind, `because` uses, talks, talks to a known target, dialogues, `not_ready_frames` waited by the readiness gate, `not_ready_waits` longer than 5 frames, `autopilot_decisions` and `chain_max`, the longest run of consecutive autopilot decisions); `v: 4` adds `autopilot` from the manifest. `prompts/`, `keyframes/`, `save/`, `video/`,
 `activity.json`, `run.lock` and the plain `trace.jsonl` are gitignored: saves and keyframes are derivable by replay.
 
 | Command | Effect |
