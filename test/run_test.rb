@@ -164,6 +164,7 @@ class RunTest < Minitest::Test
         run.trace.emit(:notable, frame:, kind: 'lead_rejected', detail: '1')
         run.trace.emit(:notable, frame:, kind: 'revisit', detail: { round: 1 })
       end
+      run.trace.emit(:notable, frame: 5, kind: 'not_ready_wait', detail: { frames: 40, reason: 'transition' })
       run.trace.emit(:notable, frame: 5, kind: 'grid_overlay_stuck', detail: [1, 2])
       run.truncate_trace!(5)
       kept = Koholint::Trace.read(File.join(run.dir, 'trace.jsonl')).map { |e| [e['frame'], e['type']] }
