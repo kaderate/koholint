@@ -1,0 +1,106 @@
+{
+  "goal": "Follow the south road to the beach, then explore for the first dungeon.",
+  "leads": [
+    {
+      "id": "lead-1",
+      "place": [
+        163,
+        16
+      ],
+      "source": null,
+      "quote": "Tu es sur l'île Cocolint!",
+      "claim": "Link is on Cocolint island, Marine is the speaker",
+      "importance": "normal"
+    },
+    {
+      "id": "lead-2",
+      "place": [
+        163,
+        16
+      ],
+      "source": {
+        "row": 3,
+        "col": 5,
+        "entity": 62
+      },
+      "quote": "Suis la route du Sud, vers la plage",
+      "claim": "Follow the south road toward the beach where Marine found Link",
+      "importance": "high"
+    },
+    {
+      "id": "lead-3",
+      "place": [
+        163,
+        16
+      ],
+      "source": {
+        "row": 3,
+        "col": 5,
+        "entity": 62
+      },
+      "quote": "des monstres terribles rôdent",
+      "claim": "Dangerous monsters roam nearby",
+      "importance": "normal"
+    },
+    {
+      "id": "lead-4",
+      "place": [
+        163,
+        16
+      ],
+      "source": {
+        "row": 4,
+        "col": 7,
+        "entity": 63
+      },
+      "quote": "Y'a un autre bidule qui est resté sur la plage",
+      "claim": "Another item was left on the beach",
+      "importance": "high"
+    },
+    {
+      "id": "lead-5",
+      "place": [
+        163,
+        16
+      ],
+      "source": {
+        "row": 4,
+        "col": 7,
+        "entity": 63
+      },
+      "quote": "fais attention aux monstres",
+      "claim": "Monsters are everywhere, be careful",
+      "importance": "normal"
+    },
+    {
+      "id": "lead-6",
+      "place": [
+        177,
+        0
+      ],
+      "source": {
+        "row": 5,
+        "col": 7,
+        "entity": 117
+      },
+      "quote": "YOUPI! J'ai la pêche!",
+      "claim": "The NPC is cheerful. This is flavour text only.",
+      "importance": "low"
+    },
+    {
+      "id": "lead-7",
+      "place": [
+        179,
+        0
+      ],
+      "source": {
+        "row": 5,
+        "col": 2,
+        "entity": 115
+      },
+      "quote": "Après une sauvegarde, vous pouvez redémarrer à la dernière porte",
+      "claim": "After saving you restart at the last door you passed through",
+      "importance": "low"
+    }
+  ]
+}
