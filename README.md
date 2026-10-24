@@ -110,8 +110,10 @@ which talk it was, new text or not, and for the latest one exhausted or worth re
 (cumulative dollars by frame, the previous run's curve in grey, cost split by skill, decisions paid and free and the
 `summary.json` usage counters); a timeline of the whole run (places, objectives, agent calls coloured by skill,
 dialogues, leads, explore stops, notables, stop; clustered past 300 markers; a click seeks a replay, or scrolls the
-feed live); the world map of the places seen up to the shown frame (visit order, exits taken, the current place, known
-cells, people and leads; a click shows that place's belief grid); and, folded at the bottom, the run header with a
+feed live); the world map of the places seen up to the shown frame (overworld screens on the 16-wide `room_id` grid,
+interiors and other places in a lane below, under the overworld screen they were entered from, kinds from
+`data/place_kinds.json`; visit order, exits taken, the current place, known cells, people and leads; a click shows
+that place's belief grid); and, folded at the bottom, the run header with a
 notes box. The map, timeline and stats are derived from the trace and cached by the shown frame.
 
 ### Past runs

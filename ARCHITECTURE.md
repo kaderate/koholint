@@ -112,7 +112,8 @@ play flow means a new `flow_version`.
 **Viewer** (`viewer.rb`, `viewer/`) — a small HTTP server. A `Follower` replays the journal of the watched
 run and seeks by restoring the nearest keyframe; `Feed` derives status, mode and alerts, feed, reasoning, objectives,
 goal, leads and the stitched dialogue history (newest first, with the person talked to and their state) from the trace
-up to the shown frame, and `Insights` the world map (places, exits taken, belief grids, people, leads), the timeline
+up to the shown frame, and `Insights` the world map (places on the overworld grid or attached to the screen they were
+entered from, kinds from `data/place_kinds.json` via `place_kinds.rb`; exits taken, belief grids, people, leads), the timeline
 markers and the cost series, cached by trace and shown frame. `Explorer` and `Registry` serve past runs (list,
 read-only replays with pacing and seek, comparison via `run_compare.rb`, star, the run header and `notes.md`). It
 never writes game state; the only files it writes are `star.json`, `summary.json`'s `starred` and `notes.md`.
