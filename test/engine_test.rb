@@ -344,6 +344,21 @@ class EngineTest < Minitest::Test
     end
   end
 
+  class AgentForever
+    def decision_point_for(_state) = Koholint::DecisionPoint.macro(:boot)
+    def decide(*) = { choice: { buttons: [], frames: 5 }, agent: 'claude' }
+  end
+
+  def test_an_uncatalogued_screen_held_too_long_stops_the_run
+    with_run do |_dir, run|
+      reason = Koholint::Engine.new(run:, policy: AgentForever.new, emulator: unknown_screen_emulator, budget: Koholint::Budget.new(frames: 20_000)).run
+      assert_equal :unknown_mode_stuck, reason
+      assert_equal 'unknown_mode_stuck', events(run, :budget_stop).first['kind']
+      assert_operator run.inputs.frames, :<=, 300 + Koholint::Engine::STUCK_UNKNOWN_FRAMES + 10
+      assert_operator run.inputs.frames, :>, 300 + Koholint::Engine::STUCK_UNKNOWN_FRAMES
+    end
+  end
+
   def test_the_boot_script_deciding_forever_stops_the_run_even_before_play
     with_run do |_dir, run|
       emulator = MenuEmulator.new

@@ -22,6 +22,7 @@ module Koholint
     AGENT_REFUSAL_LIMIT = 10
     STUCK_BOOT_FRAMES = 900
     STUCK_BOOT_ANY_FRAMES = 3600
+    STUCK_UNKNOWN_FRAMES = 600
 
     def self.resume(run_path, budget:, policy: nil, policy_factory: nil, flow_version: Koholint::FLOW_VERSION, **options)
       run = Run.open(run_path, flow_version: flow_version)
@@ -152,8 +153,10 @@ module Koholint
     end
 
     def note_unknown_mode(state)
-      return unless @played && state.phase(booted: true) == :unknown
+      return @unknown_since = nil unless @played && state.phase(booted: true) == :unknown
 
+      @unknown_since ||= state.frame
+      @budget.stop!(:unknown_mode_stuck) if state.frame - @unknown_since > STUCK_UNKNOWN_FRAMES
       detail = Modes.tuple(state).map { |field, value| "#{field}=#{value}" }.join(' ')
       @run.trace.emit(:notable, frame: state.frame, kind: 'unknown_mode', detail:) if @unknown_modes.add?(detail)
     end
