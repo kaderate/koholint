@@ -2,15 +2,19 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Koholint runs</title>
 <style>
   body { margin: 0; background: #111; color: #ddd; font: 13px/1.4 monospace; }
   a { color: #8cf; }
-  #nav, #filters { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 18px; padding: 8px 12px; background: #222; }
-  #filters { background: #1a1a1a; border-bottom: 1px solid #333; }
+  #nav { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 16px; padding: 6px 12px; background: #1b1b1b; border-bottom: 1px solid #333; }
+  #nav a { text-decoration: none; }
+  #nav a.here { color: #fff; border-bottom: 2px solid #8cf; }
+  #nav-run { color: #fd8; overflow-wrap: anywhere; }
+  #filters { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 18px; padding: 6px 12px; background: #1a1a1a; border-bottom: 1px solid #333; }
+  #table { overflow-x: auto; }
   input, select, button { background: #333; color: #ddd; border: 1px solid #555; font: inherit; padding: 2px 6px; }
   button { cursor: pointer; }
-  #compare[aria-disabled="true"] { color: #777; pointer-events: none; text-decoration: none; }
   #error { display: none; padding: 8px 12px; background: #a60; color: #fff; }
   table { border-collapse: collapse; margin: 12px; }
   th, td { padding: 3px 10px; border-bottom: 1px solid #2a2a2a; text-align: left; white-space: nowrap; }
@@ -22,7 +26,7 @@
 </style>
 </head>
 <body>
-<div id="nav"><b>Runs</b><a href="/">back to live</a><a id="compare" href="#" aria-disabled="true">compare the two picked runs</a><span id="count"></span></div>
+<nav id="nav"><b>Koholint</b><a href="/">Live</a><a class="here" href="/runs">Runs</a><a id="compare" href="#" hidden>Compare</a><span id="nav-run"></span><span id="count"></span></nav>
 <div id="filters">
   <label>min milestone <select id="milestone"></select></label>
   <label>max dollars <input id="dollars" type="number" min="0" step="0.01"></label>
@@ -30,7 +34,7 @@
   <label><input id="starred" type="checkbox"> starred only</label>
 </div>
 <div id="error"></div>
-<table><thead><tr id="head"></tr></thead><tbody id="rows"></tbody></table>
+<div id="table"><table><thead><tr id="head"></tr></thead><tbody id="rows"></tbody></table></div>
 <script>
 (function () {
   // pure:begin
@@ -93,7 +97,7 @@
   // pure:end
 
   var all = [];
-  var picked = [];
+  var picked = storedPicks();
   var sort = { key: 'run_id', descending: true };
   var rows = document.getElementById('rows');
   var head = document.getElementById('head');
@@ -101,6 +105,17 @@
   var compareLink = document.getElementById('compare');
   var milestoneSelect = document.getElementById('milestone');
   var inputs = ['milestone', 'dollars', 'tag', 'starred'].map(function (id) { return document.getElementById(id); });
+
+  function storedPicks() {
+    try {
+      var value = JSON.parse(window.localStorage.getItem('koholint.picked') || '[]');
+      return Array.isArray(value) ? value.filter(function (id) { return typeof id === 'string'; }).slice(-2) : [];
+    } catch (e) { return []; }
+  }
+
+  function storePicks() {
+    try { window.localStorage.setItem('koholint.picked', JSON.stringify(picked)); } catch (e) { /* private mode */ }
+  }
 
   function filters() {
     var dollars = parseFloat(document.getElementById('dollars').value);
@@ -134,8 +149,9 @@
 
   function renderCompare() {
     var href = compareHref(picked);
-    compareLink.setAttribute('aria-disabled', href ? 'false' : 'true');
+    compareLink.hidden = !href;
     compareLink.href = href || '#';
+    document.getElementById('nav-run').textContent = picked.join(' + ');
   }
 
   function star(run) {
@@ -157,6 +173,7 @@
       picked = picked.filter(function (id) { return id !== run.run_id; });
       if (box.checked) picked.push(run.run_id);
       if (picked.length > 2) picked = picked.slice(-2);
+      storePicks();
       render();
     });
     pickCell.appendChild(box);
@@ -215,7 +232,12 @@
   function load() {
     return fetch('/runs.json', { cache: 'no-store' })
       .then(function (r) { if (!r.ok) throw new Error('cannot list runs (' + r.status + ')'); return r.json(); })
-      .then(function (runs) { all = Array.isArray(runs) ? runs : []; showError(null); renderMilestones(); render(); })
+      .then(function (runs) {
+        all = Array.isArray(runs) ? runs : [];
+        var ids = all.map(function (run) { return run.run_id; });
+        picked = picked.filter(function (id) { return ids.indexOf(id) >= 0; });
+        showError(null); renderMilestones(); render();
+      })
       .catch(function (e) { showError(e.message); });
   }
 
