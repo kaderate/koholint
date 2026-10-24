@@ -5,6 +5,7 @@ module Koholint
     OVERLAP_MIN = 7
     ENDED = /[.!?…]\z/
     MOVES = %w[walk step goto talk_to explore].freeze
+    OPTIONAL = %i[conversation speaker cached].freeze
 
     module_function
 
@@ -90,7 +91,7 @@ module Koholint
           end
         end
       end
-      found.map { |entry| entry.except(:open).merge(text: text(entry[:pages])).compact }
+      found.map { |entry| entry.except(:open).merge(text: text(entry[:pages])).reject { |key, value| OPTIONAL.include?(key) && value.nil? } }
     end
   end
 end
