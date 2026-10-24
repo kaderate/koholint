@@ -91,6 +91,16 @@ class StartGameTest < Minitest::Test
     assert_equal :handed, step(wrapper, locked(frame: 120).tap { |s| s.dialog_state = 3 }).first
   end
 
+  def test_the_bed_before_the_first_dialogue_is_held_even_though_motion_is_free
+    bed = locked(frame: 0).tap { |s| s.motion_blocked = 0; s.scene_state = 1 }
+    wrapper = probing
+    3.times { |i| assert_equal [:boot, { buttons: [], frames: 30 }], step(wrapper, bed) }
+    free = Koholint::Policies::StartGame.new(Koholint::Policies::WalkAndTalk.new, ready: ->(s) { s.phase == :playing }, played: true)
+    free.observe(bed, frame: 0)
+    free.observe(bed, frame: 1)
+    refute_equal :boot, free.decision_point_for(bed).name
+  end
+
   def test_a_boot_lock_is_capped_then_the_probe_runs_and_a_free_tick_resets_it
     wrapper = probing
     limit = Koholint::Policies::StartGame::BOOT_LOCK_LIMIT_FRAMES / 30

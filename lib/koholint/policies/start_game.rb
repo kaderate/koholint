@@ -17,6 +17,7 @@ module Koholint
 
       def initialize(after, ready: nil, probe: false, played: false)
         @played = played
+        @dialogued = played
         @probe = probe && !ready.nil?
         @probe_step = 0
         @probe_ticks = 0
@@ -33,7 +34,8 @@ module Koholint
 
       def observe(state, frame:)
         @played ||= state.game_mode == PLAY_MODE
-        @locked_ticks = state.phase == :locked ? @locked_ticks + 1 : 0
+        @dialogued ||= state.phase == :dialogue
+        @locked_ticks = held?(state) ? @locked_ticks + 1 : 0
         return observe_probing(state, frame:) if @probe && !@handed
 
         ready = ready_state?(state) && !locked_wait?(state)
@@ -96,11 +98,13 @@ module Koholint
 
       def ready_state?(state) = @ready.call(state) || boot_lock_capped?(state)
 
-      def boot_lock_capped?(state) = @settle && state.phase == :locked && @locked_ticks * LOCKED_WAIT[:frames] >= BOOT_LOCK_LIMIT_FRAMES
+      def boot_lock_capped?(state) = @settle && held?(state) && @locked_ticks * LOCKED_WAIT[:frames] >= BOOT_LOCK_LIMIT_FRAMES
 
-      def playing?(state) = state.phase == :playing || boot_lock_capped?(state)
+      def held?(state) = state.phase == :locked || (!@dialogued && state.phase == :playing && state.scene_state == 1)
 
-      def locked_wait?(state) = @settle && state.phase == :locked && !boot_lock_capped?(state)
+      def playing?(state) = (state.phase == :playing && !locked_wait?(state)) || boot_lock_capped?(state)
+
+      def locked_wait?(state) = @settle && held?(state) && !boot_lock_capped?(state)
 
       def ready?(state) = handed_screen?(state) || (@handed && (ready_state?(state) || locked_wait?(state)))
 

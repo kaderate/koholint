@@ -45,10 +45,12 @@ class GameStateTest < Minitest::Test
     refute Koholint::GameState.played?([{ 'type' => 'perception', 'state' => { 'game_mode' => 0x02 } }, { 'type' => 'decision', 'state' => { 'game_mode' => 0x0B } }])
   end
 
-  def test_locked_when_motion_is_blocked_or_the_scene_is_locked
+  def test_locked_only_when_motion_is_blocked
     settled = { game_mode: 0x0B, game_submode: 7, dialog_state: 0 }
     assert_equal :locked, state(**settled, motion_blocked: 2, scene_state: 3).phase
-    assert_equal :locked, state(**settled, motion_blocked: 0, scene_state: 1).phase
+    assert_equal :playing, state(**settled, motion_blocked: 0, scene_state: 1).phase
+    refute state(**settled, motion_blocked: 0, scene_state: 1).locked?
+    assert state(**settled, motion_blocked: 2).locked?
     assert_equal :playing, state(**settled, motion_blocked: 0, scene_state: 3).phase
     assert_equal :playing, state(**settled, motion_blocked: 0, scene_state: 0).phase
     assert_equal :playing, state(**settled).phase

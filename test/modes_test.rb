@@ -57,7 +57,7 @@ class ModesTest < Minitest::Test
   MEASURED = {
     [0, 3, 0, 0, 0, 0, 0] => 'intro', [2, 7, 0, 0, 0, 0, 0] => 'file_select', [3, 2, 0, 0, 0, 0, 0] => 'name_entry',
     [11, 3, 0, 0, 0, 0, 0] => 'loading', [11, 7, 0, 0, 0, 0, 0] => 'play', [11, 7, 0, 0, 3, 0, 0] => 'play',
-    [11, 7, 134, 0, 3, 0, 0] => 'dialogue', [11, 7, 0, 2, 3, 0, 0] => 'motion_lock', [11, 7, 0, 0, 1, 0, 0] => 'scene_lock',
+    [11, 7, 134, 0, 3, 0, 0] => 'dialogue', [11, 7, 0, 2, 3, 0, 0] => 'motion_lock', [11, 7, 0, 0, 1, 0, 0] => 'play',
     [11, 7, 0, 0, 0, 7, 0] => 'dying', [11, 7, 0, 0, 0, 7, 4] => 'game_over',
     [12, 1, 0, 0, 0, 0, 0] => 'inventory', [12, 5, 0, 0, 1, 0, 0] => 'inventory', [12, 8, 0, 0, 0, 0, 0] => 'inventory',
     [7, 5, 0, 0, 0, 0, 0] => 'map', [7, 5, 3, 0, 0, 0, 0] => 'map', [6, 5, 0, 0, 0, 0, 0] => 'save_screen'
@@ -71,7 +71,7 @@ class ModesTest < Minitest::Test
 
   def test_phases_of_measured_tuples
     phases = { [12, 1, 0, 0, 0, 0, 0] => :menu, [12, 5, 0, 0, 0, 0, 0] => :menu, [7, 5, 0, 0, 0, 0, 0] => :map, [6, 5, 0, 0, 0, 0, 0] => :save,
-               [11, 7, 0, 0, 0, 7, 4] => :game_over, [11, 7, 0, 0, 0, 7, 0] => :cutscene, [11, 7, 0, 0, 1, 0, 0] => :locked,
+               [11, 7, 0, 0, 0, 7, 4] => :game_over, [11, 7, 0, 0, 0, 7, 0] => :cutscene, [11, 7, 0, 0, 1, 0, 0] => :playing,
                [11, 7, 0, 2, 0, 0, 0] => :locked, [11, 2, 0, 0, 0, 0, 0] => :loading, [0, 7, 0, 0, 0, 0, 0] => :boot }
     phases.each { |values, phase| assert_equal phase, state(**tuple(values)).phase(booted: true), values.inspect }
   end

@@ -8,8 +8,6 @@ module Koholint
   # Values and meaning: notes of game_mode and game_submode in data/addresses.json and the catalogue data/modes.json.
   PLAY_MODE = 0x0B
   PLAY_SETTLED_SUBMODE = 7
-  # Values and meaning: notes of link_motion_blocked and scene_state in data/addresses.json.
-  SCENE_LOCKED = 1
 
   GameState = Struct.new(:frame, :room_id, :map_id, :x, :y, :direction, :hp, :max_hp, :milestone,
                          :game_mode, :game_submode, :name_length, :dialog_state, :motion_blocked, :scene_state,
@@ -25,7 +23,7 @@ module Koholint
 
     def loading? = game_mode == PLAY_MODE && game_submode != PLAY_SETTLED_SUBMODE
 
-    def locked? = motion_blocked.to_i.positive? || scene_state == SCENE_LOCKED
+    def locked? = motion_blocked.to_i.positive?
 
     def self.played?(events) = events.any? { |event| event['type'] == 'perception' && event.dig('state', 'game_mode') == PLAY_MODE }
 
