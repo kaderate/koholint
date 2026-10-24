@@ -501,12 +501,19 @@ class PageTest < Minitest::Test
             links: [{ a: [1, 0], b: [2, 0], count: 2 }, { a: [1, 0], b: [9, 9] }] }
     view = evaluate("mapView(#{JSON.generate(map)})")
     assert_equal 2, view['nodes'].size
-    assert_equal [{ 'x1' => 64, 'y1' => 37, 'x2' => 212, 'y2' => 37, 'count' => 2 }], view['lines']
-    assert_equal [276, 74], view.values_at('width', 'height')
+    assert_equal [{ 'x1' => 64, 'y1' => 37, 'x2' => 184, 'y2' => 37, 'count' => 2 }], view['lines']
+    assert_equal [248, 74, nil], view.values_at('width', 'height', 'lane')
+    assert_equal 103, evaluate("mapView({lane: 2, places: []}).lane")
     assert_equal({ 'title' => '#1 [1,0]', 'detail' => '40% known · 1 person' }, evaluate("nodeLines(#{JSON.generate(map[:places][0])})"))
     assert_equal({ 'title' => '#2 [2,0]', 'detail' => 'no grid · 2 leads' }, evaluate("nodeLines(#{JSON.generate(map[:places][1])})"))
+    house = { place: [163, 16], order: 1, kind: 'interior', parent: [162, 0], first_frame: 260, arrivals: 1, coverage: 23 }
+    assert_equal 'interior #1 [163,16]', evaluate("nodeLines(#{JSON.generate(house)}).title")
+    assert_equal 'visit #1 [163,16] · interior · entered from [162,0] · first f260 · 1 arrival', evaluate("nodeTip(#{JSON.generate(house)})")
+    world = { place: [162, 0], order: 2, kind: 'world', cell: [2, 10], first_frame: 9, arrivals: 3 }
+    assert_equal 'visit #2 [162,0] · world · world cell (2, 10) · first f9 · 3 arrivals', evaluate("nodeTip(#{JSON.generate(world)})")
+    assert_equal '#2 [162,0]', evaluate("nodeLines(#{JSON.generate(world)}).title")
     assert_equal '(4, 7) · 2 talks, 1 text · exhausted', evaluate("personText({row: 4, col: 7, attempts: 2, texts: 1, state: 'exhausted'})")
-    assert_equal({ 'nodes' => [], 'boxes' => {}, 'lines' => [], 'width' => 0, 'height' => 0 }, evaluate('mapView(null)'))
+    assert_equal({ 'nodes' => [], 'boxes' => {}, 'lines' => [], 'width' => 0, 'height' => 0, 'lane' => nil }, evaluate('mapView(null)'))
     assert_equal %w[free blocked mixed doubtful unknown], evaluate('legendEntries()').map { |e| e['word'] }
   end
 

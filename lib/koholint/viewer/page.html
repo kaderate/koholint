@@ -99,6 +99,8 @@
   .node { position: absolute; box-sizing: border-box; width: 112px; height: 58px; padding: 3px 5px; background: #20232a; border: 1px solid #445;
           color: #ccd; font: inherit; text-align: left; cursor: pointer; overflow: hidden; }
   .node.current { border: 2px solid #fd8; }
+  .node.attached { border-style: dashed; background: #1d2620; }
+  #map-lines line.lane { stroke: #333; stroke-dasharray: 6 4; stroke-width: 1; }
   .node.picked { background: #2a3550; }
   .node small { display: block; color: #9ab; }
   #place-grid { display: grid; grid-template-columns: repeat(10, 1fr); gap: 1px; max-width: 320px; aspect-ratio: 10 / 8; margin: 4px 0; }
@@ -616,7 +618,7 @@
     return rows;
   }
 
-  var NODE_W = 112, NODE_H = 58, NODE_GAP_X = 36, NODE_GAP_Y = 30;
+  var NODE_W = 112, NODE_H = 58, NODE_GAP_X = 8, NODE_GAP_Y = 8;
 
   function nodeBox(node) {
     return { left: node.x * (NODE_W + NODE_GAP_X) + 8, top: node.y * (NODE_H + NODE_GAP_Y) + 8, width: NODE_W, height: NODE_H };
@@ -627,8 +629,9 @@
   function nodeLines(node) {
     var people = Array.isArray(node.people) ? node.people.length : 0;
     var leads = Array.isArray(node.leads) ? node.leads.length : 0;
+    var kind = typeof node.kind === 'string' && node.kind !== 'world' ? node.kind + ' ' : '';
     return {
-      title: '#' + node.order + ' ' + formatPlace(node.place),
+      title: kind + '#' + node.order + ' ' + formatPlace(node.place),
       detail: (typeof node.coverage === 'number' ? node.coverage + '% known' : 'no grid') + (people ? ' · ' + plural(people, 'person') : '') + (leads ? ' · ' + plural(leads, 'lead') : '')
     };
   }
@@ -646,7 +649,15 @@
     });
     var width = 0, height = 0;
     nodes.forEach(function (n) { var b = boxes[placeKey(n.place)]; width = Math.max(width, b.left + NODE_W + 8); height = Math.max(height, b.top + NODE_H + 8); });
-    return { nodes: nodes, boxes: boxes, lines: lines, width: width, height: height };
+    var lane = Number.isInteger(map.lane) && map.lane > 0 ? (map.lane - 1) * (NODE_H + NODE_GAP_Y) + 8 + NODE_H / 2 : null;
+    return { nodes: nodes, boxes: boxes, lines: lines, width: width, height: height, lane: lane };
+  }
+
+  function nodeTip(node) {
+    var cell = Array.isArray(node.cell) ? ' · world cell (' + node.cell.join(', ') + ')' : '';
+    var parent = Array.isArray(node.parent) ? ' · entered from ' + formatPlace(node.parent) : '';
+    return 'visit #' + node.order + ' ' + formatPlace(node.place) + ' · ' + String(node.kind || 'other') + cell + parent +
+      ' · first f' + node.first_frame + ' · ' + plural(node.arrivals || 0, 'arrival');
   }
 
   function personText(p) {
@@ -1146,6 +1157,7 @@
     lines.setAttribute('width', String(view.width));
     lines.setAttribute('height', String(view.height));
     box.style.height = view.height ? Math.min(view.height, 520) + 'px' : '';
+    if (view.lane !== null) lines.appendChild(svgNode('line', { x1: 0, x2: view.width, y1: view.lane, y2: view.lane, class: 'lane' }));
     view.lines.forEach(function (l) {
       var line = svgNode('line', { x1: l.x1, y1: l.y1, x2: l.x2, y2: l.y2 });
       if (l.count > 1) line.setAttribute('stroke-width', String(Math.min(2 + l.count, 6)));
@@ -1156,14 +1168,14 @@
       var b = view.boxes[placeKey(n.place)];
       var node = document.createElement('button');
       node.type = 'button';
-      node.className = 'node' + (n.current ? ' current' : '') + (placeKey(n.place) === picked ? ' picked' : '');
+      node.className = 'node' + (n.kind && n.kind !== 'world' ? ' attached' : '') + (n.current ? ' current' : '') + (placeKey(n.place) === picked ? ' picked' : '');
       node.style.left = b.left + 'px';
       node.style.top = b.top + 'px';
       var text = nodeLines(n);
       var detail = document.createElement('small');
       detail.textContent = text.detail;
       node.append(text.title, detail);
-      node.title = text.title + ' · first f' + n.first_frame + ' · ' + plural(n.arrivals || 0, 'arrival');
+      node.title = nodeTip(n);
       node.addEventListener('click', function () { picked = placeKey(n.place); renderMap(lastMap); });
       box.appendChild(node);
     });
