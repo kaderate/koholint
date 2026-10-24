@@ -122,12 +122,13 @@ goal, leads — every `high` one, `normal` ones of the current place, never `low
 schema and reports cost and latency. Jev (tactical choices) is planned, not wired.
 
 **Run storage** — `run.rb`: `runs/<id>/` with `manifest.json` (flow version, ROM hash, tag, harness/prompts
-sha, model), `inputs.log`, `trace.jsonl` (events validated by `trace.rb`), `keyframes/`, `save/`, `prompts/`,
+sha, model), `inputs.log`, `trace.jsonl` (events validated by `trace.rb`), `keyframes/`, `save/`, `prompts/`, `screens/` (one PNG per place, written by `place_shots.rb`:
+observability only, no trace event, the set of captured places is rebuilt from the directory; `screens <run_dir>` backfills older runs by replay),
 `world.json` (`{ goal, leads }`, rewritten from the trace at every stop), `summary.json` (written at every stop by
 `summary.rb` from the trace only, versioned by `Summary::VERSION`: totals, cost by skill, decisions by agent and
 feature usage; `archive` rewrites an outdated one), `star.json`, `notes.md` (owner notes from the viewer). Trace events (`dialogue` may carry `speaker`, `conversation` and `cached`; a `talk_to` result may carry `entity`): `perception`, `decision`, `action`, `objective`, `dialogue`, `lead`, `goal`,
 `notable`, `screen`, `screen_changed`, `affordance`, `grid_contradiction`, `keyframe`, `save`, `budget_stop`, `stop`. `budget.rb` enforces frames,
-minutes, dollars and objective steps. `archive.rb` keeps a light bundle per run in git (trace gzipped);
+minutes, dollars and objective steps. `archive.rb` keeps a light bundle per run in git (trace gzipped, `screens/` included);
 heavy artifacts stay local. A run resumes only with the same `flow_version` and ROM hash; a change to the
 play flow means a new `flow_version`.
 
@@ -135,12 +136,12 @@ play flow means a new `flow_version`.
 run and seeks by restoring the nearest keyframe; `Feed` derives status, mode and alerts, feed, reasoning, objectives,
 goal, leads and the stitched dialogue history (newest first, with the person talked to and their state) from the trace
 up to the shown frame, and `Insights` the world map (places on the overworld grid or attached to the screen they were
-entered from, kinds from `data/place_kinds.json` via `place_kinds.rb`; exits taken, belief grids, people, leads), the timeline
+entered from, kinds from `data/place_kinds.json` via `place_kinds.rb`; exits taken, belief grids, people, leads, and a `screenshot` flag per place served by `/screens/<room>-<map>.png`), the timeline
 markers and the cost series, cached by trace and shown frame. `Explorer` and `Registry` serve past runs (list,
 read-only replays with pacing and seek, comparison via `run_compare.rb`, star, the run header and `notes.md`). It
 never writes game state; the only files it writes are `star.json`, `summary.json`'s `starred` and `notes.md`.
 
-**CLI** — `cli.rb`, `bin/koholint`: `run`, `resume`, `fork`, `verify`, `summary`, `watch`, `archive`, `star`,
+**CLI** — `cli.rb`, `bin/koholint`: `run`, `resume`, `fork`, `verify`, `summary`, `screens`, `watch`, `archive`, `star`,
 `prune-heavy`, `census` (modes, or `census entities`), `npcs` (`npc_catalogue.rb`: a markdown table of the people of all
 runs, their names and the distinct texts read with the milestone and the number of runs; writes nothing).
 

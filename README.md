@@ -31,7 +31,7 @@ bin/koholint archive --from /tmp/koholint-live --commit
 ```
 
 Commands: `run`, `resume <run_dir>`, `fork <run_dir> --at-frame N`, `verify <run_dir>`, `summary <run_dir>`,
-`watch <run_dir>`, `archive`, `star <run_dir> WHY`, `prune-heavy`, `census boot|<run_dir> FRAME...|entities <run_dir> FRAME...`,
+`screens <run_dir>`, `watch <run_dir>`, `archive`, `star <run_dir> WHY`, `prune-heavy`, `census boot|<run_dir> FRAME...|entities <run_dir> FRAME...`,
 `npcs [--root DIR]`.
 
 ## Running
@@ -141,7 +141,7 @@ dialogues, leads, explore stops, notables, stop; clustered past 300 markers; a c
 feed live); the world map of the places seen up to the shown frame (overworld screens on the 16-wide `room_id` grid,
 interiors and other places in a lane below, under the overworld screen they were entered from, kinds from
 `data/place_kinds.json`; visit order, exits taken, the current place, known cells, people and leads; a click shows
-that place's belief grid); and, folded at the bottom, the run header with a
+that place's belief grid, and its screenshot at 3x with a checkbox that overlays the belief grid; places with a screenshot show it as their node); and, folded at the bottom, the run header with a
 notes box. The map, timeline and stats are derived from the trace and cached by the shown frame.
 
 ### Past runs
@@ -155,6 +155,7 @@ run and serves the watched run without it):
 | `/runs`, `/runs.json` | Table of runs with a `summary.json`: sort by column; filter by minimum milestone, maximum dollars, tag, starred only; `$/call` and `free` (decisions not made by Claude); pick two runs to compare |
 | `/run/<id>` | The live page as a read-only replay of that run, from boot; `/frame.png?run=<id>` and `/state.json?run=<id>` serve it |
 | `/control?run=<id>&speed=1\|4\|16`, `&pause=0\|1` and `&seek=<frame>` | Drive a replay; `seek` restores the nearest keyframe at or before the frame (or replays from boot) and steps to it |
+| `/screens/<room>-<map>.png[?run=<id>]` | The screenshot taken the first time the run played that place (`runs/<id>/screens/`; 404 when missing; cached 30 s) |
 | `/map.json`, `/timeline.json`, `/stats.json`, `/header.json` | World map, run timeline, cost series and usage (with `reference`, the previous run's cost series), run header and notes |
 | `/compare/<a>/<b>`, `/compare.json?a=&b=` | Summaries, usage and cost by skill side by side with differing fields marked, and the first frame at which each run reached each milestone and place |
 | `POST /star?run=<id>` (form body `why=...`) | Same as `bin/koholint star`; the `Host` header must name the viewer itself and an `Origin` header, if sent, must match |
@@ -168,7 +169,7 @@ under the runs root (`[A-Za-z0-9_.-]`, no leading dot, no `..`); anything else i
 
 Every finished run is kept in git as a light bundle under `runs/<id>/` (about 60 KB): `manifest.json` (with `tag`,
 `harness_sha`, `prompts_sha`, `model`), `inputs.log`, `trace.jsonl.gz`, `world.json`, `suggestions.md`, `summary.json`
-(written by the engine at every stop), `star.json` when starred and `notes.md` when the owner wrote notes in the viewer. `summary.json` (`v: 2`) also holds `cost_by_skill`
+(written by the engine at every stop), `star.json` when starred and `notes.md` when the owner wrote notes in the viewer, and `screens/<room>-<map>.png` (one 160x144 screenshot per place, about 3-8 KB each, taken by the engine 20 frames after the place became playable). `bin/koholint screens <run_dir>` writes the missing ones for an older run by replaying its journal from boot (about one minute per 6000 frames; idempotent). `prune-heavy` keeps `screens/`. `summary.json` (`v: 2`) also holds `cost_by_skill`
 (model calls and dollars per skill), `decisions_by_agent` (free decisions included) and `usage` (goal changes, leads
 by importance, rejected leads, objectives by kind, `because` uses, talks, talks to a known target, dialogues). `prompts/`, `keyframes/`, `save/`, `video/`,
 `activity.json`, `run.lock` and the plain `trace.jsonl` are gitignored: saves and keyframes are derivable by replay.
