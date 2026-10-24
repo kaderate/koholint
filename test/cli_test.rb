@@ -96,6 +96,8 @@ class CliTest < Minitest::Test
     assert_equal 2, cli('census')[0]
     assert_equal 2, cli('census', 'runs/x')[0]
     assert_equal 2, cli('census', 'runs/x', 'twelve')[0]
+    assert_equal 2, cli('census', 'ready')[0]
+    assert_equal 2, cli('census', 'ready', 'runs/x', 'runs/y')[0]
   end
 
   def test_realtime_run_takes_wall_time

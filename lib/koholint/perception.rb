@@ -22,7 +22,9 @@ module Koholint
                     motion_blocked: read_byte.(:link_motion_blocked), scene_state: read_byte.(:scene_state),
                     link_motion_state: read_byte.(:link_motion_state), game_over_stage: read_byte.(:game_over_stage),
                     inventory_cursor: read_byte.(:inventory_cursor), menu_option: read_byte.(:menu_option),
-                    item_a: read_byte.(:inventory_slot_a), item_b: read_byte.(:inventory_slot_b))
+                    item_a: read_byte.(:inventory_slot_a), item_b: read_byte.(:inventory_slot_b),
+                    room_transition: read_byte.(:room_transition), link_airborne: read_byte.(:link_airborne),
+                    link_z: read_byte.(:link_z), link_knockback: read_byte.(:link_knockback))
     end
   end
 end
