@@ -87,6 +87,26 @@ class ExplorerTest < Minitest::Test
     raw(port, "POST /star?run=#{URI.encode_www_form_component(run)} HTTP/1.1\r\n#{headers.join("\r\n")}\r\n\r\n#{body}")
   end
 
+  def test_screens_route_serves_only_png_files_of_the_runs_screens_dir
+    with_root do |root|
+      FileUtils.mkdir_p(File.join(root, A, 'screens'))
+      File.binwrite(File.join(root, A, 'screens', '3-1.png'), "\x89PNG\r\n\x1a\nshot".b)
+      File.write(File.join(root, 'secret.png'), 'secret')
+      File.symlink(File.join(root, 'secret.png'), File.join(root, A, 'screens', '4-1.png'))
+      with_server(root) do |port, _|
+        response = get(port, "/screens/3-1.png?run=#{A}")
+        assert_equal '200', response.code
+        assert_equal 'image/png', response['Content-Type']
+        assert_equal 'max-age=30', response['Cache-Control']
+        assert_equal 'shot', response.body.b[8..]
+        ["/screens/9-9.png?run=#{A}", "/screens/4-1.png?run=#{A}", "/screens/3-1.png?run=#{B}", "/screens/3-1.png?run=nope", '/screens/3-1.png',
+         "/screens/3-1.png?run=..%2F#{A}", "/screens/../manifest.json?run=#{A}", "/screens/%2e%2e%2fmanifest.json?run=#{A}", "/screens/1234-1.png?run=#{A}",
+         "/screens/3-1.png%0a?run=#{A}", "/screens/3-1.PNG?run=#{A}", "/screens/3-1.png/x?run=#{A}"].each { |path| assert_equal '404', code(port, path), path }
+        assert_equal '400', code(port, "/screens/3-1.png?run=#{A}&x=1")
+      end
+    end
+  end
+
   def test_runs_json_lists_runs_with_a_summary_newest_first
     with_root do |root|
       make_run(root, '20261021-000000-0000', summary: nil)
