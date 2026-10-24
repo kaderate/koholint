@@ -33,6 +33,14 @@ class TalkLogTest < Minitest::Test
     assert_equal ['- at (2,4)-(3,5): never tried', '- at (4,7): never tried'], log.lines(g, [1, 2])
   end
 
+  def test_tried_ignores_entity_keyed_attempts
+    log = Koholint::TalkLog.new
+    log.record(place: PLACE, row: 4, col: 7, talked: true, entity: 62)
+    objects = Koholint::TalkLog.objects(grid([sprite(4, 7), sprite(1, 1)]))
+    assert log.tried?(objects, PLACE, [[4, 7]])
+    refute log.tried?(objects, PLACE, [[1, 1]])
+  end
+
   def test_singular_time
     log = Koholint::TalkLog.new
     log.record(place: PLACE, row: 4, col: 7, talked: true)

@@ -180,7 +180,7 @@ module Koholint
 
     def talked(place, cells) = cells.sum { |cell| @talked[[place, cell]] }
 
-    def tried?(objects, place, cells) = @attempts.any? { |(where, cell), _| where == place && owner_of(objects, cell) == cells }
+    def tried?(objects, place, cells) = @attempts.any? { |(where, cell), _| where == place && cell[0] != :entity && owner_of(objects, cell) == cells }
 
     private
 
