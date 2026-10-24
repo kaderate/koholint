@@ -38,7 +38,12 @@ module Koholint
       LOCKED_WAIT = { skill: 'wait', params: { frames: 30 } }.freeze
       LOCKED_WAIT_LIMIT_FRAMES = 900
       HEMMED_WAIT_LIMIT = 1800 / HEMMED_WAIT[:params][:frames]
-      MENU_SKILLS = %w[press wait].freeze
+      SCREEN_SKILLS = { menu: %w[menu_move menu_assign close_menu press wait], map: %w[close_map press wait], save: %w[choose_option press wait],
+                        game_over: %w[choose_option press wait], unknown: %w[press wait] }.freeze
+      SCREEN_ONLY = %w[close_menu close_map menu_move menu_assign choose_option].freeze
+      SCREEN_WAIT = { skill: 'wait', params: { frames: 5 } }.freeze
+      SCREEN_WAIT_LIMIT_FRAMES = 300
+      WAIT_PHASES = %i[locked cutscene].freeze
 
       def initialize(client:, registry:, objectives:, manual: '', on_step: nil, on_activity: nil, ledger: nil, triggers: nil, talk_log: nil, leads: nil, explore_log: nil)
         @explore_log = explore_log || ExploreLog.new
@@ -62,12 +67,12 @@ module Koholint
         @sequence = nil
         @agent_driven = false
         @locked_since = nil
-        @skill_point = DecisionPoint.choose_skill(registry)
-        @menu_point = DecisionPoint.choose_skill(Skills::Registry.new(MENU_SKILLS.map { |name| registry.fetch(name) }))
+        @skill_point = DecisionPoint.choose_skill(subset(registry, registry.names - SCREEN_ONLY))
+        @screen_points = SCREEN_SKILLS.transform_values { |names| DecisionPoint.choose_skill(subset(registry, names)) }
       end
 
       def decision_point_for(state)
-        return @menu_point if menu?(state)
+        return @screen_points.fetch(screen(state)) if screen(state)
         return @skill_point if locked_waiting?(state)
 
         @objectives.current ? @skill_point : DecisionPoint.choose_objective
@@ -78,6 +83,7 @@ module Koholint
           @ledger.reset_unless([state.room_id, state.map_id])
           @triggers.reset_unless([state.room_id, state.map_id])
         end
+        @screen_since = nil unless screen(state)
         release_hemmed(state)
         track_locked(state)
         track { @objectives.update(state, frame:) }
@@ -93,7 +99,9 @@ module Koholint
         context[:explore_log] = @explore_log
         remember_grid(state, context)
         drop_stale_sequence(state)
-        unless menu?(state)
+        if screen(state)
+          return screen_wait(state) if screen_settling?(state)
+        else
           automatic = automatic_advance(decision_point, state, context)
           return automatic if automatic
 
@@ -158,7 +166,22 @@ module Koholint
 
       private
 
-      def menu?(state) = state.phase(booted: true) == :menu
+      def screen(state) = state.phase(booted: true).then { |phase| phase if SCREEN_SKILLS.key?(phase) }
+
+      def subset(registry, names) = Skills::Registry.new((names & registry.names).map { |name| registry.fetch(name) })
+
+      def screen_settling?(state)
+        mode = state.mode
+        settling = mode && !mode.ready.empty? && !mode.ready?(state)
+        @screen_since = settling ? @screen_since || state.frame : nil
+        settling && state.frame - @screen_since < SCREEN_WAIT_LIMIT_FRAMES
+      end
+
+      def screen_wait(state)
+        @locked_wait = true
+        { choice: SCREEN_WAIT, justification: "#{state.mode.name}: waiting for the screen to settle", confidence: 1.0, agent: 'delegated',
+          latency_ms: 0, cost_usd: 0.0, fallback: false, prompt: nil, image: nil }
+      end
 
       def hook_doubt(ledger)
         ledger.on_doubt ||= method(:doubt)
@@ -388,7 +411,7 @@ module Koholint
       end
 
       def track_locked(state)
-        if state.phase == :locked
+        if WAIT_PHASES.include?(state.phase)
           unless @locked_since
             @locked_since = state.frame
             @objectives.touch(frame: state.frame)
@@ -403,7 +426,7 @@ module Koholint
 
       def locked_waiting?(state)
         track_locked(state)
-        state.phase == :locked && locked_frames(state) < LOCKED_WAIT_LIMIT_FRAMES
+        WAIT_PHASES.include?(state.phase) && locked_frames(state) < LOCKED_WAIT_LIMIT_FRAMES
       end
 
       def locked_wait
@@ -424,7 +447,7 @@ module Koholint
         @prompt = Agents::Context.build(state:, grid: grid_for(state, context), objective: @objectives.current, history: @objectives.history,
                                        attempts: @objectives.attempts_for_prompt, manual: @manual, last_results: @last_results, ledger: @ledger, refusals: @refusals, plan: @plan,
                                        triggers: @triggers, talk_log: @talk_log, locked: (@hemmed[:attempts] if @hemmed && hemmed?(state)),
-                                       locked_frames: (locked_frames(state) if state.phase == :locked), goal: goal_line, leads: @leads.all, stamp: stamp(state))
+                                       locked_frames: (locked_frames(state) if WAIT_PHASES.include?(state.phase)), goal: goal_line, leads: @leads.all, stamp: stamp(state))
         if decision_point.name == :choose_skill && @sequence
           @pages_read = @sequence[:pages].size
           @images = Vision::DialogueShot.sheets(@sequence[:pages], per_sheet: SHEET_PAGES)

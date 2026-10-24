@@ -4,6 +4,7 @@ require 'zlib'
 require 'koholint'
 require 'koholint/boot_script'
 require 'koholint/emulator'
+require 'koholint/input_log'
 require 'koholint/perception'
 
 module EmulatorCache
@@ -26,6 +27,8 @@ module EmulatorCache
 
     def interactive(expect_hash: nil) = fetch('interactive', expect_hash) { build_interactive }
 
+    def replayed(run_dir, frame) = fetch("#{File.basename(run_dir)}-#{frame}", nil) { replay(run_dir, frame) }
+
     private
 
     def build_interactive
@@ -41,6 +44,16 @@ module EmulatorCache
       EXIT_SETTLE_FRAMES.times { emulator.step }
       raise Koholint::Error, 'Link still locked after leaving the bed' unless moves?(emulator, :down)
 
+      emulator
+    end
+
+    def replay(run_dir, frame)
+      emulator = Koholint::Emulator.boot
+      Koholint::InputLog.new(File.join(run_dir, 'inputs.log')).each_frame do |buttons|
+        break if emulator.frame >= frame
+
+        emulator.step(buttons)
+      end
       emulator
     end
 

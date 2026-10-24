@@ -31,7 +31,7 @@ bin/koholint archive --from /tmp/koholint-live --commit
 ```
 
 Commands: `run`, `resume <run_dir>`, `fork <run_dir> --at-frame N`, `verify <run_dir>`, `summary <run_dir>`,
-`watch <run_dir>`, `archive`, `star <run_dir> WHY`, `prune-heavy`.
+`watch <run_dir>`, `archive`, `star <run_dir> WHY`, `prune-heavy`, `census boot|<run_dir> FRAME...`.
 
 ## Running
 
@@ -56,7 +56,7 @@ place, so the grid went dark). The live view has a grid toggle that overlays the
 visited places from the trace; `fork` branches a run at a frame. Both work on an archived run, also on a fresh clone
 (see Run storage).
 
-## Agent skills (`flow-8`)
+## Agent skills (`flow-9`)
 
 - `explore [direction]` explores by itself: it walks to the nearest frontier (a known cell next to an unknown one) or
   untried border exit (`direction` prefers that side), steps out, re-plans, and returns to the model only at an event:
@@ -76,8 +76,23 @@ visited places from the trace; `fork` branches a run at a frame. Both work on an
   to five leads (`quote`, `claim`, importance `high|normal|low`); a lead whose quote is not in that transcription is
   dropped. Both are trace events (`goal`, `lead`), shown in the context and the live view and written to `world.json`;
   an objective can cite the lead behind it (`because`).
+- Screens are modes of the catalogue `data/modes.json`: the context names the open screen, how to leave it, its inputs,
+  cursor and options, and offers only the skills that work there. `open_menu`/`close_menu` (START), `menu_move slot`
+  (inventory cursor 0-9), `menu_assign a|b` (swap the selected item with that button's item), `open_map`/`close_map`
+  (SELECT, B), `choose_option option` (save and game-over screens); used elsewhere they stop with `wrong_mode`. An
+  uncatalogued screen gets `press` and `wait` and a `notable` `unknown_mode` in the trace; 600 frames on it stop the
+  run as `unknown_mode_stuck`. Options that quit to the title are refused.
 - Scrolling dialogue pages are stitched into one text; the context remembers what each person said and whether talking
   again is worth it; `new_text` is an objective predicate; the live view lists the dialogues read.
+
+## Mode census
+
+`bin/koholint census <run_dir> FRAME...` replays the run's journal to each frame (states cached in `tmp/census/states/`)
+and, on throwaway copies, records every change of the mode tuple, a few watched bytes and a screen hash while it opens
+and drives the inventory, the map, the save screen and the game-over screen (reached by draining health with a RAM write
+in the copy only), and diffs RAM while moving their cursors. `census boot` records the boot modes idle and with a late
+START. Reports are written to `tmp/census/*.json` and feed `data/modes.json` and `data/addresses.json` (two different
+start states for `verified`).
 
 ## Live view
 

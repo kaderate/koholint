@@ -8,6 +8,14 @@ What the printed instruction booklet says about the mechanics.
 - A "!?" mark on the map shows important locations you need to visit to proceed through the game.
 - A "message" mark on the map marks a location where you heard an important message. Press A there to make the message appear again.
 
+## Screens
+
+- START opens the inventory during free play and START closes it; B does not close it. Directions move the cursor over ten item slots in two columns; A or B swaps the selected item with the item on that button; SELECT shows or hides a status panel.
+- SELECT opens the map outdoors; B or SELECT closes it. On the map, A shows the text of the square under the cursor.
+- Pressing A, B, START and SELECT together opens the save screen: return to the game, or save and quit to the title screen.
+- When health runs out, a game-over screen offers: save and continue, save and quit, or continue without saving.
+- Some scripted scenes ignore START and SELECT.
+
 ## Controls
 
 - A talks to people, reads signs, advances messages page by page and interacts with the world.

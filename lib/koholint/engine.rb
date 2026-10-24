@@ -1,4 +1,5 @@
 require 'digest'
+require 'set'
 require 'fileutils'
 require 'koholint/budget'
 require 'koholint/canonical_save'
@@ -6,6 +7,7 @@ require 'koholint/decision'
 require 'koholint/emulator'
 require 'koholint/keyframes'
 require 'koholint/leads'
+require 'koholint/modes'
 require 'koholint/perception'
 require 'koholint/replay'
 require 'koholint/run'
@@ -20,6 +22,7 @@ module Koholint
     AGENT_REFUSAL_LIMIT = 10
     STUCK_BOOT_FRAMES = 900
     STUCK_BOOT_ANY_FRAMES = 3600
+    STUCK_UNKNOWN_FRAMES = 600
 
     def self.resume(run_path, budget:, policy: nil, policy_factory: nil, flow_version: Koholint::FLOW_VERSION, **options)
       run = Run.open(run_path, flow_version: flow_version)
@@ -43,7 +46,9 @@ module Koholint
       @keyframes = Keyframes.new(File.join(run.dir, 'keyframes'))
       @builder = Vision::GridBuilder.new(trace: run.trace, beliefs: known_beliefs(run)) if grid
       @ram_hash = Digest::SHA256.hexdigest(@emulator.cartridge_ram)
-      @played = GameState.played?(Trace.read(File.join(run.dir, 'trace.jsonl')))
+      events = Trace.read(File.join(run.dir, 'trace.jsonl'))
+      @played = GameState.played?(events)
+      @unknown_modes = events.filter_map { |event| event['detail'] if event['type'] == 'notable' && event['kind'] == 'unknown_mode' }.to_set
     end
 
     def request_stop
@@ -74,6 +79,7 @@ module Koholint
       state = Perception.read(@emulator)
       @run.trace.emit(:perception, frame: state.frame, state: state.to_h, state_hash: @emulator.state_hash)
       @played ||= state.game_mode == PLAY_MODE
+      note_unknown_mode(state)
       if @builder
         activity(:mapping, 'mapping the screen')
         grid = @builder.observe(@emulator, state)
@@ -144,6 +150,15 @@ module Koholint
       rejected = result[:leads_rejected].to_i
       @run.trace.emit(:notable, frame: state.frame, kind: 'lead_rejected', detail: "#{rejected} leads whose quote is not in the transcription") if rejected.positive?
       @run.trace.emit(:goal, frame: state.frame, text: result[:goal]) if result[:goal]
+    end
+
+    def note_unknown_mode(state)
+      return @unknown_since = nil unless @played && state.phase(booted: true) == :unknown
+
+      @unknown_since ||= state.frame
+      @budget.stop!(:unknown_mode_stuck) if state.frame - @unknown_since > STUCK_UNKNOWN_FRAMES
+      detail = Modes.tuple(state).map { |field, value| "#{field}=#{value}" }.join(' ')
+      @run.trace.emit(:notable, frame: state.frame, kind: 'unknown_mode', detail:) if @unknown_modes.add?(detail)
     end
 
     def note_fallback(result)

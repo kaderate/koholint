@@ -737,19 +737,55 @@ class DelegatedPolicyTest < Minitest::Test
     assert_empty client.calls
   end
 
-  def test_a_menu_asks_the_agent_with_press_and_wait_only_and_no_lock_or_dialogue_handling
+  def test_a_settled_menu_asks_the_agent_with_the_menu_skills_and_no_lock_or_dialogue_handling
     press = ok('skill' => 'press', 'params' => { 'button' => 'b', 'frames' => 3 })
     client = ScriptedClient.new(skill: press)
     p = policy(client)
-    menu = state(game_mode: 0x0C, game_submode: 5, dialog_state: 1, motion_blocked: 2)
+    menu = state(game_mode: 0x0C, game_submode: 8, dialog_state: 1, motion_blocked: 2)
     p.observe(menu, frame: 100)
     point, result = decide(p, menu)
     assert_equal :choose_skill, point.name
-    assert_equal %w[press wait], point.registry.names
+    assert_equal %w[menu_move menu_assign close_menu press wait], point.registry.names
     assert_equal 'claude', result[:agent]
     assert_equal({ skill: 'press', params: { 'button' => 'b', 'frames' => 3 } }, result[:choice])
     assert_includes client.calls.last[:prompt], 'Phase: menu'
-    assert_includes client.calls.last[:prompt], 'B or START usually closes it'
+    assert_includes client.calls.last[:prompt], 'Screen: inventory (menu)'
+    assert_includes client.calls.last[:prompt], 'To leave: START closes it'
+  end
+
+  def test_a_menu_still_opening_waits_without_calling_the_agent
+    client = ScriptedClient.new
+    p = policy(client)
+    opening = state(game_mode: 0x0C, game_submode: 1)
+    _point, result = decide(p, opening)
+    assert_equal({ skill: 'wait', params: { frames: 5 } }, result[:choice])
+    assert_equal 'delegated', result[:agent]
+    assert_empty client.calls
+  end
+
+  def test_the_screen_settling_clock_restarts_after_leaving_the_screen
+    client = ScriptedClient.new
+    p = policy(client)
+    opening = ->(frame) { state(frame:, game_mode: 0x0C, game_submode: 1) }
+    p.observe(opening.(100), frame: 100)
+    decide(p, opening.(100))
+    p.observe(state(frame: 2000), frame: 2000)
+    assert_nil p.instance_variable_get(:@screen_since)
+    p.observe(opening.(2100), frame: 2100)
+    _point, result = decide(p, opening.(2100))
+    assert_equal 'delegated', result[:agent]
+    assert_empty client.calls
+  end
+
+  def test_each_screen_offers_its_own_skills_and_play_offers_no_screen_only_skill
+    p = policy(ScriptedClient.new)
+    assert_equal %w[close_map press wait], p.decision_point_for(state(game_mode: 7, game_submode: 5)).registry.names
+    assert_equal %w[choose_option press wait], p.decision_point_for(state(game_mode: 6, game_submode: 5)).registry.names
+    assert_equal %w[choose_option press wait], p.decision_point_for(state(game_mode: 11, game_submode: 7, link_motion_state: 7, game_over_stage: 4)).registry.names
+    assert_equal %w[press wait], p.decision_point_for(state(game_mode: 0x0D, game_submode: 1)).registry.names
+    play = Koholint::Policies::Delegated::SCREEN_ONLY & p.instance_variable_get(:@skill_point).registry.names
+    assert_empty play
+    assert_includes p.instance_variable_get(:@skill_point).registry.names, 'open_menu'
   end
 
   def test_the_locked_cap_hands_the_decision_back_to_the_agent_with_a_note

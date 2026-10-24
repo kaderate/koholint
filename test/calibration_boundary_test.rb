@@ -2,22 +2,33 @@ require 'test_helper'
 
 class CalibrationBoundaryTest < Minitest::Test
   ROOT = File.expand_path('..', __dir__)
-  AGENT_SIDE = Dir[File.join(ROOT, 'lib/koholint/policies/**/*.rb')] +
+  AGENT_SIDE = %w[policies skills agents].flat_map { |dir| Dir[File.join(ROOT, "lib/koholint/#{dir}/**/*.rb")] } +
                %w[decision engine].map { |name| File.join(ROOT, "lib/koholint/#{name}.rb") }
+  MEMORY = %w[poke debug_write instance_variable_get instance_variable_set mmu motherboard .fill(].freeze
   FORBIDDEN = %w[write poke instance_variable_get instance_variable_set send public_send __send__ mmu motherboard const_get .fill(].freeze
 
   def self.violations(source) = FORBIDDEN.select { |token| source.include?(token) }
 
   def test_agent_side_code_never_references_calibration
     refute_empty AGENT_SIDE
-    offenders = AGENT_SIDE.select { |path| File.read(path).match?(%r{Calibration|calibration/}) }
+    offenders = AGENT_SIDE.select { |path| File.read(path).match?(%r{Calibration|calibration/|Probes|probes/}) }
     assert_empty offenders
+  end
+
+  def test_agent_side_code_never_touches_emulator_memory
+    assert(AGENT_SIDE.any? { |path| path.include?('/skills/') } && AGENT_SIDE.any? { |path| path.include?('/agents/') })
+    assert_empty(AGENT_SIDE.select { |path| MEMORY.any? { |token| File.read(path).include?(token) } })
   end
 
   def test_only_the_grid_builder_uses_calibration_outside_it
     outside = Dir[File.join(ROOT, 'lib/**/*.rb')].reject { |path| path.start_with?(File.join(ROOT, 'lib/koholint/calibration/')) }
     users = outside.select { |path| File.read(path).match?(%r{Calibration|calibration/}) }
     assert_equal [File.join(ROOT, 'lib/koholint/vision/grid_builder.rb')], users
+  end
+
+  def test_only_the_cli_uses_the_probes
+    outside = Dir[File.join(ROOT, 'lib/**/*.rb')].reject { |path| path.start_with?(File.join(ROOT, 'lib/koholint/probes/')) }
+    assert_equal [File.join(ROOT, 'lib/koholint/cli.rb')], outside.select { |path| File.read(path).match?(%r{Probes|probes/}) }
   end
 
   def test_calibration_code_never_writes_emulator_memory

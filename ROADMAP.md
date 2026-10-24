@@ -17,7 +17,7 @@ Only what is left to do. When something lands, delete it here (git is the histor
 10. **Real-time play** — the emulator stays paused between decisions; an optional `--live-clock` with pause-on-danger and a reflex layer (Jev or deterministic) is undecided.
 
 ## Open decisions and loose ends
-- Addresses at `verified_count: 1` need a second independent check (`game_mode`, `game_submode`, `name_length`, `max_hearts`, `dialog_state`).
+- Addresses at `verified_count: 1` need a second independent check (`name_length`, `max_hearts`, `dialog_state`).
 - Ladder beyond shield and sword; whether a run may inherit a map, a goal or leads from a previous run.
 - Dialogues and people: a text is attributed to the last successful `talk_to` target (a text that opens by itself, or a person who moved, is not attributed; people who moved split into two entries); a dialogue longer than the page limit is read page by page and counts as several talks; the world stamp (milestone, places visited, leads) misses other changes such as items; `new_text` and people's memory compare letters and digits only, so a transcription variant beyond punctuation counts as new; stitching joins on an overlap of 7+ characters that starts on a word and may end mid-word (a scrolling box cuts words), so a real repeated phrase of that length across two pages is merged once.
 - Leads: sheets are attached only to `choose_skill`, so an objective chosen right after a dialogue cannot cite its leads yet; the lead `source` is the last `talk_to` target cell, null for texts that opened by themselves.
@@ -39,4 +39,8 @@ Only what is left to do. When something lands, delete it here (git is the histor
 - `explore`: next steps are a candidate menu (the model picks among the frontiers and exits the engine lists) and place labels; its walked cells and walls are per-place memory outside the beliefs (not appearance evidence), an exit whose step opens a dialogue by itself is skipped silently (not listed in `no_frontier`), and its `untried_object` range (3 cells) and leg/outward frame limits are unmeasured.
 - Agent loop deferred: a failed sheet call loses the dialogue pages (their PNGs remain under `prompts/`).
 - Explore: border exits are tried blindly (no passability or static-sprite check) and a dead border cell costs two paid calls before it is marked tried.
-- Game modes are not catalogued: needs a mode census (START menu, SELECT map...) stored in `data/modes.json` with provenance; today any non-play mode once past boot is the `menu` phase.
+- Game modes left to measure: game modes 1, 4, 5, 8, 9, 10 and above 12 (credits, file copy and delete, other scripted scenes) are not in `data/modes.json`; they surface as `unknown` with a `notable` `unknown_mode`. Dialogue choices inside a text box (yes/no) are not modelled; signs and objects were not probed apart from people's dialogues.
+- `scene_lock` (`scene_state` 1, phase `locked`) stays a hypothesis: run 20261022-111719-ac88 read it at frame 8220 while START and SELECT worked, so the `locked` phase may hold free play until the 900-frame cap; probe it.
+- Map: the map cursor did not move in either census state and its address is unknown; only `open_map`/`close_map` exist.
+- `save_game` skill: the save screen is measured (mode 6, settled submode 5, arrow `menu_option`, option 1 saves and quits to the opening scenes); it needs the boot script to resume from the title after quitting and a check that the cartridge RAM changed. The four-button combination is not reachable through `press` (one button).
+- The game ignores START and SELECT about 12 frames after returning to play and a SELECT shorter than 4 frames; the screen skills repeat an unanswered press, the exact windows are unmeasured.
