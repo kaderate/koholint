@@ -88,4 +88,32 @@ class ModesTest < Minitest::Test
     assert_equal :boot, state(game_mode: 0x0D, game_submode: 1).phase
     assert_equal :boot, state(game_mode: 12, game_submode: 8).phase
   end
+
+  def test_values_must_be_bytes_and_lists_non_empty
+    assert_raises(Koholint::Modes::Invalid) { load([entry('a', { 'game_mode' => [] })]) }
+    assert_raises(Koholint::Modes::Invalid) { load([entry('a', { 'game_mode' => 256 })]) }
+    assert_raises(Koholint::Modes::Invalid) { load([entry('a', { 'game_mode' => [-1, 3] })]) }
+    assert_raises(Koholint::Modes::Invalid) { load([entry('a', { 'game_mode' => { 'not' => [300] } })]) }
+  end
+
+  def test_counts_and_keys_are_strict
+    assert_raises(Koholint::Modes::Invalid) { load([entry('a', { 'game_mode' => 1 }, verified_count: '2')]) }
+    assert_raises(Koholint::Modes::Invalid) { load([entry('a', { 'game_mode' => 1 }, colour: 'green')]) }
+  end
+
+  def test_cursor_and_options_must_agree_with_the_addresses
+    cursor = { 'field' => 'menu_option', 'addr' => '0xC13F', 'count' => 2 }
+    load([entry('a', { 'game_mode' => 6 }, cursor:, options: [{ 'text' => 'back' }, { 'text' => 'quit', 'quits' => true }])])
+    assert_raises(Koholint::Modes::Invalid) { load([entry('a', { 'game_mode' => 6 }, cursor:, options: [{ 'text' => 'back' }])]) }
+    assert_raises(Koholint::Modes::Invalid) { load([entry('a', { 'game_mode' => 6 }, cursor: cursor.merge('field' => 'nowhere'))]) }
+    assert_raises(Koholint::Modes::Invalid) { load([entry('a', { 'game_mode' => 6 }, options: [{ 'text' => 'back' }])]) }
+    assert_raises(Koholint::Modes::Invalid) { load([entry('a', { 'game_mode' => 6 }, cursor:, options: [{ 'text' => 'a' }, { 'text' => 'b', 'quits' => 'yes' }])]) }
+  end
+
+  def test_quitting_options_are_flagged_and_hidden_from_choices
+    over = Koholint::Modes.catalogue.find { |mode| mode.name == 'game_over' }
+    assert over.quits?(1)
+    assert_equal [0, 2], over.choices.map(&:first)
+    assert_equal [0], Koholint::Modes.catalogue.find { |mode| mode.name == 'save_screen' }.choices.map(&:first)
+  end
 end

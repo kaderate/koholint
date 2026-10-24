@@ -239,6 +239,7 @@ module Koholint
           end
 
           def screen_input(state)
+            return finish(:refused) if @frames.zero? && mode(state).quits?(@target)
             return confirm(state) if @confirming
 
             move(state, cursor_of(state)) do
@@ -249,8 +250,8 @@ module Koholint
 
           def confirm(state)
             elapsed = @frames - @confirming
-            return [:a] if elapsed < HOLD
             return finish(:done) if Screens.mode_name(state) != @screen
+            return [:a] if elapsed < HOLD
             return finish(:no_response) if elapsed >= HOLD + LIMIT
 
             []
@@ -260,13 +261,15 @@ module Koholint
         end
 
         def params_schema
-          { type: 'object', title: name, properties: { option: { type: 'integer', minimum: 0, maximum: 2 } }, required: %w[option],
+          { type: 'object', title: name, properties: { option: { type: 'integer', minimum: 0, maximum: last } }, required: %w[option],
             additionalProperties: false }
         end
 
+        def last = Modes.option_limit - 1
+
         def normalize(params)
           params = Skills.symbolize(params, %i[option])
-          raise ArgumentError, 'choose_option: option must be 0..2' unless params[:option].is_a?(Integer) && params[:option].between?(0, 2)
+          raise ArgumentError, "choose_option: option must be 0..#{last}" unless params[:option].is_a?(Integer) && params[:option].between?(0, last)
 
           { option: params[:option] }
         end

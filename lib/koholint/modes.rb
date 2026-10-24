@@ -12,6 +12,9 @@ module Koholint
     PHASES = %w[boot loading playing locked dialogue menu map save game_over cutscene].freeze
     CONFIDENCES = %w[hypothesis verified].freeze
     REQUIRED = %w[name kind phase match enter exit inputs source confidence verified_count].freeze
+    KEYS = (REQUIRED + %w[ready cursor options note]).freeze
+    CURSOR_KEYS = %w[field addr count columns wraps].freeze
+    OPTION_KEYS = %w[text quits].freeze
     BYTES = Set.new(0..255).freeze
     IN_PLAY = %i[loading playing locked dialogue cutscene game_over].freeze
 
@@ -26,6 +29,10 @@ module Koholint
       def refines?(other) = (sets.keys | other.sets.keys).all? { |field| set(field).subset?(other.set(field)) }
 
       def set(field) = sets.fetch(field, BYTES)
+
+      def choices = (options || []).each_with_index.reject { |option, _| option['quits'] }.map { |option, index| [index, option['text']] }
+
+      def quits?(index) = options&.dig(index, 'quits') == true
     end
 
     module_function
@@ -66,9 +73,38 @@ module Koholint
       raise Invalid, "#{name}: unknown kind #{entry['kind']}" unless KINDS.include?(entry['kind'])
       raise Invalid, "#{name}: unknown phase #{entry['phase']}" unless PHASES.include?(entry['phase'])
       raise Invalid, "#{name}: unknown confidence #{entry['confidence']}" unless CONFIDENCES.include?(entry['confidence'])
-      raise Invalid, "#{name}: verified needs verified_count >= 2" if entry['confidence'] == 'verified' && entry['verified_count'].to_i < 2
+      raise Invalid, "#{name}: verified_count must be a non-negative integer" unless entry['verified_count'].is_a?(Integer) && entry['verified_count'] >= 0
+      raise Invalid, "#{name}: verified needs verified_count >= 2" if entry['confidence'] == 'verified' && entry['verified_count'] < 2
       raise Invalid, "#{name}: match must be a non-empty object" unless entry['match'].is_a?(Hash) && !entry['match'].empty?
+      unknown = entry.keys - KEYS
+      raise Invalid, "#{name}: unknown keys #{unknown.join(', ')}" unless unknown.empty?
+
+      validate_cursor!(name, entry['cursor'], entry['options'])
     end
+
+    def validate_cursor!(name, cursor, options)
+      raise Invalid, "#{name}: options need a cursor" if options && !cursor
+      return unless cursor
+
+      raise Invalid, "#{name}: cursor must be an object" unless cursor.is_a?(Hash)
+      unknown = cursor.keys - CURSOR_KEYS
+      raise Invalid, "#{name}: unknown cursor keys #{unknown.join(', ')}" unless unknown.empty?
+      raise Invalid, "#{name}: cursor field #{cursor['field']} is not in data/addresses.json" unless address_names.include?(cursor['field'])
+      raise Invalid, "#{name}: cursor count must be a positive integer" unless cursor['count'].is_a?(Integer) && cursor['count'].positive?
+      return unless options
+
+      raise Invalid, "#{name}: #{options.size} options for a cursor of #{cursor['count']}" unless options.is_a?(Array) && options.size == cursor['count']
+
+      options.each do |option|
+        raise Invalid, "#{name}: an option needs a text" unless option.is_a?(Hash) && option['text'].is_a?(String)
+        raise Invalid, "#{name}: unknown option keys" unless (option.keys - OPTION_KEYS).empty?
+        raise Invalid, "#{name}: quits must be true or absent" unless [nil, true].include?(option['quits'])
+      end
+    end
+
+    def address_names = @address_names ||= JSON.parse(File.read(File.expand_path('../../data/addresses.json', __dir__))).map { |entry| entry['name'] }
+
+    def option_limit = catalogue.filter_map { |mode| mode.cursor['count'] if mode.options }.max
 
     def validate_catalogue!(modes)
       duplicate = modes.map(&:name).tally.find { |_, count| count > 1 }
@@ -94,8 +130,11 @@ module Koholint
 
     def values(name, spec)
       case spec
-      when Integer then Set[spec]
-      when Array then spec.all?(Integer) ? Set.new(spec) : raise(Invalid, "#{name}: values must be integers")
+      when Integer then byte(name, spec) && Set[spec]
+      when Array
+        raise Invalid, "#{name}: empty value list" if spec.empty?
+
+        Set.new(spec.map { |value| byte(name, value) })
       when 'nonzero' then BYTES - Set[0]
       when Hash
         raise Invalid, "#{name}: only {\"not\": ...} is allowed" unless spec.keys == ['not']
@@ -103,6 +142,12 @@ module Koholint
         BYTES - values(name, spec['not'])
       else raise Invalid, "#{name}: bad value #{spec.inspect}"
       end
+    end
+
+    def byte(name, value)
+      raise Invalid, "#{name}: #{value.inspect} is not a byte" unless value.is_a?(Integer) && BYTES.include?(value)
+
+      value
     end
   end
 end

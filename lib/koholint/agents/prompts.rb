@@ -37,7 +37,7 @@ module Koholint
         menu_move moves the inventory cursor to a slot (0-9, two columns, left to right then top to bottom).
         menu_assign swaps the item under the inventory cursor with the item on the A or B button.
         open_map opens the map with SELECT during free play; close_map closes it.
-        choose_option moves the arrow of a save or game-over screen to an option (0 = top) and confirms it with A.
+        choose_option moves the arrow of a save or game-over screen to one of the listed options (0 = top) and confirms it with A; quitting to the title is refused.
         People may say more when talked to again: talk to the same person again while each talk gives a new text, and stop when the listing says exhausted. Come back to people when the listing says worth retrying after something changed (a new place reached, a new lead). Texts from people can name places or tasks: treat them as leads.
         A dialogue that opens by itself is triggered by the game and may repeat while you stay where it triggers. The context lists the things on screen with how many times you talked to each: people or objects you have never tried to talk to are worth trying before repeating an action that keeps failing.
         Do not repeat a skill that just stopped the same way from the same state; try something different or gather information. When on-screen text matters, transcribe it in the optional transcription field. When an image is attached it shows the top and the bottom of the screen stacked; a dialogue box may be in either.

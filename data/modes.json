@@ -48,7 +48,7 @@
    "exit": {"buttons": ["a"], "text": "move the arrow with up/down and confirm with A"},
    "inputs": {"up/down": "move the arrow", "a": "confirm the option"},
    "cursor": {"field": "menu_option", "addr": "0xC13F", "count": 3, "wraps": true},
-   "options": ["save and continue", "save and quit to the title screen", "continue without saving"],
+   "options": [{"text": "save and continue"}, {"text": "save and quit to the title screen", "quits": true}, {"text": "continue without saving"}],
    "source": "probe_2026-10-22: both census states; options 0 and 2 resume play with full health, option 1 goes to the opening scenes (game mode 0)", "confidence": "verified", "verified_count": 2},
   {"name": "inventory", "kind": "menu", "phase": "menu", "match": {"game_mode": 12}, "ready": {"game_submode": 8},
    "enter": {"buttons": ["start"], "text": "START during free play (it does nothing in some scripted scenes)"},
@@ -67,6 +67,6 @@
    "exit": {"buttons": ["a"], "text": "A on the first option, B or START return to the game"},
    "inputs": {"up/down": "move the arrow", "a": "confirm the option", "b": "return to the game", "start": "return to the game"},
    "cursor": {"field": "menu_option", "addr": "0xC13F", "count": 2, "wraps": true},
-   "options": ["return to the game", "save and quit to the title screen"],
+   "options": [{"text": "return to the game"}, {"text": "save and quit to the title screen", "quits": true}],
    "source": "probe_2026-10-22: both census states; option 1 goes to the opening scenes (game mode 0)", "confidence": "verified", "verified_count": 2}
 ]

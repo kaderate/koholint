@@ -360,7 +360,8 @@ class AgentsContextTest < Minitest::Test
     assert_includes text, 'Phase: game_over'
     assert_includes text, 'Screen: game_over (game_over)'
     assert_includes text, "To leave: #{Koholint::Modes.catalogue.find { |m| m.name == 'game_over' }.exit['text']}"
-    assert_includes text, 'Options: 0 save and continue, 1 save and quit to the title screen, 2 continue without saving'
+    assert_includes text, 'Options (choose_option): 0 save and continue, 2 continue without saving'
+    refute_includes text, 'quit'
     assert_includes text, 'Cursor: menu option 1 of 0..2'
     refute_includes screen_header, 'Screen:'
   end

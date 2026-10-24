@@ -113,12 +113,29 @@ class ScreensTest < Minitest::Test
     assert_equal 9, result[:item_a]
   end
 
-  def test_choose_option_moves_the_arrow_and_confirms
-    result, after = drive('choose_option', { option: 1 }, state(game_mode: 6, game_submode: 5))
-    assert_equal :done, result[:stopped_by]
-    assert_equal 0, after.game_mode
-    assert_equal :done, drive('choose_option', { option: 0 }, state(game_mode: 6, game_submode: 5)).first[:stopped_by]
+  def test_choose_option_moves_the_arrow_confirms_and_releases_a_once_the_screen_left
+    start = state(game_mode: 6, game_submode: 5, menu_option: 1)
+    screen = Screen.new(start)
+    execution = registry.start('choose_option', start, { option: 0 })
+    inputs = []
+    while (buttons = execution.next_input(screen.state))
+      inputs << buttons
+      screen.feed(buttons)
+    end
+    assert_equal :done, execution.stopped_by
+    assert_equal [11, 2], [screen.state.game_mode, screen.state.game_submode]
+    assert_equal 1, inputs.count { |buttons| buttons.include?(:a) }
     assert_equal :wrong_mode, drive('choose_option', { option: 2 }, state(game_mode: 6, game_submode: 5)).first[:stopped_by]
+  end
+
+  def test_choose_option_refuses_an_option_that_quits_to_the_title
+    result, after = drive('choose_option', { option: 1 }, state(game_mode: 6, game_submode: 5))
+    assert_equal :refused, result[:stopped_by]
+    assert_equal 0, result[:frames]
+    assert_equal 6, after.game_mode
+    over = state(link_motion_state: 7, game_over_stage: 4)
+    assert_equal :refused, drive('choose_option', { option: 1 }, over).first[:stopped_by]
+    assert_equal 2, registry.fetch('choose_option').params_schema.dig(:properties, :option, :maximum)
   end
 
   def run_skill(emulator, name, params)

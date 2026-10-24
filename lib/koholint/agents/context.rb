@@ -100,7 +100,7 @@ module Koholint
         lines << "Inputs: #{mode.inputs.map { |input, effect| "#{input} #{effect}" }.join('; ')}" unless mode.inputs.empty?
         cursor = mode.cursor
         lines << "Cursor: #{cursor['field'].tr('_', ' ')} #{state[cursor['field'].to_sym]} of 0..#{cursor['count'] - 1}" if cursor
-        lines << "Options: #{mode.options.each_with_index.map { |text, i| "#{i} #{text}" }.join(', ')}" if mode.options
+        lines << "Options (choose_option): #{mode.choices.map { |index, text| "#{index} #{text}" }.join(', ')}" if mode.options
         lines << "Item ids on the buttons: A #{state.item_a.to_i}, B #{state.item_b.to_i} (0 = empty)" if mode.kind == 'menu'
         lines
       end
