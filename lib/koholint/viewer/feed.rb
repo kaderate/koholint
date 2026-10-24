@@ -7,6 +7,7 @@ require 'koholint/trace'
 require 'koholint/vision/capabilities'
 require 'koholint/vision/grid_builder'
 require 'koholint/vision/world'
+require 'koholint/place_shots'
 require 'koholint/viewer/insights'
 
 module Koholint
@@ -109,12 +110,13 @@ module Koholint
         full = trace_events(run_dir)
         shown = kind == :timeline ? full.size : visible(full, kind == :map ? follower.frame : upto)
         frames = kind == :timeline ? follower.journal_frames : nil
+        shots = kind == :map ? PlaceShots.names(run_dir).sort : nil
         CACHE_LOCK.synchronize do
           entry = INSIGHT_CACHE[[run_dir, kind]]
-          return remember(INSIGHT_CACHE, [run_dir, kind], entry, limit: INSIGHT_LIMIT)[:value] if entry && same_trace?(entry[:source], full) && entry[:key] == [shown, frames]
+          return remember(INSIGHT_CACHE, [run_dir, kind], entry, limit: INSIGHT_LIMIT)[:value] if entry && same_trace?(entry[:source], full) && entry[:key] == [shown, frames, shots]
         end
         value = compute(kind, run_dir, full, shown, follower, frames)
-        CACHE_LOCK.synchronize { remember(INSIGHT_CACHE, [run_dir, kind], { source: WeakRef.new(full), key: [shown, frames], value: }, limit: INSIGHT_LIMIT) }
+        CACHE_LOCK.synchronize { remember(INSIGHT_CACHE, [run_dir, kind], { source: WeakRef.new(full), key: [shown, frames, shots], value: }, limit: INSIGHT_LIMIT) }
         value
       end
 
@@ -129,7 +131,7 @@ module Koholint
         case kind
         when :map
           lists = grid_events(trace)
-          Insights.map(trace, screens: lists[:screens], affordances: lists[:affordances], frame: follower.frame)
+          Insights.map(trace, screens: lists[:screens], affordances: lists[:affordances], frame: follower.frame, shots: PlaceShots.places(run_dir))
         when :timeline then Insights.timeline(trace, frames:).merge(run_id: File.basename(run_dir))
         when :stats then Insights.stats(trace).merge(run_id: File.basename(run_dir), frames: [follower.journal_frames.to_i, trace.last&.fetch('frame', 0).to_i].max)
         end
