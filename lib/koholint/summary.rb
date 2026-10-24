@@ -12,7 +12,7 @@ module Koholint
     TERMINAL = %w[achieved abandoned failed].freeze
     DETERMINISTIC_AGENTS = %w[start_game walk_and_talk].freeze
     FILE = 'summary.json'.freeze
-    VERSION = 2
+    VERSION = 3
     LEAD_TIERS = %w[high normal low].freeze
     MANIFEST_KEYS = %w[flow_version tag harness_sha prompts_sha model].freeze
 
