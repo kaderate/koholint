@@ -24,7 +24,7 @@ require 'koholint/viewer'
 module Koholint
   module CLI
     USAGE = 'usage: koholint run|resume <run_dir>|fork <run_dir> --at-frame N|verify <run_dir>|summary <run_dir>|watch <run_dir>|' \
-            'archive|star <run_dir> WHY|prune-heavy|census boot|<run_dir> FRAME... ' \
+            'archive|star <run_dir> WHY|prune-heavy|census boot|<run_dir> FRAME...|entities <run_dir> FRAME... ' \
             '[--frames N --minutes N --steps N --dollars X --root DIR --runs-root DIR --tag NAME --realtime --grid --port N --host H --from live|start|DIR ' \
             '--speed X --agent --model M --max-dollars X --claude-command PATH --commit --full --keep N --yes]'.freeze
 
@@ -111,12 +111,24 @@ module Koholint
     end
 
     def census(args, out)
+      return census_entities(args.drop(1), out) if args.first == 'entities'
+
       require 'koholint/probes/mode_census'
       raise OptionParser::MissingArgument, 'boot or <run_dir> FRAME...' unless args.first == 'boot' || args.size > 1
 
       census = Probes::ModeCensus
       paths = args.first == 'boot' ? [census.census_boot] : census.census(run_dir(args), args.drop(1).map { |frame| Integer(frame) })
       paths.each { |path| out.puts "census #{path}" }
+      0
+    rescue ArgumentError => e
+      raise OptionParser::InvalidArgument, e.message
+    end
+
+    def census_entities(args, out)
+      require 'koholint/probes/entity_census'
+      raise OptionParser::MissingArgument, 'entities <run_dir> FRAME...' unless args.size > 1
+
+      Probes::EntityCensus.census(run_dir(args), args.drop(1).map { |frame| Integer(frame) }).each { |path| out.puts "census #{path}" }
       0
     rescue ArgumentError => e
       raise OptionParser::InvalidArgument, e.message

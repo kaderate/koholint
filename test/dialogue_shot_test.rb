@@ -49,4 +49,55 @@ class DialogueShotTest < Minitest::Test
     _, _, rows = decode(Koholint::Vision::DialogueShot.sheets(pages).first)
     assert_equal [1, 2, 3], [0, 384, 768].map { |y| rows[y].getbyte(0) }
   end
+
+  DARK = [27, 42, 9].pack('C3')
+  LIGHT = [154, 158, 63].pack('C3')
+  MID = [73, 107, 34].pack('C3')
+
+  def page(box_band:, text:, scene: MID)
+    rows = Array.new(96) do |y|
+      band = y / 48
+      Array.new(160) do |x|
+        next scene unless band == box_band
+
+        lit = text.any? { |tx, ty, width| y % 48 == ty && x.between?(tx, tx + width - 1) }
+        lit ? LIGHT : DARK
+      end
+    end
+    rows.map { |row| row.map { |pixel| pixel * 4 }.join * 4 }.join
+  end
+
+  def test_text_rows_read_only_the_dialogue_box_band
+    shot = Koholint::Vision::DialogueShot
+    rows = shot.text_rows(page(box_band: 1, text: [[20, 10, 30], [20, 26, 12]]))
+    assert_equal 2, rows.size
+    assert_equal shot.text_rows(page(box_band: 1, text: [[20, 10, 30], [20, 26, 12]], scene: LIGHT)), rows
+    assert_equal rows, shot.text_rows(page(box_band: 0, text: [[20, 14, 30], [20, 30, 12]]))
+    assert_empty shot.text_rows(page(box_band: 2, text: []))
+  end
+
+  def test_the_signature_ignores_partly_typed_rows_and_the_capture_phase
+    shot = Koholint::Vision::DialogueShot
+    typed = ->(width) { shot.text_rows(page(box_band: 1, text: [[20, 10, width]])) }
+    second = shot.text_rows(page(box_band: 1, text: [[20, 10, 50], [30, 26, 40]]))
+    assert_equal shot.signature([typed.(10), typed.(50), second]), shot.signature([typed.(30), second, []])
+    refute_equal shot.signature([typed.(50)]), shot.signature([typed.(50), second])
+    assert_nil shot.signature([[], []])
+    assert_equal shot.page_hash(page(box_band: 1, text: [[20, 10, 50]])), shot.page_hash(page(box_band: 1, text: [[20, 10, 50]], scene: LIGHT))
+  end
+
+  def test_two_capture_phases_of_the_same_conversation_share_a_signature
+    skip_without_rom!
+    require 'koholint/probes/entity_census'
+    census = Koholint::Probes::EntityCensus
+    base = EmulatorCache.replayed(File.expand_path('../runs/20261024-095541-18df', __dir__), 3150)
+    marin = Koholint::Entities.read(base).find { |entity| entity[:type] == 62 }
+    first = census.converse(census.approach(base, marin, :up, [0, 16]))
+    shifted = Koholint::Emulator.restore(base.dump)
+    7.times { shifted.step([]) }
+    second = census.converse(census.approach(shifted, marin, :up, [0, 16]))
+    assert_operator first[:pages], :>, 5
+    refute_equal first[:page_sequence], second[:page_sequence]
+    assert_equal first[:signature], second[:signature]
+  end
 end
