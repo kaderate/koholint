@@ -4,6 +4,7 @@ require 'koholint'
 require 'koholint/game_state'
 require 'koholint/emulator'
 require 'koholint/input_log'
+require 'koholint/modes'
 require 'koholint/run'
 require 'koholint/trace'
 
@@ -60,7 +61,8 @@ module Koholint
     end
 
     def due(state, frame: state.frame)
-      return nil unless state.room_id && state.map_id && state.phase(booted: true) == :playing && !state.dialog_open?
+      return nil unless state.room_id && state.map_id && state.phase(booted: true) == :playing && !state.dialog_open? &&
+                    Modes.ready?(state)
 
       place = [state.room_id, state.map_id]
       return nil if @captured[place]
