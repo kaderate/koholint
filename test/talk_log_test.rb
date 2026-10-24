@@ -162,8 +162,9 @@ class TalkLogTest < Minitest::Test
   def test_entities_come_first_and_sprites_without_an_entity_stay_as_fallback
     log = Koholint::TalkLog.new
     g = grid([sprite(2, 4, height: 32), sprite(2, 5, height: 32), sprite(6, 8)])
-    lines = log.lines(g, PLACE, entities: [entity(62, [3, 5]), entity(45, [6, 1], kind: :unknown, slot: 2)])
-    assert_equal ['- at (3,5): entity type 62 (npc): never tried', '- at (6,1): entity type 45 (kind unknown): never tried', '- at (6,8): never tried'], lines
+    lines = log.lines(g, PLACE, entities: [entity(62, [3, 5]), entity(45, [6, 1], kind: :unknown, slot: 2), entity(117, [0, 0], slot: 3).merge(verified: false)])
+    assert_equal ['- at (0,0): entity type 117 (npc, unverified): never tried', '- at (3,5): entity type 62 (npc): never tried',
+                  '- at (6,1): entity type 45 (kind unknown): never tried', '- at (6,8): never tried'], lines
   end
 
   def test_identical_conversation_signatures_exhaust_even_when_transcriptions_differ

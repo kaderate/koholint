@@ -234,6 +234,7 @@ module Koholint
     def entity_label(place, entity)
       name = name_of(place, entity[:type])
       kind = entity[:kind].to_s == 'unknown' ? 'kind unknown' : entity[:kind].to_s
+      kind += ', unverified' if entity[:kind].to_s != 'unknown' && entity[:verified] == false
       "entity type #{entity[:type]} (#{kind}#{name ? ", name #{name}" : ''})"
     end
 

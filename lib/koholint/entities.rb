@@ -22,7 +22,9 @@ module Koholint
         x = at.(:entity_x)
         y = at.(:entity_y)
         type = at.(:entity_type)
-        { slot:, type:, x:, y:, status:, state: at.(:entity_state), cell: Geometry.cell_for(x, y), kind: kinds.fetch(type, :unknown) }
+        known = kinds[type]
+        { slot:, type:, x:, y:, status:, state: at.(:entity_state), cell: Geometry.cell_for(x, y), kind: known ? known[:kind] : :unknown,
+          verified: known ? known[:verified] : false, moves: known&.dig(:moves) }
       end
     end
 
@@ -34,7 +36,7 @@ module Koholint
     def load(path = DEFAULT_PATH)
       JSON.parse(File.read(path)).to_h do |entry|
         validate!(entry)
-        [Integer(entry.fetch('type')), entry.fetch('kind').to_sym]
+        [Integer(entry.fetch('type')), { kind: entry.fetch('kind').to_sym, verified: entry['confidence'] == 'verified', moves: entry['moves'] }]
       end
     end
 
