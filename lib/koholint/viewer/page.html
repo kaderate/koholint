@@ -96,13 +96,22 @@
   #map { position: relative; overflow: auto; min-height: 120px; max-height: 520px; background: #141414; }
   #map-lines { position: absolute; left: 0; top: 0; }
   #map-lines line { stroke: #557; stroke-width: 2; }
-  .node { position: absolute; box-sizing: border-box; width: 112px; height: 58px; padding: 3px 5px; background: #20232a; border: 1px solid #445;
+  .node { position: absolute; box-sizing: border-box; width: 96px; height: 86px; padding: 3px 5px; background: #20232a; border: 1px solid #445;
           color: #ccd; font: inherit; text-align: left; cursor: pointer; overflow: hidden; }
   .node.current { border: 2px solid #fd8; }
   .node.attached { border-style: dashed; background: #1d2620; }
   #map-lines line.lane { stroke: #333; stroke-dasharray: 6 4; stroke-width: 1; }
   .node.picked { background: #2a3550; }
   .node small { display: block; color: #9ab; }
+  .node.shot { padding: 0; }
+  .node img { position: absolute; left: 0; top: 0; width: 100%; height: 100%; image-rendering: pixelated; }
+  .node .cap { position: absolute; left: 0; right: 0; bottom: 0; padding: 1px 3px; background: rgba(10, 10, 14, 0.72); color: #eef; font-size: 11px; white-space: nowrap; overflow: hidden; }
+  #place-shot { display: none; margin: 4px 0; }
+  #place-shot.on { display: block; }
+  #place-shot-frame { position: relative; width: 100%; max-width: 480px; aspect-ratio: 10 / 9; background: #000; }
+  #place-shot-frame img { position: absolute; left: 0; top: 0; width: 100%; height: 100%; image-rendering: pixelated; }
+  #place-shot-grid { display: none; position: absolute; left: 0; top: 0; width: 100%; height: 100%; grid-template-columns: repeat(10, 1fr); grid-template-rows: repeat(8, 1fr); opacity: 0.85; pointer-events: none; }
+  #place-shot-grid.on { display: grid; }
   #place-grid { display: grid; grid-template-columns: repeat(10, 1fr); gap: 1px; max-width: 320px; aspect-ratio: 10 / 8; margin: 4px 0; }
   #place-grid i { display: block; }
   #place-people, #place-leads { margin: 2px 0; padding-left: 16px; }
@@ -158,7 +167,7 @@
     <div id="map-note" class="muted"></div>
     <div id="map-wrap">
       <div id="map"><svg id="map-lines"></svg></div>
-      <div id="place"><div id="place-title"></div><div id="place-grid"></div><div id="map-legend"></div><ul id="place-people"></ul><ul id="place-leads"></ul></div>
+      <div id="place"><div id="place-title"></div><div id="place-shot"><label><input type="checkbox" id="place-shot-overlay"> belief grid</label><div id="place-shot-frame"><img id="place-shot-img" alt="place screenshot"><div id="place-shot-grid"></div></div></div><div id="place-grid"></div><div id="map-legend"></div><ul id="place-people"></ul><ul id="place-leads"></ul></div>
     </div>
   </section>
   <details class="block wide" id="header-block">
@@ -618,7 +627,7 @@
     return rows;
   }
 
-  var NODE_W = 112, NODE_H = 58, NODE_GAP_X = 8, NODE_GAP_Y = 8;
+  var NODE_W = 96, NODE_H = 86, NODE_GAP_X = 8, NODE_GAP_Y = 8;
 
   function nodeBox(node) {
     return { left: node.x * (NODE_W + NODE_GAP_X) + 8, top: node.y * (NODE_H + NODE_GAP_Y) + 8, width: NODE_W, height: NODE_H };
@@ -651,6 +660,11 @@
     nodes.forEach(function (n) { var b = boxes[placeKey(n.place)]; width = Math.max(width, b.left + NODE_W + 8); height = Math.max(height, b.top + NODE_H + 8); });
     var lane = Number.isInteger(map.lane) && map.lane > 0 ? (map.lane - 1) * (NODE_H + NODE_GAP_Y) + 8 + NODE_H / 2 : null;
     return { nodes: nodes, boxes: boxes, lines: lines, width: width, height: height, lane: lane };
+  }
+
+  function screenshotUrl(node) {
+    if (!node || node.screenshot !== true || !Array.isArray(node.place) || !node.place.every(function (n) { return Number.isInteger(n) && n >= 0 && n < 1000; })) return null;
+    return '/screens/' + node.place[0] + '-' + node.place[1] + '.png';
   }
 
   function nodeTip(node) {
@@ -1172,9 +1186,21 @@
       node.style.left = b.left + 'px';
       node.style.top = b.top + 'px';
       var text = nodeLines(n);
-      var detail = document.createElement('small');
-      detail.textContent = text.detail;
-      node.append(text.title, detail);
+      var shot = screenshotUrl(n);
+      if (shot) {
+        var thumb = document.createElement('img');
+        thumb.src = withRun(shot, runId);
+        thumb.alt = '';
+        var cap = document.createElement('span');
+        cap.className = 'cap';
+        cap.textContent = text.title;
+        node.classList.add('shot');
+        node.append(thumb, cap);
+      } else {
+        var detail = document.createElement('small');
+        detail.textContent = text.detail;
+        node.append(text.title, detail);
+      }
       node.title = nodeTip(n);
       node.addEventListener('click', function () { picked = placeKey(n.place); renderMap(lastMap); });
       box.appendChild(node);
@@ -1182,6 +1208,28 @@
     document.getElementById('map-note').textContent = view.nodes.length ? plural(view.nodes.length, 'place') + ' at f' + map.frame + (map.truncated ? ' (first places only)' : '') : 'No place visited yet.';
     renderPlace(view.nodes.filter(function (n) { return placeKey(n.place) === picked; })[0]);
   }
+
+  function renderShot(node) {
+    var box = document.getElementById('place-shot');
+    var img = document.getElementById('place-shot-img');
+    var overlay = document.getElementById('place-shot-grid');
+    var url = screenshotUrl(node);
+    box.classList.toggle('on', url !== null);
+    overlay.replaceChildren();
+    if (url === null) return;
+    var src = withRun(url, runId);
+    if (img.getAttribute('src') !== src) img.src = src;
+    overlay.classList.toggle('on', document.getElementById('place-shot-overlay').checked);
+    (Array.isArray(node.cells) ? node.cells : []).forEach(function (cells) {
+      (Array.isArray(cells) ? cells : []).forEach(function (state) {
+        var cell = document.createElement('i');
+        if (state && state !== 'unknown') cell.style.background = cellColor(state);
+        overlay.appendChild(cell);
+      });
+    });
+  }
+
+  document.getElementById('place-shot-overlay').addEventListener('change', function () { if (lastMap) renderMap(lastMap); });
 
   function renderPlace(node) {
     var grid = document.getElementById('place-grid');
@@ -1197,6 +1245,7 @@
         });
       });
     }
+    renderShot(node);
     fillList('place-people', node && Array.isArray(node.people) ? node.people.map(personText) : []);
     fillList('place-leads', node && Array.isArray(node.leads) ? node.leads.map(function (l) { return '[' + String(l.importance || '?') + '] ' + truncate(l.claim, 160); }) : []);
   }

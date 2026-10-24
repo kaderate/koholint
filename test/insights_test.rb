@@ -54,6 +54,19 @@ class InsightsTest < Minitest::Test
     end
   end
 
+  def test_the_map_flags_the_places_that_have_a_screenshot_and_refreshes_when_one_appears
+    with_dir do |dir, trace|
+      seen(trace, 10, 5)
+      walk(trace, 20, 5, 6, [4, 80])
+      seen(trace, 21, 6)
+      follower = Follower.new(100, 100, 0, :in_sync)
+      assert_equal [false, false], Koholint::Viewer::Feed.insight(:map, dir, follower)[:places].map { |n| n[:screenshot] }
+      FileUtils.mkdir_p(File.join(dir, 'screens'))
+      File.binwrite(File.join(dir, 'screens', '6-0.png'), 'png')
+      assert_equal [false, true], Koholint::Viewer::Feed.insight(:map, dir, follower)[:places].map { |n| n[:screenshot] }
+    end
+  end
+
   def test_the_map_follows_the_shown_frame
     with_dir do |dir, trace|
       seen(trace, 10, 5)

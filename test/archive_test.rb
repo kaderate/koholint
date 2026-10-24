@@ -191,6 +191,23 @@ class ArchiveTest < Minitest::Test
     end
   end
 
+  def test_the_screenshots_ride_in_the_light_bundle_and_survive_prune_heavy
+    assert_includes Koholint::Archive::LIGHT, 'screens'
+    refute_includes Koholint::Archive::HEAVY, 'screens'
+    refute_match(%r{screens}, File.read(GITIGNORE))
+    Dir.mktmpdir do |base|
+      live = File.join(base, 'live')
+      source = make_run(live, '20261020-000001-aaaa')
+      FileUtils.mkdir_p(File.join(source, 'screens'))
+      File.binwrite(File.join(source, 'screens', '3-1.png'), 'png')
+      root = File.join(base, 'runs')
+      capture { |o| Koholint::Archive.archive(root:, from: live, out: o) }
+      assert_equal 'png', File.binread(File.join(root, '20261020-000001-aaaa', 'screens', '3-1.png'))
+      Koholint::Archive.prune_heavy(root:, keep: 0, yes: true, out: StringIO.new)
+      assert File.file?(File.join(root, '20261020-000001-aaaa', 'screens', '3-1.png'))
+    end
+  end
+
   def cli(*argv)
     out = StringIO.new
     err = StringIO.new

@@ -10,7 +10,7 @@ require 'koholint/trace'
 
 module Koholint
   module Archive
-    LIGHT = %w[manifest.json inputs.log world.json suggestions.md summary.json star.json notes.md trace.jsonl.gz].freeze
+    LIGHT = %w[manifest.json inputs.log world.json suggestions.md summary.json star.json notes.md trace.jsonl.gz screens].freeze
     HEAVY = %w[prompts keyframes].freeze
     TRACE = 'trace.jsonl'.freeze
     INDEX = File.join('docs', 'runs', 'index.md')
@@ -86,13 +86,14 @@ module Koholint
     def import(source, dest, full:)
       FileUtils.mkdir_p(dest)
       fresh = current?(source)
-      changed = (LIGHT - ["#{TRACE}.gz", *(Summary::FILE unless fresh)]).select { |name| refresh(File.join(source, name), File.join(dest, name)) }
+      changed = (LIGHT - ["#{TRACE}.gz", 'screens', *(Summary::FILE unless fresh)]).select { |name| refresh(File.join(source, name), File.join(dest, name)) }
+      changed.concat(copy_dir(source, dest, 'screens'))
       trace = Trace.raw(File.join(source, TRACE))
       unless trace == archived_trace(dest)
         Trace.write_archive(trace, File.join(dest, "#{TRACE}.gz"))
         changed << TRACE
       end
-      changed.concat(prompts(source, dest)) if full
+      changed.concat(copy_dir(source, dest, 'prompts')) if full
       stale = !fresh && (changed.any? || !current?(dest))
       Summary.write(dest) if stale
       changed.any? || stale
@@ -112,12 +113,12 @@ module Koholint
       nil
     end
 
-    def prompts(source, dest)
-      dir = File.join(source, 'prompts')
+    def copy_dir(source, dest, name)
+      dir = File.join(source, name)
       return [] unless File.directory?(dir)
 
-      FileUtils.mkdir_p(File.join(dest, 'prompts'))
-      Dir.children(dir).sort.select { |name| refresh(File.join(dir, name), File.join(dest, 'prompts', name)) }
+      FileUtils.mkdir_p(File.join(dest, name))
+      Dir.children(dir).sort.select { |file| refresh(File.join(dir, file), File.join(dest, name, file)) }
     end
 
     def seal(dir)

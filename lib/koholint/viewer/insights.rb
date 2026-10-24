@@ -95,7 +95,7 @@ module Koholint
         found.compact
       end
 
-      def map(trace, screens:, affordances:, frame:)
+      def map(trace, screens:, affordances:, frame:, shots: {})
         found = visits(trace)
         places = found[:places].values.first(MAX_PLACES)
         keep = places.to_h { |entry| [entry[:place], true] }
@@ -111,7 +111,7 @@ module Koholint
           known = cells&.flatten&.count { |state| state != 'unknown' }
           entry.merge(x: spots[entry[:place]][0], y: spots[entry[:place]][1], kind: PlaceKinds.kind(entry[:place]),
                       cell: PlaceKinds.grid?(entry[:place]) ? PlaceKinds.cell(entry[:place]) : nil, parent: placed[:parents][entry[:place]],
-                      current: entry[:place] == found[:current],
+                      current: entry[:place] == found[:current], screenshot: shots.key?(entry[:place]),
                       coverage: known && (known * 100.0 / (ROWS * COLS)).round, cells:,
                       people: people.fetch(entry[:place], []),
                       leads: leads.fetch(entry[:place], []).last(LEADS_PER_PLACE).map { |e| { id: e['id'], importance: e['importance'], claim: clip(e['claim']) } })
