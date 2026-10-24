@@ -8,7 +8,7 @@ module Koholint
   module Summary
     STALL_FRAMES = 3600
     HP_PER_HEART = Perception::HP_PER_HEART.to_f
-    DIAGNOSTIC_NOTABLE_KINDS = %w[grid_overlay_stuck lead_rejected revisit unknown_mode].freeze
+    DIAGNOSTIC_NOTABLE_KINDS = %w[grid_overlay_stuck lead_rejected not_ready_wait revisit unknown_mode].freeze
     TERMINAL = %w[achieved abandoned failed].freeze
     DETERMINISTIC_AGENTS = %w[start_game walk_and_talk].freeze
     FILE = 'summary.json'.freeze
@@ -86,7 +86,9 @@ module Koholint
         because_used: started.count { |e| e['because'] },
         talks: talks.size,
         talks_to_known: talks.count { |e| seen.key?(target = [talk_place(e), e['params']&.values_at('row', 'col')]) || !(seen[target] = true) },
-        dialogues: events.select { |e| e['type'] == 'dialogue' }.map { |e| [e['frame'], e['place']] }.uniq.size }
+        dialogues: events.select { |e| e['type'] == 'dialogue' }.map { |e| [e['frame'], e['place']] }.uniq.size,
+        not_ready_frames: events.sum { |e| e['type'] == 'perception' ? e['not_ready_frames'].to_i : 0 },
+        not_ready_waits: events.count { |e| e['type'] == 'notable' && e['kind'] == 'not_ready_wait' } }
     end
 
     def talk_place(action)
