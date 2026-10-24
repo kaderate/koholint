@@ -1,0 +1,91 @@
+{
+  "goal": "Go to the beach to the south to retrieve the other item, then look for leads toward the first dungeon.",
+  "leads": [
+    {
+      "id": "lead-1",
+      "place": [
+        163,
+        16
+      ],
+      "source": null,
+      "quote": "Tu es sur l'île Cocolint!",
+      "claim": "The island Link is on is called Cocolint",
+      "importance": "normal"
+    },
+    {
+      "id": "lead-2",
+      "place": [
+        163,
+        16
+      ],
+      "source": {
+        "row": 3,
+        "col": 5,
+        "entity": 62
+      },
+      "quote": "Suis la route du Sud, vers la plage",
+      "claim": "Follow the south road toward the beach where I found you",
+      "importance": "high"
+    },
+    {
+      "id": "lead-3",
+      "place": [
+        163,
+        16
+      ],
+      "source": {
+        "row": 3,
+        "col": 5,
+        "entity": 62
+      },
+      "quote": "des monstres terribles rôdent",
+      "claim": "Dangerous monsters roam the area",
+      "importance": "normal"
+    },
+    {
+      "id": "lead-4",
+      "place": [
+        163,
+        16
+      ],
+      "source": {
+        "row": 4,
+        "col": 7,
+        "entity": 63
+      },
+      "quote": "Utilisez-le pour repousser vos ennemis!",
+      "claim": "Shield recovered; use it to repel enemies",
+      "importance": "normal"
+    },
+    {
+      "id": "lead-5",
+      "place": [
+        163,
+        16
+      ],
+      "source": {
+        "row": 4,
+        "col": 7,
+        "entity": 63
+      },
+      "quote": "Y'a un autre bidule qui est resté sur la plage.",
+      "claim": "Another item was left on the beach",
+      "importance": "high"
+    },
+    {
+      "id": "lead-6",
+      "place": [
+        163,
+        16
+      ],
+      "source": {
+        "row": 4,
+        "col": 7,
+        "entity": 63
+      },
+      "quote": "fais attention aux monstres",
+      "claim": "Monsters are everywhere; be careful",
+      "importance": "normal"
+    }
+  ]
+}

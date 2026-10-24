@@ -1,0 +1,15 @@
+{
+  "flow_version": "flow-12",
+  "rom_sha256": "211a1d1559dc2684d63d87f62a6b1e9109201a6383b4004e9dd5e18ee926ee83",
+  "seed": 0,
+  "budget": {
+    "active_seconds": 1500.0,
+    "dollars": 1.5
+  },
+  "status": "stopped",
+  "parent": null,
+  "tag": "ready-gate",
+  "harness_sha": "92d93eedb8e1d3cec391e26d89bc67d71184f1ce",
+  "prompts_sha": "0a7f5abbbc742ae2776590032fb234ba0040da4e7f3f8553aa9af226103c0980",
+  "model": "sonnet"
+}

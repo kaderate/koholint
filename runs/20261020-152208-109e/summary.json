@@ -1,5 +1,5 @@
 {
-  "v": 2,
+  "v": 3,
   "run_id": "20261020-152208-109e",
   "flow_version": "flow-5",
   "tag": "npc-dialogues",
@@ -74,6 +74,8 @@
     "because_used": 0,
     "talks": 6,
     "talks_to_known": 2,
-    "dialogues": 4
+    "dialogues": 4,
+    "not_ready_frames": 0,
+    "not_ready_waits": 0
   }
 }

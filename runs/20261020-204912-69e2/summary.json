@@ -1,5 +1,5 @@
 {
-  "v": 2,
+  "v": 3,
   "run_id": "20261020-204912-69e2",
   "flow_version": "flow-6",
   "tag": "explore-1",
@@ -78,6 +78,8 @@
     "because_used": 0,
     "talks": 4,
     "talks_to_known": 1,
-    "dialogues": 4
+    "dialogues": 4,
+    "not_ready_frames": 0,
+    "not_ready_waits": 0
   }
 }

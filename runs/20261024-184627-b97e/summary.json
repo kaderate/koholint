@@ -1,5 +1,5 @@
 {
-  "v": 2,
+  "v": 3,
   "run_id": "20261024-184627-b97e",
   "flow_version": "flow-11",
   "tag": "npc-revisit-3",
@@ -83,6 +83,8 @@
     "because_used": 18,
     "talks": 50,
     "talks_to_known": 14,
-    "dialogues": 12
+    "dialogues": 12,
+    "not_ready_frames": 0,
+    "not_ready_waits": 0
   }
 }
