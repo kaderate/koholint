@@ -1,7 +1,9 @@
 require 'json'
 require 'optparse'
 require 'koholint'
+require 'koholint/ab'
 require 'koholint/archive'
+require 'koholint/autopilot'
 require 'koholint/budget'
 require 'koholint/engine'
 require 'koholint/agents/claude_cli'
@@ -25,9 +27,10 @@ require 'koholint/viewer'
 module Koholint
   module CLI
     USAGE = 'usage: koholint run|resume <run_dir>|fork <run_dir> --at-frame N|verify <run_dir>|summary <run_dir>|screens <run_dir>|watch <run_dir>|' \
-            'archive|star <run_dir> WHY|prune-heavy|census boot|<run_dir> FRAME...|entities <run_dir> FRAME...|ready <run_dir>|npcs ' \
+            'archive|star <run_dir> WHY|prune-heavy|census boot|<run_dir> FRAME...|entities <run_dir> FRAME...|ready <run_dir>|npcs|' \
+            'ab-plan <run_dir> --at-frame N|ab-report PREFIX ' \
             '[--frames N --minutes N --steps N --dollars X --root DIR --runs-root DIR --tag NAME --realtime --grid --port N --host H --from live|start|DIR ' \
-            '--speed X --agent --model M --max-dollars X --claude-command PATH --commit --full --keep N --yes]'.freeze
+            '--speed X --agent --autopilot on|off --model M --max-dollars X --claude-command PATH --commit --full --keep N --yes --arms A,B --forks N]'.freeze
 
     DEFAULT_MODEL = 'sonnet'.freeze
     DEFAULT_MAX_DOLLARS = 1.5
@@ -50,6 +53,9 @@ module Koholint
         o.on('--realtime') { options[:realtime] = true }
         o.on('--grid') { options[:grid] = true }
         o.on('--agent') { options[:agent] = true }
+        o.on('--autopilot MODE', %w[on off]) { |v| options[:autopilot] = v == 'on' }
+        o.on('--arms LIST', Array) { |v| options[:arms] = v }
+        o.on('--forks N', Integer) { |v| options[:forks] = v.positive? ? v : raise(OptionParser::InvalidArgument, v.to_s) }
         o.on('--model M') { |v| options[:model] = v }
         o.on('--max-dollars X', Float) { |v| options[:dollars] = v }
         o.on('--claude-command PATH') { |v| options[:claude_command] = v }
@@ -74,6 +80,7 @@ module Koholint
 
     def dispatch(command, args, options, out)
       flow = options.fetch(:flow_version, Koholint::FLOW_VERSION)
+      return ab_plan(args, options, out) if command == 'ab-plan'
       options = options.merge(dollars: options.fetch(:dollars, DEFAULT_MAX_DOLLARS), grid: true) if options[:agent]
       limits = options.slice(:frames, :steps, :active_seconds, :dollars)
       budget = Budget.new(**limits)
@@ -81,16 +88,17 @@ module Koholint
       when 'run'
         factory = policy_factory(options, budget, probe: true)
         run = Run.create(root: options.fetch(:root, 'runs'), flow_version: flow, budget: limits, tag: options[:tag],
-                         model: options[:agent] ? options.fetch(:model, DEFAULT_MODEL) : nil)
+                         model: options[:agent] ? options.fetch(:model, DEFAULT_MODEL) : nil, autopilot: (options.fetch(:autopilot, true) if options[:agent]))
         play(Engine.new(run:, policy: factory.call(run), budget:, **engine_options(options)), run, out)
       when 'resume'
         factory = policy_factory(options, budget)
         run = Run.open(run_dir(args), flow_version: flow)
+        settle_autopilot(run, options)
         engine = Engine.resume(run.dir, policy_factory: factory, budget:, flow_version: flow, **engine_options(options))
         play(engine, run, out)
       when 'fork'
         at_frame = options.fetch(:at_frame) { raise OptionParser::MissingArgument, '--at-frame' }
-        child = Run.open(run_dir(args), flow_version: flow).fork(at_frame: at_frame, flow_version: flow)
+        child = parent_run(run_dir(args)).fork(at_frame:, flow_version: flow, **options.slice(:tag, :autopilot, :root))
         out.puts "run #{child.dir}"
         0
       when 'watch'
@@ -102,6 +110,9 @@ module Koholint
         Archive.star(run_dir(args), args[1] || raise(OptionParser::MissingArgument, 'why'), out:)
       when 'prune-heavy' then Archive.prune_heavy(root: options.fetch(:root, 'runs'), **options.slice(:keep, :yes), out:)
       when 'census' then census(args, out)
+      when 'ab-report'
+        out.print AB.markdown(AB.report(prefix: args.first || raise(OptionParser::MissingArgument, 'prefix'), root: options.fetch(:root, 'runs')))
+        0
       when 'npcs'
         require 'koholint/npc_catalogue'
         out.print NpcCatalogue.markdown(options.fetch(:root, 'runs'))
@@ -116,6 +127,37 @@ module Koholint
       else
         raise OptionParser::InvalidOption, command.to_s
       end
+    end
+
+    def settle_autopilot(run, options)
+      recorded = run.manifest['autopilot']
+      if recorded.nil?
+        return unless options[:agent]
+
+        run.manifest['autopilot'] = options.fetch(:autopilot, true)
+        return run.write_manifest
+      end
+      return if !options.key?(:autopilot) || options[:autopilot] == recorded
+
+      raise Koholint::Error, "run #{run.id} was recorded with autopilot #{recorded ? 'on' : 'off'}; resume keeps it"
+    end
+
+    def parent_run(dir)
+      flow = Summary.read_json(File.join(dir, 'manifest.json'))['flow_version']
+      Run.open(dir, flow_version: flow)
+    end
+
+    def ab_plan(args, options, out)
+      at_frame = options.fetch(:at_frame) { raise OptionParser::MissingArgument, '--at-frame' }
+      parent = parent_run(run_dir(args))
+      raise Koholint::Error, "cannot fork at frame #{at_frame}: run has #{parent.inputs.frames} frames" unless (0..parent.inputs.frames).cover?(at_frame)
+
+      plan = { parent: parent.dir, at_frame:, arms: options.fetch(:arms, AB::ARMS.keys), forks: options.fetch(:forks, 3), dollars: options.fetch(:dollars, 0.8),
+               frames: options.fetch(:frames, 3000), tag: options.fetch(:tag, 'ab'), root: options.fetch(:root, 'tmp/ab/runs') }
+      _record, script = AB.plan(**plan, **options.slice(:model))
+      out.print File.read(script)
+      out.puts "plan #{script}"
+      0
     end
 
     def census(args, out)
@@ -173,7 +215,8 @@ module Koholint
       manual = manual_text
       lambda do |run|
         events = events_for(run)
-        delegated = Policies::Delegated.new(client:, registry: Skills::Registry.default, objectives: objectives_for(run, events), ledger: ledger_for(run, events),
+        autopilot = Autopilot.new unless run.manifest['autopilot'] == false
+        delegated = Policies::Delegated.new(client:, autopilot:, registry: Skills::Registry.default, objectives: objectives_for(run, events), ledger: ledger_for(run, events),
                                             triggers: Triggers.from_events(events), talk_log: TalkLog.from_events(events), explore_log: ExploreLog.from_events(events), leads: Leads.from_events(events), manual:, on_step: budget.method(:step_done), budget:,
                                             on_activity: run.method(:write_activity))
         Policies::StartGame.new(delegated, ready: ->(state) { %i[playing dialogue].include?(state.phase) }, probe:, played: GameState.played?(events))

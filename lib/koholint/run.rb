@@ -15,7 +15,7 @@ module Koholint
 
     attr_reader :dir, :manifest
 
-    def self.create(root: 'runs', flow_version:, budget:, parent: nil, seed: 0, rom_path: Koholint.rom_path, tag: nil, model: nil)
+    def self.create(root: 'runs', flow_version:, budget:, parent: nil, seed: 0, rom_path: Koholint.rom_path, tag: nil, model: nil, autopilot: nil)
       dir = unique_dir(root)
       FileUtils.mkdir_p(File.join(dir, 'save'))
       FileUtils.mkdir_p(File.join(dir, 'keyframes'))
@@ -25,7 +25,8 @@ module Koholint
       InputLog.new(File.join(dir, 'inputs.log')).flush
       manifest = { 'flow_version' => flow_version, 'rom_sha256' => rom_hash(rom_path), 'seed' => seed,
                    'budget' => JSON.parse(JSON.generate(budget)), 'status' => 'created', 'parent' => parent,
-                   'tag' => tag, 'harness_sha' => harness_sha, 'prompts_sha' => Agents::Prompts.digest, 'model' => model }
+                   'tag' => tag, 'harness_sha' => harness_sha, 'prompts_sha' => Agents::Prompts.digest, 'model' => model,
+                   'autopilot' => autopilot }
       new(dir, manifest).tap(&:write_manifest)
     end
 
@@ -80,12 +81,12 @@ module Koholint
       write_manifest
     end
 
-    def fork(at_frame:, flow_version:, rom_path: Koholint.rom_path)
+    def fork(at_frame:, flow_version:, rom_path: Koholint.rom_path, root: File.dirname(dir), **overrides)
       raise Error, "cannot fork at frame #{at_frame}: run has #{inputs.frames} frames" unless (0..inputs.frames).cover?(at_frame)
 
-      child = self.class.create(root: File.dirname(dir), flow_version: flow_version, budget: manifest['budget'],
-                                parent: { 'id' => id, 'frame' => at_frame }, seed: manifest['seed'], rom_path: rom_path,
-                                tag: manifest['tag'], model: manifest['model'])
+      inherited = { tag: manifest['tag'], model: manifest['model'], autopilot: manifest['autopilot'] }.merge(overrides.slice(:tag, :model, :autopilot))
+      child = self.class.create(root:, flow_version:, budget: manifest['budget'], parent: { 'id' => id, 'frame' => at_frame }, seed: manifest['seed'],
+                                rom_path:, **inherited)
       journal = InputLog.new(File.join(child.dir, 'inputs.log'))
       inputs.each_frame.first(at_frame).each { |buttons| journal.append(buttons) }
       journal.flush
