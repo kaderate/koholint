@@ -13,7 +13,7 @@ Only what is left to do. When something lands, delete it here (git is the histor
 6. **Interactions beyond walking** — push, dive/swim, item use; capabilities feed the beliefs of the vision plan.
 7. **Combat** — open question: micro-decisions; settle by spike (Jev macros vs deterministic vs hybrid) after the first agent loop.
 8. **Navigation spike** — A* on the known grid vs Jev macros vs hybrid, measured on success, frames, cost, latency.
-9. **Live view, layout C** — clickable timeline of notable events and agent calls, fork from the UI, pause/stop.
+9. **Live view, layout C** — fork from the UI, pause/stop of the live engine.
 10. **Real-time play** — the emulator stays paused between decisions; an optional `--live-clock` with pause-on-danger and a reflex layer (Jev or deterministic) is undecided.
 
 ## Open decisions and loose ends

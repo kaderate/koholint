@@ -103,17 +103,19 @@ schema and reports cost and latency. Jev (tactical choices) is planned, not wire
 sha, model), `inputs.log`, `trace.jsonl` (events validated by `trace.rb`), `keyframes/`, `save/`, `prompts/`,
 `world.json` (`{ goal, leads }`, rewritten from the trace at every stop), `summary.json` (written at every stop by
 `summary.rb` from the trace only, versioned by `Summary::VERSION`: totals, cost by skill, decisions by agent and
-feature usage; `archive` rewrites an outdated one), `star.json`. Trace events: `perception`, `decision`, `action`, `objective`, `dialogue`, `lead`, `goal`,
+feature usage; `archive` rewrites an outdated one), `star.json`, `notes.md` (owner notes from the viewer). Trace events: `perception`, `decision`, `action`, `objective`, `dialogue`, `lead`, `goal`,
 `notable`, `screen`, `screen_changed`, `affordance`, `grid_contradiction`, `keyframe`, `save`, `budget_stop`, `stop`. `budget.rb` enforces frames,
 minutes, dollars and objective steps. `archive.rb` keeps a light bundle per run in git (trace gzipped);
 heavy artifacts stay local. A run resumes only with the same `flow_version` and ROM hash; a change to the
 play flow means a new `flow_version`.
 
 **Viewer** (`viewer.rb`, `viewer/`) — a small HTTP server. A `Follower` replays the journal of the watched
-run; `Feed` derives status, feed, reasoning, objectives, goal, leads and the stitched dialogue history (newest first,
-with the person talked to) from the trace up to the shown frame. `Explorer` and `Registry` serve
-past runs (list, read-only replays with pacing, comparison via `run_compare.rb`, star). It never writes game
-state.
+run and seeks by restoring the nearest keyframe; `Feed` derives status, mode and alerts, feed, reasoning, objectives,
+goal, leads and the stitched dialogue history (newest first, with the person talked to and their state) from the trace
+up to the shown frame, and `Insights` the world map (places, exits taken, belief grids, people, leads), the timeline
+markers and the cost series, cached by trace and shown frame. `Explorer` and `Registry` serve past runs (list,
+read-only replays with pacing and seek, comparison via `run_compare.rb`, star, the run header and `notes.md`). It
+never writes game state; the only files it writes are `star.json`, `summary.json`'s `starred` and `notes.md`.
 
 **CLI** — `cli.rb`, `bin/koholint`: `run`, `resume`, `fork`, `verify`, `summary`, `watch`, `archive`, `star`,
 `prune-heavy`, `census`.
