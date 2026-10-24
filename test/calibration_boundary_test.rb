@@ -2,8 +2,9 @@ require 'test_helper'
 
 class CalibrationBoundaryTest < Minitest::Test
   ROOT = File.expand_path('..', __dir__)
-  AGENT_SIDE = Dir[File.join(ROOT, 'lib/koholint/policies/**/*.rb')] +
+  AGENT_SIDE = %w[policies skills agents].flat_map { |dir| Dir[File.join(ROOT, "lib/koholint/#{dir}/**/*.rb")] } +
                %w[decision engine].map { |name| File.join(ROOT, "lib/koholint/#{name}.rb") }
+  MEMORY = %w[poke debug_write instance_variable_get instance_variable_set mmu motherboard .fill(].freeze
   FORBIDDEN = %w[write poke instance_variable_get instance_variable_set send public_send __send__ mmu motherboard const_get .fill(].freeze
 
   def self.violations(source) = FORBIDDEN.select { |token| source.include?(token) }
@@ -12,6 +13,11 @@ class CalibrationBoundaryTest < Minitest::Test
     refute_empty AGENT_SIDE
     offenders = AGENT_SIDE.select { |path| File.read(path).match?(%r{Calibration|calibration/|Probes|probes/}) }
     assert_empty offenders
+  end
+
+  def test_agent_side_code_never_touches_emulator_memory
+    assert(AGENT_SIDE.any? { |path| path.include?('/skills/') } && AGENT_SIDE.any? { |path| path.include?('/agents/') })
+    assert_empty(AGENT_SIDE.select { |path| MEMORY.any? { |token| File.read(path).include?(token) } })
   end
 
   def test_only_the_grid_builder_uses_calibration_outside_it
