@@ -15,6 +15,7 @@ require 'koholint/policies/delegated'
 require 'koholint/skills/registry'
 require 'koholint/policies/start_game'
 require 'koholint/policies/walk_and_talk'
+require 'koholint/place_shots'
 require 'koholint/replay'
 require 'koholint/pacer'
 require 'koholint/run'
@@ -23,7 +24,7 @@ require 'koholint/viewer'
 
 module Koholint
   module CLI
-    USAGE = 'usage: koholint run|resume <run_dir>|fork <run_dir> --at-frame N|verify <run_dir>|summary <run_dir>|watch <run_dir>|' \
+    USAGE = 'usage: koholint run|resume <run_dir>|fork <run_dir> --at-frame N|verify <run_dir>|summary <run_dir>|screens <run_dir>|watch <run_dir>|' \
             'archive|star <run_dir> WHY|prune-heavy|census boot|<run_dir> FRAME...|entities <run_dir> FRAME...|npcs ' \
             '[--frames N --minutes N --steps N --dollars X --root DIR --runs-root DIR --tag NAME --realtime --grid --port N --host H --from live|start|DIR ' \
             '--speed X --agent --model M --max-dollars X --claude-command PATH --commit --full --keep N --yes]'.freeze
@@ -104,6 +105,9 @@ module Koholint
       when 'npcs'
         require 'koholint/npc_catalogue'
         out.print NpcCatalogue.markdown(options.fetch(:root, 'runs'))
+        0
+      when 'screens'
+        PlaceShots.backfill(run_dir(args), out:)
         0
       when 'verify' then verify(Run.open(run_dir(args), flow_version: flow), out)
       when 'summary'
