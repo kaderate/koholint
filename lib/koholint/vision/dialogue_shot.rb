@@ -13,6 +13,7 @@ module Koholint
       BOX_SHARE = 0.9
       BOX_ROWS = 8
       HASH_CHARS = 16
+      MIN_ROWS = 2
 
       PAGE_HEIGHT = BANDS.size * BAND_HEIGHT * SCALE
 
@@ -53,6 +54,8 @@ module Koholint
         return nil if rows.empty?
 
         full = rows.reject { |row| (head = row.sub(/0+\z/, '')) && rows.any? { |other| other != row && other.start_with?(head) } }
+        return nil if full.size < MIN_ROWS
+
         Digest::SHA256.hexdigest(full.sort.join("\n"))[0, HASH_CHARS]
       end
     end

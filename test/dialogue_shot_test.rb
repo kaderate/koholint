@@ -81,8 +81,8 @@ class DialogueShotTest < Minitest::Test
     typed = ->(width) { shot.text_rows(page(box_band: 1, text: [[20, 10, width]])) }
     second = shot.text_rows(page(box_band: 1, text: [[20, 10, 50], [30, 26, 40]]))
     assert_equal shot.signature([typed.(10), typed.(50), second]), shot.signature([typed.(30), second, []])
-    refute_equal shot.signature([typed.(50)]), shot.signature([typed.(50), second])
     assert_nil shot.signature([[], []])
+    assert_nil shot.signature([typed.(50)])
     assert_equal shot.page_hash(page(box_band: 1, text: [[20, 10, 50]])), shot.page_hash(page(box_band: 1, text: [[20, 10, 50]], scene: LIGHT))
   end
 

@@ -11,7 +11,7 @@ class RevisitPolicyTest < Minitest::Test
   TARKIN = { slot: 1, type: 63, x: 120, y: 80, cell: [4, 7], kind: :npc, verified: true, moves: false }.freeze
 
   def text_page(width)
-    rows = Array.new(96) { |y| y < 48 ? [DARK * 0, LIGHT * 160].join : Array.new(160) { |x| y == 60 && x.between?(20, 20 + width - 1) ? LIGHT : DARK }.join }
+    rows = Array.new(96) { |y| y < 48 ? [DARK * 0, LIGHT * 160].join : Array.new(160) { |x| (y == 60 && x.between?(20, 20 + width - 1)) || (y == 70 && x.between?(30, 30 + width - 1)) ? LIGHT : DARK }.join }
     rows.map { |row| row.unpack('a3' * 160).map { |pixel| pixel * 4 }.join * 4 }.join
   end
 
@@ -127,5 +127,26 @@ class RevisitPolicyTest < Minitest::Test
     p.after_action(choice: revisit[:choice], outcome: { stopped_by: 'no_path', talked: false, blocked_at: { row: 4, col: 6, direction: :right } },
                    state: state(frame: 520, hp: 20), frame: 520)
     assert_equal attempts, @objectives.attempts_for_prompt
+  end
+
+  def test_a_reading_taken_while_the_dialogue_is_still_open_is_never_cached
+    p = setup_revisit(skill: [ok('skill' => 'advance_dialogue', 'params' => {}, 'transcription' => 'Partial words.')], entities: [])
+    step(p, state)
+    40.times do |i|
+      at = state(frame: 100 + (i * 30), **OPEN)
+      p.after_action(choice: step(p, at, text_page(40))[:choice], outcome: { stopped_by: 'done' }, state: at, frame: at.frame + 30)
+    end
+    read = step(p, state(frame: 1300, **OPEN), text_page(40))
+    assert_equal 5, @client.calls.last[:images].size
+    refute(read[:transcription].any? { |entry| entry.key?(:conversation) })
+    assert_nil @talk_log.pages_for(Koholint::Vision::DialogueShot.signature([Koholint::Vision::DialogueShot.text_rows(text_page(40))]))
+  end
+
+  def test_a_longer_reading_replaces_a_shorter_one
+    @talk_log = Koholint::TalkLog.new
+    @talk_log.store_pages('a' * 16, ['Hi'])
+    @talk_log.store_pages('a' * 16, ['Hi there, friend'])
+    @talk_log.store_pages('a' * 16, ['Hi'])
+    assert_equal ['Hi there, friend'], @talk_log.pages_for('a' * 16)
   end
 end

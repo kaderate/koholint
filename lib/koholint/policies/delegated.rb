@@ -485,7 +485,7 @@ module Koholint
         elsif decision_point.name == :choose_skill && @sequence
           @pages_read = @sequence[:pages].size
           @images = Vision::DialogueShot.sheets(@sequence[:pages], per_sheet: SHEET_PAGES)
-          @read_at = @sequence.slice(:start, :place, :source).merge(conversation: Vision::DialogueShot.signature(@sequence[:rows]))
+          @read_at = @sequence.slice(:start, :place, :source).merge(conversation: (Vision::DialogueShot.signature(@sequence[:rows]) unless state.dialog_open?))
           @sequence = nil
           @page = @pages_read
           @objectives.touch(frame: state.frame)
@@ -586,7 +586,7 @@ module Koholint
       end
 
       def cached_reading(decision_point, state)
-        return unless decision_point.name == :choose_skill && @sequence && state.phase != :dialogue
+        return unless decision_point.name == :choose_skill && @sequence && state.phase != :dialogue && !state.dialog_open?
 
         conversation = Vision::DialogueShot.signature(@sequence[:rows])
         pages = conversation && @talk_log.pages_for(conversation)

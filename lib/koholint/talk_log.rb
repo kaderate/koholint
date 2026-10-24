@@ -106,7 +106,10 @@ module Koholint
       @texts << { place:, cell:, key:, stamp:, entity:, conversation:, speaker: }.compact
     end
 
-    def store_pages(conversation, pages) = (@pages[conversation] ||= pages.dup.freeze)
+    def store_pages(conversation, pages)
+      known = @pages[conversation]
+      @pages[conversation] = pages.dup.freeze if known.nil? || pages.sum(&:size) > known.sum(&:size)
+    end
 
     def pages_for(conversation) = @pages[conversation]
 
