@@ -102,9 +102,9 @@ class TalkLogTest < Minitest::Test
     assert_includes lines, '- at (6,2): talked to 1 time (dialogue opened 0)'
     assert_equal '... 8 more objects', lines.last
   end
-  def talk(log, text, stamp = ['none', 1, 0]) = log.remember(place: PLACE, cell: [4, 7], text:, stamp:)
+  def talk(log, text, stamp = ['none', 1]) = log.remember(place: PLACE, cell: [4, 7], text:, stamp:)
 
-  def memory_line(log, stamp = ['none', 1, 0]) = log.lines(grid([sprite(4, 7)]), PLACE, stamp:).first.split('; ', 2).last
+  def memory_line(log, stamp = ['none', 1]) = log.lines(grid([sprite(4, 7)]), PLACE, stamp:).first.split('; ', 2).last
 
   def test_people_are_exhausted_when_two_talks_repeat_under_an_unchanged_world
     log = Koholint::TalkLog.new
@@ -117,9 +117,9 @@ class TalkLogTest < Minitest::Test
     talk(log, 'Hello.')
     assert_equal '4 texts read, last talk gave nothing new (2 talks in a row with nothing new), exhausted', memory_line(log)
     assert_equal '4 texts read, last talk gave nothing new (2 talks in a row with nothing new), worth retrying: yes (something changed since the last talk)',
-                 memory_line(log, ['none', 2, 0])
-    talk(log, 'Hello.', ['none', 2, 0])
-    assert_equal '5 texts read, last talk gave nothing new (3 talks in a row with nothing new)', memory_line(log, ['none', 2, 0])
+                 memory_line(log, ['none', 2])
+    talk(log, 'Hello.', ['none', 2])
+    assert_equal '5 texts read, last talk gave nothing new (3 talks in a row with nothing new)', memory_line(log, ['none', 2])
   end
 
   def test_the_memory_is_rebuilt_from_dialogue_events_and_the_last_talk_target
@@ -131,7 +131,7 @@ class TalkLogTest < Minitest::Test
               said.call('A sign')]
     log = Koholint::TalkLog.from_events(events)
     assert_equal ['- at (4,7): talked to 2 times (dialogue opened 2); 2 texts read, last talk gave nothing new (1 talk in a row with nothing new), exhausted'],
-                 log.lines(grid([sprite(4, 7)]), PLACE, stamp: ['none', 1, 0])
+                 log.lines(grid([sprite(4, 7)]), PLACE, stamp: ['none', 1])
   end
   def test_punctuation_or_a_re_read_contained_in_an_earlier_text_is_not_new
     log = Koholint::TalkLog.new
@@ -148,15 +148,15 @@ class TalkLogTest < Minitest::Test
   def test_an_npc_is_known_by_its_entity_type_wherever_it_stands
     log = Koholint::TalkLog.new
     log.record(place: PLACE, row: 4, col: 7, talked: true, entity: 63)
-    log.remember(place: PLACE, cell: [4, 7], text: 'Hello.', stamp: ['none', 1, 0], entity: 63)
+    log.remember(place: PLACE, cell: [4, 7], text: 'Hello.', stamp: ['none', 1], entity: 63)
     log.record(place: PLACE, row: 2, col: 2, talked: true, entity: 63)
-    log.remember(place: PLACE, cell: [2, 2], text: 'Hello.', stamp: ['none', 1, 0], entity: 63)
-    lines = log.lines(grid([sprite(5, 1)]), PLACE, stamp: ['none', 1, 0], entities: [entity(63, [5, 1])])
+    log.remember(place: PLACE, cell: [2, 2], text: 'Hello.', stamp: ['none', 1], entity: 63)
+    lines = log.lines(grid([sprite(5, 1)]), PLACE, stamp: ['none', 1], entities: [entity(63, [5, 1])])
     assert_equal ['- at (5,1): entity type 63 (npc): talked to 2 times (dialogue opened 2); 2 texts read, last talk gave nothing new (1 talk in a row with nothing new), exhausted'],
                  lines
-    assert_equal :exhausted, log.status(place: PLACE, entity: 63, stamp: ['none', 1, 0])
+    assert_equal :exhausted, log.status(place: PLACE, entity: 63, stamp: ['none', 1])
     assert_equal :changed, log.status(place: PLACE, entity: 63, stamp: ['shield', 1, 0])
-    assert_equal :never, log.status(place: PLACE, entity: 62, stamp: ['none', 1, 0])
+    assert_equal :never, log.status(place: PLACE, entity: 62, stamp: ['none', 1])
   end
 
   def test_entities_come_first_and_sprites_without_an_entity_stay_as_fallback
@@ -169,9 +169,9 @@ class TalkLogTest < Minitest::Test
 
   def test_identical_conversation_signatures_exhaust_even_when_transcriptions_differ
     log = Koholint::TalkLog.new
-    log.remember(place: PLACE, cell: [4, 7], text: 'Hello traveller.', stamp: ['none', 1, 0], entity: 63, conversation: 'c' * 16)
-    log.remember(place: PLACE, cell: [4, 7], text: 'Helo travler!', stamp: ['none', 1, 0], entity: 63, conversation: 'c' * 16)
-    assert_equal :exhausted, log.status(place: PLACE, entity: 63, stamp: ['none', 1, 0])
+    log.remember(place: PLACE, cell: [4, 7], text: 'Hello traveller.', stamp: ['none', 1], entity: 63, conversation: 'c' * 16)
+    log.remember(place: PLACE, cell: [4, 7], text: 'Helo travler!', stamp: ['none', 1], entity: 63, conversation: 'c' * 16)
+    assert_equal :exhausted, log.status(place: PLACE, entity: 63, stamp: ['none', 1])
     assert_equal :exhausted, log.last_status(place: PLACE, entity: 63)
   end
 
@@ -188,6 +188,6 @@ class TalkLogTest < Minitest::Test
     assert_equal 'Tarkin', log.name_of(PLACE, 63)
     assert_equal 2, log.attempts(PLACE, [[:entity, 63]])
     assert_equal ['Tarkin (4,7)'], log.people(PLACE, [entity(63, [4, 7])])
-    assert_equal :exhausted, log.status(place: PLACE, entity: 63, stamp: ['none', 1, 0])
+    assert_equal :exhausted, log.status(place: PLACE, entity: 63, stamp: ['none', 1])
   end
 end

@@ -53,13 +53,12 @@ module Koholint
       page.size
     end
 
-    def stamp(milestone:, places:, leads:) = [milestone.to_s, places, leads]
+    def stamp(milestone:, places:) = [milestone.to_s, places]
 
     def from_events(events)
       source = nil
       places = []
       milestone = nil
-      leads = 0
       found = []
       events.each do |event|
         type = event['type']
@@ -70,7 +69,6 @@ module Koholint
           place = Summary.perceived_place(event)
           places << place if place && !places.include?(place)
           milestone = event.dig('state', 'milestone')
-        when 'lead' then leads += 1
         when 'action'
           next unless MOVES.include?(event['skill'].to_s)
 
@@ -86,7 +84,7 @@ module Koholint
             last[:cached] ||= (true if event['cached'] == true)
           else
             found << { frame: event['frame'], place: event['place'], source:, pages: [event['text'].to_s], open: true,
-                       stamp: stamp(milestone:, places: places.size, leads:), conversation: event['conversation'], speaker: event['speaker'],
+                       stamp: stamp(milestone:, places: places.size), conversation: event['conversation'], speaker: event['speaker'],
                        cached: (true if event['cached'] == true) }
           end
         end

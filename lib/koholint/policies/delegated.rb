@@ -518,7 +518,7 @@ module Koholint
         @revisit.read if @images || @reading
       end
 
-      def stamp(state) = Dialogues.stamp(milestone: state.milestone, places: @objectives.visited.size, leads: @leads.all.size)
+      def stamp(state) = Dialogues.stamp(milestone: state.milestone, places: @objectives.visited.size)
 
       def notes_for(output, transcription, state)
         goal = @leads.change_goal(output['goal'], frame: state.frame, objectives: @objectives.finished)

@@ -46,7 +46,7 @@ class RevisitPolicyTest < Minitest::Test
   end
 
   def exhaust_before_the_shield
-    stamp = Koholint::Dialogues.stamp(milestone: :none, places: 1, leads: 0)
+    stamp = Koholint::Dialogues.stamp(milestone: :none, places: 1)
     2.times { @talk_log.remember(place: [163, 16], cell: [4, 7], text: 'Hello, take this.', stamp:, entity: 63, conversation: 'e' * 16) }
   end
 

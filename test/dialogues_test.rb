@@ -95,9 +95,9 @@ class DialoguesTest < Minitest::Test
       { 'type' => 'dialogue', 'frame' => 7, 'place' => [1, 0], 'text' => 'A sign.' }
     ]
     first, second = Koholint::Dialogues.from_events(events)
-    assert_equal({ frame: 2, place: [1, 0], source: { row: 3, col: 4 }, text: "M' sieu! Pour sauvegarder,", stamp: ['none', 1, 0] },
+    assert_equal({ frame: 2, place: [1, 0], source: { row: 3, col: 4 }, text: "M' sieu! Pour sauvegarder,", stamp: ['none', 1] },
                  first.except(:pages))
-    assert_equal [nil, 'A sign.', ['none', 1, 1]], second.values_at(:source, :text, :stamp)
+    assert_equal [nil, 'A sign.', ['none', 1]], second.values_at(:source, :text, :stamp)
   end
 
   def test_an_explore_between_a_talk_and_a_text_clears_the_source

@@ -5,7 +5,7 @@ require 'koholint/talk_log'
 
 class RevisitTest < Minitest::Test
   PLACE = [163, 16].freeze
-  STAMP = ['shield', 1, 0].freeze
+  STAMP = ['shield', 1].freeze
 
   def setup
     @log = Koholint::TalkLog.new
@@ -55,7 +55,7 @@ class RevisitTest < Minitest::Test
       act(entities: [people.first])
     end
     assert_nil act(entities: [people.first])
-    assert_equal 62, act(entities: [people.first], stamp: ['shield', 2, 0])[:npc][:type]
+    assert_equal 62, act(entities: [people.first], stamp: ['shield', 2])[:npc][:type]
   end
 
   def test_round_cap_per_npc_and_stamp
@@ -75,7 +75,7 @@ class RevisitTest < Minitest::Test
     @revisit.talked({ talked: false, stopped_by: 'target_free' })
     assert_nil act(entities: [people.last])
     assert_equal %w[no_dialogue unreachable], @revisit.notes.map { |note| note[:detail][:outcome] }
-    refute_nil act(entities: [people.last], stamp: ['shield', 3, 0])
+    refute_nil act(entities: [people.last], stamp: ['shield', 3])
   end
 
   def test_the_cycle_stops_at_its_frame_cap_for_the_place_and_stamp

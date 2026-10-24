@@ -71,7 +71,7 @@ validated parameters; it reports how it stopped (`done`, `blocked`, `no_path`, `
 counts blocked edges per place (doubtful edges), `triggers.rb` forbids inputs that re-fire a scripted event,
 `talk_log.rb` remembers which sides of a person gave no response and, per person (the entity type that `talk_to` faced when the
 dialogue opened, reported in its result, else the last `talk_to` target cell), the key (letters
-and digits only, as for `new_text`) of each stitched text read, its conversation signature and speaker name, and a world stamp (milestone, places visited, leads): the context says whether the last talk gave
+and digits only, as for `new_text`) of each stitched text read, its conversation signature and speaker name, and a world stamp (milestone, places visited): the context says whether the last talk gave
 new text, how many talks in a row gave nothing new, and `worth retrying` (the stamp changed or the last talk was new) or
 `exhausted` (the last two talks repeated under the same stamp, by text or by signature). It also keeps the page texts per
 conversation signature. The listing of things on screen shows entities first (cell, type, kind, name) and the sprite
