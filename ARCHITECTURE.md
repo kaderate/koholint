@@ -76,9 +76,12 @@ new text, how many talks in a row gave nothing new, and `worth retrying` (the st
 `exhausted` (the last two talks repeated under the same stamp, by text or by signature). It also keeps the page texts per
 conversation signature. The listing of things on screen shows entities first (cell, type, kind, name) and the sprite
 objects that hold no entity as a fallback.
-`revisit.rb` is the deterministic revisit: for the `npc` entities of the current place that are not exhausted for the current
-stamp, it gives the next `talk_to` (nearest person first, the same person until exhausted), with caps of 6 rounds per
-person and stamp, 1800 frames per place and stamp, and 2 failed talks (then unreachable for the stamp); it records one
+`revisit.rb` is the deterministic revisit: for the `npc` entities of a `verified` kind in the current place that are not
+exhausted for the current stamp, it gives the next `talk_to` (nearest person first, the same person until exhausted, each
+person of a type shared by several tried once per stamp), with caps of 6 rounds per person and stamp, 1800 frames per
+stamp, 3 stamps per visit of the place and 2 failed talks per person and visit (then unreachable); it never acts outside
+free play, with health below the maximum minus one heart, within 300 frames of a hit, while hemmed, or with an `enemy`
+or a moving or unmeasured `unknown` entity within 3 cells. Its talks are not objective attempts. It records one
 `notable` `revisit` `{npc, round, outcome}` per round.
 `vision/dialogue_shot.rb` also reduces a captured page to the text pixel rows of its dialogue box; a conversation's
 signature hashes the rows that are not the partial form of a longer row (pages are captured mid-typing at a phase that
@@ -89,7 +92,7 @@ scrolling text box into the full text without losing a word; the stored events s
 **Decision points and policies** — `decision.rb` defines the points (`choose_objective`, `choose_skill`,
 `move`, macros) with their output schema and validation. A policy answers them: `policies/delegated.rb`
 (agent-driven; owns the context, plan memory, automatic dialogue pages, lock/hemmed handling, and before asking the model
-the revisit of people and the reuse of conversations already read: a closed dialogue whose signature is known is not sent
+the revisit of people and the reuse of conversations already read: a dialogue closed when read (dialog state back to 0) whose signature (at least 2 full rows) is known is not sent
 as sheets, its stored text is emitted again with `cached: true`; when a revisit is due it replaces the model's skill choice,
 also right after a sheet reading),
 `policies/walk_and_talk.rb` and `start_game.rb` (deterministic baselines and the intro), `with_fallback.rb`
