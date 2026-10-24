@@ -1148,6 +1148,11 @@ class DelegatedEngineTest < Minitest::Test
 
     def decide(_point, _state, _context)
       refused = @script.shift
+      if refused == :autopilot
+        return { choice: { skill: 'wait', params: { frames: 1 } }, justification: 'autopilot', confidence: 1.0, agent: 'delegated', latency_ms: 0, cost_usd: 0.0,
+                 fallback: false, autopilot: true }
+      end
+
       { choice: { skill: 'wait', params: { frames: 1 } }, justification: 'x', confidence: 0.0, agent: 'claude', latency_ms: 0, cost_usd: 0.0,
         fallback: refused != :ok, decision_point: @point, **(refused == :refused ? { refused: true } : {}) }
     end
@@ -1174,6 +1179,14 @@ class DelegatedEngineTest < Minitest::Test
   def test_refusals_neither_reset_nor_count_as_failures_and_a_success_resets_them
     refusal_run([:failed] * 4 + [:refused] * 9 + [:ok] + [:refused] * 9 + [:ok] * 400) { |reason, _| assert_equal :frames, reason }
     refusal_run([:failed] * 4 + [:refused] * 9 + [:failed] + [:ok] * 400) { |reason, _| assert_equal :agent_failures, reason }
+  end
+
+  def test_autopilot_decisions_are_traced_and_reset_neither_failures_nor_refusals
+    refusal_run([:failed] * 4 + [:autopilot] * 3 + [:failed] + [:ok] * 400) do |reason, run|
+      assert_equal :agent_failures, reason
+      assert_equal [true] * 3, events(run, :decision).filter_map { |e| e['autopilot'] }
+    end
+    refusal_run([:refused] * 9 + [:autopilot] + [:refused] + [:ok] * 400) { |reason, _| assert_equal :agent_refusals, reason }
   end
 
   def test_resume_abandons_dangling_objectives_and_does_not_reuse_ids
@@ -1640,5 +1653,102 @@ class DelegatedTriggersTest < Minitest::Test
     p, = setup_policy
     assert_equal [163, 16], p.send(:place_of, {}, :to, state)
     assert_equal [1, 2], p.send(:place_of, { to: { room: 1, map: 2 } }, :to, state)
+  end
+end
+
+class DelegatedAutopilotTest < Minitest::Test
+  include DelegatedHelpers
+
+  def new_place = ok('title' => 'go', 'predicate' => { 'kind' => 'new_place' })
+  def explore = ok('skill' => 'explore', 'params' => { 'direction' => 'up' })
+
+  def autopiloted(client, autopilot: Koholint::Autopilot.new, revisit: nil)
+    @objectives = Koholint::Objectives.new(trace: trace)
+    Koholint::Policies::Delegated.new(client:, registry: Koholint::Skills::Registry.default, objectives: @objectives, manual: '', autopilot:, revisit:)
+  end
+
+  def outcome(stop, frame) = { skill: 'explore', params: {}, stopped_by: stop, moved_cells: 2, cells_walked: 2, place_changed: false, room_changed: false,
+                               hp_delta: 0, from: { room: 163, map: 16, row: 3, col: 4 }, to: { room: 163, map: 16, row: 3, col: 4 + frame % 3 },
+                               blocked_edges: [], exits: [], offered: [] }
+
+  def tours(policy, count, stop: :budget, start: 100)
+    results = []
+    count.times do |i|
+      frame = start + i * 300
+      now = state(frame:, x: 40 + 16 * (i % 5))
+      policy.observe(now, frame:)
+      point = policy.decision_point_for(now)
+      result = policy.decide(point, now, { grid: })
+      results << result
+      next unless point.name == :choose_skill
+
+      policy.after_action(choice: result[:choice], outcome: outcome(stop, frame), state: state(frame: frame + 290, x: 40 + 16 * (i % 5)), frame: frame + 290)
+    end
+    results
+  end
+
+  def test_benign_explore_stops_are_continued_for_free_and_paid_calls_drop
+    on = ScriptedClient.new(objective: new_place, default: explore)
+    results = tours(autopiloted(on), 9)
+    off = ScriptedClient.new(objective: new_place, default: explore)
+    tours(autopiloted(off, autopilot: nil), 9)
+    assert_equal 9, off.calls.size
+    assert_equal 3, on.calls.size
+    free = results.select { |r| r[:autopilot] }
+    assert_equal 6, free.size
+    assert(free.all? { |r| r[:choice] == { skill: 'explore', params: {} } && r[:cost_usd].zero? && r[:agent] == 'delegated' && r[:prompt].nil? })
+    assert_equal 'claude', results[8][:agent]
+    assert_equal 8, @objectives.current[:attempts].size
+  end
+
+  def test_an_autopilot_explore_still_completes_a_new_place_objective_and_the_model_picks_the_next
+    client = ScriptedClient.new(objective: [new_place] * 2, default: explore)
+    p = autopiloted(client)
+    assert tours(p, 3).last[:autopilot]
+    assert_equal 2, client.calls.size
+    p.observe(state(frame: 2000, room_id: 7), frame: 2000)
+    assert_equal :achieved, @objectives.history.last[:outcome]
+    point = p.decision_point_for(state(frame: 2010, room_id: 7))
+    assert_equal :choose_objective, point.name
+    refute p.decide(point, state(frame: 2010, room_id: 7), { grid: })[:autopilot]
+    assert_equal 3, client.calls.size
+  end
+
+  def test_untried_objects_and_other_stops_go_to_the_model
+    client = ScriptedClient.new(objective: new_place, default: explore)
+    results = tours(autopiloted(client), 4, stop: :untried_object)
+    assert_equal 4, client.calls.size
+    assert(results.none? { |r| r[:autopilot] })
+  end
+
+  def test_a_reach_cell_objective_is_never_autopiloted
+    cell = ok('title' => 'go', 'predicate' => { 'kind' => 'reach_cell', 'place' => [163, 16], 'row' => 0, 'col' => 0 })
+    client = ScriptedClient.new(objective: cell, default: explore)
+    p = autopiloted(client)
+    context = { grid: Koholint::Vision::Grid.new(cells: Array.new(8) { Array.new(10) }, static_sprites: {}, beliefs: Koholint::Vision::Beliefs.new,
+                                                 capabilities: Koholint::Vision::Capabilities.new) }
+    p.decide(p.decision_point_for(state), state, context)
+    assert_equal 'reach_cell', @objectives.current[:predicate][:kind]
+    2.times do |i|
+      result = p.decide(p.decision_point_for(state), state(frame: 200 + i), context)
+      refute result[:autopilot]
+      p.after_action(choice: result[:choice], outcome: outcome(:budget, 200 + i), state: state(frame: 300 + i), frame: 300 + i)
+    end
+    assert_equal 3, client.calls.size
+  end
+
+  def test_a_due_revisit_comes_before_the_autopilot
+    revisit = Class.new(Koholint::Revisit) do
+      def candidate(**) = true
+      def next_action(**) = { skill: 'talk_to', params: { row: 2, col: 3 }, npc: { type: 5, cell: [2, 3] }, round: 1 }
+    end.new(talk_log: Koholint::TalkLog.new)
+    client = ScriptedClient.new(objective: new_place, default: explore)
+    p = autopiloted(client, revisit:)
+    p.decide(Koholint::DecisionPoint.choose_objective, state, { grid: })
+    p.decide(p.decision_point_for(state), state, { grid: })
+    p.after_action(choice: { skill: 'explore', params: { direction: 'up' } }, outcome: outcome(:budget, 200), state: state(frame: 200), frame: 200)
+    result = p.decide(p.decision_point_for(state(frame: 210)), state(frame: 210), { grid:, entities: -> { [] } })
+    assert_equal 'talk_to', result[:choice][:skill]
+    refute result[:autopilot]
   end
 end

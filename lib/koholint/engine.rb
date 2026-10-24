@@ -119,7 +119,7 @@ module Koholint
       @run.trace.emit(:decision, frame: state.frame, decision_point: chosen.name.to_s, input: state.to_h, options: chosen.options || [],
                                  choice: choice, justification: result[:justification], confidence: result[:confidence],
                                  agent: result[:agent], latency_ms: result[:latency_ms].to_i, cost_usd: result[:cost_usd].to_f, fallback: result[:fallback] || false,
-                                 **seen, **(result[:plan] ? { plan: result[:plan] } : {}))
+                                 **seen, **(result[:plan] ? { plan: result[:plan] } : {}), **(result[:autopilot] ? { autopilot: true } : {}))
       if choice.key?(:skill)
         activity(:acting, "acting: #{choice[:skill]}", skill: choice[:skill], params: choice[:params])
         outcome = execute(choice, state, chosen.registry, context)
@@ -181,7 +181,7 @@ module Koholint
     end
 
     def note_fallback(result)
-      return if @budget.exhausted
+      return if @budget.exhausted || result[:autopilot]
 
       if result[:refused]
         @refusals += 1

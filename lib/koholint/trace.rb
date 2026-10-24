@@ -29,7 +29,7 @@ module Koholint
     ALLOWED = { dialogue: { source: %w[agent] }, lead: { importance: %w[high normal low] } }.freeze
     OPTIONAL = { perception: { not_ready_frames: ->(v) { v.is_a?(Integer) && v.positive? } },
                  decision: { prompt_sha: ->(v) { v.is_a?(String) && v.match?(/\A\h{64}\z/) }, image: ->(v) { [true, false].include?(v) },
-                              plan: ->(v) { v.is_a?(String) && v.length <= 200 && !v.match?(/[[:cntrl:]]/) } },
+                              plan: ->(v) { v.is_a?(String) && v.length <= 200 && !v.match?(/[[:cntrl:]]/) }, autopilot: ->(v) { v == true } },
                  dialogue: { speaker: ->(v) { v.is_a?(String) && v.length.between?(1, SPEAKER_MAX) && !v.match?(/[[:cntrl:]]/) },
                              conversation: ->(v) { v.is_a?(String) && v.match?(/\A\h{16}\z/) }, cached: ->(v) { [true, false].include?(v) } },
                  objective: { because: ->(v) { v.is_a?(String) && v.match?(/\Alead-\d+\z/) },

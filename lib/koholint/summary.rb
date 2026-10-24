@@ -12,9 +12,9 @@ module Koholint
     TERMINAL = %w[achieved abandoned failed].freeze
     DETERMINISTIC_AGENTS = %w[start_game walk_and_talk].freeze
     FILE = 'summary.json'.freeze
-    VERSION = 3
+    VERSION = 4
     LEAD_TIERS = %w[high normal low].freeze
-    MANIFEST_KEYS = %w[flow_version tag harness_sha prompts_sha model].freeze
+    MANIFEST_KEYS = %w[flow_version tag harness_sha prompts_sha model autopilot].freeze
 
     module_function
 
@@ -88,7 +88,13 @@ module Koholint
         talks_to_known: talks.count { |e| seen.key?(target = [talk_place(e), e['params']&.values_at('row', 'col')]) || !(seen[target] = true) },
         dialogues: events.select { |e| e['type'] == 'dialogue' }.map { |e| [e['frame'], e['place']] }.uniq.size,
         not_ready_frames: events.sum { |e| e['type'] == 'perception' ? e['not_ready_frames'].to_i : 0 },
-        not_ready_waits: events.count { |e| e['type'] == 'notable' && e['kind'] == 'not_ready_wait' } }
+        not_ready_waits: events.count { |e| e['type'] == 'notable' && e['kind'] == 'not_ready_wait' },
+        **autopilot(events.select { |e| e['type'] == 'decision' }) }
+    end
+
+    def autopilot(decisions)
+      chains = decisions.chunk_while { |a, b| a['autopilot'] && b['autopilot'] }.select { |chain| chain.first['autopilot'] }
+      { autopilot_decisions: decisions.count { |e| e['autopilot'] }, chain_max: chains.map(&:size).max || 0 }
     end
 
     def talk_place(action)

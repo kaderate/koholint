@@ -159,7 +159,7 @@ class InsightsTest < Minitest::Test
     assert_equal Insights::SERIES, series.size
     assert_equal [1000, 1.0], series.last
     stats = Insights.stats(trace)
-    assert_equal %i[goal_changes leads lead_rejected objectives_by_kind because_used talks talks_to_known dialogues not_ready_frames not_ready_waits], stats[:usage].keys
+    assert_equal %i[goal_changes leads lead_rejected objectives_by_kind because_used talks talks_to_known dialogues not_ready_frames not_ready_waits autopilot_decisions chain_max], stats[:usage].keys
   end
 
   def test_mode_and_alerts_come_from_the_shown_trace

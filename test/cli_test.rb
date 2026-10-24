@@ -42,11 +42,32 @@ class CliTest < Minitest::Test
   def test_fork_creates_child_run
     skip_without_rom!
     Dir.mktmpdir do |dir|
-      run_dir = cli('run', '--frames', '300', '--root', dir)[1][/^run (.+)$/, 1]
+      run_dir = cli('run', '--frames', '300', '--root', dir, '--flow-version', 'flow-old', '--tag', 'parent')[1][/^run (.+)$/, 1]
       code, out, = cli('fork', run_dir, '--at-frame', '150')
       assert_equal 0, code
       child = out[/^run (.+)$/, 1]
       assert_equal 150, Koholint::InputLog.load(File.join(child, 'inputs.log')).frames
+      assert_equal dir, File.dirname(child)
+      code, out, = cli('fork', run_dir, '--at-frame', '120', '--root', File.join(dir, 'ab'), '--tag', 'ab-off-1', '--autopilot', 'off')
+      assert_equal 0, code
+      child = out[/^run (.+)$/, 1]
+      assert_equal File.join(dir, 'ab'), File.dirname(child)
+      manifest = JSON.parse(File.read(File.join(child, 'manifest.json')))
+      assert_equal [Koholint::FLOW_VERSION, 'ab-off-1', false, 120], manifest.values_at('flow_version', 'tag', 'autopilot').push(manifest.dig('parent', 'frame'))
+    end
+  end
+
+  def test_the_autopilot_flag_reaches_the_manifest_and_the_policy_and_resume_keeps_it
+    skip_without_rom!
+    with_fake_claude do |dir|
+      off = Koholint::Run.create(root: dir, flow_version: Koholint::FLOW_VERSION, budget: {}, autopilot: false)
+      code, _out, err = cli('resume', off.dir, '--agent', '--claude-command', FAKE_CLAUDE, '--autopilot', 'on')
+      assert_equal 1, code
+      assert_match(/autopilot off; resume keeps it/, err)
+      factory = Koholint::CLI.policy_factory({ agent: true, claude_command: FAKE_CLAUDE }, Koholint::Budget.new)
+      assert_nil factory.call(off).instance_variable_get(:@after).instance_variable_get(:@autopilot)
+      on = Koholint::Run.create(root: dir, flow_version: Koholint::FLOW_VERSION, budget: {}, autopilot: true)
+      assert_kind_of Koholint::Autopilot, factory.call(on).instance_variable_get(:@after).instance_variable_get(:@autopilot)
     end
   end
 
@@ -160,7 +181,7 @@ class CliTest < Minitest::Test
       assert(decisions.all? { |d| d['fallback'] && d['cost_usd'] == 0.0123 })
       argv = JSON.parse(File.readlines(ENV.fetch('FAKE_CLAUDE_LOG')).first)['argv']
       assert_equal 'haiku', argv[argv.index('--model') + 1]
-      assert_equal 'haiku', JSON.parse(File.read(File.join(run_dir, 'manifest.json')))['model']
+      assert_equal ['haiku', true], JSON.parse(File.read(File.join(run_dir, 'manifest.json'))).values_at('model', 'autopilot')
       assert_equal [2, 'haiku'], JSON.parse(File.read(File.join(run_dir, 'summary.json'))).values_at('calls', 'model')
       assert_equal 0, cli('verify', run_dir)[0]
     end
@@ -170,9 +191,11 @@ class CliTest < Minitest::Test
     skip_without_rom!
     with_fake_claude do |dir|
       run_dir = cli('run', '--frames', '300', '--root', dir)[1][/^run (.+)$/, 1]
-      code, out, = cli('resume', run_dir, '--agent', '--claude-command', FAKE_CLAUDE, '--max-dollars', '0.01')
+      assert_nil JSON.parse(File.read(File.join(run_dir, 'manifest.json')))['autopilot']
+      code, out, = cli('resume', run_dir, '--agent', '--claude-command', FAKE_CLAUDE, '--max-dollars', '0.01', '--autopilot', 'off')
       assert_equal 0, code
       assert_match(/^stopped: dollars$/, out)
+      assert_equal false, JSON.parse(File.read(File.join(run_dir, 'manifest.json')))['autopilot']
     end
   end
 
@@ -202,7 +225,7 @@ class CliTest < Minitest::Test
 
   def test_the_flow_is_4_and_resume_refuses_a_flow_3_run
     skip_without_rom!
-    assert_equal 'flow-12', Koholint::FLOW_VERSION
+    assert_equal 'flow-13', Koholint::FLOW_VERSION
     Dir.mktmpdir do |dir|
       run = Koholint::Run.create(root: dir, flow_version: 'flow-3', budget: {})
       code, _out, err = cli('resume', run.dir)
