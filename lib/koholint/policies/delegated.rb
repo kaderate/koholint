@@ -1,5 +1,6 @@
 require 'koholint/agents/context'
 require 'koholint/agents/prompts'
+require 'koholint/autopilot'
 require 'koholint/decision'
 require 'koholint/dialogues'
 require 'koholint/explore_log'
@@ -50,8 +51,9 @@ module Koholint
       HURT_FRAMES = 300
 
       def initialize(client:, registry:, objectives:, manual: '', on_step: nil, on_activity: nil, ledger: nil, triggers: nil, talk_log: nil, leads: nil, explore_log: nil, revisit: nil,
-                     budget: nil)
+                     budget: nil, autopilot: nil)
         @budget = budget
+        @autopilot = autopilot
         @explore_log = explore_log || ExploreLog.new
         @leads = leads || Leads.new
         @ledger = hook_doubt(ledger || Ledger.new)
@@ -103,7 +105,9 @@ module Koholint
       def cancel = (@client.cancel if @client.respond_to?(:cancel))
 
       def decide(decision_point, state, context)
+        @asked = false
         result = decide_with(decision_point, state, context)
+        @autopilot&.model_called(state:, objective: @objectives.current, news: !Array(result[:leads]).empty? || !result[:goal].nil?) if @asked
         notes = @revisit.notes
         notes.empty? ? result : result.merge(notables: notes)
       end
@@ -138,6 +142,9 @@ module Koholint
 
             @locks.clear
           end
+
+          autopilot = autopilot_choice(decision_point, state)
+          return autopilot if autopilot
         end
 
         reply = ask(decision_point, state, context)
@@ -163,6 +170,7 @@ module Koholint
       def after_action(choice:, outcome:, state:, frame:)
         return unless choice.key?(:skill)
 
+        @autopilot&.acted(skill: choice[:skill], outcome:)
         @frame = frame
         @page += 1 if choice[:skill] == 'advance_dialogue'
         unless state.phase == :dialogue
@@ -495,6 +503,7 @@ module Koholint
           @image = context[:dialogue_shot]&.call
         end
         announce_call(decision_point, state)
+        @asked = true
         pictures = @images ? { images: @images } : { image: @image }
         @client.call(system: Agents::Prompts.system_for(decision_point, sheets: !@images.nil?), prompt: @prompt, schema: decision_point.json_schema, **pictures)
       end
@@ -605,6 +614,12 @@ module Koholint
 
       def entities_now
         @entities = @entities_reader ? Array(@entities_reader.call) : []
+      end
+
+      def autopilot_choice(decision_point, state)
+        return unless @autopilot && decision_point.name == :choose_skill && !@sequence && !@reading && !hemmed?(state)
+
+        @autopilot.next_choice(state:, objective: @objectives.current)
       end
 
       def revisit_low? = @budget ? @budget.nearly_exhausted?(frames: Revisit::CYCLE_FRAMES, share: REVISIT_BUDGET_SHARE) : false
