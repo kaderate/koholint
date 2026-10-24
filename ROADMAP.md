@@ -40,7 +40,6 @@ Only what is left to do. When something lands, delete it here (git is the histor
 - Agent loop deferred: a failed sheet call loses the dialogue pages (their PNGs remain under `prompts/`).
 - Explore: border exits are tried blindly (no passability or static-sprite check) and a dead border cell costs two paid calls before it is marked tried.
 - Game modes left to measure: game modes 1, 4, 5, 8, 9, 10 and above 12 (credits, file copy and delete, other scripted scenes) are not in `data/modes.json`; they surface as `unknown` with a `notable` `unknown_mode`. Dialogue choices inside a text box (yes/no) are not modelled; signs and objects were not probed apart from people's dialogues.
-- `scene_lock` (`scene_state` 1, phase `locked`) stays a hypothesis: run 20261022-111719-ac88 read it at frame 8220 while START and SELECT worked, so the `locked` phase may hold free play until the 900-frame cap; probe it.
 - Map: the map cursor did not move in either census state and its address is unknown; only `open_map`/`close_map` exist.
 - `save_game` skill: the save screen is measured (mode 6, settled submode 5, arrow `menu_option`, option 1 saves and quits to the opening scenes); it needs the boot script to resume from the title after quitting and a check that the cartridge RAM changed. The four-button combination is not reachable through `press` (one button).
 - The game ignores START and SELECT about 12 frames after returning to play and a SELECT shorter than 4 frames; the screen skills repeat an unanswered press, the exact windows are unmeasured.
