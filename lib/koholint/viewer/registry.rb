@@ -55,7 +55,10 @@ module Koholint
         entry = fetch(dir)
         if seek
           entry.follower.seek(seek)
-          @lock.synchronize { entry.owed = 0.0 }
+          @lock.synchronize do
+            entry.owed = 0.0
+            entry.ticked_at = @clock.call
+          end
         end
         @lock.synchronize do
           entry.speed = speed if speed
