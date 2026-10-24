@@ -31,7 +31,8 @@ pacing (`pacer.rb`) and observability.
 **Perception** — `perception.rb`, `addresses.rb`, `game_state.rb`, `data/addresses.json`: a typed `GameState`
 (position, room/map, HP, phase such as dialogue or locked, milestone, inventory cursor, menu option, A/B items) read from RAM. Every address carries
 provenance and a `verified_count`; `verified` needs two independent checks. No RAM writes to gameplay state.
-`entities.rb` reads the game's entity table (16 slots: status, type, x, y, state) into `{ slot, type, x, y, status, state,
+`GameState` also carries the readiness signals (`room_transition`, `link_airborne`, `link_z`, `link_knockback`,
+measured by `probes/readiness_census.rb`, `bin/koholint census ready <run_dir>`). `entities.rb` reads the game's entity table (16 slots: status, type, x, y, state) into `{ slot, type, x, y, status, state,
 cell, kind }` for the active slots; the kind per type id (`npc`, `enemy`, `object`, `unknown`) comes from
 `data/entities.json`, measured by `probes/entity_census.rb` (`bin/koholint census entities`): A pressed next to the
 entity opens a dialogue that does not open with its slot cleared in a control copy (`npc`); contact damage against the
@@ -47,10 +48,24 @@ routes to, a `match` on the mode tuple (`game_mode`, `game_submode`, `dialog_sta
 entries that match the same tuple unless one strictly refines the other (the most specific wins). `Modes.for(state)`
 resolves the entry; `GameState#phase` is `boot` for anything outside play mode before the run first played, else the
 entry's phase (`loading`, `playing`, `locked`, `dialogue`, `cutscene`, `menu`, `map`, `save`, `game_over`, `boot` for
-the title screens) or `unknown`; the engine emits a `notable` `unknown_mode` once per unknown tuple (rebuilt from the
+the title screens) or `unknown`; the `ready` of `play` lists the readiness signals at rest (no screen scroll, not in the
+air, no knockback, no door walk: `link_motion_state` not 2, 3 or 4); the engine emits a `notable` `unknown_mode` once per unknown tuple (rebuilt from the
 trace on resume). `probes/mode_census.rb` (`bin/koholint census`; the probes are the only code allowed to write RAM, in throwaway copies, and are used by the CLI only) is the probe that measures them: from a replayed
 state it plays scenarios on throwaway copies (START, SELECT, the four-button save combination, health drained to zero
 by a RAM write in the copy only) and diffs RAM while moving cursors; reports go to `tmp/census/`.
+
+**Readiness gate** — `readiness.rb`: in the `playing` and `loading` phases Link is ready when the `ready` signals of
+the `play` mode hold for 2 consecutive frames (`Readiness::STABLE_FRAMES`: the last scroll write lands one frame after
+`room_transition` clears; the census found the BG tile indices final by then after every scroll, door, jump and
+knockback of run `20261024-184627-b97e`). The engine feeds it every frame it steps; at the start of each iteration,
+before the perception event, the grid builder and the policy, it steps frames with no input (journalled, so replay,
+verify and resume are unchanged; resume primes it with the frame before) until ready, records the wait on the
+`perception` event (`not_ready_frames`) and as a diagnostic `notable` `not_ready_wait` `{frames, reason}` when over 5
+frames, and stops the run with `not_ready_stuck` after 600 frames. Skills are never interrupted: one that ends mid-scroll
+returns, and the next iteration waits. Other phases (boot, menu, map, save, game over, dialogue, locks, cutscenes) keep
+their own handling. The grid builder only observes states whose signals are at rest; place screenshots wait for them too.
+Measured: a screen scroll lasts 35-51 frames (vertical about 36, horizontal about 44), a ledge jump 20-27, a jump into a
+screen change 53-66, a knockback 15-16, a door 62 (walk in, loading, walk out).
 
 **Vision** (`vision/`) — what RAM does not give: `screen_vision` and `screen_snapshot` read the screen,
 `grid_builder` probes neighbouring cells (the only place that snapshots and restores the emulator) and
@@ -103,7 +118,8 @@ mode, rebuilt from the trace on resume) the screens go to the agent with their o
 all with `press` and `wait`), after a deterministic wait while the screen is still opening; `cutscene` waits like
 `locked`. The play skill set has no screen-only skill. The engine stops the run with
 `stuck_boot` when the boot script decides for over 900 consecutive frames in a non-play mode past boot, or 3600 in any case. It stops
-with `unknown_mode_stuck` after 600 consecutive frames on an uncatalogued screen. `choose_option` refuses (`refused`) the
+with `unknown_mode_stuck` after 600 consecutive frames on an uncatalogued screen, and with `not_ready_stuck` after 600
+frames waited for readiness. `choose_option` refuses (`refused`) the
 catalogue options flagged `quits` (save and quit to the title), and the context lists only the other options.
 
 **Objectives** — `objectives.rb`: a short goal with a predicate the harness checks from memory
@@ -126,7 +142,7 @@ sha, model), `inputs.log`, `trace.jsonl` (events validated by `trace.rb`), `keyf
 observability only, no trace event, the set of captured places is rebuilt from the directory; `screens <run_dir>` backfills older runs by replay),
 `world.json` (`{ goal, leads }`, rewritten from the trace at every stop), `summary.json` (written at every stop by
 `summary.rb` from the trace only, versioned by `Summary::VERSION`: totals, cost by skill, decisions by agent and
-feature usage; `archive` rewrites an outdated one), `star.json`, `notes.md` (owner notes from the viewer). Trace events (`dialogue` may carry `speaker`, `conversation` and `cached`; a `talk_to` result may carry `entity`): `perception`, `decision`, `action`, `objective`, `dialogue`, `lead`, `goal`,
+feature usage; `archive` rewrites an outdated one), `star.json`, `notes.md` (owner notes from the viewer). Trace events (`dialogue` may carry `speaker`, `conversation` and `cached`; a `talk_to` result may carry `entity`; a `perception` may carry `not_ready_frames`): `perception`, `decision`, `action`, `objective`, `dialogue`, `lead`, `goal`,
 `notable`, `screen`, `screen_changed`, `affordance`, `grid_contradiction`, `keyframe`, `save`, `budget_stop`, `stop`. `budget.rb` enforces frames,
 minutes, dollars and objective steps. `archive.rb` keeps a light bundle per run in git (trace gzipped, `screens/` included);
 heavy artifacts stay local. A run resumes only with the same `flow_version` and ROM hash; a change to the
@@ -142,12 +158,12 @@ read-only replays with pacing and seek, comparison via `run_compare.rb`, star, t
 never writes game state; the only files it writes are `star.json`, `summary.json`'s `starred` and `notes.md`.
 
 **CLI** — `cli.rb`, `bin/koholint`: `run`, `resume`, `fork`, `verify`, `summary`, `screens`, `watch`, `archive`, `star`,
-`prune-heavy`, `census` (modes, or `census entities`), `npcs` (`npc_catalogue.rb`: a markdown table of the people of all
+`prune-heavy`, `census` (modes, `census entities` or `census ready`), `npcs` (`npc_catalogue.rb`: a markdown table of the people of all
 runs, their names and the distinct texts read with the milestone and the number of runs; writes nothing).
 
 ## Data flow of one decision
 
-1. The engine reads `GameState` and emits a `perception` event; vision updates the grid and beliefs.
+1. The engine waits for readiness (see Readiness gate), reads `GameState` and emits a `perception` event; vision updates the grid and beliefs.
 2. The policy gets a decision point and a context. For an agent policy: render context, call the model, validate
    the answer against the schema; invalid twice means deterministic fallback.
 3. The engine emits a `decision` event (choice, justification, confidence, cost, latency, prompt sha) and runs

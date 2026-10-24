@@ -31,7 +31,7 @@ bin/koholint archive --from /tmp/koholint-live --commit
 ```
 
 Commands: `run`, `resume <run_dir>`, `fork <run_dir> --at-frame N`, `verify <run_dir>`, `summary <run_dir>`,
-`screens <run_dir>`, `watch <run_dir>`, `archive`, `star <run_dir> WHY`, `prune-heavy`, `census boot|<run_dir> FRAME...|entities <run_dir> FRAME...`,
+`screens <run_dir>`, `watch <run_dir>`, `archive`, `star <run_dir> WHY`, `prune-heavy`, `census boot|<run_dir> FRAME...|entities <run_dir> FRAME...|ready <run_dir>`,
 `npcs [--root DIR]`.
 
 ## Running
@@ -57,8 +57,11 @@ place, so the grid went dark). The live view has a grid toggle that overlays the
 visited places from the trace; `fork` branches a run at a frame. Both work on an archived run, also on a fresh clone
 (see Run storage).
 
-## Agent skills (`flow-11`)
+## Agent skills (`flow-12`)
 
+- Between decisions the engine waits, with no input, until Link is ready (no screen scroll, door walk, jump or
+  knockback, then 2 settled frames): the screen is never mapped and the model never called mid-scroll or mid-jump
+  (`notable` `not_ready_wait` for waits over 5 frames; the run stops with `not_ready_stuck` after 600 frames).
 - `explore [direction]` explores by itself: it walks to the nearest frontier (a known cell next to an unknown one) or
   untried border exit (`direction` prefers that side), steps out, re-plans, and returns to the model only at an event:
   `new_place`, `dialogue`, `untried_object` (once per thing never talked to within 3 cells), `blocked`, `stalled` (3
@@ -115,6 +118,14 @@ opens in the control is not the entity's); pins Link on it for 90 frames and com
 whether it moves; and talks to it twice and at a shifted frame to compare conversation signatures. Reports go to
 `tmp/entities/*.json` and feed `data/entities.json` (kinds) and `data/addresses.json`.
 
+## Readiness census
+
+`bin/koholint census ready <run_dir>` replays the whole journal frame by frame and writes `tmp/census/readiness-<run>.json`:
+every span of play where Link is not ready (screen scroll, door, jump, knockback, forced walk) with its length and the
+frames after it until the BG tile indices stop changing, the durations per kind, and the bytes of 0xC100-0xC1FF and
+0xFF80-0xFFBF that are at rest in still play yet move in every screen change (how `room_transition` was found). It
+feeds `data/addresses.json` and the `ready` of the `play` mode in `data/modes.json`. About 4 minutes per 25,000 frames.
+
 ## NPC catalogue
 
 `bin/koholint npcs [--root DIR]` prints a markdown table of the people of all runs under `DIR` (default `runs`): per
@@ -169,9 +180,9 @@ under the runs root (`[A-Za-z0-9_.-]`, no leading dot, no `..`); anything else i
 
 Every finished run is kept in git as a light bundle under `runs/<id>/` (about 60 KB): `manifest.json` (with `tag`,
 `harness_sha`, `prompts_sha`, `model`), `inputs.log`, `trace.jsonl.gz`, `world.json`, `suggestions.md`, `summary.json`
-(written by the engine at every stop), `star.json` when starred and `notes.md` when the owner wrote notes in the viewer, and `screens/<room>-<map>.png` (one 160x144 screenshot per place, about 3-8 KB each, taken by the engine 20 frames after the place became playable). `bin/koholint screens <run_dir>` writes the missing ones for an older run by replaying its journal from boot (about one minute per 6000 frames; idempotent). `prune-heavy` keeps `screens/`. `summary.json` (`v: 2`) also holds `cost_by_skill`
+(written by the engine at every stop), `star.json` when starred and `notes.md` when the owner wrote notes in the viewer, and `screens/<room>-<map>.png` (one 160x144 screenshot per place, about 3-8 KB each, taken by the engine 20 frames after the place became playable and ready). `bin/koholint screens <run_dir>` writes the missing ones for an older run by replaying its journal from boot (about one minute per 6000 frames; idempotent). `prune-heavy` keeps `screens/`. `summary.json` (`v: 3`) also holds `cost_by_skill`
 (model calls and dollars per skill), `decisions_by_agent` (free decisions included) and `usage` (goal changes, leads
-by importance, rejected leads, objectives by kind, `because` uses, talks, talks to a known target, dialogues). `prompts/`, `keyframes/`, `save/`, `video/`,
+by importance, rejected leads, objectives by kind, `because` uses, talks, talks to a known target, dialogues, `not_ready_frames` waited by the readiness gate and `not_ready_waits` longer than 5 frames). `prompts/`, `keyframes/`, `save/`, `video/`,
 `activity.json`, `run.lock` and the plain `trace.jsonl` are gitignored: saves and keyframes are derivable by replay.
 
 | Command | Effect |
