@@ -13,7 +13,7 @@ require 'koholint/perception'
 module Koholint
   module Probes
     module ModeCensus
-      TUPLE = Modes::FIELDS
+      TUPLE = Modes::TUPLE_FIELDS
       WATCH = %i[inventory_cursor menu_option inventory_slot_a inventory_slot_b hp].freeze
       RAM_RANGES = [0xC000..0xDFFF, 0xFF80..0xFFFE].freeze
       OUT_DIR = File.join(Config::ROOT, 'tmp', 'census')

@@ -445,4 +445,18 @@ class EngineTest < Minitest::Test
       assert_equal 0, policy.decided.first
     end
   end
+
+  def test_changing_readiness_signals_on_an_uncatalogued_screen_note_it_once
+    with_run do |_dir, run|
+      emulator = MenuEmulator.new
+      emulator.define_singleton_method(:read) do |addr|
+        { hp: 24, max_hearts: 3, link_x: 80, link_y: 60, game_mode: frame < 300 ? 0x0B : 0x0D, game_submode: 7,
+          link_z: frame < 300 ? 0 : frame % 7, link_knockback: frame < 300 ? 0 : frame % 5 }.fetch(Koholint::Perception::ADDRESSES.key(addr), 0)
+      end
+      Koholint::Engine.new(run:, policy: BootForever.new, emulator:, budget: Koholint::Budget.new(frames: 600)).run
+      unknown = events(run, :notable).select { |e| e['kind'] == 'unknown_mode' }
+      assert_equal 1, unknown.size
+      refute_includes unknown.first['detail'], 'link_z'
+    end
+  end
 end
