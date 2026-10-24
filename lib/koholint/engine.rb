@@ -10,6 +10,7 @@ require 'koholint/keyframes'
 require 'koholint/leads'
 require 'koholint/modes'
 require 'koholint/perception'
+require 'koholint/place_shots'
 require 'koholint/replay'
 require 'koholint/run'
 require 'koholint/summary'
@@ -46,6 +47,7 @@ module Koholint
       @emulator = emulator || Emulator.boot
       @keyframes = Keyframes.new(File.join(run.dir, 'keyframes'))
       @builder = Vision::GridBuilder.new(trace: run.trace, beliefs: known_beliefs(run)) if grid
+      @shots = PlaceShots.new(run.dir)
       @ram_hash = Digest::SHA256.hexdigest(@emulator.cartridge_ram)
       events = Trace.read(File.join(run.dir, 'trace.jsonl'))
       @played = GameState.played?(events)
@@ -80,6 +82,7 @@ module Koholint
       state = Perception.read(@emulator)
       @run.trace.emit(:perception, frame: state.frame, state: state.to_h, state_hash: @emulator.state_hash)
       @played ||= state.game_mode == PLAY_MODE
+      @shots.capture(@emulator, state)
       note_unknown_mode(state)
       if @builder
         activity(:mapping, 'mapping the screen')
@@ -211,6 +214,7 @@ module Koholint
 
         step(buttons)
         current = Perception.read(@emulator)
+        @shots.capture(@emulator, current)
       end
       finish_frames(execution.frames)
       execution.result(current)
