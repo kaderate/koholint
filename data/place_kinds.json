@@ -1,0 +1,10 @@
+[
+  {"kind": "world", "map_ids": [0], "layout": "grid16",
+   "note": "room_id is a cell of a 16-wide grid: x = room_id & 15, y = room_id >> 4; +1 is east, +16 is south",
+   "source": "trace_census_2026-10-24: 94 of 94 consecutive map 0 places over 7 archived runs differ by 1 within a row or by 16; 93 of 94 exits agree with the pre-scroll edge Link left by",
+   "confidence": "verified", "verified_count": 7},
+  {"kind": "interior", "map_ids": [16], "layout": "attached",
+   "note": "houses entered by a door from the overworld",
+   "source": "trace_census_2026-10-24: door transitions from map 16 to map 0 in 7 archived runs, from map 0 to map 16 in 1",
+   "confidence": "verified", "verified_count": 7}
+]
