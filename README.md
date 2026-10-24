@@ -80,7 +80,8 @@ visited places from the trace; `fork` branches a run at a frame. Both work on an
   cursor and options, and offers only the skills that work there. `open_menu`/`close_menu` (START), `menu_move slot`
   (inventory cursor 0-9), `menu_assign a|b` (swap the selected item with that button's item), `open_map`/`close_map`
   (SELECT, B), `choose_option option` (save and game-over screens); used elsewhere they stop with `wrong_mode`. An
-  uncatalogued screen gets `press` and `wait` and a `notable` `unknown_mode` in the trace.
+  uncatalogued screen gets `press` and `wait` and a `notable` `unknown_mode` in the trace; 600 frames on it stop the
+  run as `unknown_mode_stuck`. Options that quit to the title are refused.
 - Scrolling dialogue pages are stitched into one text; the context remembers what each person said and whether talking
   again is worth it; `new_text` is an objective predicate; the live view lists the dialogues read.
 

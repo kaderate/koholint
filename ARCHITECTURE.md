@@ -80,7 +80,9 @@ mode, rebuilt from the trace on resume) the screens go to the agent with their o
 `menu_assign`, `close_menu`; `map`: `close_map`; `save` and `game_over`: `choose_option`; `unknown`: `press` and `wait`;
 all with `press` and `wait`), after a deterministic wait while the screen is still opening; `cutscene` waits like
 `locked`. The play skill set has no screen-only skill. The engine stops the run with
-`stuck_boot` when the boot script decides for over 900 consecutive frames in a non-play mode past boot, or 3600 in any case.
+`stuck_boot` when the boot script decides for over 900 consecutive frames in a non-play mode past boot, or 3600 in any case. It stops
+with `unknown_mode_stuck` after 600 consecutive frames on an uncatalogued screen. `choose_option` refuses (`refused`) the
+catalogue options flagged `quits` (save and quit to the title), and the context lists only the other options.
 
 **Objectives** — `objectives.rb`: a short goal with a predicate the harness checks from memory
 (`leave_place`, `reach_place`, `reach_cell`, `dialogue_closed`, `new_place`, `new_text`: a text not read before in
