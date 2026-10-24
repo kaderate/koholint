@@ -38,6 +38,21 @@ class FollowerTest < Minitest::Test
     end
   end
 
+  def test_seek_lands_on_the_replayed_state_backwards_and_forwards
+    with_recorded_run do |run|
+      follower = Koholint::Viewer::Follower.new(run.dir, from: :start)
+      assert_equal 450, follower.seek(450)
+      assert_equal Koholint::Replay.to(run, 450).state_hash, follower.state_hash
+      assert_equal 120, follower.seek(120)
+      assert_equal Koholint::Replay.to(run, 120).state_hash, follower.state_hash
+      assert_raises(ArgumentError) { follower.seek(601) }
+      assert_raises(ArgumentError) { follower.seek(-1) }
+      assert_equal 120, follower.frame
+      drain(follower)
+      assert_equal :in_sync, follower.sync
+    end
+  end
+
   def test_live_start_restores_a_keyframe_at_or_below_the_edge
     with_recorded_run do |run|
       follower = Koholint::Viewer::Follower.new(run.dir)

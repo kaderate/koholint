@@ -45,13 +45,20 @@ module Koholint
           jump_if_lagging
           capture
           count = [max_frames, lag].min
-          count.times do
-            @emulator.step(buttons_at_cursor)
-            advance_cursor(1)
-            @frame = @emulator.frame
-            capture
-          end
+          play(count)
           [count, 0].max
+        end
+      end
+
+      def seek(target)
+        synchronize do
+          refresh_journal
+          raise ArgumentError, "frame must be between 0 and #{@total}" unless target.is_a?(Integer) && target.between?(0, @total)
+
+          rewind if target < @frame
+          restore_keyframe_at_or_before(target)
+          play(target - @frame)
+          @frame
         end
       end
 
@@ -68,6 +75,22 @@ module Koholint
       private
 
       def synchronize(&) = @lock.synchronize(&)
+
+      def play(count)
+        count.times do
+          @emulator.step(buttons_at_cursor)
+          advance_cursor(1)
+          @frame = @emulator.frame
+          capture
+        end
+      end
+
+      def rewind
+        @emulator = Emulator.boot
+        @frame = 0
+        @entry = 0
+        @used = 0
+      end
 
       def open_journal
         raise Error, "no run at #{@dir}" unless File.file?(File.join(@dir, 'manifest.json'))
@@ -106,10 +129,7 @@ module Koholint
       end
 
       def start(from)
-        @emulator = Emulator.boot
-        @frame = 0
-        @entry = 0
-        @used = 0
+        rewind
         restore_keyframe_at_or_before(@total) if from == :live
         capture
       end
