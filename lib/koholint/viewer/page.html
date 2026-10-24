@@ -624,6 +624,7 @@
     Object.keys(kinds).sort().forEach(function (kind) { rows.push('objective ' + kind + ': ' + kinds[kind]); });
     if (typeof u.talks === 'number') rows.push('talks: ' + u.talks + ' (' + (u.talks_to_known || 0) + ' to known)');
     if (typeof u.lead_rejected === 'number' && u.lead_rejected) rows.push('leads rejected: ' + u.lead_rejected);
+    if (typeof u.not_ready_frames === 'number' && u.not_ready_frames) rows.push('not ready: ' + u.not_ready_frames + ' frames (' + (u.not_ready_waits || 0) + ' waits over 5)');
     return rows;
   }
 
