@@ -19,7 +19,12 @@ module EmulatorCache
   class << self
     attr_writer :dir
 
-    def dir = @dir || File.join(Koholint::Config::ROOT, 'tmp', 'emulator_cache')
+    def dir = @dir || ENV['KOHOLINT_CACHE_DIR'] || File.join(shared_root, 'tmp', 'emulator_cache')
+
+    def shared_root
+      common = `git -C #{Koholint::Config::ROOT} rev-parse --git-common-dir 2>/dev/null`.strip
+      common.empty? ? Koholint::Config::ROOT : File.dirname(File.expand_path(common, Koholint::Config::ROOT))
+    end
 
     def at(frame, expect_hash: nil) = fetch(frame.to_s, expect_hash) { build(frame) }
 
