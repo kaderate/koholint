@@ -135,7 +135,7 @@ class SummaryTest < Minitest::Test
                      objectives: { count: 2, achieved: 1 }, stop_reason: 'dollars', symptoms: [], starred: false,
                      cost_by_skill: { 'choose_skill' => { calls: 4, usd: 1.0 } }, decisions_by_agent: { 'claude' => 4, 'start_game' => 1 },
                      usage: { goal_changes: 0, leads: { high: 0, normal: 0, low: 0 }, lead_rejected: 0, objectives_by_kind: { 'unknown' => 2 },
-                              because_used: 0, talks: 0, talks_to_known: 0, dialogues: 0 } },
+                              because_used: 0, talks: 0, talks_to_known: 0, dialogues: 0, not_ready_frames: 0, not_ready_waits: 0 } },
                    Koholint::Summary.record(run.dir))
     end
   end
@@ -179,16 +179,19 @@ class SummaryTest < Minitest::Test
       t.emit(:dialogue, frame: 14, place: [1, 16], text: 'a', source: 'agent', page: 1)
       t.emit(:dialogue, frame: 14, place: [1, 16], text: 'b', source: 'agent', page: 2)
       t.emit(:dialogue, frame: 15, place: [1, 16], text: 'c', source: 'agent', page: 1)
+      t.emit(:perception, frame: 60, state: PLAYING, not_ready_frames: 3)
+      t.emit(:notable, frame: 99, kind: 'not_ready_wait', detail: { frames: 38, reason: 'transition' })
+      t.emit(:perception, frame: 99, state: PLAYING, not_ready_frames: 38)
       record = Koholint::Summary.record(run.dir)
       assert_equal({ 'choose_objective' => { calls: 1, usd: 0.1 }, 'walk' => { calls: 2, usd: 0.5 } }, record[:cost_by_skill])
       assert_equal({ 'claude' => 3, 'delegated' => 1, 'start_game' => 1 }, record[:decisions_by_agent])
       assert_equal({ goal_changes: 2, leads: { high: 1, normal: 1, low: 0 }, lead_rejected: 1, objectives_by_kind: { 'dialogue_closed' => 2 },
-                     because_used: 1, talks: 4, talks_to_known: 1, dialogues: 2 }, record[:usage])
+                     because_used: 1, talks: 4, talks_to_known: 1, dialogues: 2, not_ready_frames: 41, not_ready_waits: 1 }, record[:usage])
     end
   end
 
   def test_diagnostic_notables_are_not_progress
-    %w[grid_overlay_stuck lead_rejected revisit unknown_mode].each { |kind| refute Koholint::Summary.progress?({ 'type' => 'notable', 'kind' => kind }), kind }
+    %w[grid_overlay_stuck lead_rejected not_ready_wait revisit unknown_mode].each { |kind| refute Koholint::Summary.progress?({ 'type' => 'notable', 'kind' => kind }), kind }
     assert Koholint::Summary.progress?({ 'type' => 'notable', 'kind' => 'other' })
   end
 end

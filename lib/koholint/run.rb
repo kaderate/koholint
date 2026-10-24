@@ -156,7 +156,7 @@ module Koholint
 
     private
 
-    def decided_at_resume?(event) = %w[perception decision lead goal].include?(event['type']) || (event['type'] == 'notable' && %w[lead_rejected revisit].include?(event['kind']))
+    def decided_at_resume?(event) = %w[perception decision lead goal].include?(event['type']) || (event['type'] == 'notable' && %w[lead_rejected not_ready_wait revisit].include?(event['kind']))
 
     def copy_save(event, into)
       path = File.join(dir, 'save', event['path'])

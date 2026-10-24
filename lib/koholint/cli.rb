@@ -25,7 +25,7 @@ require 'koholint/viewer'
 module Koholint
   module CLI
     USAGE = 'usage: koholint run|resume <run_dir>|fork <run_dir> --at-frame N|verify <run_dir>|summary <run_dir>|screens <run_dir>|watch <run_dir>|' \
-            'archive|star <run_dir> WHY|prune-heavy|census boot|<run_dir> FRAME...|entities <run_dir> FRAME...|npcs ' \
+            'archive|star <run_dir> WHY|prune-heavy|census boot|<run_dir> FRAME...|entities <run_dir> FRAME...|ready <run_dir>|npcs ' \
             '[--frames N --minutes N --steps N --dollars X --root DIR --runs-root DIR --tag NAME --realtime --grid --port N --host H --from live|start|DIR ' \
             '--speed X --agent --model M --max-dollars X --claude-command PATH --commit --full --keep N --yes]'.freeze
 
@@ -120,6 +120,7 @@ module Koholint
 
     def census(args, out)
       return census_entities(args.drop(1), out) if args.first == 'entities'
+      return census_ready(args.drop(1), out) if args.first == 'ready'
 
       require 'koholint/probes/mode_census'
       raise OptionParser::MissingArgument, 'boot or <run_dir> FRAME...' unless args.first == 'boot' || args.size > 1
@@ -140,6 +141,14 @@ module Koholint
       0
     rescue ArgumentError => e
       raise OptionParser::InvalidArgument, e.message
+    end
+
+    def census_ready(args, out)
+      require 'koholint/probes/readiness_census'
+      raise OptionParser::MissingArgument, 'ready <run_dir>' unless args.size == 1
+
+      out.puts "census #{Probes::ReadinessCensus.census(run_dir(args))}"
+      0
     end
 
     def watch_from(options)

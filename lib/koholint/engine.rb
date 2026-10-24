@@ -11,6 +11,7 @@ require 'koholint/leads'
 require 'koholint/modes'
 require 'koholint/perception'
 require 'koholint/place_shots'
+require 'koholint/readiness'
 require 'koholint/replay'
 require 'koholint/run'
 require 'koholint/summary'
@@ -25,6 +26,8 @@ module Koholint
     STUCK_BOOT_FRAMES = 900
     STUCK_BOOT_ANY_FRAMES = 3600
     STUCK_UNKNOWN_FRAMES = 600
+    NOT_READY_STUCK_FRAMES = 600
+    NOT_READY_NOTABLE_FRAMES = 5
 
     def self.resume(run_path, budget:, policy: nil, policy_factory: nil, flow_version: Koholint::FLOW_VERSION, **options)
       run = Run.open(run_path, flow_version: flow_version)
@@ -32,10 +35,15 @@ module Koholint
       run.truncate_trace!(run.inputs.frames)
       run.truncate_prompts!(run.inputs.frames)
       policy = policy_factory.call(run) if policy_factory
-      new(run: run, policy: policy, budget: budget, emulator: Replay.to(run, run.inputs.frames), **options)
+      frames = run.inputs.frames
+      emulator = Replay.to(run, [frames - 1, 0].max)
+      previous = Perception.read(emulator)
+      emulator.step(run.inputs.each_frame.to_a.last) if frames.positive?
+      new(run: run, policy: policy, budget: budget, emulator:, previous:, **options)
     end
 
-    def initialize(run:, policy:, budget:, keyframe_every: 1800, decision_point: DecisionPoint.move, emulator: nil, pacer: nil, grid: false)
+    def initialize(run:, policy:, budget:, keyframe_every: 1800, decision_point: DecisionPoint.move, emulator: nil, pacer: nil, grid: false,
+                   previous: nil)
       @run = run
       @policy = policy
       @budget = budget
@@ -45,6 +53,8 @@ module Koholint
       @fallbacks = 0
       @refusals = 0
       @emulator = emulator || Emulator.boot
+      @readiness = Readiness.new
+      @readiness.observe(previous) if previous
       @keyframes = Keyframes.new(File.join(run.dir, 'keyframes'))
       @builder = Vision::GridBuilder.new(trace: run.trace, beliefs: known_beliefs(run)) if grid
       @shots = PlaceShots.new(run.dir)
@@ -79,14 +89,17 @@ module Koholint
     def known_beliefs(run) = Vision::Beliefs.from_events(Trace.read(File.join(run.dir, 'trace.jsonl')))
 
     def iterate
-      state = Perception.read(@emulator)
-      @run.trace.emit(:perception, frame: state.frame, state: state.to_h, state_hash: @emulator.state_hash)
+      state, waited = await_ready(Perception.read(@emulator))
+      return if @budget.exhausted
+
+      @run.trace.emit(:perception, frame: state.frame, state: state.to_h, state_hash: @emulator.state_hash,
+                                   **(waited.positive? ? { not_ready_frames: waited } : {}))
       @played ||= state.game_mode == PLAY_MODE
       @shots.capture(@emulator, state)
       note_unknown_mode(state)
       if @builder
         activity(:mapping, 'mapping the screen')
-        grid = @builder.observe(@emulator, state)
+        grid = @builder.observe(@emulator, state) if Readiness.signals_ready?(state)
       end
       @policy.observe(state, frame: state.frame) if @policy.respond_to?(:observe)
       return if @budget.exhausted
@@ -212,8 +225,7 @@ module Koholint
           break
         end
 
-        step(buttons)
-        current = Perception.read(@emulator)
+        current = step(buttons)
         @shots.capture(@emulator, current)
       end
       finish_frames(execution.frames)
@@ -225,6 +237,29 @@ module Koholint
       @run.inputs.append(buttons)
       @budget.tick(frames: 1)
       after_frame
+      Perception.read(@emulator).tap { |state| @readiness.observe(state) }
+    end
+
+    # Between decisions only: a skill runs to its end, and the next observation waits here, stepping no input.
+    def await_ready(state)
+      waited = 0
+      reasons = Hash.new(0)
+      while (reason = @readiness.reason(state))
+        if waited >= NOT_READY_STUCK_FRAMES
+          @budget.stop!(:not_ready_stuck)
+          break
+        end
+        break if @budget.exhausted
+
+        reasons[reason] += 1
+        state = step([])
+        waited += 1
+      end
+      finish_frames(waited) if waited.positive?
+      if waited > NOT_READY_NOTABLE_FRAMES
+        @run.trace.emit(:notable, frame: state.frame, kind: 'not_ready_wait', detail: { frames: waited, reason: reasons.max_by(&:last).first })
+      end
+      [state, waited]
     end
 
     def finish_frames(done)

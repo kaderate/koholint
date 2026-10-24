@@ -377,4 +377,86 @@ class EngineTest < Minitest::Test
       assert_operator run.inputs.frames, :<=, Koholint::Engine::STUCK_BOOT_FRAMES + 10
     end
   end
+
+  class Recorder
+    attr_reader :decided, :observed
+
+    def initialize = (@decided = []) && (@observed = [])
+    def decision_point_for(_state) = Koholint::DecisionPoint.macro(:boot)
+    def observe(state, frame:) = @observed << [frame, state.room_transition]
+    def decide(_point, state, _context) = (@decided << state.frame) && { choice: { buttons: [], frames: 5 }, agent: 'claude' }
+  end
+
+  class Spy
+    attr_reader :frames
+
+    def initialize = (@frames = [])
+    def observe(_emulator, state) = (@frames << state.frame) && nil
+  end
+
+  def scrolling_emulator(until_frame)
+    emulator = MenuEmulator.new
+    emulator.define_singleton_method(:read) do |addr|
+      { hp: 24, max_hearts: 3, link_x: 80, link_y: 60, game_mode: 0x0B, game_submode: 7,
+        room_transition: frame < until_frame ? 4 : 0 }.fetch(Koholint::Perception::ADDRESSES.key(addr), 0)
+    end
+    emulator
+  end
+
+  def test_no_observation_or_decision_while_the_screen_scrolls
+    with_run do |_dir, run|
+      policy = Recorder.new
+      engine = Koholint::Engine.new(run:, policy:, emulator: scrolling_emulator(40), budget: Koholint::Budget.new(frames: 60))
+      spy = Spy.new
+      engine.instance_variable_set(:@builder, spy)
+      engine.run
+      assert_equal 41, policy.decided.first
+      assert_equal 41, spy.frames.first
+      assert(policy.observed.all? { |_, transition| transition.zero? })
+      assert_equal 41, events(run, :perception).first['frame']
+      assert_equal 41, events(run, :perception).first['not_ready_frames']
+      wait = events(run, :notable).find { |e| e['kind'] == 'not_ready_wait' }
+      assert_equal({ 'frames' => 41, 'reason' => 'transition' }, wait['detail'])
+      assert_equal 60, run.inputs.frames
+    end
+  end
+
+  def test_a_screen_that_never_becomes_ready_stops_the_run
+    with_run do |_dir, run|
+      policy = Recorder.new
+      reason = Koholint::Engine.new(run:, policy:, emulator: scrolling_emulator(Float::INFINITY), budget: Koholint::Budget.new(frames: 20_000)).run
+      assert_equal :not_ready_stuck, reason
+      assert_equal 'not_ready_stuck', events(run, :budget_stop).first['kind']
+      assert_empty policy.decided
+      assert_equal Koholint::Engine::NOT_READY_STUCK_FRAMES, run.inputs.frames
+      assert File.file?(File.join(run.dir, 'summary.json'))
+    end
+  end
+
+  def test_screens_outside_play_are_not_gated
+    with_run do |_dir, run|
+      emulator = MenuEmulator.new
+      emulator.define_singleton_method(:read) do |addr|
+        { hp: 24, max_hearts: 3, link_x: 80, link_y: 60, game_mode: 0x0B, game_submode: 7, dialog_state: 1,
+          room_transition: 4 }.fetch(Koholint::Perception::ADDRESSES.key(addr), 0)
+      end
+      policy = Recorder.new
+      Koholint::Engine.new(run:, policy:, emulator:, budget: Koholint::Budget.new(frames: 10)).run
+      assert_equal 0, policy.decided.first
+    end
+  end
+
+  def test_changing_readiness_signals_on_an_uncatalogued_screen_note_it_once
+    with_run do |_dir, run|
+      emulator = MenuEmulator.new
+      emulator.define_singleton_method(:read) do |addr|
+        { hp: 24, max_hearts: 3, link_x: 80, link_y: 60, game_mode: frame < 300 ? 0x0B : 0x0D, game_submode: 7,
+          link_z: frame < 300 ? 0 : frame % 7, link_knockback: frame < 300 ? 0 : frame % 5 }.fetch(Koholint::Perception::ADDRESSES.key(addr), 0)
+      end
+      Koholint::Engine.new(run:, policy: BootForever.new, emulator:, budget: Koholint::Budget.new(frames: 600)).run
+      unknown = events(run, :notable).select { |e| e['kind'] == 'unknown_mode' }
+      assert_equal 1, unknown.size
+      refute_includes unknown.first['detail'], 'link_z'
+    end
+  end
 end

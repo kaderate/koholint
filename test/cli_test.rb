@@ -96,6 +96,8 @@ class CliTest < Minitest::Test
     assert_equal 2, cli('census')[0]
     assert_equal 2, cli('census', 'runs/x')[0]
     assert_equal 2, cli('census', 'runs/x', 'twelve')[0]
+    assert_equal 2, cli('census', 'ready')[0]
+    assert_equal 2, cli('census', 'ready', 'runs/x', 'runs/y')[0]
   end
 
   def test_realtime_run_takes_wall_time
@@ -200,7 +202,7 @@ class CliTest < Minitest::Test
 
   def test_the_flow_is_4_and_resume_refuses_a_flow_3_run
     skip_without_rom!
-    assert_equal 'flow-11', Koholint::FLOW_VERSION
+    assert_equal 'flow-12', Koholint::FLOW_VERSION
     Dir.mktmpdir do |dir|
       run = Koholint::Run.create(root: dir, flow_version: 'flow-3', budget: {})
       code, _out, err = cli('resume', run.dir)

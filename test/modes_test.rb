@@ -1,5 +1,6 @@
 require_relative 'test_helper'
 require 'json'
+require 'koholint/addresses'
 require 'tmpdir'
 require 'koholint/game_state'
 require 'koholint/modes'
@@ -115,5 +116,15 @@ class ModesTest < Minitest::Test
     assert over.quits?(1)
     assert_equal [0, 2], over.choices.map(&:first)
     assert_equal [0], Koholint::Modes.catalogue.find { |mode| mode.name == 'save_screen' }.choices.map(&:first)
+  end
+
+  def test_every_play_ready_signal_is_an_address_and_a_mode_field
+    names = JSON.parse(File.read(Koholint::Addresses::DEFAULT_PATH)).map { |entry| entry['name'] }
+    play = JSON.parse(File.read(Koholint::Modes::DEFAULT_PATH)).find { |entry| entry['name'] == 'play' }
+    refute_empty play['ready']
+    play['ready'].each_key do |field|
+      assert_includes Koholint::Modes::FIELDS, field.to_sym
+      assert_includes names, field
+    end
   end
 end

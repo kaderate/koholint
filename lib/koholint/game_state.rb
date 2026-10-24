@@ -11,7 +11,8 @@ module Koholint
 
   GameState = Struct.new(:frame, :room_id, :map_id, :x, :y, :direction, :hp, :max_hp, :milestone,
                          :game_mode, :game_submode, :name_length, :dialog_state, :motion_blocked, :scene_state,
-                         :link_motion_state, :game_over_stage, :inventory_cursor, :menu_option, :item_a, :item_b, keyword_init: true) do
+                         :link_motion_state, :game_over_stage, :inventory_cursor, :menu_option, :item_a, :item_b,
+                         :room_transition, :link_airborne, :link_z, :link_knockback, keyword_init: true) do
     # Link's sprites cover x - 8...x + 8 and y - 16...y; nil when his center is outside the 8x10 grid.
     def self.cell_at(x, y) = Geometry.cell_for(x, y)
 
