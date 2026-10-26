@@ -31,7 +31,8 @@ module Koholint
       def census(run_dir, frames, crawl: 0, out: OUT_DIR)
         tested = Hash.new(0)
         frames.map do |frame|
-          start = ModeCensus.state_at(run_dir, frame)
+          start = ModeCensus.copy(ModeCensus.state_at(run_dir, frame))
+          settled?(start)
           rooms = crawl.positive? ? crawl(start, crawl) : [start]
           report = { run: File.basename(run_dir), frame:, rooms: rooms.map { |emulator| scan(emulator, tested:, out:) } }
           write(File.join(out, "#{File.basename(run_dir)}-#{frame}#{crawl.positive? ? "-crawl#{crawl}" : ''}.json"), report)
