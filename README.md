@@ -107,12 +107,14 @@ visited places from the trace; `fork` branches a run at a frame (the parent may 
   type id and measured kind (`data/entities.json`), sprites without an entity as a fallback, and the names people gave
   (`speaker`, asked in the transcription call). People are remembered by (place, entity type), so a person who moved
   keeps their memory.
-- People are talked to again deterministically (`revisit.rb`, no model call to decide it): when a verified `npc` of the
-  current place is not exhausted for the current world stamp (milestone, places visited), the policy issues `talk_to`
-  itself (agent `delegated`, cost 0), lets the pages advance, and repeats until two conversations in a row are identical,
-  6 rounds per person, 1800 frames per stamp, 3 stamps per visit, or 2 failed talks per visit; never when hurt, hemmed,
-  or near a hostile or moving unknown entity; each round is a `notable` `revisit` event
-  (`{npc, round, outcome}`). A conversation is identified by a signature of its pages' text pixels; a conversation
+- On arrival in a place, before the model is called, people and signs are engaged deterministically (`revisit.rb`, no
+  model call to decide it): when a verified `npc` of the current place is not exhausted for the current world stamp
+  (milestone, places visited) or a verified sign was never read, the policy issues `talk_to` itself (agent `delegated`,
+  cost 0), lets the pages advance, and repeats until two conversations in a row are identical (a sign is read once), at
+  most 4 engagements and 900 frames per visit, 6 rounds per person, 2 per sign, 1800 frames per stamp, 3 stamps per
+  visit, or 2 failed talks per visit; never when hurt, hemmed, or near a hostile or moving unknown entity; each round is
+  a `notable` `revisit` event (`{npc|sign, round, outcome}`). Each new place also gets a `place_card` (people, enemies,
+  signs, objects, exits) kept in `world.json` `places`. A conversation is identified by a signature of its pages' text pixels; a conversation
   already read is not sent to the model again (its stored text is reused, `dialogue` events with `cached: true`).
 
 ## Mode census

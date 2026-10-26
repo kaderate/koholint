@@ -59,6 +59,7 @@ class RevisitTest < Minitest::Test
   end
 
   def test_round_cap_per_npc_and_stamp
+    @revisit = Koholint::Revisit.new(talk_log: @log, visit_engagements: 10, visit_frames: 10_000)
     rounds = (1..Koholint::Revisit::ROUND_CAP).map do |i|
       action = act(entities: [people.first], frame: 100 + i)
       say(62, "Text number #{%w[one two three four five six seven][i - 1]}.")
@@ -81,6 +82,7 @@ class RevisitTest < Minitest::Test
   end
 
   def test_the_cycle_stops_at_its_frame_cap_for_the_place_and_stamp
+    @revisit = Koholint::Revisit.new(talk_log: @log, visit_frames: 10_000)
     act(frame: 100)
     say(62, 'One.')
     assert act(frame: 100 + Koholint::Revisit::CYCLE_FRAMES - 1)
@@ -119,6 +121,7 @@ class RevisitTest < Minitest::Test
   end
 
   def test_the_candidate_applies_the_frame_cap_like_next_action
+    @revisit = Koholint::Revisit.new(talk_log: @log, visit_frames: 10_000)
     act(frame: 100)
     say(62, 'One.')
     assert_nil @revisit.candidate(state: state(frame: 100 + Koholint::Revisit::CYCLE_FRAMES), entities: people, stamp: STAMP)
@@ -147,5 +150,57 @@ class RevisitTest < Minitest::Test
     assert_nil @revisit.next_action(state: state(hp: 15), entities: people, stamp: STAMP)
     assert_nil act(danger: true)
     assert act
+  end
+
+  def sign(cell) = { cell:, object: 0xD4, kind: :sign, verified: true }
+
+  def read_sign(cell, text)
+    @log.remember(place: PLACE, cell:, text:, stamp: STAMP)
+    @revisit.read
+  end
+
+  def test_an_unread_sign_is_engaged_like_a_person_and_read_once
+    action = act(entities: [], signs: [sign([2, 3])])
+    assert_equal({ skill: 'talk_to', params: { row: 2, col: 3 } }, action.slice(:skill, :params))
+    assert_equal({ place: PLACE, cell: [2, 3] }, action[:sign])
+    read_sign([2, 3], 'Signs are read once.')
+    assert_nil act(entities: [], signs: [sign([2, 3])])
+    assert_nil act(entities: [], signs: [sign([2, 3])], stamp: ['shield', 2])
+    assert_equal [{ sign: { place: PLACE, cell: [2, 3] }, round: 1, outcome: 'read' }], @revisit.notes.map { |note| note[:detail] }
+  end
+
+  def test_the_nearest_of_people_and_signs_goes_first_and_an_unreachable_sign_is_dropped
+    tarkin = [people.last]
+    first = act(entities: tarkin, signs: [sign([3, 4])])
+    assert_equal [3, 4], first[:sign][:cell]
+    @revisit.talked({ talked: false, stopped_by: 'no_response' })
+    act(entities: tarkin, signs: [sign([3, 4])])
+    @revisit.talked({ talked: false, stopped_by: 'no_response' })
+    assert_equal 63, act(entities: tarkin, signs: [sign([3, 4])])[:npc][:type]
+    assert_equal %w[no_dialogue unreachable], @revisit.notes.map { |note| note[:detail][:outcome] }
+  end
+
+  def test_a_visit_engages_at_most_its_cap_then_waits_for_the_next_visit
+    signs = [[1, 1], [1, 3], [1, 5], [1, 7], [1, 9]].map { |cell| sign(cell) }
+    cells = Array.new(Koholint::Revisit::VISIT_ENGAGEMENTS) do |i|
+      cell = act(entities: [], signs:, frame: 100 + i)[:params].values_at(:row, :col)
+      read_sign(cell, "Sign number #{%w[one two three four][i]}.")
+      cell
+    end
+    assert_equal 4, cells.uniq.size
+    assert_nil act(entities: [], signs:, frame: 110)
+    assert_equal 'visit_cap', @revisit.notes.last[:detail][:outcome]
+    @revisit.next_action(state: state(room_id: 162), entities: [], stamp: STAMP)
+    refute_nil act(entities: [], signs:, frame: 200)
+  end
+
+  def test_a_visit_engages_for_at_most_its_frame_cap
+    act(entities: [], signs: [sign([1, 1]), sign([1, 3])], frame: 100)
+    assert_nil act(entities: [], signs: [sign([1, 1]), sign([1, 3])], frame: 100 + Koholint::Revisit::VISIT_FRAMES)
+    assert_nil @revisit.candidate(state: state(frame: 100 + Koholint::Revisit::VISIT_FRAMES), entities: [], signs: [sign([1, 3])], stamp: STAMP)
+  end
+
+  def test_unverified_signs_are_not_engaged
+    assert_nil act(entities: [], signs: [sign([2, 3]).merge(verified: false)])
   end
 end

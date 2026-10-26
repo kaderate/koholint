@@ -149,4 +149,34 @@ class RevisitPolicyTest < Minitest::Test
     @talk_log.store_pages('a' * 16, ['Hi'])
     assert_equal ['Hi there, friend'], @talk_log.pages_for('a' * 16)
   end
+
+  class AutopilotSpy
+    attr_reader :calls
+
+    def initialize = (@calls = [])
+    def acted(skill:, outcome:) = @calls << [skill, outcome]
+    def model_called(**) = nil
+    def next_choice(**) = nil
+  end
+
+  def test_an_unread_sign_is_engaged_before_the_model_and_hidden_from_the_autopilot
+    p = setup_revisit(skill: [walk, walk], entities: [])
+    autopilot = AutopilotSpy.new
+    p.instance_variable_set(:@autopilot, autopilot)
+    signs = [{ object: 99, cell: [2, 3], kind: :sign, verified: true }]
+    with_signs = context.merge(objects: -> { signs })
+    p.prepare(with_signs)
+    engage = p.decide(p.decision_point_for(state), state, with_signs)
+    assert_equal [{ skill: 'talk_to', params: { row: 2, col: 3 } }, 'delegated'], engage.values_at(:choice, :agent)
+    assert_match(/\Aengage sign at \(2,3\), round 1/, engage[:justification])
+    assert_empty @client.calls
+    p.after_action(choice: engage[:choice], outcome: { stopped_by: 'no_response', talked: false }, state: state(frame: 150), frame: 150)
+    assert_empty autopilot.calls
+    p.decide(p.decision_point_for(state(frame: 160)), state(frame: 160), with_signs)
+    p.after_action(choice: { skill: 'talk_to', params: { row: 2, col: 3 } }, outcome: { stopped_by: 'no_response', talked: false }, state: state(frame: 200), frame: 200)
+    asked = p.decide(p.decision_point_for(state(frame: 210)), state(frame: 210), with_signs)
+    assert_equal 'claude', asked[:agent]
+    assert_includes @client.calls.last[:prompt], '- at (2,3): sign: tried, no text yet'
+    assert_equal [{ sign: { place: [163, 16], cell: [2, 3] }, round: 2, outcome: 'unreachable' }], asked[:notables].map { |note| note[:detail] }
+  end
 end

@@ -198,4 +198,17 @@ class TalkLogTest < Minitest::Test
     assert_equal ['Tarkin (4,7)'], log.people(PLACE, [entity(63, [4, 7])])
     assert_equal :exhausted, log.status(place: PLACE, entity: 63, stamp: ['none', 1])
   end
+
+  def test_a_sign_is_read_once_a_text_without_an_entity_is_remembered_on_its_cell
+    log = Koholint::TalkLog.new
+    assert_equal :never, log.sign_status(place: PLACE, cell: [2, 3])
+    log.record(place: PLACE, row: 2, col: 3, talked: false)
+    assert_equal :tried, log.sign_status(place: PLACE, cell: [2, 3])
+    log.remember(place: PLACE, cell: [2, 3], text: 'Someone talks.', stamp: ['none', 1], entity: 63)
+    refute log.sign_read?(place: PLACE, cell: [2, 3])
+    log.remember(place: PLACE, cell: [2, 3], text: 'A sign reads.', stamp: ['none', 1])
+    assert log.sign_read?(place: PLACE, cell: [2, 3])
+    assert_equal :read, log.sign_status(place: PLACE, cell: [2, 3])
+    refute log.sign_read?(place: [162, 0], cell: [2, 3])
+  end
 end

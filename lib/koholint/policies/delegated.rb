@@ -81,6 +81,11 @@ module Koholint
         @screen_points = SCREEN_SKILLS.transform_values { |names| DecisionPoint.choose_skill(subset(registry, names)) }
       end
 
+      def prepare(context)
+        @entities_reader = context[:entities] if context[:entities]
+        @objects_reader = context[:objects] if context[:objects]
+      end
+
       def decision_point_for(state)
         return @screen_points.fetch(screen(state)) if screen(state)
         return @skill_point if locked_waiting?(state)
@@ -115,7 +120,7 @@ module Koholint
       def decide_with(decision_point, state, context)
         @prompt = @image = @images = @reading = nil
         @revisit_acting = false
-        @entities_reader = context[:entities] if context[:entities]
+        prepare(context)
         context[:ledger] = @ledger
         context[:triggers] = @triggers
         context[:talk_log] = @talk_log
@@ -170,7 +175,7 @@ module Koholint
       def after_action(choice:, outcome:, state:, frame:)
         return unless choice.key?(:skill)
 
-        @autopilot&.acted(skill: choice[:skill], outcome:)
+        @autopilot&.acted(skill: choice[:skill], outcome:) unless @revisit_acting
         @frame = frame
         @page += 1 if choice[:skill] == 'advance_dialogue'
         unless state.phase == :dialogue
@@ -485,7 +490,7 @@ module Koholint
       def ask(decision_point, state, context)
         @prompt = Agents::Context.build(state:, grid: grid_for(state, context), objective: @objectives.current, history: @objectives.history, entities: entities_now,
                                        attempts: @objectives.attempts_for_prompt, manual: @manual, last_results: @last_results, ledger: @ledger, refusals: @refusals, plan: @plan,
-                                       triggers: @triggers, talk_log: @talk_log, locked: (@hemmed[:attempts] if @hemmed && hemmed?(state)),
+                                       triggers: @triggers, talk_log: @talk_log, signs: objects_now, locked: (@hemmed[:attempts] if @hemmed && hemmed?(state)),
                                        locked_frames: (locked_frames(state) if WAIT_PHASES.include?(state.phase)), goal: goal_line, leads: @leads.all, stamp: stamp(state))
         if @reading
           text = Dialogues.text(@reading[:transcription].map { |entry| entry[:text] })
@@ -616,6 +621,8 @@ module Koholint
         @entities = @entities_reader ? Array(@entities_reader.call) : []
       end
 
+      def objects_now = @objects_reader ? Array(@objects_reader.call) : []
+
       def autopilot_choice(decision_point, state)
         return unless @autopilot && decision_point.name == :choose_skill && !@sequence && !@reading && !hemmed?(state)
 
@@ -629,18 +636,19 @@ module Koholint
       def revisit_candidate(state)
         return unless @entities_reader
 
-        @revisit.candidate(state:, entities: entities_now, stamp: stamp(state), budget_low: revisit_low?, danger: revisit_danger?(state))
+        @revisit.candidate(state:, entities: entities_now, signs: objects_now, stamp: stamp(state), budget_low: revisit_low?, danger: revisit_danger?(state))
       end
 
       def revisit_choice(decision_point, state)
         return unless decision_point.name == :choose_skill && !@sequence
 
-        action = @revisit.next_action(state:, entities: entities_now, stamp: stamp(state), budget_low: revisit_low?, danger: revisit_danger?(state))
+        action = @revisit.next_action(state:, entities: entities_now, signs: objects_now, stamp: stamp(state), budget_low: revisit_low?, danger: revisit_danger?(state))
         return unless action
 
         @revisit_acting = true
         npc = action[:npc]
-        { choice: action.slice(:skill, :params), justification: "revisit npc: entity type #{npc[:type]} at (#{npc[:cell][0]},#{npc[:cell][1]}), round #{action[:round]}",
+        what = npc ? "revisit npc: entity type #{npc[:type]} at (#{npc[:cell][0]},#{npc[:cell][1]})" : "engage sign at (#{action[:sign][:cell][0]},#{action[:sign][:cell][1]})"
+        { choice: action.slice(:skill, :params), justification: "#{what}, round #{action[:round]}",
           confidence: 1.0, agent: 'delegated', latency_ms: 0, cost_usd: 0.0, fallback: false, prompt: nil, image: nil }
       end
 

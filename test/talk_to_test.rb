@@ -31,10 +31,10 @@ class TalkToTest < Minitest::Test
   def centre(row, col) = Koholint::Geometry.center_of(row, col)
 
   def talk(row, col, from: [4, 5], grid: FakeGrid.new(sprites: [[row, col]]), ledger: nil, solid: [row, col], opens_after: 1, free: false,
-           dialogue_at: nil, room_change_at: nil, damage_at: nil, limit: 600, blocked: [], triggers: nil, open_cells: nil, talk_log: nil, entities: nil)
+           dialogue_at: nil, room_change_at: nil, damage_at: nil, limit: 600, blocked: [], triggers: nil, open_cells: nil, talk_log: nil, entities: nil, objects: nil)
     x, y = centre(*from)
     start = state(x:, y:)
-    execution = registry.start('talk_to', start, { row:, col: }, { grid:, ledger:, triggers:, talk_log:, entities: }.compact)
+    execution = registry.start('talk_to', start, { row:, col: }, { grid:, ledger:, triggers:, talk_log:, entities:, objects: }.compact)
     inputs = []
     a_presses = 0
     dialog = 0
@@ -167,6 +167,14 @@ class TalkToTest < Minitest::Test
     assert_equal :done, result[:stopped_by], result.inspect
     refute_equal({ row: 4, col: 7 }, result[:standing_cell])
     assert_equal 1, result[:standing_cells_tried].size
+  end
+
+  def test_a_room_object_read_from_one_side_is_approached_from_that_side_only
+    sign = [{ object: 212, cell: [4, 8], kind: :sign, verified: true, faces: [:up] }]
+    result, = talk(4, 8, objects: -> { sign })
+    assert_equal [{ row: 5, col: 8 }, :up], result.values_at(:standing_cell, :facing)
+    other, = talk(4, 8, objects: -> { [sign.first.merge(cell: [1, 1])] })
+    assert_equal({ row: 4, col: 7 }, other[:standing_cell])
   end
 
   def test_when_every_side_is_known_the_exclusion_does_not_prevent_a_retry

@@ -98,6 +98,13 @@ class AgentsContextTest < Minitest::Test
     assert_includes build(talk_log: log), '- at (1,2): talked to 1 time (dialogue opened 1)'
   end
 
+  def test_signs_on_screen_are_listed_with_their_reading_status
+    log = Koholint::TalkLog.new
+    signs = [{ object: 99, cell: [3, 4], kind: :sign, verified: true }, { object: 99, cell: [5, 6], kind: :sign, verified: true }]
+    log.remember(place: [163, 16], cell: [5, 6], text: 'Read me.', stamp: ['none', 1])
+    assert_includes build(talk_log: log, signs:), "- at (1,2): never tried\n- at (3,4): sign: never read\n- at (5,6): sign: read"
+  end
+
   def test_the_things_section_lists_the_sides_without_response
     log = Koholint::TalkLog.new
     log.record(place: [163, 16], row: 1, col: 2, talked: false, standing: [[[2, 2], true], [[0, 2], true]])

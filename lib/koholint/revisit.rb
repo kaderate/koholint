@@ -7,12 +7,18 @@ module Koholint
     FAILURE_CAP = 2
     VISIT_STAMPS = 3
     DANGER_PIXELS = 48
+    VISIT_ENGAGEMENTS = 4
+    VISIT_FRAMES = 900
+    SIGN_ROUNDS = 2
     PHASES = %i[playing].freeze
 
     attr_reader :open
 
-    def initialize(talk_log:)
+    def initialize(talk_log:, visit_engagements: VISIT_ENGAGEMENTS, visit_frames: VISIT_FRAMES)
       @talk_log = talk_log
+      @visit_engagements = visit_engagements
+      @visit_frames = visit_frames
+      @sign_rounds = Hash.new(0)
       @npcs = Hash.new { |hash, key| hash[key] = { rounds: 0, slots: [] } }
       @failures = Hash.new(0)
       @visit = nil
@@ -21,7 +27,7 @@ module Koholint
       @notes = []
     end
 
-    def candidate(state:, entities:, stamp:, budget_low: false, danger: false)
+    def candidate(state:, entities:, stamp:, signs: [], budget_low: false, danger: false)
       return if budget_low || danger || !PHASES.include?(state.phase(booted: true)) || hurt?(state) || threatened?(state, entities)
 
       place = [state.room_id, state.map_id]
@@ -31,40 +37,50 @@ module Koholint
 
       people = entities.select { |entity| npc?(entity) }
       pending = people.select { |entity| pending?(place, entity, stamp, people, visit) }
-      return if pending.empty?
+      unread = signs.select { |sign| sign?(sign) && unread?(place, sign, visit) }
+      return if pending.empty? && unread.empty?
+      return spent(visit, state) if spent?(visit, state.frame)
+
+      current = unread.find { |sign| [:sign, sign[:cell]] == visit[:current] }
+      return current if current
 
       tried = @npcs[[place, visit[:current], stamp]][:slots] if visit[:current]
       same = pending.select { |entity| entity[:type] == visit[:current] }
       (same.reject { |entity| tried.include?(entity[:slot]) }.first || same.first) ||
-        pending.min_by { |entity| [distance(state, entity), entity[:slot]] }
+        (pending + unread).min_by { |target| [distance(state, target), target[:slot] || -1, target[:cell]] }
     end
 
-    def next_action(state:, entities:, stamp:, budget_low: false, danger: false)
+    def next_action(state:, entities:, stamp:, signs: [], budget_low: false, danger: false)
       close(:no_text) if @open
       place = [state.room_id, state.map_id]
       visit = visit_for(place)
-      npc = candidate(state:, entities:, stamp:, budget_low:, danger:) or return
+      target = candidate(state:, entities:, stamp:, signs:, budget_low:, danger:) or return
 
       visit[:cycles][stamp] ||= state.frame
-      visit[:current] = npc[:type]
-      entry = @npcs[[place, npc[:type], stamp]]
+      visit[:started] ||= state.frame
+      visit[:engaged] += 1
+      return engage_sign(place, visit, target, stamp) if sign?(target)
+
+      visit[:current] = target[:type]
+      entry = @npcs[[place, target[:type], stamp]]
       entry[:rounds] += 1
-      entry[:slots] |= [npc[:slot]]
-      @open = { place:, type: npc[:type], cell: npc[:cell], round: entry[:rounds], stamp:, visit: visit[:id] }
-      { skill: 'talk_to', params: { row: npc[:cell][0], col: npc[:cell][1] }, npc: @open.slice(:place, :type, :cell), round: entry[:rounds] }
+      entry[:slots] |= [target[:slot]]
+      @open = { place:, type: target[:type], cell: target[:cell], round: entry[:rounds], stamp:, visit: visit[:id] }
+      { skill: 'talk_to', params: { row: target[:cell][0], col: target[:cell][1] }, npc: @open.slice(:place, :type, :cell), round: entry[:rounds] }
     end
 
     def talked(outcome)
       return unless @open
       return if outcome[:talked] == true || outcome['talked'] == true
 
-      key = [@open[:visit], @open[:type]]
+      key = [@open[:visit], @open[:sign] ? [:sign, @open[:cell]] : @open[:type]]
       @failures[key] += 1
       close(@failures[key] >= FAILURE_CAP ? :unreachable : :no_dialogue)
     end
 
     def read
       return unless @open
+      return close(@talk_log.sign_read?(place: @open[:place], cell: @open[:cell]) ? :read : :no_text) if @open[:sign]
 
       close(@talk_log.last_status(place: @open[:place], entity: @open[:type]))
     end
@@ -79,6 +95,31 @@ module Koholint
 
     def npc?(entity) = entity[:kind].to_s == 'npc' && entity[:verified] == true && entity[:cell]
 
+    def sign?(object) = object[:kind].to_s == 'sign' && object[:verified] == true && object[:cell]
+
+    def unread?(place, sign, visit)
+      @sign_rounds[[place, sign[:cell]]] < SIGN_ROUNDS && @failures[[visit[:id], [:sign, sign[:cell]]]] < FAILURE_CAP &&
+        !@talk_log.sign_read?(place:, cell: sign[:cell])
+    end
+
+    def engage_sign(place, visit, sign, stamp)
+      visit[:current] = [:sign, sign[:cell]]
+      round = @sign_rounds[[place, sign[:cell]]] += 1
+      @open = { place:, sign: true, cell: sign[:cell], round:, stamp:, visit: visit[:id] }
+      { skill: 'talk_to', params: { row: sign[:cell][0], col: sign[:cell][1] }, sign: { place:, cell: sign[:cell] }, round: }
+    end
+
+    def spent?(visit, frame) = visit[:engaged] >= @visit_engagements || (visit[:started] && frame - visit[:started] >= @visit_frames)
+
+    def spent(visit, state)
+      return if visit[:spent]
+
+      visit[:spent] = true
+      @notes << { kind: 'revisit', detail: { place: visit[:place], round: 0, outcome: 'visit_cap', engagements: visit[:engaged],
+                                             frames: visit[:started] ? state.frame - visit[:started] : 0 } }
+      nil
+    end
+
     def hurt?(state) = state.hp && state.max_hp && state.hp < state.max_hp - Perception::HP_PER_HEART
 
     def threatened?(state, entities)
@@ -92,7 +133,7 @@ module Koholint
       return @visit if @visit && @visit[:place] == place
 
       @visits += 1
-      @visit = { place:, id: @visits, cycles: {}, capped: [], current: nil }
+      @visit = { place:, id: @visits, cycles: {}, capped: [], current: nil, engaged: 0, started: nil, spent: false }
     end
 
     def blocked?(visit, stamp, frame)
@@ -118,7 +159,8 @@ module Koholint
     end
 
     def close(outcome)
-      @notes << { kind: 'revisit', detail: { npc: @open.slice(:place, :type, :cell), round: @open[:round], outcome: outcome.to_s } }
+      who = @open[:sign] ? { sign: @open.slice(:place, :cell) } : { npc: @open.slice(:place, :type, :cell) }
+      @notes << { kind: 'revisit', detail: { **who, round: @open[:round], outcome: outcome.to_s } }
       @open = nil
     end
 

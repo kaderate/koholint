@@ -176,7 +176,15 @@ module Koholint
       talks.empty? ? :never : assess(talks, talks.last[:stamp])[:status]
     end
 
-    def attempts(place, cells) = cells.sum { |cell| @attempts[[place, cell]] }
+    def sign_read?(place:, cell:) = @texts.any? { |talk| talk[:place] == place && talk[:cell] == cell && !talk[:entity] }
+
+    def sign_status(place:, cell:)
+      return :read if sign_read?(place:, cell:)
+
+      @attempts[[place, cell]].positive? ? :tried : :never
+    end
+
+    def attempts(place, cells) =cells.sum { |cell| @attempts[[place, cell]] }
 
     def talked(place, cells) = cells.sum { |cell| @talked[[place, cell]] }
 

@@ -39,7 +39,8 @@ entity opens a dialogue that does not open with its slot cleared in a control co
 same control (`enemy`, never observed so far); otherwise `unknown`. The engine passes `Entities.read` to the policy and
 skills as the `entities` context entry. `Entities.objects` reads the room object table (`room_objects`, one id per cell)
 and keeps the ids that `data/entities.json` lists with an `object` key and a kind (`sign`: shows a text when read with A,
-`object`); it is the `objects` context entry. `probes/object_census.rb` (`bin/koholint census objects`) measures them: in
+`object`) and the directions Link faced when it answered (`faces`, which restrict the standing cells of `talk_to`); it is
+the `objects` context entry. `probes/object_census.rb` (`bin/koholint census objects`) measures them: in
 a throwaway copy with every entity slot cleared, Link is put next to each cell, faces it by walking 6 frames and presses
 A (a dialogue that also opens without A in a control copy is not the object's; the first page is saved as a PNG); each
 object id is sampled 6 times unless it answered; `--crawl N` first crosses screen edges in copies to reach N screens of
@@ -102,15 +103,19 @@ dialogue opened, reported in its result, else the last `talk_to` target cell), t
 and digits only, as for `new_text`) of each stitched text read, its conversation signature and speaker name, and a world stamp (milestone, places visited): the context says whether the last talk gave
 new text, how many talks in a row gave nothing new, and `worth retrying` (the stamp changed or the last talk was new) or
 `exhausted` (the last two talks repeated under the same stamp, by text or by signature). It also keeps the page texts per
-conversation signature. The listing of things on screen shows entities first (cell, type, kind, name) and the sprite
-objects that hold no entity as a fallback.
-`revisit.rb` is the deterministic revisit: for the `npc` entities of a `verified` kind in the current place that are not
-exhausted for the current stamp, it gives the next `talk_to` (nearest person first, the same person until exhausted, each
-person of a type shared by several tried once per stamp), with caps of 6 rounds per person and stamp, 1800 frames per
-stamp, 3 stamps per visit of the place and 2 failed talks per person and visit (then unreachable); it never acts outside
-free play, with health below the maximum minus one heart, within 300 frames of a hit, while hemmed, or with an `enemy`
-or a moving or unmeasured `unknown` entity within 3 cells. Its talks are not objective attempts. It records one
-`notable` `revisit` `{npc, round, outcome}` per round.
+conversation signature. The listing of things on screen shows entities first (cell, type, kind, name), the sprite
+objects that hold no entity as a fallback, and the signs with their reading status.
+`revisit.rb` is the deterministic revisit and arrival engagement: for the `npc` entities of a `verified` kind in the
+current place that are not exhausted for the current stamp, and the `verified` `sign` room objects not read yet (a sign
+is read once: a text remembered on its cell with no entity; `TalkLog#sign_status` is `never`, `tried` or `read`), it
+gives the next `talk_to` (nearest target first, the same target until done, each person of a type shared by several
+tried once per stamp), with caps of 4 engagements and 900 frames per visit of the place (`VISIT_ENGAGEMENTS`,
+`VISIT_FRAMES`, then one `visit_cap` note), 6 rounds per person and stamp, 2 rounds per sign, 1800 frames per stamp, 3
+stamps per visit and 2 failed talks per target and visit (then unreachable); it never acts outside free play, with
+health below the maximum minus one heart, within 300 frames of a hit, while hemmed, or with an `enemy` or a moving or
+unmeasured `unknown` entity within 3 cells. Its talks are journaled like any decision (agent `delegated`, cost 0), are
+not objective attempts and are hidden from the explore autopilot. It records one `notable` `revisit`
+`{npc|sign, round, outcome}` per round.
 `vision/dialogue_shot.rb` also reduces a captured page to the text pixel rows of its dialogue box; a conversation's
 signature hashes the rows that are not the partial form of a longer row (pages are captured mid-typing at a phase that
 varies, so raw page hashes are not stable; the signature was measured identical across phases and runs).
@@ -120,7 +125,8 @@ scrolling text box into the full text without losing a word; the stored events s
 **Decision points and policies** — `decision.rb` defines the points (`choose_objective`, `choose_skill`,
 `move`, macros) with their output schema and validation. A policy answers them: `policies/delegated.rb`
 (agent-driven; owns the context, plan memory, automatic dialogue pages, lock/hemmed handling, and before asking the model
-the revisit of people and the reuse of conversations already read: a dialogue closed when read (dialog state back to 0) whose signature (at least 2 full rows) is known is not sent
+the revisit of people and signs (its `prepare(context)` gets the entity and object readers before `decision_point_for`, so
+the first decision of a visit or a run engages too) and the reuse of conversations already read: a dialogue closed when read (dialog state back to 0) whose signature (at least 2 full rows) is known is not sent
 as sheets, its stored text is emitted again with `cached: true`; when a revisit is due it replaces the model's skill choice,
 also right after a sheet reading; and the explore autopilot, `autopilot.rb`: after an `explore` that stopped with
 `new_place` or `budget`, the policy issues the next `explore` with no direction itself (agent `delegated`, cost 0,

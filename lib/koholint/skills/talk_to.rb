@@ -33,6 +33,7 @@ module Koholint
           @failed = []
           @entities = context[:entities]
           @entity = nil
+          @faces = faces_for(context[:objects], person)
           super(target: nil, context:, **rest)
           @facing = Navigation::Planner.direction_between(@standing, @person) if @standing
         end
@@ -137,8 +138,14 @@ module Koholint
         def neighbours
           Navigation::Planner::DELTAS.values.filter_map do |dr, dc|
             cell = [@person[0] + dr, @person[1] + dc]
-            cell if cell[0].between?(0, Geometry::ROWS - 1) && cell[1].between?(0, Geometry::COLS - 1) && !@grid&.static_sprite(*cell)
+            cell if cell[0].between?(0, Geometry::ROWS - 1) && cell[1].between?(0, Geometry::COLS - 1) && !@grid&.static_sprite(*cell) &&
+                    (@faces.empty? || @faces.include?(Navigation::Planner.direction_between(cell, @person)))
           end
+        end
+
+        def faces_for(objects, person)
+          found = objects && Array(objects.call).find { |object| object[:cell] == person }
+          Array(found&.dig(:faces)).map(&:to_sym)
         end
 
         def turns(path)

@@ -9,6 +9,7 @@ module Koholint
     SLOTS = 16
     KINDS = %w[npc enemy object unknown].freeze
     OBJECT_KINDS = %w[sign object].freeze
+    FACES = %w[up down left right].freeze
     DEFAULT_PATH = File.expand_path('../../data/entities.json', __dir__)
     ADDRESSES = Addresses.load.slice(:entity_x, :entity_y, :entity_status, :entity_state, :entity_type, :room_objects).freeze
     ROOM_ROW_STRIDE = 16
@@ -35,7 +36,7 @@ module Koholint
         Geometry::COLS.times.filter_map do |col|
           object = reader.read(ADDRESSES.fetch(:room_objects) + (row * ROOM_ROW_STRIDE) + col)
           known = kinds[object] or next
-          { object:, cell: [row, col], kind: known[:kind], verified: known[:verified] }
+          { object:, cell: [row, col], kind: known[:kind], verified: known[:verified], faces: known[:faces] }.compact
         end
       end
     end
@@ -44,7 +45,7 @@ module Koholint
       @object_catalogue ||= {}
       @object_catalogue[path] ||= JSON.parse(File.read(path)).select { |entry| entry.key?('object') }.to_h do |entry|
         validate!(entry)
-        [Integer(entry.fetch('object')), { kind: entry.fetch('kind').to_sym, verified: entry['confidence'] == 'verified' }]
+        [Integer(entry.fetch('object')), { kind: entry.fetch('kind').to_sym, verified: entry['confidence'] == 'verified', faces: entry['faces']&.map(&:to_sym) }.compact]
       end.freeze
     end
 
@@ -66,6 +67,7 @@ module Koholint
         raise Invalid, "entity #{entry[id].inspect}: missing #{key}" unless entry.key?(key)
       end
       raise Invalid, "entity #{entry[id]}: unknown kind #{entry['kind']}" unless (id == 'object' ? OBJECT_KINDS : KINDS).include?(entry['kind'])
+      raise Invalid, "entity #{entry[id]}: unknown faces #{entry['faces']}" unless (Array(entry['faces']) - FACES).empty?
       raise Invalid, "entity #{entry['type']}: unknown confidence #{entry['confidence']}" unless Addresses::CONFIDENCES.include?(entry['confidence'])
       return unless entry['confidence'] == 'verified' && entry['verified_count'] < 2
 

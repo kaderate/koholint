@@ -51,20 +51,22 @@ class EntitiesTest < Minitest::Test
     reader.write(0xD711 + (2 * 16) + 3, 99)
     reader.write(0xD711 + (7 * 16) + 9, 98)
     reader.write(0xD711 + 10, 99)
-    found = Koholint::Entities.objects(reader, kinds: { 99 => { kind: :sign, verified: true }, 98 => { kind: :object, verified: false } })
-    assert_equal [{ object: 99, cell: [2, 3], kind: :sign, verified: true }, { object: 98, cell: [7, 9], kind: :object, verified: false }], found
+    found = Koholint::Entities.objects(reader, kinds: { 99 => { kind: :sign, verified: true, faces: [:up] }, 98 => { kind: :object, verified: false } })
+    assert_equal [{ object: 99, cell: [2, 3], kind: :sign, verified: true, faces: [:up] }, { object: 98, cell: [7, 9], kind: :object, verified: false }], found
   end
 
   def test_object_entries_are_validated_apart_from_entity_types
     Dir.mktmpdir do |dir|
       path = File.join(dir, 'entities.json')
       File.write(path, JSON.generate([{ 'type' => 62, 'kind' => 'npc', 'source' => 's', 'confidence' => 'hypothesis', 'verified_count' => 1 },
-                                      { 'object' => 99, 'kind' => 'sign', 'source' => 's', 'confidence' => 'hypothesis', 'verified_count' => 1 }]))
+                                      { 'object' => 99, 'kind' => 'sign', 'source' => 's', 'confidence' => 'hypothesis', 'verified_count' => 1, 'faces' => ['up'] }]))
       assert_equal [62], Koholint::Entities.load(path).keys
-      assert_equal({ 99 => { kind: :sign, verified: false } }, Koholint::Entities.object_catalogue(path))
+      assert_equal({ 99 => { kind: :sign, verified: false, faces: [:up] } }, Koholint::Entities.object_catalogue(path))
       bad = File.join(dir, 'bad.json')
       File.write(bad, JSON.generate([{ 'object' => 99, 'kind' => 'npc', 'source' => 's', 'confidence' => 'hypothesis', 'verified_count' => 1 }]))
       assert_raises(Koholint::Entities::Invalid) { Koholint::Entities.object_catalogue(bad) }
+      File.write(bad, JSON.generate([{ 'object' => 99, 'kind' => 'sign', 'source' => 's', 'confidence' => 'hypothesis', 'verified_count' => 1, 'faces' => ['north'] }]))
+      assert_raises(Koholint::Entities::Invalid) { Koholint::Entities.validate!(JSON.parse(File.read(bad)).first) }
     end
   end
 
