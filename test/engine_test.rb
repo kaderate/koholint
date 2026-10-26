@@ -459,4 +459,31 @@ class EngineTest < Minitest::Test
       refute_includes unknown.first['detail'], 'link_z'
     end
   end
+
+  def visiting_emulator
+    emulator = MenuEmulator.new
+    emulator.define_singleton_method(:read) do |addr|
+      room = frame.between?(100, 199) ? 161 : 162
+      slot0 = { entity_status: 5, entity_type: 62, entity_x: 88, entity_y: 48 }
+      { hp: 24, max_hearts: 3, link_x: 80, link_y: 60, game_mode: 0x0B, game_submode: frame.between?(100, 110) ? 3 : 7,
+        room_id: room, **(room == 162 ? slot0 : {}) }.fetch(Koholint::Perception::ADDRESSES.key(addr), 0)
+    end
+    emulator
+  end
+
+  def test_each_visit_of_a_place_gets_one_place_card_once_ready_and_a_resume_keeps_it
+    with_run do |_dir, run|
+      Koholint::Engine.new(run:, policy: Recorder.new, emulator: visiting_emulator, budget: Koholint::Budget.new(frames: 260)).run
+      cards = events(run, :place_card)
+      assert_equal [[162, 0], [161, 0], [162, 0]], cards.map { |card| card['place'] }
+      assert_equal [1, 112], cards.first(2).map { |card| card['frame'] }
+      assert_equal [{ 'type' => 62, 'cell' => [2, 5], 'verified' => true }], cards.first['people']
+      assert_equal [[], [], {}], cards.first.values_at('signs', 'enemies', 'exits')
+      Koholint::Engine.new(run:, policy: Recorder.new, emulator: visiting_emulator.tap { |e| e.instance_variable_set(:@frame, 260) },
+                           budget: Koholint::Budget.new(frames: 20)).run
+      assert_equal 3, events(run, :place_card).size
+      world = JSON.parse(File.read(File.join(run.dir, 'world.json')))
+      assert_equal %w[161-0 162-0], world['places'].keys.sort
+    end
+  end
 end

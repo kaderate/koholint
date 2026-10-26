@@ -73,6 +73,13 @@ their own handling. The grid builder only observes states whose signals are at r
 Measured: a screen scroll lasts 35-51 frames (vertical about 36, horizontal about 44), a ledge jump 20-27, a jump into a
 screen change 53-66, a knockback 15-16, a door 62 (walk in, loading, walk out).
 
+**Place cards** — `place_card.rb`: on the first ready observation in the `playing` phase of each visit of a place
+(a new place since the last card; rebuilt from the trace on resume), after the grid builder, the engine scans the entity
+table and the room objects and emits a `place_card` event: people (`npc` entities, verified or not), enemies, unknown
+entities, signs, objects (`object` entities and room objects) with their cells, and exits (border cells believed
+walkable, by side). `world.json` `places` keeps per place the last card, the visits, the first and last card frames, the
+names and talk status of the people and whether each sign was read (from the talk log rebuilt from the trace).
+
 **Vision** (`vision/`) — what RAM does not give: `screen_vision` and `screen_snapshot` read the screen,
 `grid_builder` probes neighbouring cells (the only place that snapshots and restores the emulator) and
 builds a collision `grid`; `beliefs` and `world` accumulate per-place knowledge (observed free, blocked,
@@ -153,10 +160,10 @@ schema and reports cost and latency. Jev (tactical choices) is planned, not wire
 **Run storage** — `run.rb`: `runs/<id>/` with `manifest.json` (flow version, ROM hash, tag, harness/prompts
 sha, model, `autopilot` for agent runs; `resume` keeps it), `inputs.log`, `trace.jsonl` (events validated by `trace.rb`), `keyframes/`, `save/`, `prompts/`, `screens/` (one PNG per place, written by `place_shots.rb`:
 observability only, no trace event, the set of captured places is rebuilt from the directory; `screens <run_dir>` backfills older runs by replay),
-`world.json` (`{ goal, leads }`, rewritten from the trace at every stop), `summary.json` (written at every stop by
+`world.json` (`{ goal, leads, places }`, rewritten from the trace at every stop), `summary.json` (written at every stop by
 `summary.rb` from the trace only, versioned by `Summary::VERSION`: totals, cost by skill, decisions by agent and
 feature usage, with `autopilot_decisions` and `chain_max`; `archive` rewrites an outdated one), `star.json`, `notes.md` (owner notes from the viewer). Trace events (`dialogue` may carry `speaker`, `conversation` and `cached`; a `talk_to` result may carry `entity`; a `perception` may carry `not_ready_frames`; a `decision` may carry `autopilot`): `perception`, `decision`, `action`, `objective`, `dialogue`, `lead`, `goal`,
-`notable`, `screen`, `screen_changed`, `affordance`, `grid_contradiction`, `keyframe`, `save`, `budget_stop`, `stop`. `budget.rb` enforces frames,
+`notable`, `place_card`, `screen`, `screen_changed`, `affordance`, `grid_contradiction`, `keyframe`, `save`, `budget_stop`, `stop`. `budget.rb` enforces frames,
 minutes, dollars and objective steps. `archive.rb` keeps a light bundle per run in git (trace gzipped, `screens/` included);
 heavy artifacts stay local. A run resumes only with the same `flow_version` and ROM hash; a change to the
 play flow means a new `flow_version`.
@@ -180,7 +187,8 @@ version, and may set the child's `--tag`, `--autopilot` and `--root`.
 
 ## Data flow of one decision
 
-1. The engine waits for readiness (see Readiness gate), reads `GameState` and emits a `perception` event; vision updates the grid and beliefs.
+1. The engine waits for readiness (see Readiness gate), reads `GameState` and emits a `perception` event; vision updates the grid and beliefs;
+   on a new place the engine emits its `place_card`.
 2. The policy gets a decision point and a context. For an agent policy: render context, call the model, validate
    the answer against the schema; invalid twice means deterministic fallback.
 3. The engine emits a `decision` event (choice, justification, confidence, cost, latency, prompt sha) and runs

@@ -10,6 +10,7 @@ require 'koholint/keyframes'
 require 'koholint/leads'
 require 'koholint/modes'
 require 'koholint/perception'
+require 'koholint/place_card'
 require 'koholint/place_shots'
 require 'koholint/readiness'
 require 'koholint/replay'
@@ -61,6 +62,7 @@ module Koholint
       @ram_hash = Digest::SHA256.hexdigest(@emulator.cartridge_ram)
       events = Trace.read(File.join(run.dir, 'trace.jsonl'))
       @played = GameState.played?(events)
+      @card_place = carded_place(events)
       @unknown_modes = events.filter_map { |event| event['detail'] if event['type'] == 'notable' && event['kind'] == 'unknown_mode' }.to_set
     end
 
@@ -101,11 +103,13 @@ module Koholint
         activity(:mapping, 'mapping the screen')
         grid = @builder.observe(@emulator, state) if Readiness.signals_ready?(state)
       end
+      note_place(state, grid)
       @policy.observe(state, frame: state.frame) if @policy.respond_to?(:observe)
       return if @budget.exhausted
 
-      decision_point = @policy.respond_to?(:decision_point_for) ? @policy.decision_point_for(state) : @decision_point
       context = context_for(grid)
+      @policy.prepare(context) if @policy.respond_to?(:prepare)
+      decision_point = @policy.respond_to?(:decision_point_for) ? @policy.decision_point_for(state) : @decision_point
       activity(:deciding, 'deciding what to do', decision_point: decision_point.name.to_s)
       result = @policy.decide(decision_point, state, context)
       @budget.tick(cost: result[:cost_usd].to_f)
@@ -133,6 +137,25 @@ module Koholint
       activity(:idle, 'between decisions')
     end
 
+    def note_place(state, grid)
+      place = [state.room_id, state.map_id]
+      return unless state.phase(booted: true) == :playing
+      return if place == @card_place
+
+      @card_place = place
+      card = PlaceCard.build(place:, entities: Entities.read(@emulator), objects: Entities.objects(@emulator), grid:)
+      @run.trace.emit(:place_card, frame: state.frame, **card)
+    end
+
+    def carded_place(events)
+      events.reduce(nil) do |carded, event|
+        next event['place'] if event['type'] == 'place_card'
+
+        place = Summary.perceived_place(event)
+        place && place != carded ? nil : carded
+      end
+    end
+
     def activity(kind, label, **detail)
       @acting = kind == :acting ? [label, detail] : nil
       @run.write_activity(kind:, label:, frame: @emulator.frame, detail:)
@@ -141,7 +164,7 @@ module Koholint
     def context_for(grid)
       context = @builder ? { grid: } : {}
       context.merge(dialogue_shot: -> { Vision::DialogueShot.crop(@emulator) }, dialogue_rgb: -> { Vision::DialogueShot.rgb(@emulator) },
-                    entities: -> { Entities.read(@emulator) })
+                    entities: -> { Entities.read(@emulator) }, objects: -> { Entities.objects(@emulator) })
     end
 
     def record_prompt(result, frame, name)

@@ -23,7 +23,8 @@ module Koholint
       grid_contradiction: %i[place row col direction believed observed],
       dialogue: %i[place text source page],
       lead: %i[id place source quote claim importance],
-      goal: %i[text]
+      goal: %i[text],
+      place_card: %i[place people enemies signs objects exits]
     }.freeze
     SPEAKER_MAX = 40
     ALLOWED = { dialogue: { source: %w[agent] }, lead: { importance: %w[high normal low] } }.freeze

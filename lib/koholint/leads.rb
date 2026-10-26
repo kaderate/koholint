@@ -1,6 +1,7 @@
 require 'json'
 require 'koholint/ledger'
 require 'koholint/objectives'
+require 'koholint/place_card'
 require 'koholint/trace'
 
 module Koholint
@@ -34,9 +35,10 @@ module Koholint
     def self.clean(text, cap = nil) = text.to_s.gsub(/[[:cntrl:]]/, ' ').gsub(/\s+/, ' ').strip.then { |t| cap ? t[0, cap] : t }
 
     def self.write_world(dir)
-      leads = from_events(Trace.read(File.join(dir, 'trace.jsonl')))
+      events = Trace.read(File.join(dir, 'trace.jsonl'))
+      leads = from_events(events)
       path = File.join(dir, 'world.json')
-      File.write("#{path}.tmp", "#{JSON.pretty_generate({ goal: leads.goal, leads: leads.all })}\n")
+      File.write("#{path}.tmp", "#{JSON.pretty_generate({ goal: leads.goal, leads: leads.all, places: PlaceCard.world(events) })}\n")
       File.rename("#{path}.tmp", path)
     end
 
