@@ -27,10 +27,10 @@ require 'koholint/viewer'
 module Koholint
   module CLI
     USAGE = 'usage: koholint run|resume <run_dir>|fork <run_dir> --at-frame N|verify <run_dir>|summary <run_dir>|screens <run_dir>|watch <run_dir>|' \
-            'archive|star <run_dir> WHY|prune-heavy|census boot|<run_dir> FRAME...|entities <run_dir> FRAME...|ready <run_dir>|npcs|' \
+            'archive|star <run_dir> WHY|prune-heavy|census boot|<run_dir> FRAME...|entities <run_dir> FRAME...|objects <run_dir> FRAME...|ready <run_dir>|npcs|' \
             'ab-plan <run_dir> --at-frame N|ab-report PREFIX ' \
             '[--frames N --minutes N --steps N --dollars X --root DIR --runs-root DIR --tag NAME --realtime --grid --port N --host H --from live|start|DIR ' \
-            '--speed X --agent --autopilot on|off --model M --max-dollars X --claude-command PATH --commit --full --keep N --yes --arms A,B --forks N]'.freeze
+            '--speed X --agent --autopilot on|off --model M --max-dollars X --claude-command PATH --commit --full --keep N --yes --arms A,B --forks N --crawl N]'.freeze
 
     DEFAULT_MODEL = 'sonnet'.freeze
     DEFAULT_MAX_DOLLARS = 1.5
@@ -56,6 +56,7 @@ module Koholint
         o.on('--autopilot MODE', %w[on off]) { |v| options[:autopilot] = v == 'on' }
         o.on('--arms LIST', Array) { |v| options[:arms] = v }
         o.on('--forks N', Integer) { |v| options[:forks] = v.positive? ? v : raise(OptionParser::InvalidArgument, v.to_s) }
+        o.on('--crawl N', Integer) { |v| options[:crawl] = v.positive? ? v : raise(OptionParser::InvalidArgument, v.to_s) }
         o.on('--model M') { |v| options[:model] = v }
         o.on('--max-dollars X', Float) { |v| options[:dollars] = v }
         o.on('--claude-command PATH') { |v| options[:claude_command] = v }
@@ -109,7 +110,7 @@ module Koholint
       when 'star'
         Archive.star(run_dir(args), args[1] || raise(OptionParser::MissingArgument, 'why'), out:)
       when 'prune-heavy' then Archive.prune_heavy(root: options.fetch(:root, 'runs'), **options.slice(:keep, :yes), out:)
-      when 'census' then census(args, out)
+      when 'census' then census(args, out, crawl: options.fetch(:crawl, 0))
       when 'ab-report'
         out.print AB.markdown(AB.report(prefix: args.first || raise(OptionParser::MissingArgument, 'prefix'), root: options.fetch(:root, 'runs')))
         0
@@ -160,9 +161,10 @@ module Koholint
       0
     end
 
-    def census(args, out)
+    def census(args, out, crawl: 0)
       return census_entities(args.drop(1), out) if args.first == 'entities'
       return census_ready(args.drop(1), out) if args.first == 'ready'
+      return census_objects(args.drop(1), out, crawl:) if args.first == 'objects'
 
       require 'koholint/probes/mode_census'
       raise OptionParser::MissingArgument, 'boot or <run_dir> FRAME...' unless args.first == 'boot' || args.size > 1
@@ -180,6 +182,16 @@ module Koholint
       raise OptionParser::MissingArgument, 'entities <run_dir> FRAME...' unless args.size > 1
 
       Probes::EntityCensus.census(run_dir(args), args.drop(1).map { |frame| Integer(frame) }).each { |path| out.puts "census #{path}" }
+      0
+    rescue ArgumentError => e
+      raise OptionParser::InvalidArgument, e.message
+    end
+
+    def census_objects(args, out, crawl:)
+      require 'koholint/probes/object_census'
+      raise OptionParser::MissingArgument, 'objects <run_dir> FRAME... [--crawl N]' unless args.size > 1
+
+      Probes::ObjectCensus.census(run_dir(args), args.drop(1).map { |frame| Integer(frame) }, crawl:).each { |path| out.puts "census #{path}" }
       0
     rescue ArgumentError => e
       raise OptionParser::InvalidArgument, e.message

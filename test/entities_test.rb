@@ -46,6 +46,28 @@ class EntitiesTest < Minitest::Test
     end
   end
 
+  def test_room_objects_of_a_catalogued_id_are_read_by_cell
+    reader = FakeReader.new
+    reader.write(0xD711 + (2 * 16) + 3, 99)
+    reader.write(0xD711 + (7 * 16) + 9, 98)
+    reader.write(0xD711 + 10, 99)
+    found = Koholint::Entities.objects(reader, kinds: { 99 => { kind: :sign, verified: true }, 98 => { kind: :object, verified: false } })
+    assert_equal [{ object: 99, cell: [2, 3], kind: :sign, verified: true }, { object: 98, cell: [7, 9], kind: :object, verified: false }], found
+  end
+
+  def test_object_entries_are_validated_apart_from_entity_types
+    Dir.mktmpdir do |dir|
+      path = File.join(dir, 'entities.json')
+      File.write(path, JSON.generate([{ 'type' => 62, 'kind' => 'npc', 'source' => 's', 'confidence' => 'hypothesis', 'verified_count' => 1 },
+                                      { 'object' => 99, 'kind' => 'sign', 'source' => 's', 'confidence' => 'hypothesis', 'verified_count' => 1 }]))
+      assert_equal [62], Koholint::Entities.load(path).keys
+      assert_equal({ 99 => { kind: :sign, verified: false } }, Koholint::Entities.object_catalogue(path))
+      bad = File.join(dir, 'bad.json')
+      File.write(bad, JSON.generate([{ 'object' => 99, 'kind' => 'npc', 'source' => 's', 'confidence' => 'hypothesis', 'verified_count' => 1 }]))
+      assert_raises(Koholint::Entities::Invalid) { Koholint::Entities.object_catalogue(bad) }
+    end
+  end
+
   def test_near_picks_the_closest_entity_within_one_cell
     list = [{ slot: 0, type: 62, cell: [3, 5] }, { slot: 1, type: 63, cell: [4, 7] }, { slot: 2, type: 9, cell: nil }]
     assert_equal 63, Koholint::Entities.near(list, [4, 8])[:type]

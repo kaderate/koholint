@@ -37,7 +37,13 @@ cell, kind }` for the active slots; the kind per type id (`npc`, `enemy`, `objec
 `data/entities.json`, measured by `probes/entity_census.rb` (`bin/koholint census entities`): A pressed next to the
 entity opens a dialogue that does not open with its slot cleared in a control copy (`npc`); contact damage against the
 same control (`enemy`, never observed so far); otherwise `unknown`. The engine passes `Entities.read` to the policy and
-skills as the `entities` context entry.
+skills as the `entities` context entry. `Entities.objects` reads the room object table (`room_objects`, one id per cell)
+and keeps the ids that `data/entities.json` lists with an `object` key and a kind (`sign`: shows a text when read with A,
+`object`); it is the `objects` context entry. `probes/object_census.rb` (`bin/koholint census objects`) measures them: in
+a throwaway copy with every entity slot cleared, Link is put next to each cell, faces it by walking 6 frames and presses
+A (a dialogue that also opens without A in a control copy is not the object's; the first page is saved as a PNG); each
+object id is sampled 6 times unless it answered; `--crawl N` first crosses screen edges in copies to reach N screens of
+the same map.
 
 **Game modes** — `modes.rb`, `data/modes.json`: the catalogue of the game's screens (intro, file select, name entry,
 loading, play, dialogue, locks, dying, game over, inventory, map, save screen). Each entry has a kind, the engine phase it
@@ -165,7 +171,7 @@ read-only replays with pacing and seek, comparison via `run_compare.rb`, star, t
 never writes game state; the only files it writes are `star.json`, `summary.json`'s `starred` and `notes.md`.
 
 **CLI** — `cli.rb`, `bin/koholint`: `run`, `resume`, `fork`, `verify`, `summary`, `screens`, `watch`, `archive`, `star`,
-`prune-heavy`, `census` (modes, `census entities` or `census ready`), `npcs` (`npc_catalogue.rb`: a markdown table of the people of all
+`prune-heavy`, `census` (modes, `census entities`, `census objects` or `census ready`), `npcs` (`npc_catalogue.rb`: a markdown table of the people of all
 runs, their names and the distinct texts read with the milestone and the number of runs; writes nothing), `ab-plan` and
 `ab-report` (`ab.rb`: the fork and resume commands of an A/B between autopilot arms from one frame of a run, written to
 `tmp/ab/plan.json` and `tmp/ab/run.sh`; then a table per arm measured from the fork frame on: cost, paid calls, new places and

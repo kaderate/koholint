@@ -133,6 +133,15 @@ opens in the control is not the entity's); pins Link on it for 90 frames and com
 whether it moves; and talks to it twice and at a shifted frame to compare conversation signatures. Reports go to
 `tmp/entities/*.json` and feed `data/entities.json` (kinds) and `data/addresses.json`.
 
+## Object census
+
+`bin/koholint census objects <run_dir> FRAME... [--crawl N]` replays the journal to each frame and reads the room object
+table (one id per cell); in throwaway copies with every entity slot cleared it puts Link next to each cell, faces it by
+walking and presses A, with a control copy without A. A cell whose dialogue opens only with A is readable; its first
+page is saved under `tmp/objects/pages/`. Each object id is sampled 6 times unless it answered. `--crawl N` first crosses
+screen edges in copies to reach N screens of the same map. Reports go to `tmp/objects/*.json` and feed the `object`
+entries of `data/entities.json` (kind `sign` or `object`).
+
 ## Readiness census
 
 `bin/koholint census ready <run_dir>` replays the whole journal frame by frame and writes `tmp/census/readiness-<run>.json`:

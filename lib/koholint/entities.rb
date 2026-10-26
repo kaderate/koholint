@@ -8,8 +8,10 @@ module Koholint
 
     SLOTS = 16
     KINDS = %w[npc enemy object unknown].freeze
+    OBJECT_KINDS = %w[sign object].freeze
     DEFAULT_PATH = File.expand_path('../../data/entities.json', __dir__)
-    ADDRESSES = Addresses.load.slice(:entity_x, :entity_y, :entity_status, :entity_state, :entity_type).freeze
+    ADDRESSES = Addresses.load.slice(:entity_x, :entity_y, :entity_status, :entity_state, :entity_type, :room_objects).freeze
+    ROOM_ROW_STRIDE = 16
 
     module_function
 
@@ -28,23 +30,42 @@ module Koholint
       end
     end
 
+    def objects(reader, kinds: object_catalogue)
+      Geometry::ROWS.times.flat_map do |row|
+        Geometry::COLS.times.filter_map do |col|
+          object = reader.read(ADDRESSES.fetch(:room_objects) + (row * ROOM_ROW_STRIDE) + col)
+          known = kinds[object] or next
+          { object:, cell: [row, col], kind: known[:kind], verified: known[:verified] }
+        end
+      end
+    end
+
+    def object_catalogue(path = DEFAULT_PATH)
+      @object_catalogue ||= {}
+      @object_catalogue[path] ||= JSON.parse(File.read(path)).select { |entry| entry.key?('object') }.to_h do |entry|
+        validate!(entry)
+        [Integer(entry.fetch('object')), { kind: entry.fetch('kind').to_sym, verified: entry['confidence'] == 'verified' }]
+      end.freeze
+    end
+
     def catalogue(path = DEFAULT_PATH)
       @catalogue ||= {}
       @catalogue[path] ||= load(path).freeze
     end
 
     def load(path = DEFAULT_PATH)
-      JSON.parse(File.read(path)).to_h do |entry|
+      JSON.parse(File.read(path)).reject { |entry| entry.key?('object') }.to_h do |entry|
         validate!(entry)
         [Integer(entry.fetch('type')), { kind: entry.fetch('kind').to_sym, verified: entry['confidence'] == 'verified', moves: entry['moves'] }]
       end
     end
 
     def validate!(entry)
-      %w[type kind source confidence verified_count].each do |key|
-        raise Invalid, "entity #{entry['type'].inspect}: missing #{key}" unless entry.key?(key)
+      id = entry.key?('object') ? 'object' : 'type'
+      [id, *%w[kind source confidence verified_count]].each do |key|
+        raise Invalid, "entity #{entry[id].inspect}: missing #{key}" unless entry.key?(key)
       end
-      raise Invalid, "entity #{entry['type']}: unknown kind #{entry['kind']}" unless KINDS.include?(entry['kind'])
+      raise Invalid, "entity #{entry[id]}: unknown kind #{entry['kind']}" unless (id == 'object' ? OBJECT_KINDS : KINDS).include?(entry['kind'])
       raise Invalid, "entity #{entry['type']}: unknown confidence #{entry['confidence']}" unless Addresses::CONFIDENCES.include?(entry['confidence'])
       return unless entry['confidence'] == 'verified' && entry['verified_count'] < 2
 
