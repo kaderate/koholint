@@ -68,7 +68,7 @@ module Koholint
       end
       raise Invalid, "entity #{entry[id]}: unknown kind #{entry['kind']}" unless (id == 'object' ? OBJECT_KINDS : KINDS).include?(entry['kind'])
       raise Invalid, "entity #{entry[id]}: unknown faces #{entry['faces']}" unless (Array(entry['faces']) - FACES).empty?
-      raise Invalid, "entity #{entry['type']}: unknown confidence #{entry['confidence']}" unless Addresses::CONFIDENCES.include?(entry['confidence'])
+      raise Invalid, "entity #{entry[id]}: unknown confidence #{entry['confidence']}" unless Addresses::CONFIDENCES.include?(entry['confidence'])
       return unless entry['confidence'] == 'verified' && entry['verified_count'] < 2
 
       raise Invalid, "entity #{entry['type']}: verified needs verified_count >= 2"

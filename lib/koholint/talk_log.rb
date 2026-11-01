@@ -184,7 +184,7 @@ module Koholint
       @attempts[[place, cell]].positive? ? :tried : :never
     end
 
-    def attempts(place, cells) =cells.sum { |cell| @attempts[[place, cell]] }
+    def attempts(place, cells) = cells.sum { |cell| @attempts[[place, cell]] }
 
     def talked(place, cells) = cells.sum { |cell| @talked[[place, cell]] }
 
