@@ -35,6 +35,16 @@ class AutopilotTest < Minitest::Test
     assert_equal 1, pilot.chain
   end
 
+  def test_a_third_return_to_the_same_place_goes_back_to_the_model
+    pilot = primed(stop: :known_place)
+    2.times do |i|
+      pilot.acted(skill: 'explore', outcome: { stopped_by: :known_place, to: { room: 147, map: 0 } })
+      refute_nil pilot.next_choice(state: state(frame: 400 + i), objective: objective)
+    end
+    pilot.acted(skill: 'explore', outcome: { stopped_by: :known_place, to: { room: 147, map: 0 } })
+    assert_equal 'explore loop', pilot.hold_reason(state: state(frame: 500), objective: objective)
+  end
+
   def test_other_stops_go_back_to_the_model
     %i[dialogue no_frontier blocked stalled locked untried_object damage].each do |stop|
       pilot = primed(stop:)

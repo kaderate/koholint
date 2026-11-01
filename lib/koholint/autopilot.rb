@@ -3,6 +3,7 @@ module Koholint
     CHAIN_LIMIT = 6
     CHAIN_FRAMES = 2400
     BENIGN = %w[new_place known_place budget].freeze
+    RETURNS = 3
     EXPLORING = %w[new_place leave_place new_text].freeze
     CHOICE = { skill: 'explore', params: {} }.freeze
 
@@ -13,6 +14,7 @@ module Koholint
       @chain_frames = chain_frames
       @chain = 0
       @since = @stop = nil
+      @returns = Hash.new(0)
     end
 
     def model_called(state:, objective:, news: false)
@@ -22,16 +24,20 @@ module Koholint
       @objective = objective&.dig(:id)
       @news = news
       @stop = nil
+      @returns = Hash.new(0)
     end
 
     def acted(skill:, outcome:)
       @stop = skill.to_s == 'explore' && outcome.is_a?(Hash) ? outcome[:stopped_by].to_s : nil
+      to = outcome[:to] if @stop == 'known_place'
+      @returns[[to[:room], to[:map]]] += 1 if to.is_a?(Hash) && @returns
     end
 
     def hold_reason(state:, objective:)
       return 'no model call yet' unless @since
       return "last stop #{@stop || 'not an explore'}" unless BENIGN.include?(@stop)
       return 'new lead or goal' if @news
+      return 'explore loop' if @returns.values.max.to_i >= RETURNS
       return "phase #{state.phase}" unless state.phase == :playing
       return 'hp dropped' if state.hp.to_i < @hp
       return 'objective changed' unless objective && objective[:id] == @objective

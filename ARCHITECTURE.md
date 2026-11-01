@@ -100,7 +100,8 @@ with no input, through the walk-in and the loading); when the place has none, to
 places and exits it has taken (`explore_log.rb` route: breadth-first, the destination of each exit taken is recorded), to
 the nearest place that still has some (or was never surveyed); only then to the nearest frontier (a known cell next to an
 unknown one), except that untried exits or doors that no known path reaches yet send it to the frontier first; each
-result's survey says whether the place still has such work (`pending`), which is what the route looks for; it steps out, re-plans, and stops at
+result's survey says whether the place still has such work (`pending`), which is what the route looks for; a place change
+that does not cross the border is recorded as a door, and a step up from or into a door cell is never a frontier; it steps out, re-plans, and stops at
 an event (`new_place` for a place never seen in the run, `known_place` for a return,
 `dialogue`, `untried_object` once per thing never talked to nearby, `blocked`, `stalled` after 3
 attempts that walked no new cell, `no_frontier`, `locked`, `budget` at 600 frames); `explore_log.rb` keeps per place the cells it walked or found walled, the exits
@@ -147,7 +148,8 @@ the revisit of people and signs (its `prepare(context)` gets the entity and obje
 the first decision of a visit or a run engages too) and the reuse of conversations already read: a dialogue closed when read (dialog state back to 0) whose signature (at least 2 full rows) is known is not sent
 as sheets, its stored text is emitted again with `cached: true`; when a revisit is due it replaces the model's skill choice,
 also right after a sheet reading; and the explore autopilot, `autopilot.rb`: after an `explore` that stopped with
-`new_place`, `known_place` (not counted in the 6-explore chain) or `budget`, the policy issues the next `explore` with no direction itself (agent `delegated`, cost 0,
+`new_place`, `known_place` (not counted in the 6-explore chain; a third return to the same place goes back to the
+model) or `budget`, the policy issues the next `explore` with no direction itself (agent `delegated`, cost 0,
 `decision` event with `autopilot: true`), after the revisit, the hemmed wait and pending dialogue pages; the model is called again
 on any other stop (`untried_object` included) or action, a new lead or goal from the last call, a phase other than `playing`, health lower than at the
 last call, an objective that changed or whose kind is not `new_place`, `leave_place` or `new_text`, and after 6 autopilot

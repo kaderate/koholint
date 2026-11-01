@@ -170,6 +170,18 @@ class ExploreTest < Minitest::Test
     assert_includes inputs, []
   end
 
+  def test_a_step_up_from_a_door_cell_is_not_a_frontier_and_a_room_change_inside_the_screen_is_a_door
+    rows = with(CLOSED, [3, 5], '?')
+    door = [{ object: 226, cell: [4, 5], kind: :door, verified: true }]
+    result, = explore(rows, objects: -> { door }, explore_log: Koholint::ExploreLog.new, limit: 50)
+    refute_equal({ kind: :frontier, row: 4, col: 5, direction: :up }, result[:target])
+    execution = registry.start('explore', state, {}, { grid: MapGrid.new(with(CLOSED, [3, 5], '.')), objects: -> { door } })
+    execution.next_input(state)
+    3.times { execution.next_input(state(y: 79)) }
+    execution.next_input(state(y: 70, room_id: 9))
+    assert_equal [{ row: 5, col: 5, direction: :up, outcome: :left, to: [9, 0], kind: :door }], execution.result[:exits]
+  end
+
   def test_an_exit_blocked_twice_is_tried
     rows = with(CLOSED, [7, 5], '.')
     log = Koholint::ExploreLog.new

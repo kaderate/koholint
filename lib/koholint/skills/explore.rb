@@ -145,6 +145,9 @@ module Koholint
           to = room(state)
           if @target && @target[:kind] == :door && (@outward || @entering.positive?)
             @exits << { row: @target[:cell][0], col: @target[:cell][1], direction: :up, outcome: :left, to:, kind: :door }
+          elsif @cell && @heading && neighbour(@cell, @heading)
+            door = [@cell, neighbour(@cell, @heading)].find { |cell| @doors.include?(cell) } || @cell
+            @exits << { row: door[0] + 1, col: door[1], direction: :up, outcome: :left, to:, kind: :door }
           elsif @cell && @heading
             @exits << { row: @cell[0], col: @cell[1], direction: @heading, outcome: :left, to: }
           end
@@ -358,6 +361,7 @@ module Koholint
 
         def frontier_kind(cell, direction)
           ahead = neighbour(cell, direction) or return nil
+          return nil if @doors.include?(ahead) || (direction == :up && @doors.include?(cell))
 
           :frontier if !@walls.include?(ahead) && !@known.static_sprite(*ahead) && UNKNOWN.include?(@known.passable(*ahead, direction))
         end
