@@ -116,6 +116,9 @@ module Koholint
           "- at (#{sign[:cell][0]},#{sign[:cell][1]}): sign: #{SIGN_STATUS.fetch(talk_log.sign_status(place:, cell: sign[:cell]))}"
         end
         people = talk_log.people(place, entities)
+        lines += signs.select { |door| door[:kind].to_s == 'door' }.sort_by { |door| door[:cell] }.map do |door|
+          "- at (#{door[:cell][0]},#{door[:cell][1]}): door: walk up into it from (#{door[:cell][0] + 1},#{door[:cell][1]}) to enter"
+        end
         lines.unshift("People on screen: #{people.join(', ')}") if people.any?
         lines.empty? ? [] : ["Things on screen you can interact with:\n#{lines.join("\n")}"]
       end

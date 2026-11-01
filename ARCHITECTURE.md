@@ -39,11 +39,13 @@ entity opens a dialogue that does not open with its slot cleared in a control co
 same control (`enemy`, never observed so far); otherwise `unknown`. The engine passes `Entities.read` to the policy and
 skills as the `entities` context entry. `Entities.objects` reads the room object table (`room_objects`, one id per cell)
 and keeps the ids that `data/entities.json` lists with an `object` key and a kind (`sign`: shows a text when read with A,
-`object`) and the directions Link faced when it answered (`faces`, which restrict the standing cells of `talk_to`); it is
+`object`, `door`: walking up into it from the cell below enters a building) and the directions Link faced when it answered (`faces`, which restrict the standing cells of `talk_to`); it is
 the `objects` context entry. `probes/object_census.rb` (`bin/koholint census objects`) measures them: in
 a throwaway copy with every entity slot cleared, Link is put next to each cell, faces it by walking 6 frames and presses
 A (a dialogue that also opens without A in a control copy is not the object's; the first page is saved as a PNG); each
-object id is sampled 6 times unless it answered; `--crawl N` first crosses screen edges in copies to reach N screens of
+object id is sampled 6 times unless it answered; `probes/door_census.rb` (`bin/koholint census doors`) puts Link
+below up to 2 cells per object id in such a copy and walks up: an id is a door when Link walks into that cell by himself and
+arrives in another place (226 at 5 house doors of map 0, 225 at one); `--crawl N` first crosses screen edges in copies to reach N screens of
 the same map.
 
 **Game modes** — `modes.rb`, `data/modes.json`: the catalogue of the game's screens (intro, file select, name entry,
@@ -77,9 +79,10 @@ screen change 53-66, a knockback 15-16, a door 62 (walk in, loading, walk out).
 **Place cards** — `place_card.rb`: on the first ready observation in the `playing` phase of each visit of a place
 (a new place since the last card; rebuilt from the trace on resume), after the grid builder, the engine scans the entity
 table and the room objects and emits a `place_card` event: people (`npc` entities, verified or not), enemies, unknown
-entities, signs, objects (`object` entities and room objects) with their cells, and exits (border cells believed
-walkable, by side). `world.json` `places` keeps per place the last card, the visits, the first and last card frames, the
-names and talk status of the people and whether each sign was read (from the talk log rebuilt from the trace).
+entities, signs, objects (`object` entities and room objects) with their cells, doors (room objects of kind `door`), and exits
+(border cells believed walkable, by side). `world.json` `places` keeps per place the last card, the visits, the first and last card frames, the
+names and talk status of the people and whether each sign was read (from the talk log rebuilt from the trace). The
+agent's context lists the doors of the screen with the cell to walk up from.
 
 **Vision** (`vision/`) — what RAM does not give: `screen_vision` and `screen_snapshot` read the screen,
 `grid_builder` probes neighbouring cells (the only place that snapshots and restores the emulator) and

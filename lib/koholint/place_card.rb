@@ -19,6 +19,7 @@ module Koholint
         signs: objects.select { |object| object[:kind].to_s == 'sign' }.map { |object| { cell: object[:cell], object: object[:object], verified: object[:verified] == true } },
         objects: of.('object').map { |entity| { cell: entity[:cell], type: entity[:type] } } +
           objects.select { |object| object[:kind].to_s == 'object' }.map { |object| object.slice(:cell, :object) },
+        doors: objects.select { |object| object[:kind].to_s == 'door' }.map { |object| { cell: object[:cell], object: object[:object], verified: object[:verified] == true } },
         exits: exits(grid) }
     end
 
@@ -38,7 +39,7 @@ module Koholint
       cards = events.select { |event| event['type'] == 'place_card' }
       cards.group_by { |event| event['place'] }.to_h do |place, seen|
         last = seen.last
-        card = last.slice('people', 'enemies', 'unknown', 'signs', 'objects', 'exits')
+        card = last.slice('people', 'enemies', 'unknown', 'signs', 'objects', 'doors', 'exits')
         card['people'] = card['people'].map do |person|
           name = log.name_of(place, person['type'])
           person.merge(**(name ? { 'name' => name } : {}), 'status' => log.last_status(place:, entity: person['type']).to_s)

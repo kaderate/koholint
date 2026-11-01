@@ -23,7 +23,8 @@ class PlaceCardTest < Minitest::Test
   def card
     entities = [entity(115, [5, 2], :npc), entity(117, [5, 7], :npc, verified: false), entity(110, [2, 2], :unknown, moves: true),
                 entity(9, [6, 6], :enemy), entity(45, [6, 1], :object), entity(1, nil, :npc)]
-    objects = [{ object: 212, cell: [3, 3], kind: :sign, verified: true }, { object: 40, cell: [1, 1], kind: :object, verified: false }]
+    objects = [{ object: 212, cell: [3, 3], kind: :sign, verified: true }, { object: 40, cell: [1, 1], kind: :object, verified: false },
+               { object: 226, cell: [4, 5], kind: :door, verified: true }]
     Koholint::PlaceCard.build(place: PLACE, entities:, objects:, grid: grid(true))
   end
 
@@ -31,7 +32,7 @@ class PlaceCardTest < Minitest::Test
     assert_equal({ place: PLACE, people: [{ type: 115, cell: [5, 2], verified: true }, { type: 117, cell: [5, 7], verified: false }],
                    enemies: [{ type: 9, cell: [6, 6] }], unknown: [{ type: 110, cell: [2, 2], moves: true }],
                    signs: [{ cell: [3, 3], object: 212, verified: true }], objects: [{ cell: [6, 1], type: 45 }, { cell: [1, 1], object: 40 }],
-                   exits: { up: [[0, 4], [0, 5]], right: [[3, 9]] } }, card)
+                   doors: [{ cell: [4, 5], object: 226, verified: true }], exits: { up: [[0, 4], [0, 5]], right: [[3, 9]] } }, card)
   end
 
   def test_unknown_passability_gives_no_exit
@@ -56,6 +57,7 @@ class PlaceCardTest < Minitest::Test
       assert_equal [{ 'type' => 115, 'cell' => [5, 2], 'verified' => true, 'name' => 'Kid', 'status' => 'new' },
                     { 'type' => 117, 'cell' => [5, 7], 'verified' => false, 'status' => 'never' }], place['people']
       assert_equal [{ 'up' => [[0, 4], [0, 5]], 'right' => [[3, 9]] }], [place['exits']]
+      assert_equal [{ 'cell' => [4, 5], 'object' => 226, 'verified' => true }], place['doors']
     end
   end
 

@@ -8,7 +8,7 @@ module Koholint
 
     SLOTS = 16
     KINDS = %w[npc enemy object unknown].freeze
-    OBJECT_KINDS = %w[sign object].freeze
+    OBJECT_KINDS = %w[sign object door].freeze
     FACES = %w[up down left right].freeze
     DEFAULT_PATH = File.expand_path('../../data/entities.json', __dir__)
     ADDRESSES = Addresses.load.slice(:entity_x, :entity_y, :entity_status, :entity_state, :entity_type, :room_objects).freeze
