@@ -95,7 +95,7 @@ visited places from the trace; `fork` branches a run at a frame (the parent may 
 - The agent writes a one-line `plan` that the next call sees; the live view shows its reasoning and plan under each
   decision.
 - The agent sets its own long-term `goal`, restates or revises it at every objective (the context says when it was set) and, in the call that transcribes a text (dialogue, sign, object), extracts up
-  to five leads (`quote`, `claim`, importance `high|normal|low`); a lead whose quote is not in that transcription is
+  to five leads (`quote`, `claim`, importance `high|normal|low|tip`, `tip` for how-to-play advice); a lead whose quote is not in that transcription is
   dropped. Both are trace events (`goal`, `lead`), shown in the context and the live view and written to `world.json`;
   an objective can cite the lead behind it (`because`).
 - Screens are modes of the catalogue `data/modes.json`: the context names the open screen, how to leave it, its inputs,

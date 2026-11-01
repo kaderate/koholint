@@ -19,6 +19,7 @@ module Koholint
       THINGS_LIMIT = 12
       HIGH_LEADS = 8
       NORMAL_LEADS = 5
+      TIP_LEADS = 4
       QUOTE_LIMIT = 80
 
       def self.build(state:, grid:, objective:, history:, attempts:, manual:, last_results:, max_chars: 9000, ledger: nil, refusals: [], plan: nil, triggers: nil, talk_log: nil, locked: nil, locked_frames: nil, goal: nil, leads: [], stamp: nil, entities: [], signs: [])
@@ -115,10 +116,10 @@ module Koholint
         lines += signs.select { |sign| sign[:kind].to_s == 'sign' }.sort_by { |sign| sign[:cell] }.map do |sign|
           "- at (#{sign[:cell][0]},#{sign[:cell][1]}): sign: #{SIGN_STATUS.fetch(talk_log.sign_status(place:, cell: sign[:cell]))}"
         end
-        people = talk_log.people(place, entities)
         lines += signs.select { |door| door[:kind].to_s == 'door' }.sort_by { |door| door[:cell] }.map do |door|
           "- at (#{door[:cell][0]},#{door[:cell][1]}): door: walk up into it from (#{door[:cell][0] + 1},#{door[:cell][1]}) to enter"
         end
+        people = talk_log.people(place, entities)
         lines.unshift("People on screen: #{people.join(', ')}") if people.any?
         lines.empty? ? [] : ["Things on screen you can interact with:\n#{lines.join("\n")}"]
       end
@@ -206,11 +207,12 @@ module Koholint
         newest = leads.reverse
         high = newest.select { |lead| lead[:importance] == 'high' }.first(HIGH_LEADS)
         normal = newest.select { |lead| lead[:importance] == 'normal' && lead[:place] == place }.first(NORMAL_LEADS)
-        lines = (high + normal).map do |lead|
+        tips = newest.select { |lead| lead[:importance] == 'tip' }.first(TIP_LEADS)
+        lines = (high + normal + tips).map do |lead|
           quote = lead[:quote].size > QUOTE_LIMIT ? "#{lead[:quote][0, QUOTE_LIMIT - 3]}..." : lead[:quote]
           "- [#{lead[:id]} #{lead[:importance]}] #{lead[:claim]} — \"#{quote}\""
         end
-        lines.empty? ? [] : ["Leads from texts you read (all high ones, normal ones of this place):\n#{lines.join("\n")}"]
+        lines.empty? ? [] : ["Leads from texts you read (all high ones, normal ones of this place, the newest how-to-play tips):\n#{lines.join("\n")}"]
       end
       private_class_method :leads_block
 

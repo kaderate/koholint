@@ -6,7 +6,7 @@ require 'koholint/trace'
 
 module Koholint
   class Leads
-    IMPORTANCE = %w[high normal low].freeze
+    IMPORTANCE = %w[high normal low tip].freeze
     LIMIT = 5
     CLAIM_MAX = 160
     QUOTE_MIN = 8

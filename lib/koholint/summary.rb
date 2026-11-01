@@ -13,7 +13,7 @@ module Koholint
     DETERMINISTIC_AGENTS = %w[start_game walk_and_talk].freeze
     FILE = 'summary.json'.freeze
     VERSION = 4
-    LEAD_TIERS = %w[high normal low].freeze
+    LEAD_TIERS = %w[high normal low tip].freeze
     MANIFEST_KEYS = %w[flow_version tag harness_sha prompts_sha model autopilot].freeze
 
     module_function

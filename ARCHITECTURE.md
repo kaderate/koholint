@@ -170,7 +170,8 @@ achieved/abandoned/failed events; a `started` event may carry `because`, the id 
 long-term direction is the agent's own `goal` (a short text it restates or revises at every objective; the context shows
 when it was set). `leads.rb` holds the leads: claims the
 agent extracts from texts it read (dialogue, signs, objects), each with a verbatim `quote`, a `claim` and an importance
-(`high`, `normal`, `low`). A lead whose quote is not in the transcription of the same call is dropped (`notable`
+(`high`, `normal`, `low`, or `tip` for how-to-play advice; the context shows all high leads, the normal ones of the
+place and the 4 newest tips). A lead whose quote is not in the transcription of the same call is dropped (`notable`
 `lead_rejected`), duplicates are dropped by quote. Goal and leads are rebuilt from the `goal` and `lead` trace events on
 resume.
 

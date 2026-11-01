@@ -134,7 +134,7 @@ class SummaryTest < Minitest::Test
                      latency_ms: { median: 3000, p90: 5000 }, highest_milestone: 'shield', places_seen: 2,
                      objectives: { count: 2, achieved: 1 }, stop_reason: 'dollars', symptoms: [], starred: false,
                      cost_by_skill: { 'choose_skill' => { calls: 4, usd: 1.0 } }, decisions_by_agent: { 'claude' => 4, 'start_game' => 1 },
-                     usage: { goal_changes: 0, leads: { high: 0, normal: 0, low: 0 }, lead_rejected: 0, objectives_by_kind: { 'unknown' => 2 },
+                     usage: { goal_changes: 0, leads: { high: 0, normal: 0, low: 0, tip: 0 }, lead_rejected: 0, objectives_by_kind: { 'unknown' => 2 },
                               because_used: 0, talks: 0, talks_to_known: 0, dialogues: 0, not_ready_frames: 0, not_ready_waits: 0,
                               autopilot_decisions: 0, chain_max: 0 } },
                    Koholint::Summary.record(run.dir))
@@ -186,7 +186,7 @@ class SummaryTest < Minitest::Test
       record = Koholint::Summary.record(run.dir)
       assert_equal({ 'choose_objective' => { calls: 1, usd: 0.1 }, 'walk' => { calls: 2, usd: 0.5 } }, record[:cost_by_skill])
       assert_equal({ 'claude' => 3, 'delegated' => 1, 'start_game' => 1 }, record[:decisions_by_agent])
-      assert_equal({ goal_changes: 2, leads: { high: 1, normal: 1, low: 0 }, lead_rejected: 1, objectives_by_kind: { 'dialogue_closed' => 2 },
+      assert_equal({ goal_changes: 2, leads: { high: 1, normal: 1, low: 0, tip: 0 }, lead_rejected: 1, objectives_by_kind: { 'dialogue_closed' => 2 },
                      because_used: 1, talks: 4, talks_to_known: 1, dialogues: 2, not_ready_frames: 41, not_ready_waits: 1,
                      autopilot_decisions: 0, chain_max: 0 }, record[:usage])
     end

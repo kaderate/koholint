@@ -347,6 +347,12 @@ class AgentsContextTest < Minitest::Test
     refute_includes build(leads: [lead(1, 'low')]), 'Leads from texts'
   end
 
+  def test_the_newest_how_to_play_tips_are_shown_from_any_place
+    leads = (1..6).map { |i| lead(i, 'tip', place: [i, 0]) }
+    section = build(leads:)[/Leads from texts.*?(?=\n\n|\z)/m]
+    assert_equal %w[lead-6 lead-5 lead-4 lead-3], section.lines.drop(1).map { |line| line[/lead-\d+/] }
+  end
+
   def test_leads_are_capped_newest_first
     leads = (1..10).map { |i| lead(i, 'high') } + (11..17).map { |i| lead(i, 'normal') }
     shown = build(leads:).scan(/\[(lead-\d+)/).flatten

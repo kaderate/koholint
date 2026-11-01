@@ -27,7 +27,7 @@ module Koholint
       place_card: %i[place people enemies signs objects exits]
     }.freeze
     SPEAKER_MAX = 40
-    ALLOWED = { dialogue: { source: %w[agent] }, lead: { importance: %w[high normal low] } }.freeze
+    ALLOWED = { dialogue: { source: %w[agent] }, lead: { importance: %w[high normal low tip] } }.freeze
     OPTIONAL = { perception: { not_ready_frames: ->(v) { v.is_a?(Integer) && v.positive? } },
                  decision: { prompt_sha: ->(v) { v.is_a?(String) && v.match?(/\A\h{64}\z/) }, image: ->(v) { [true, false].include?(v) },
                               plan: ->(v) { v.is_a?(String) && v.length <= 200 && !v.match?(/[[:cntrl:]]/) }, autopilot: ->(v) { v == true } },
