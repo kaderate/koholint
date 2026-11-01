@@ -82,13 +82,81 @@ class ExploreTest < Minitest::Test
     result, = explore(rows, exits: [[[7, 5], :down]])
     assert_equal :new_place, result[:stopped_by]
     assert result[:place_changed]
-    assert_equal [{ row: 7, col: 5, direction: :down, outcome: :left }], result[:exits]
+    assert_equal [{ row: 7, col: 5, direction: :down, outcome: :left, to: [2, 0] }], result[:exits]
     log = Koholint::ExploreLog.new
     log.absorb(result)
     assert log.tried?(PLACE, [7, 5], :down)
     result, = explore(rows, exits: [[[7, 5], :down]], explore_log: log)
+    assert_equal [:known_place, { goal: [2, 0], next: [2, 0] }], result.values_at(:stopped_by, :route)
+    log.absorb({ from: { room: 2, map: 0 }, survey: { sides: {}, doors: [] } })
+    result, = explore(rows, exits: [[[7, 5], :down]], explore_log: log)
     assert_equal :no_frontier, result[:stopped_by]
     assert_equal [{ row: 7, col: 5, direction: :down }], result[:tried_exits]
+  end
+
+  def test_a_side_left_once_is_not_offered_again_from_another_cell
+    rows = with(CLOSED, [7, 4], '.', [7, 5], '.')
+    log = Koholint::ExploreLog.new
+    result, = explore(rows, exits: [[[7, 5], :down]], explore_log: log)
+    assert_equal :new_place, result[:stopped_by]
+    log.absorb(result)
+    log.absorb({ from: { room: 2, map: 0 }, survey: { sides: {}, doors: [] } })
+    result, inputs = explore(rows, exits: [[[7, 4], :down]], explore_log: log)
+    assert_equal :no_frontier, result[:stopped_by], result.inspect
+    assert_equal [[]], inputs
+  end
+
+  def test_a_return_to_a_known_place_is_known_place_not_new_place
+    rows = with(CLOSED, [7, 5], '.')
+    log = Koholint::ExploreLog.new
+    log.note({ from: { room: 2, map: 0 } })
+    result, = explore(rows, exits: [[[7, 5], :down]], explore_log: log)
+    assert_equal :known_place, result[:stopped_by]
+  end
+
+  def test_a_place_without_untried_exits_heads_for_the_nearest_place_that_has_some
+    rows = with(CLOSED, [7, 5], '.', [0, 5], '.', [4, 7], '?')
+    log = Koholint::ExploreLog.new
+    log.absorb({ from: { room: 1, map: 0 }, exits: [{ row: 7, col: 5, direction: :down, outcome: :left, to: [2, 0] }, { row: 0, col: 5, direction: :up, outcome: :left, to: [3, 0] }],
+                 survey: { sides: { down: [{ row: 7, col: 5 }], up: [{ row: 0, col: 5 }] }, doors: [] } })
+    log.absorb({ from: { room: 2, map: 0 }, exits: [{ row: 0, col: 5, direction: :up, outcome: :left, to: [1, 0] }],
+                 survey: { sides: { up: [{ row: 0, col: 5 }] }, doors: [] } })
+    log.absorb({ from: { room: 3, map: 0 }, exits: [{ row: 7, col: 5, direction: :down, outcome: :left, to: [1, 0] }],
+                 survey: { sides: { down: [{ row: 7, col: 5 }], left: [{ row: 3, col: 0 }] }, doors: [] } })
+    refute log.untried?([2, 0])
+    assert log.untried?([3, 0])
+    result, = explore(rows, exits: [[[0, 5], :up]], explore_log: log)
+    assert_equal :known_place, result[:stopped_by], result.inspect
+    assert_equal({ goal: [3, 0], next: [3, 0] }, result[:route])
+    assert_equal({ kind: :exit, row: 0, col: 5, direction: :up }, result[:target])
+  end
+
+  def test_an_untried_door_is_entered_by_walking_up_into_it
+    rows = with(CLOSED, [3, 5], '#')
+    door = [{ object: 226, cell: [3, 5], kind: :door, verified: true }]
+    execution = registry.start('explore', state(x: 40, y: 96), {}, { grid: MapGrid.new(rows), objects: -> { door } })
+    x, y = 40, 96
+    room_id = 1
+    submode = 7
+    inputs = []
+    300.times do
+      current = Koholint::GameState.new(frame: 0, room_id:, map_id: room_id == 1 ? 0 : 16, x:, y:, hp: 24, dialog_state: 0, game_mode: 0x0B, game_submode: submode, milestone: :none)
+      buttons = execution.next_input(current) or break
+      inputs << buttons
+      dx, dy = DELTA.fetch(buttons.first, [0, 0])
+      cell = Koholint::Geometry.cell_for(x + dx + (7 * dx), y + dy + (7 * dy))
+      submode = 2 if cell == [3, 5] && room_id == 1
+      next if submode != 7 || cell.nil? || (rows[cell[0]][cell[1]] == '#' && cell != [3, 5])
+
+      x += dx
+      y += dy
+    end
+    room_id = 5 if submode == 2
+    result = execution.result(Koholint::GameState.new(frame: 0, room_id:, map_id: 16, x:, y:, hp: 24, dialog_state: 0, game_mode: 0x0B, game_submode: 7, milestone: :none))
+    assert_equal({ sides: {}, doors: [{ row: 3, col: 5 }] }, result[:survey])
+    assert_equal :door, result[:target][:kind], result.inspect
+    assert_equal [4, 5, :up], result[:target].values_at(:row, :col, :direction)
+    assert_includes inputs, []
   end
 
   def test_an_exit_blocked_twice_is_tried

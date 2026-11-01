@@ -2,7 +2,7 @@ module Koholint
   class Autopilot
     CHAIN_LIMIT = 6
     CHAIN_FRAMES = 2400
-    BENIGN = %w[new_place budget].freeze
+    BENIGN = %w[new_place known_place budget].freeze
     EXPLORING = %w[new_place leave_place new_text].freeze
     CHOICE = { skill: 'explore', params: {} }.freeze
 
@@ -47,7 +47,7 @@ module Koholint
     def next_choice(state:, objective:)
       return if hold_reason(state:, objective:)
 
-      @chain += 1
+      @chain += 1 unless @stop == 'known_place'
       @stop = nil
       { choice: CHOICE, justification: "autopilot: explore again (#{@chain}/#{@chain_limit})", confidence: 1.0, agent: 'delegated',
         latency_ms: 0, cost_usd: 0.0, fallback: false, autopilot: true, prompt: nil, image: nil }

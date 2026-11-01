@@ -196,6 +196,7 @@ module Koholint
         feed_ledger(choice, outcome, state, frame, objective: !revisiting)
         opened = feed_triggers(choice, outcome, state)
         feed_talk_log(choice, outcome, state)
+        @explore_log.note(outcome)
         @explore_log.absorb(outcome) if choice[:skill] == 'explore'
         note_no_path(choice, outcome, frame) unless revisiting
         unless @waiting || revisiting

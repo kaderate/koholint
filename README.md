@@ -46,7 +46,7 @@ agent saw to `runs/<id>/prompts/<frame>-<decision_point>.txt` (and `.png` when a
 of replay); the `decision` trace event carries its `prompt_sha`. `--tag NAME` labels a run.
 
 **Autopilot.** `--autopilot on|off` (default `on`, agent runs only) is recorded in the manifest (`autopilot`); `resume`
-keeps the recorded value and refuses a different one. With it on, an `explore` that stops at a new place or at its frame
+keeps the recorded value and refuses a different one. With it on, an `explore` that stops at a new place, a known place or at its frame
 budget is followed by another `explore` with no direction that the harness issues itself (agent `delegated`, cost 0, the
 `decision` event carries `autopilot: true`); the model decides again on any other stop or action, after a new lead or goal,
 outside free play, after damage, when the objective changes or is not `new_place`, `leave_place` or `new_text`, and after
@@ -77,9 +77,11 @@ visited places from the trace; `fork` branches a run at a frame (the parent may 
 - Between decisions the engine waits, with no input, until Link is ready (no screen scroll, door walk, jump or
   knockback, then 2 settled frames): the screen is never mapped and the model never called mid-scroll or mid-jump
   (`notable` `not_ready_wait` for waits over 5 frames; the run stops with `not_ready_stuck` after 600 frames).
-- `explore [direction]` (relaunched by the autopilot after benign stops, see Running) explores by itself: it walks to the nearest frontier (a known cell next to an unknown one) or
-  untried border exit (`direction` prefers that side), steps out, re-plans, and returns to the model only at an event:
-  `new_place`, `dialogue`, `untried_object` (once per thing never talked to within 3 cells), `blocked`, `stalled` (3
+- `explore [direction]` (relaunched by the autopilot after benign stops, see Running) explores by itself: it walks to the nearest
+  untried border exit (a side never left from this place) or untried door (walking up into it), else toward the nearest
+  place it has taken an exit to that still has untried exits or doors, else to the nearest frontier (a known cell next to
+  an unknown one) (`direction` prefers that side), steps out, re-plans, and returns to the model only at an event:
+  `new_place`, `known_place` (a return to a place already seen), `dialogue`, `untried_object` (once per thing never talked to within 3 cells), `blocked`, `stalled` (3
   attempts in a row walked no new cell), `no_frontier` (with the exits already tried), `locked`, `damage` or `budget` (600 frames). What it walked, the walls it found, the
   exits it tried and the things it offered are kept per place and rebuilt from the trace on resume.
 - `goto row col` walks to a cell of the known grid by a shortest path with the fewest turns (stops `done`, `blocked`,

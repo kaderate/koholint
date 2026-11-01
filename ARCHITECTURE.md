@@ -95,10 +95,16 @@ with the fewest turns over known cells), `skills/` (`walk`, `goto`, `step`, `tal
 `advance_dialogue`, `wait`, and the screen skills of `skills/screens.rb`: `open_menu`, `close_menu`, `menu_move`,
 `menu_assign`, `open_map`, `close_map`, `choose_option`, which check the current mode from the catalogue, stop with
 `wrong_mode` elsewhere and repeat a press the game ignored) behind `skills/registry.rb`. `explore` chains goto legs by itself: it walks to the
-nearest frontier (a known cell next to an unknown one) or untried border exit, steps out, re-plans, and stops at
-an event (`new_place`, `dialogue`, `untried_object` once per thing never talked to nearby, `blocked`, `stalled` after 3
+nearest untried border exit (a side never left from this place) or untried door (it walks up from the cell below and waits,
+with no input, through the walk-in and the loading); when the place has none, to the exit or door that leads, over the
+places and exits it has taken (`explore_log.rb` route: breadth-first, the destination of each exit taken is recorded), to
+the nearest place that still has some (or was never surveyed); only then to the nearest frontier (a known cell next to an
+unknown one); it steps out, re-plans, and stops at
+an event (`new_place` for a place never seen in the run, `known_place` for a return,
+`dialogue`, `untried_object` once per thing never talked to nearby, `blocked`, `stalled` after 3
 attempts that walked no new cell, `no_frontier`, `locked`, `budget` at 600 frames); `explore_log.rb` keeps per place the cells it walked or found walled, the exits
-tried (left, or blocked twice) and the things already offered, rebuilt from its `action` events on resume. A skill is a bounded, deterministic action with
+tried (left, or blocked twice) with their destination, the survey of each explored place (open border cells by side, doors),
+the places seen in any action and the things already offered, rebuilt from the `action` events on resume. A skill is a bounded, deterministic action with
 validated parameters; it reports how it stopped (`done`, `blocked`, `no_path`, `no_response`…). `ledger.rb`
 counts blocked edges per place (doubtful edges), `triggers.rb` forbids inputs that re-fire a scripted event,
 `talk_to` resolves the person to the entity at or next to the target cell
@@ -138,7 +144,7 @@ the revisit of people and signs (its `prepare(context)` gets the entity and obje
 the first decision of a visit or a run engages too) and the reuse of conversations already read: a dialogue closed when read (dialog state back to 0) whose signature (at least 2 full rows) is known is not sent
 as sheets, its stored text is emitted again with `cached: true`; when a revisit is due it replaces the model's skill choice,
 also right after a sheet reading; and the explore autopilot, `autopilot.rb`: after an `explore` that stopped with
-`new_place` or `budget`, the policy issues the next `explore` with no direction itself (agent `delegated`, cost 0,
+`new_place`, `known_place` (not counted in the 6-explore chain) or `budget`, the policy issues the next `explore` with no direction itself (agent `delegated`, cost 0,
 `decision` event with `autopilot: true`), after the revisit, the hemmed wait and pending dialogue pages; the model is called again
 on any other stop (`untried_object` included) or action, a new lead or goal from the last call, a phase other than `playing`, health lower than at the
 last call, an objective that changed or whose kind is not `new_place`, `leave_place` or `new_text`, and after 6 autopilot

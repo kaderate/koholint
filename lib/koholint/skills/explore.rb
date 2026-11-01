@@ -12,7 +12,11 @@ module Koholint
       STUCK_ATTEMPTS = 3
       FRUITLESS_ATTEMPTS = 3
       OBJECT_RANGE = 3
+      ENTER_FRAMES = 120
+      WALK_IN = 3
       UNKNOWN = %i[unknown stale].freeze
+      SIDES = { up: ->(row, _col) { row.zero? }, down: ->(row, _col) { row == Geometry::ROWS - 1 },
+                left: ->(_row, col) { col.zero? }, right: ->(_row, col) { col == Geometry::COLS - 1 } }.freeze
 
       class Known
         def initialize(grid, walked)
@@ -54,6 +58,10 @@ module Koholint
           @known = grid && Known.new(grid, @walked)
           @planner = @known && Navigation::Planner.new(grid: @known, ledger: @ledger, place: @place, triggers: context[:triggers], mode: :free_only)
           @objects = grid ? TalkLog.objects(grid) : []
+          @doors = Array(context[:objects]&.call).select { |object| object[:kind].to_s == 'door' && object[:cell][0] < Geometry::ROWS - 1 }.map { |object| object[:cell] }
+          @survey = @known && survey
+          @route = nil
+          @entering = 0
           @cell = @start.cell
           @offered = near_objects(@cell)
           @untried = []
@@ -76,6 +84,8 @@ module Koholint
           merged = super.merge(place_changed: room(state) != @place, cells_walked: @cells_walked, legs: @legs, target: target_summary,
                                crossed: @crossed.map(&:dup), walls: @new_walls.map { |row, col| { row:, col: } }, blocked_edges: @blocked.map(&:dup), exits: @exits.map(&:dup),
                                offered: @offered.map { |row, col| { row:, col: } })
+          merged[:survey] = @survey if @survey
+          merged[:route] = @route if @route
           merged[:cause] = @fail_cause if @stopped_by == :blocked && @fail_cause
           merged[:untried_objects] = @untried.map { |row, col| { row:, col: } } if @stopped_by == :untried_object
           merged[:tried_exits] = @log ? @log.tried_exits(@place) : [] if @stopped_by == :no_frontier
@@ -91,9 +101,10 @@ module Koholint
 
         def input_for(state)
           return finish(@idle) if @idle
-          return depart if room(state) != @place
+          return depart(state) if room(state) != @place
           return harmed if state.hp.to_i < @start.hp.to_i
           return stop_now(:dialogue) if state.dialog_open?
+          return entering if walking_in?(state)
 
           @locked = state.locked? ? @locked + 1 : 0
           return finish(:locked) if @locked >= LOCK_FRAMES
@@ -130,9 +141,33 @@ module Koholint
           buttons
         end
 
-        def depart
-          @exits << { row: @cell[0], col: @cell[1], direction: @heading, outcome: :left } if @cell && @heading
-          finish(:new_place)
+        def depart(state)
+          to = room(state)
+          if @target && @target[:kind] == :door && (@outward || @entering.positive?)
+            @exits << { row: @target[:cell][0], col: @target[:cell][1], direction: :up, outcome: :left, to:, kind: :door }
+          elsif @cell && @heading
+            @exits << { row: @cell[0], col: @cell[1], direction: @heading, outcome: :left, to: }
+          end
+          finish(@log&.known?(to) ? :known_place : :new_place)
+        end
+
+        def walking_in?(state) = @entering.positive? || state.loading? || state.link_motion_state.to_i == WALK_IN
+
+        def entering
+          @entering += 1
+          return finish(:locked) if @entering > ENTER_FRAMES
+
+          []
+        end
+
+        def survey
+          sides = SIDES.to_h do |side, border|
+            cells = Geometry::ROWS.times.to_a.product(Geometry::COLS.times.to_a).select do |row, col|
+              border.(row, col) && @known.known?([row, col]) && DIRECTIONS.any? { |d| @known.passable(row, col, d) == :yes }
+            end
+            [side, cells.map { |row, col| { row:, col: } }]
+          end
+          { sides: sides.reject { |_, cells| cells.empty? }, doors: @doors.map { |row, col| { row:, col: } } }
         end
 
         def enter(state)
@@ -200,7 +235,7 @@ module Koholint
 
         def outward(state)
           cell, direction = @target.values_at(:cell, :direction)
-          if state.cell && state.cell != cell
+          if state.cell && state.cell != cell && @target[:kind] != :door
             @crossed << [*cell, direction] if state.cell == neighbour(cell, direction)
             @outward = nil
             return attempt_over(state)
@@ -224,7 +259,7 @@ module Koholint
         def fail_step(cell, direction)
           edge = { row: cell[0], col: cell[1], direction: }
           block(edge)
-          @exits << edge.merge(outcome: :blocked) if @target[:kind] == :exit
+          @exits << edge.merge(outcome: :blocked) if %i[exit door].include?(@target[:kind])
           return unless @target[:kind] == :frontier
 
           @new_walls << neighbour(cell, direction)
@@ -247,25 +282,66 @@ module Koholint
 
         def candidates(from)
           paths = {}
-          found = (0...Geometry::ROWS).to_a.product((0...Geometry::COLS).to_a).flat_map do |cell|
+          path_to = ->(cell) { paths.fetch(cell) { paths[cell] = @planner.path(from:, to: cell) } }
+          local = gather(from, path_to) { |cell, direction| exit_kind(cell, direction) } + doors(path_to) { |door| !@log&.door_tried?(@place, door) }
+          return order(local) if local.any?
+
+          routed = routed(from, path_to)
+          return order(routed) if routed.any?
+
+          order(gather(from, path_to) { |cell, direction| frontier_kind(cell, direction) })
+        end
+
+        def routed(from, path_to)
+          hop = @log&.route(@place) or return []
+
+          @route = { goal: hop[:goal], next: hop[:next] }
+          via = hop[:via]
+          return doors(path_to) { |door| door == via } if via.is_a?(Array)
+
+          gather(from, path_to) { |cell, direction| :exit if direction == via && neighbour(cell, direction).nil? }
+        end
+
+        def gather(from, path_to)
+          (0...Geometry::ROWS).to_a.product((0...Geometry::COLS).to_a).flat_map do |cell|
             next [] unless cell == from || @known.known?(cell)
 
             DIRECTIONS.filter_map do |direction|
-              kind = kind_of(cell, direction)
+              kind = yield(cell, direction)
               next unless kind && open?(cell, direction)
 
-              path = paths.fetch(cell) { paths[cell] = @planner.path(from:, to: cell) } or next
+              path = path_to.(cell) or next
               { kind:, cell:, direction:, path: }
             end
           end
-          found.sort_by do |c|
-            [@hint.nil? || c[:direction] == @hint ? 0 : 1, c[:path].size, c[:kind] == :exit ? 0 : 1, *c[:cell], DIRECTIONS.index(c[:direction])]
+        end
+
+        def doors(path_to)
+          @doors.filter_map do |door|
+            next unless yield(door)
+
+            below = [door[0] + 1, door[1]]
+            next unless open?(below, :up)
+
+            path = path_to.(below) or next
+            { kind: :door, cell: below, direction: :up, path: }
           end
         end
 
-        def kind_of(cell, direction)
-          ahead = neighbour(cell, direction)
-          return (@log&.tried?(@place, cell, direction) ? nil : :exit) unless ahead
+        def order(found)
+          found.sort_by do |c|
+            [@hint.nil? || c[:direction] == @hint ? 0 : 1, c[:path].size, c[:kind] == :frontier ? 1 : 0, *c[:cell], DIRECTIONS.index(c[:direction])]
+          end
+        end
+
+        def exit_kind(cell, direction)
+          return nil if neighbour(cell, direction) || @log&.tried?(@place, cell, direction) || @log&.side_left?(@place, direction)
+
+          :exit
+        end
+
+        def frontier_kind(cell, direction)
+          ahead = neighbour(cell, direction) or return nil
 
           :frontier if !@walls.include?(ahead) && !@known.static_sprite(*ahead) && UNKNOWN.include?(@known.passable(*ahead, direction))
         end
