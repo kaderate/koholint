@@ -72,6 +72,7 @@ module Koholint
 
     def untried?(place)
       survey = @surveys[place] or return true
+      return survey[:pending] unless survey[:pending].nil?
 
       survey[:sides].any? { |side, cells| !side_left?(place, side) && cells.any? { |cell| !tried?(place, cell, side) } } ||
         survey[:doors].any? { |cell| !door_tried?(place, cell) }
@@ -127,7 +128,7 @@ module Koholint
       sides = (Ledger.pick(survey, :sides) || {}).to_h do |side, cells|
         [side.to_sym, Array(cells).filter_map { |cell| cell_of(cell) if cell.is_a?(Hash) }]
       end
-      { sides:, doors: Array(Ledger.pick(survey, :doors)).filter_map { |cell| cell_of(cell) if cell.is_a?(Hash) } }
+      { sides:, doors: Array(Ledger.pick(survey, :doors)).filter_map { |cell| cell_of(cell) if cell.is_a?(Hash) }, pending: Ledger.pick(survey, :pending) }
     end
 
     def tried_exits(place)

@@ -131,6 +131,16 @@ class ExploreTest < Minitest::Test
     assert_equal({ kind: :exit, row: 0, col: 5, direction: :up }, result[:target])
   end
 
+  def test_untried_exits_that_cannot_be_reached_yet_send_explore_to_the_frontier_before_another_place
+    rows = with(CLOSED, [0, 5], '.', [1, 5], '#', [1, 4], '#', [1, 6], '#', [2, 5], '?', [7, 5], '.')
+    log = Koholint::ExploreLog.new
+    log.absorb({ from: { room: 1, map: 0 }, exits: [{ row: 7, col: 5, direction: :down, outcome: :left, to: [2, 0] }] })
+    result, = explore(rows, truth: with(rows, [2, 5], '#'), explore_log: log, limit: 200)
+    assert_includes result[:walls], { row: 2, col: 5 }, result.inspect
+    assert_equal({ goal: [2, 0], next: [2, 0] }, result[:route])
+    assert_equal false, result[:survey][:pending]
+  end
+
   def test_an_untried_door_is_entered_by_walking_up_into_it
     rows = with(CLOSED, [3, 5], '#')
     door = [{ object: 226, cell: [3, 5], kind: :door, verified: true }]
@@ -146,14 +156,15 @@ class ExploreTest < Minitest::Test
       dx, dy = DELTA.fetch(buttons.first, [0, 0])
       cell = Koholint::Geometry.cell_for(x + dx + (7 * dx), y + dy + (7 * dy))
       submode = 2 if cell == [3, 5] && room_id == 1
+      room_id = 5 if submode == 2 && inputs.count([]) > 10
       next if submode != 7 || cell.nil? || (rows[cell[0]][cell[1]] == '#' && cell != [3, 5])
 
       x += dx
       y += dy
     end
-    room_id = 5 if submode == 2
+    assert_equal :new_place, execution.result[:stopped_by]
     result = execution.result(Koholint::GameState.new(frame: 0, room_id:, map_id: 16, x:, y:, hp: 24, dialog_state: 0, game_mode: 0x0B, game_submode: 7, milestone: :none))
-    assert_equal({ sides: {}, doors: [{ row: 3, col: 5 }] }, result[:survey])
+    assert_equal({ sides: {}, doors: [{ row: 3, col: 5 }], pending: false }, result[:survey])
     assert_equal :door, result[:target][:kind], result.inspect
     assert_equal [4, 5, :up], result[:target].values_at(:row, :col, :direction)
     assert_includes inputs, []

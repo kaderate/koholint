@@ -84,7 +84,7 @@ module Koholint
           merged = super.merge(place_changed: room(state) != @place, cells_walked: @cells_walked, legs: @legs, target: target_summary,
                                crossed: @crossed.map(&:dup), walls: @new_walls.map { |row, col| { row:, col: } }, blocked_edges: @blocked.map(&:dup), exits: @exits.map(&:dup),
                                offered: @offered.map { |row, col| { row:, col: } })
-          merged[:survey] = @survey if @survey
+          merged[:survey] = @survey.merge(pending: pending?) if @survey
           merged[:route] = @route if @route
           merged[:cause] = @fail_cause if @stopped_by == :blocked && @fail_cause
           merged[:untried_objects] = @untried.map { |row, col| { row:, col: } } if @stopped_by == :untried_object
@@ -283,13 +283,28 @@ module Koholint
         def candidates(from)
           paths = {}
           path_to = ->(cell) { paths.fetch(cell) { paths[cell] = @planner.path(from:, to: cell) } }
-          local = gather(from, path_to) { |cell, direction| exit_kind(cell, direction) } + doors(path_to) { |door| !@log&.door_tried?(@place, door) }
+          local = untried(from, path_to)
           return order(local) if local.any?
+
+          frontier = gather(from, path_to) { |cell, direction| frontier_kind(cell, direction) }
+          return order(frontier) if frontier.any? && untried(from, nil).any?
 
           routed = routed(from, path_to)
           return order(routed) if routed.any?
 
-          order(gather(from, path_to) { |cell, direction| frontier_kind(cell, direction) })
+          order(frontier)
+        end
+
+        def untried(from, path_to)
+          gather(from, path_to) { |cell, direction| exit_kind(cell, direction) } +
+            doors(path_to) { |door| !@log&.door_tried?(@place, door) && @exits.none? { |exit| exit[:kind] == :door && exit[:row] == door[0] + 1 && exit[:col] == door[1] } }
+        end
+
+        def pending?
+          return false unless @planner && @cell
+
+          path_to = ->(cell) { @planner.path(from: @cell, to: cell) }
+          untried(@cell, path_to).any? || (untried(@cell, nil).any? && gather(@cell, path_to) { |cell, direction| frontier_kind(cell, direction) }.any?)
         end
 
         def routed(from, path_to)
@@ -310,7 +325,7 @@ module Koholint
               kind = yield(cell, direction)
               next unless kind && open?(cell, direction)
 
-              path = path_to.(cell) or next
+              path = path_to ? path_to.(cell) : [] or next
               { kind:, cell:, direction:, path: }
             end
           end
@@ -323,7 +338,7 @@ module Koholint
             below = [door[0] + 1, door[1]]
             next unless open?(below, :up)
 
-            path = path_to.(below) or next
+            path = path_to ? path_to.(below) : [] or next
             { kind: :door, cell: below, direction: :up, path: }
           end
         end
@@ -335,7 +350,8 @@ module Koholint
         end
 
         def exit_kind(cell, direction)
-          return nil if neighbour(cell, direction) || @log&.tried?(@place, cell, direction) || @log&.side_left?(@place, direction)
+          return nil if neighbour(cell, direction) || @log&.tried?(@place, cell, direction) || @log&.side_left?(@place, direction) ||
+                        @exits.any? { |exit| exit[:outcome] == :left && exit[:direction] == direction }
 
           :exit
         end

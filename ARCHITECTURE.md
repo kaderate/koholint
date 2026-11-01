@@ -99,11 +99,12 @@ nearest untried border exit (a side never left from this place) or untried door 
 with no input, through the walk-in and the loading); when the place has none, to the exit or door that leads, over the
 places and exits it has taken (`explore_log.rb` route: breadth-first, the destination of each exit taken is recorded), to
 the nearest place that still has some (or was never surveyed); only then to the nearest frontier (a known cell next to an
-unknown one); it steps out, re-plans, and stops at
+unknown one), except that untried exits or doors that no known path reaches yet send it to the frontier first; each
+result's survey says whether the place still has such work (`pending`), which is what the route looks for; it steps out, re-plans, and stops at
 an event (`new_place` for a place never seen in the run, `known_place` for a return,
 `dialogue`, `untried_object` once per thing never talked to nearby, `blocked`, `stalled` after 3
 attempts that walked no new cell, `no_frontier`, `locked`, `budget` at 600 frames); `explore_log.rb` keeps per place the cells it walked or found walled, the exits
-tried (left, or blocked twice) with their destination, the survey of each explored place (open border cells by side, doors),
+tried (left, or blocked twice) with their destination, the survey of each explored place (open border cells by side, doors, `pending`),
 the places seen in any action and the things already offered, rebuilt from the `action` events on resume. A skill is a bounded, deterministic action with
 validated parameters; it reports how it stopped (`done`, `blocked`, `no_path`, `no_response`…). `ledger.rb`
 counts blocked edges per place (doubtful edges), `triggers.rb` forbids inputs that re-fire a scripted event,
