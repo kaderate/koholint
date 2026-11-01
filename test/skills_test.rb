@@ -260,11 +260,13 @@ class SkillsTest < Minitest::Test
     assert_equal 7, result[:offset][:dy].abs
   end
 
-  def test_centring_stops_after_sixteen_frames_when_never_aligned
+  def test_centring_stops_once_link_does_not_move_and_after_sixteen_frames_when_never_aligned
     execution = registry.start('walk', state(y: 39), { direction: :left, cells: 1 })
+    drifting = registry.start('walk', state(y: 39), { direction: :left, cells: 1 })
+    assert_equal 8 + 16, drive(drifting, Array.new(8) { state(y: 39) } + Array.new(52) { |i| state(x: 72 + (i % 2), y: 39) }).size
     inputs = drive(execution, Array.new(60) { state(y: 39) })
     result = execution.result(state(y: 39))
-    assert_equal 8 + 16, inputs.size
+    assert_equal 8 + Koholint::Skills::Execution::CENTRING_STILL, inputs.size
     assert_equal :blocked, result[:stopped_by]
     refute result[:aligned]
   end

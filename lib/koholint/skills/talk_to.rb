@@ -181,7 +181,10 @@ module Koholint
 
         def person_entity(cell)
           near = Array(@entities&.call).select { |entity| entity[:cell] && entity[:kind].to_s != 'enemy' }
-          found = Entities.near(near.select { |entity| entity[:kind].to_s == 'npc' }, cell) || Entities.near(near, cell, within: 0)
+          people = near.select { |entity| entity[:kind].to_s == 'npc' && (entity[:cell][0] - cell[0]).abs <= 1 && (entity[:cell][1] - cell[1]).abs <= 1 }
+          found = people.min_by do |entity|
+            [covered(entity).include?(cell) ? 0 : 1, (entity[:cell][0] - cell[0]).abs + (entity[:cell][1] - cell[1]).abs, entity[:moves] ? 1 : 0, entity[:slot]]
+          end || Entities.near(near, cell, within: 0)
           found&.slice(:slot, :type, :x, :y, :kind)
         end
 
@@ -254,6 +257,7 @@ module Koholint
 
           @face_origin ||= position
           @face_still = position == @face_last ? @face_still + 1 : 0
+          return out_of_reach(state) if @face_still >= CONTACT_FRAMES && @who && !within_reach?(position, slack: Geometry::ALIGN_TOLERANCE)
           return begin_talk(state) if @face_still >= CONTACT_FRAMES || (@face_frames.positive? && within_reach?(position))
 
           return finish(:target_free) if @who ? passed?(position) : drifted?(position)
@@ -280,14 +284,20 @@ module Koholint
           (position[axis] - @face_origin[axis]).abs >= FREE_PIXELS || @face_frames >= FACE_FRAMES
         end
 
-        def within_reach?(position)
+        def out_of_reach(state)
+          note_tried(:no_response)
+          @failed << @standing
+          retarget(state) || finish(:no_response)
+        end
+
+        def within_reach?(position, slack: 0)
           return false unless @who
 
           horizontal = %i[left right].include?(@facing)
           sign = %i[right down].include?(@facing) ? 1 : -1
           along = horizontal ? @who[:x] - position[0] : @who[:y] - position[1]
           cross = horizontal ? @who[:y] - position[1] : @who[:x] - position[0]
-          (along * sign).between?(1, REACH_PIXELS) && cross.abs <= HALF
+          (along * sign).between?(1, REACH_PIXELS + slack) && cross.abs <= HALF + slack
         end
 
         def passed?(position)

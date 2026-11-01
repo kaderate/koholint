@@ -6,6 +6,7 @@ module Koholint
     class Goto
       STILL_FRAMES = 8
       SETTLE_FRAMES = 16
+      SETTLE_STILL = 2
 
       class Run < Execution
         def initialize(target:, context:, **rest)
@@ -109,6 +110,7 @@ module Koholint
         end
 
         def settle(state, cell, direction)
+          @settle = SETTLE_FRAMES if @settle.positive? && @still >= SETTLE_STILL
           return nil if @arrived_by == direction || @settle >= SETTLE_FRAMES
 
           dx, dy = Geometry.offset(state.x, state.y, cell)

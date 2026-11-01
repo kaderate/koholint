@@ -116,6 +116,13 @@ class TalkToTest < Minitest::Test
 
   def person_at(x, y, slot: 3, type: 111) = { slot:, type:, x:, y:, cell: Koholint::Geometry.cell_for(x, y), kind: :npc }
 
+  def test_a_person_who_stays_put_wins_over_a_walker_in_the_same_cell
+    walker = person_at(136, 80, slot: 2, type: 111).merge(moves: true)
+    sitter = person_at(136, 80, slot: 6, type: 115).merge(moves: false)
+    result, = talk(4, 8, entities: -> { [walker, sitter] })
+    assert_equal({ type: 115, slot: 6, kind: 'npc' }, result[:entity])
+  end
+
   def test_a_person_the_grid_believes_walkable_is_still_talked_to
     result, inputs = talk(4, 8, grid: FakeGrid.new, entities: -> { [person_at(136, 80)] })
     assert_equal :done, result[:stopped_by], result.inspect

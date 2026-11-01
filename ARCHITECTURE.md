@@ -106,14 +106,16 @@ an event (`new_place` for a place never seen in the run, `known_place` for a ret
 attempts that walked no new cell, `no_frontier`, `locked`, `budget` at 600 frames); `explore_log.rb` keeps per place the cells it walked or found walled, the exits
 tried (left, or blocked twice) with their destination, the survey of each explored place (open border cells by side, doors, `pending`),
 the places seen in any action and the things already offered, rebuilt from the `action` events on resume. A skill is a bounded, deterministic action with
-validated parameters; it reports how it stopped (`done`, `blocked`, `no_path`, `no_response`…). `ledger.rb`
+validated parameters (the perpendicular settle of `goto` and the centring after a move give up once Link stops moving);
+it reports how it stopped (`done`, `blocked`, `no_path`, `no_response`…). `ledger.rb`
 counts blocked edges per place (doubtful edges), `triggers.rb` forbids inputs that re-fire a scripted event,
 `talk_to` resolves the person to the entity at or next to the target cell
 (an `npc`, else any non-enemy entity in that cell): the cells its 16-pixel box covers by at least 4 pixels are the person
 (a person between four cells is four cells), the standing cell is next to one of them, the walk re-plans when the entity
 moves away (up to 6 times), Link aligns with the entity's pixel position and presses A at contact or once facing it
 within 16 pixels (type 111 does not block Link; A opened from up to 19 pixels), the target is free only when the entity
-is gone or Link walked past it, and A is pressed again every 12 frames for 48 frames (the game ignores A for 24 frames after a
+is gone or Link walked past it, a standing cell where Link stops short of reach (furniture) counts as no response, a
+person who stays put wins over a walker on the same cells, and A is pressed again every 12 frames for 48 frames (the game ignores A for 24 frames after a
 dialogue closes: `dialogue_cooldown`); without an entity it falls back on the grid. `talk_log.rb` remembers which sides of a person gave no response and, per person (the entity type that `talk_to` faced when the
 dialogue opened, reported in its result, else the last `talk_to` target cell), the key (letters
 and digits only, as for `new_text`) of each stitched text read, its conversation signature and speaker name, and a world stamp (milestone, places visited): the context says whether the last talk gave
