@@ -8,9 +8,14 @@ module Koholint
       CONTACT_FRAMES = 3
       FREE_PIXELS = 12
       PRESS_FRAMES = 3
-      RESPONSE_FRAMES = 30
+      REPRESS_FRAMES = 12
+      RESPONSE_FRAMES = 48
       TALK_REPLANS = 3
       TALK_STANDING_CELLS = 3
+      TRACK_REPLANS = 6
+      OVERLAP_PIXELS = 4
+      REACH_PIXELS = 16
+      HALF = 8
       FREE_CAUSE = 'target cell was walkable: it may not hold a person any more'.freeze
 
       class Run < Goto::Run
@@ -26,6 +31,8 @@ module Koholint
           @face_frames = 0
           @face_origin = nil
           @face_last = nil
+          @align_last = nil
+          @align_frames = 0
           @face_still = 0
           @press_frames = 0
           @response_frames = 0
@@ -33,12 +40,17 @@ module Koholint
           @failed = []
           @entities = context[:entities]
           @entity = nil
+          @tracks = 0
+          @who = person_entity(person)
+          @cells = @who ? covered(@who) : [person]
           @faces = faces_for(context[:objects], person)
           super(target: nil, context:, **rest)
-          @facing = Navigation::Planner.direction_between(@standing, @person) if @standing
+          @facing = facing_from(@standing) if @standing
         end
 
         def next_input(state)
+          return walk_to(state, choose(state.cell)) if @phase != :talk && !@stopped_by && moved_away?(state)
+
           buttons = super
           return buttons unless buttons.nil? && @phase == :walk
           return next_input(state) if @stopped_by == :blocked && replan(state)
@@ -53,6 +65,8 @@ module Koholint
           merged = super.merge(talked: @talked, standing_cell: (@standing && { row: @standing[0], col: @standing[1] }), facing: @facing, replans: @replans, standing_cells_tried: @tried.map(&:dup))
           merged[:cause] = FREE_CAUSE if @stopped_by == :target_free
           merged[:entity] = @entity if @entity
+          merged[:person_cells] = @cells.map { |row, col| { row:, col: } } if @who
+          merged[:tracked] = @tracks if @tracks.positive?
           merged
         end
 
@@ -104,7 +118,7 @@ module Koholint
           @still = 0
           @heading = nil
           @position = [state.x, state.y]
-          @facing = Navigation::Planner.direction_between(@standing, @person) if @path
+          @facing = facing_from(@standing) if @path
           @stopped_by = @path ? nil : :no_path
           true
         end
@@ -121,26 +135,79 @@ module Koholint
 
           chosen = choose(state.cell) or return nil
           @replans += 1
-          @path = chosen
+          restart(state, chosen)
+          input_for(state)
+        end
+
+        def walk_to(state, path)
+          @tracks += 1
+          @last = state
+          return restart(state, path) && next_input(state) if path
+
+          @stopped_by = :no_path
+          nil
+        end
+
+        def restart(state, path)
+          @path = path
           @phase = :walk
           @index = 0
-          @arrived_by = nil
+          @arrived_by = @idle_reason = @centring = nil
           @settle = 0
           @still = 0
           @heading = nil
           @position = [state.x, state.y]
           @face_frames = @face_still = @press_frames = @response_frames = 0
-          @face_origin = @face_last = nil
-          @facing = Navigation::Planner.direction_between(@standing, @person)
-          input_for(state)
+          @face_origin = @face_last = @align_last = nil
+          @align_frames = 0
+          @facing = facing_from(@standing)
+          true
         end
 
         def neighbours
-          Navigation::Planner::DELTAS.values.filter_map do |dr, dc|
-            cell = [@person[0] + dr, @person[1] + dc]
-            cell if cell[0].between?(0, Geometry::ROWS - 1) && cell[1].between?(0, Geometry::COLS - 1) && !@grid&.static_sprite(*cell) &&
-                    (@faces.empty? || @faces.include?(Navigation::Planner.direction_between(cell, @person)))
-          end
+          @cells.flat_map do |person|
+            Navigation::Planner::DELTAS.values.filter_map do |dr, dc|
+              cell = [person[0] + dr, person[1] + dc]
+              cell if cell[0].between?(0, Geometry::ROWS - 1) && cell[1].between?(0, Geometry::COLS - 1) && !@cells.include?(cell) &&
+                      !@grid&.static_sprite(*cell) && (@faces.empty? || @faces.include?(Navigation::Planner.direction_between(cell, person)))
+            end
+          end.uniq
+        end
+
+        def facing_from(cell)
+          person = @cells.find { |c| (c[0] - cell[0]).abs + (c[1] - cell[1]).abs == 1 } || @person
+          Navigation::Planner.direction_between(cell, person)
+        end
+
+        def person_entity(cell)
+          near = Array(@entities&.call).select { |entity| entity[:cell] && entity[:kind].to_s != 'enemy' }
+          found = Entities.near(near.select { |entity| entity[:kind].to_s == 'npc' }, cell) || Entities.near(near, cell, within: 0)
+          found&.slice(:slot, :type, :x, :y, :kind)
+        end
+
+        def covered(entity)
+          span = ->(centre, cell_of) { (centre - HALF..centre + HALF - 1).group_by(&cell_of).select { |_, px| px.size >= OVERLAP_PIXELS }.keys }
+          rows = span.(entity[:y], ->(y) { (y - 8).div(Geometry::CELL) }).select { |row| row.between?(0, Geometry::ROWS - 1) }
+          cols = span.(entity[:x], ->(x) { x.div(Geometry::CELL) }).select { |col| col.between?(0, Geometry::COLS - 1) }
+          rows.product(cols)
+        end
+
+        def current_who
+          Array(@entities&.call).find { |entity| entity[:slot] == @who[:slot] && entity[:type] == @who[:type] }
+        end
+
+        def moved_away?(state)
+          return false unless @who && @standing && @tracks < TRACK_REPLANS && state.cell
+
+          now = current_who or return false
+          cells = covered(now)
+          return false if cells == @cells
+
+          @who = now.slice(:slot, :type, :x, :y, :kind)
+          @cells = cells
+          @person = cells.first
+          adjacent = @cells.any? { |c| (c[0] - @standing[0]).abs + (c[1] - @standing[1]).abs == 1 } && !@cells.include?(@standing)
+          !adjacent
         end
 
         def faces_for(objects, person)
@@ -179,19 +246,56 @@ module Koholint
         end
 
         def face(state)
-          return finish(:target_free) if @face_frames.zero? && believed_free?
+          return finish(:target_free) if @face_frames.zero? && (@who ? current_who.nil? : believed_free?)
 
           position = [state.x, state.y]
+          align = align_with_person(position)
+          return align if align
+
           @face_origin ||= position
           @face_still = position == @face_last ? @face_still + 1 : 0
-          return begin_talk(state) if @face_still >= CONTACT_FRAMES
+          return begin_talk(state) if @face_still >= CONTACT_FRAMES || (@face_frames.positive? && within_reach?(position))
 
-          axis = %i[left right].include?(@facing) ? 0 : 1
-          return finish(:target_free) if (position[axis] - @face_origin[axis]).abs >= FREE_PIXELS || @face_frames >= FACE_FRAMES
+          return finish(:target_free) if @who ? passed?(position) : drifted?(position)
 
           @face_last = position
           @face_frames += 1
           [@facing]
+        end
+
+        def align_with_person(position)
+          return nil unless @who && @align_frames < FACE_FRAMES
+
+          horizontal = %i[left right].include?(@facing)
+          off = horizontal ? @who[:y] - position[1] : @who[:x] - position[0]
+          return nil if off.abs <= Geometry::ALIGN_TOLERANCE || position == @align_last
+
+          @align_last = position
+          @align_frames += 1
+          [horizontal ? (off.positive? ? :down : :up) : (off.positive? ? :right : :left)]
+        end
+
+        def drifted?(position)
+          axis = %i[left right].include?(@facing) ? 0 : 1
+          (position[axis] - @face_origin[axis]).abs >= FREE_PIXELS || @face_frames >= FACE_FRAMES
+        end
+
+        def within_reach?(position)
+          return false unless @who
+
+          horizontal = %i[left right].include?(@facing)
+          sign = %i[right down].include?(@facing) ? 1 : -1
+          along = horizontal ? @who[:x] - position[0] : @who[:y] - position[1]
+          cross = horizontal ? @who[:y] - position[1] : @who[:x] - position[0]
+          (along * sign).between?(1, REACH_PIXELS) && cross.abs <= HALF
+        end
+
+        def passed?(position)
+          return true if @face_frames >= FACE_FRAMES + HALF
+
+          axis = %i[left right].include?(@facing) ? 0 : 1
+          sign = %i[right down].include?(@facing) ? 1 : -1
+          ((position[axis] - [@who[:x], @who[:y]][axis]) * sign) >= 0
         end
 
         def note_tried(outcome) = @tried << { row: @standing[0], col: @standing[1], outcome: }
@@ -202,6 +306,7 @@ module Koholint
 
         def faced_entity
           return unless @entities && @standing
+          return { type: @who[:type], slot: @who[:slot], kind: @who[:kind].to_s } if @who
 
           delta = Navigation::Planner::DELTAS.fetch(@facing, [0, 0])
           faced = [@standing[0] + delta[0], @standing[1] + delta[1]]
@@ -221,18 +326,15 @@ module Koholint
             note_tried(:done)
             return finish(:done)
           end
-          if @press_frames < PRESS_FRAMES
-            @press_frames += 1
-            return [:a]
-          end
           if @response_frames >= RESPONSE_FRAMES
             note_tried(:no_response)
             @failed << @standing
             return retarget(state) || finish(:no_response)
           end
 
+          pressing = @response_frames % REPRESS_FRAMES < PRESS_FRAMES
           @response_frames += 1
-          []
+          pressing ? [:a] : []
         end
       end
 

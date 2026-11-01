@@ -106,12 +106,94 @@ class TalkToTest < Minitest::Test
     assert_equal({ type: 63, slot: 1, kind: 'npc' }, result[:entity])
     result, = talk(4, 8, entities: -> { [people.last] })
     refute result.key?(:entity)
-    result, = talk(4, 8, entities: -> { [people.first.merge(cell: [4, 9])] })
-    refute result.key?(:entity)
-    result, = talk(4, 8, entities: -> { [people.first.merge(kind: :unknown), people.first.merge(type: 45, slot: 2, kind: :unknown)] })
+    result, = talk(4, 8, entities: -> { [people.first.merge(kind: :unknown)] })
+    assert_equal({ type: 63, slot: 1, kind: 'unknown' }, result[:entity])
+    result, = talk(4, 8, entities: -> { [people.first.merge(kind: :unknown, x: 152, cell: [4, 9])] })
     refute result.key?(:entity)
     result, = talk(4, 8)
     refute result.key?(:entity)
+  end
+
+  def person_at(x, y, slot: 3, type: 111) = { slot:, type:, x:, y:, cell: Koholint::Geometry.cell_for(x, y), kind: :npc }
+
+  def test_a_person_the_grid_believes_walkable_is_still_talked_to
+    result, inputs = talk(4, 8, grid: FakeGrid.new, entities: -> { [person_at(136, 80)] })
+    assert_equal :done, result[:stopped_by], result.inspect
+    assert result[:talked]
+    assert_includes inputs, [:a]
+  end
+
+  def test_a_person_straddling_four_cells_is_faced_from_outside_them
+    covered = [[2, 2], [2, 3], [3, 2], [3, 3]]
+    result, = talk(2, 3, from: [5, 5], grid: FakeGrid.new, solid: nil, blocked: covered, entities: -> { [person_at(48, 56)] })
+    assert_equal :done, result[:stopped_by], result.inspect
+    assert_equal covered, result[:person_cells].map { |c| [c[:row], c[:col]] }.sort
+    standing = result[:standing_cell].values_at(:row, :col)
+    refute_includes covered, standing
+    faced = Koholint::Navigation::Planner::DELTAS.fetch(result[:facing]).zip(standing).map(&:sum)
+    assert_includes covered, faced
+  end
+
+  def test_a_person_who_walks_away_is_followed
+    frames = 0
+    walker = -> { frames < 20 ? person_at(136, 80) : person_at(136, 32) }
+    x, y = centre(4, 5)
+    execution = registry.start('talk_to', state(x:, y:), { row: 4, col: 8 }, { grid: FakeGrid.new, entities: -> { [walker.call] } })
+    dialog = 0
+    a = 0
+    400.times do
+      buttons = execution.next_input(state(x:, y:, dialog_state: dialog)) or break
+      frames += 1
+      a += 1 if buttons == [:a]
+      at = Koholint::Geometry.cell_for(x, y)
+      dialog = 3 if a.positive? && at.zip(walker.call[:cell]).sum { |p, q| (p - q).abs } == 1
+      dx, dy = { up: [0, -1], down: [0, 1], left: [-1, 0], right: [1, 0] }.fetch(buttons.first, [0, 0])
+      ahead = Koholint::Geometry.cell_for(x + (8 * dx), y + (8 * dy))
+      next if ahead == walker.call[:cell]
+
+      x += dx
+      y += dy
+    end
+    result = execution.result(state(x:, y:, dialog_state: dialog))
+    assert_equal :done, result[:stopped_by], result.inspect
+    assert_operator result[:tracked], :>=, 1
+    assert_equal [[1, 8]], result[:person_cells].map { |c| [c[:row], c[:col]] }
+  end
+
+  def test_a_person_who_does_not_block_link_is_talked_to_once_within_reach
+    x, y = centre(4, 5)
+    person = person_at(*centre(4, 6))
+    execution = registry.start('talk_to', state(x:, y:), { row: 4, col: 6 }, { grid: FakeGrid.new, entities: -> { [person] } })
+    inputs = []
+    40.times do
+      buttons = execution.next_input(state(x:, y:, dialog_state: inputs.include?([:a]) ? 3 : 0)) or break
+      inputs << buttons
+      x += 1 if buttons == [:right]
+    end
+    result = execution.result(state(x:, y:, dialog_state: 3))
+    assert_equal :done, result[:stopped_by], result.inspect
+    assert_includes 1..Koholint::Skills::TalkTo::REACH_PIXELS, person[:x] - x
+  end
+
+  def test_a_person_who_leaves_the_screen_is_target_free
+    frames = 0
+    result, inputs = talk(4, 8, grid: FakeGrid.new, entities: -> { (frames += 1) < 30 ? [person_at(136, 80)] : [] })
+    assert_equal :target_free, result[:stopped_by], result.inspect
+    refute_includes inputs, [:a]
+  end
+
+  def test_a_ignored_right_after_a_dialogue_is_pressed_again
+    result, inputs = talk(4, 8, opens_after: 4)
+    assert_equal :done, result[:stopped_by], result.inspect
+    assert_equal 1, result[:standing_cells_tried].size
+    assert_equal 4, inputs.count([:a])
+  end
+
+  def test_a_new_standing_cell_after_no_response_is_walked_to_before_facing
+    result, = talk(4, 8, from: [4, 7], open_cells: [[3, 8]])
+    assert_equal :done, result[:stopped_by], result.inspect
+    assert_equal [[4, 7, :no_response], [3, 8, :done]], tried(result)
+    assert_equal [3, 8], result[:to].values_at(:row, :col)
   end
 
   def test_already_standing_next_to_the_person_skips_walking
@@ -125,7 +207,7 @@ class TalkToTest < Minitest::Test
     result, inputs = talk(4, 8, opens_after: nil)
     assert_equal :no_response, result[:stopped_by]
     assert_equal false, result[:talked]
-    assert_equal 9, inputs.count([:a])
+    assert_equal 36, inputs.count([:a])
     assert_equal 3, result[:standing_cells_tried].size
     assert_operator result[:frames], :<=, 400
   end
@@ -405,6 +487,28 @@ class TalkToTest < Minitest::Test
       assert_equal :done, report.fetch(cell)[:stopped_by], cell.inspect
       assert report.fetch(cell)[:talked], cell.inspect
       assert report.fetch(cell)[:dialog_after], cell.inspect
+    end
+  end
+
+  def test_rom_a_person_straddling_four_cells_answers_from_any_of_them
+    skip_without_rom!
+    emulator = Koholint::Emulator.restore(EmulatorCache.interactive.dump)
+    state = Koholint::Perception.read(emulator)
+    trace = Struct.new(:events) { def emit(*, **) = nil }.new([])
+    grid = 2.times.map { Koholint::Vision::GridBuilder.new(trace:, prober: ProbeAdapter.new).observe(emulator, state) }.last
+    report = [[2, 4], [3, 4], [3, 5]].to_h do |cell|
+      copy = Koholint::Emulator.restore(emulator.dump)
+      execution = registry.start('talk_to', Koholint::Perception.read(copy), { row: cell[0], col: cell[1] }, { grid:, entities: -> { Koholint::Entities.read(copy) } })
+      while (buttons = execution.next_input(Koholint::Perception.read(copy)))
+        copy.step(buttons)
+      end
+      [cell, execution.result(Koholint::Perception.read(copy))]
+    end
+    puts "\nROM talk_to by entity: #{report.transform_values { |r| r.slice(:stopped_by, :standing_cell, :facing, :person_cells, :frames) }.inspect}"
+    report.each do |cell, result|
+      assert_equal :done, result[:stopped_by], "#{cell.inspect}: #{result.inspect}"
+      assert_equal({ type: 62, slot: 0, kind: 'npc' }, result[:entity])
+      assert_equal [[2, 4], [2, 5], [3, 4], [3, 5]], result[:person_cells].map { |c| [c[:row], c[:col]] }.sort
     end
   end
 

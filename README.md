@@ -84,7 +84,8 @@ visited places from the trace; `fork` branches a run at a frame (the parent may 
   exits it tried and the things it offered are kept per place and rebuilt from the trace on resume.
 - `goto row col` walks to a cell of the known grid by a shortest path with the fewest turns (stops `done`, `blocked`,
   `no_path`, ...; a result carries `blocked_at` when a move hit a wall); `step direction pixels` moves a few pixels;
-  `talk_to row col` walks next to a person, faces them and presses A, trying other sides on no response.
+  `talk_to row col` walks next to a person, faces them and presses A, trying other sides on no response; the person is
+  the entity at or next to the cell, followed when it walks away, and may cover several cells.
 - A ledger counts blocked edges per place; an edge blocked twice is marked doubtful in the context, and an objective
   that keeps failing is abandoned as `unreachable`.
 - Dialogue pages are advanced automatically (one `decision` with agent `delegated` and cost 0 per page) and read once
