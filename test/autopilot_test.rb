@@ -18,12 +18,21 @@ class AutopilotTest < Minitest::Test
   end
 
   def test_a_benign_stop_continues_with_an_undirected_free_explore
-    %i[new_place budget].each do |stop|
+    %i[new_place known_place budget].each do |stop|
       result = primed(stop:).next_choice(state: state(frame: 400), objective: objective)
       assert_equal({ skill: 'explore', params: {} }, result[:choice])
       assert_equal [0.0, 'delegated', true, false], result.values_at(:cost_usd, :agent, :autopilot, :fallback)
       assert_match(/\Aautopilot/, result[:justification])
     end
+  end
+
+  def test_a_return_to_a_known_place_does_not_count_in_the_chain
+    pilot = primed(stop: :known_place)
+    pilot.next_choice(state: state(frame: 400), objective: objective)
+    assert_equal 0, pilot.chain
+    pilot.acted(skill: 'explore', outcome: { stopped_by: :new_place })
+    pilot.next_choice(state: state(frame: 500), objective: objective)
+    assert_equal 1, pilot.chain
   end
 
   def test_other_stops_go_back_to_the_model
