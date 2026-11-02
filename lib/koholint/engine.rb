@@ -4,6 +4,7 @@ require 'fileutils'
 require 'koholint/budget'
 require 'koholint/canonical_save'
 require 'koholint/entities'
+require 'koholint/items'
 require 'koholint/decision'
 require 'koholint/emulator'
 require 'koholint/keyframes'
@@ -63,6 +64,7 @@ module Koholint
       events = Trace.read(File.join(run.dir, 'trace.jsonl'))
       @played = GameState.played?(events)
       @card_place = carded_place(events)
+      @items = ItemWatch.from_events(events)
       @unknown_modes = events.filter_map { |event| event['detail'] if event['type'] == 'notable' && event['kind'] == 'unknown_mode' }.to_set
     end
 
@@ -261,7 +263,10 @@ module Koholint
       @run.inputs.append(buttons)
       @budget.tick(frames: 1)
       after_frame
-      Perception.read(@emulator).tap { |state| @readiness.observe(state) }
+      Perception.read(@emulator).tap do |state|
+        @readiness.observe(state)
+        @items.observe(state).each { |gain| @run.trace.emit(:item_gained, frame: state.frame, **gain) }
+      end
     end
 
     # Between decisions only: a skill runs to its end, and the next observation waits here, stepping no input.

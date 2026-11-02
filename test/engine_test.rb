@@ -333,6 +333,25 @@ class EngineTest < Minitest::Test
     emulator
   end
 
+  def shield_emulator(at:)
+    emulator = MenuEmulator.new
+    emulator.define_singleton_method(:read) do |addr|
+      { hp: 24, max_hearts: 3, link_x: 80, link_y: 60, game_mode: 0x0B, game_submode: 7, room_id: 163, map_id: 16,
+        inventory_slot_b: frame >= at ? 4 : 0, shield_level: frame >= at ? 1 : 0 }.fetch(Koholint::Perception::ADDRESSES.key(addr), 0)
+    end
+    emulator
+  end
+
+  def test_a_new_item_is_emitted_once_on_its_frame_and_not_again_after_a_resume
+    with_run do |_dir, run|
+      Koholint::Engine.new(run:, policy: BootForever.new, emulator: shield_emulator(at: 50), budget: Koholint::Budget.new(frames: 100)).run
+      gained = events(run, :item_gained)
+      assert_equal [[50, 4, 'shield', [163, 16], [4]]], gained.map { |e| e.values_at('frame', 'item', 'name', 'place', 'held') }
+      Koholint::Engine.new(run:, policy: BootForever.new, emulator: shield_emulator(at: 50), budget: Koholint::Budget.new(frames: 100)).run
+      assert_equal 1, events(run, :item_gained).size
+    end
+  end
+
   def test_an_uncatalogued_screen_is_noted_once_per_tuple_and_once_across_a_resume
     with_run do |_dir, run|
       Koholint::Engine.new(run:, policy: BootForever.new, emulator: unknown_screen_emulator, budget: Koholint::Budget.new(frames: 600)).run

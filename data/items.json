@@ -1,0 +1,15 @@
+[
+  {"id": 1, "name": "sword", "milestone": "sword", "source": "general knowledge of the game's item ids (inventory constants of the disassembly), not measured: no run has obtained it", "confidence": "hypothesis", "verified_count": 0},
+  {"id": 2, "name": "bombs", "source": "general knowledge of the game's item ids, not measured", "confidence": "hypothesis", "verified_count": 0},
+  {"id": 3, "name": "power bracelet", "source": "general knowledge of the game's item ids, not measured", "confidence": "hypothesis", "verified_count": 0},
+  {"id": 4, "name": "shield", "milestone": "shield", "source": "RAM diff on the frame the shield text opens: runs 20261020-070238-d8c5 and 20261019-201231-a1d5 (2026-10-20), 20261101-141755-eca1 (frame 3465) and 20261102-075426-e333 (frame 5935) (2026-11-02): inventory_slot_b 0 -> 4 with shield_level 0 -> 1 on the same frame, no other inventory byte changed; holding B with it raises the shield (shield_raised)", "confidence": "verified", "verified_count": 4},
+  {"id": 5, "name": "bow", "source": "general knowledge of the game's item ids, not measured", "confidence": "hypothesis", "verified_count": 0},
+  {"id": 6, "name": "hookshot", "source": "general knowledge of the game's item ids, not measured", "confidence": "hypothesis", "verified_count": 0},
+  {"id": 7, "name": "magic rod", "source": "general knowledge of the game's item ids, not measured", "confidence": "hypothesis", "verified_count": 0},
+  {"id": 8, "name": "pegasus boots", "source": "general knowledge of the game's item ids, not measured", "confidence": "hypothesis", "verified_count": 0},
+  {"id": 9, "name": "ocarina", "source": "general knowledge of the game's item ids, not measured", "confidence": "hypothesis", "verified_count": 0},
+  {"id": 10, "name": "roc's feather", "source": "general knowledge of the game's item ids, not measured", "confidence": "hypothesis", "verified_count": 0},
+  {"id": 11, "name": "shovel", "source": "general knowledge of the game's item ids, not measured", "confidence": "hypothesis", "verified_count": 0},
+  {"id": 12, "name": "magic powder", "source": "general knowledge of the game's item ids, not measured", "confidence": "hypothesis", "verified_count": 0},
+  {"id": 13, "name": "boomerang", "source": "general knowledge of the game's item ids, not measured", "confidence": "hypothesis", "verified_count": 0}
+]

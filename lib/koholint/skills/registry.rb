@@ -6,6 +6,7 @@ require 'koholint/skills/press'
 require 'koholint/skills/screens'
 require 'koholint/skills/step'
 require 'koholint/skills/talk_to'
+require 'koholint/skills/use_item'
 require 'koholint/skills/wait'
 require 'koholint/skills/walk'
 
@@ -24,7 +25,8 @@ module Koholint
     class Registry
       def self.default
         new([Walk.new, Press.new, AdvanceDialogue.new, Wait.new, Goto.new, Step.new, TalkTo.new, Explore.new, Screens.open_menu, Screens.close_menu,
-             Screens.open_map, Screens.close_map, Screens::MenuMove.new, Screens::MenuAssign.new, Screens::ChooseOption.new])
+             Screens.open_map, Screens.close_map, Screens::MenuMove.new, Screens::MenuAssign.new, Screens::ChooseOption.new,
+             UseItem.new, Guard.new])
       end
 
       def initialize(skills)

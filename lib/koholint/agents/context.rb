@@ -1,6 +1,7 @@
 require 'json'
 require 'koholint/game_state'
 require 'koholint/geometry'
+require 'koholint/items'
 require 'koholint/perception'
 require 'koholint/vision/grid'
 
@@ -79,6 +80,7 @@ module Koholint
           lines << "Link offset from cell centre (positive = right of / below the centre): dx=#{dx}, dy=#{dy}"
         end
         lines << "Health: #{hearts(state.hp)} of #{hearts(state.max_hp)} hearts"
+        lines << items_line(state)
         known = link && triggers ? triggers.forbidden(place, link) : []
         known.each do |input|
           times = triggers.input_count(place, link, input)
@@ -105,10 +107,16 @@ module Koholint
         cursor = mode.cursor
         lines << "Cursor: #{cursor['field'].tr('_', ' ')} #{state[cursor['field'].to_sym]} of 0..#{cursor['count'] - 1}" if cursor
         lines << "Options (choose_option): #{mode.choices.map { |index, text| "#{index} #{text}" }.join(', ')}" if mode.options
-        lines << "Item ids on the buttons: A #{state.item_a.to_i}, B #{state.item_b.to_i} (0 = empty)" if mode.kind == 'menu'
         lines
       end
       private_class_method :screen_lines
+
+      def self.items_line(state)
+        slots = Items.slots(state).each_with_index.reject { |id, _| id.to_i.zero? }.map { |id, slot| "#{slot} #{Items.label(id)}" }
+        "Items (a ? marks a name not yet measured): A #{Items.label(state.item_a)}, B #{Items.label(state.item_b)}; " \
+          "inventory slots: #{slots.empty? ? 'all empty' : slots.join(', ')}"
+      end
+      private_class_method :items_line
 
       SIGN_STATUS = { read: 'read', tried: 'tried, no text yet', never: 'never read' }.freeze
 
