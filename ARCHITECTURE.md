@@ -155,7 +155,7 @@ on any other stop or action, a new lead or goal from the last call, a phase othe
 last call, an objective that changed or whose kind is not `new_place`, `leave_place` or `new_text` (unless it has a target), and after 6 autopilot
 explores or 2400 frames since the last call. An objective with a `target` (picked from the candidate menu) is followed from the first
 skill decision after the model's call: `explore` with the exit's direction, or with an `aim` in the skill context (a door to enter first,
-a place to route to through `ExploreLog#route(goal:)`), or one `talk_to` of a person or sign of the current place; a new goal
+a place to route to through `ExploreLog#route(goal:)`), or one `talk_to` of a person or sign of the current place (a `new_text` target left behind is not routed back to; a door Link stands on or just below is not a candidate); a new goal
 from that call does not hold it. When a chain stopped `new_place` or `known_place` and achieved the model's objective, the next
 `choose_objective` is answered by the policy (`new_place`, `autopilot: true` on the objective) while the place or a routed place has
 untried exits and the caps allow it. Results of autopilot decisions are marked `(autopilot)` in the context's results and attempts. Autopilot explores are objective attempts like any other (loop and stall

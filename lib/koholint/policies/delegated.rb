@@ -352,7 +352,7 @@ module Koholint
                             signs: signs.select { |object| object[:kind].to_s == 'sign' }.map { |object| object.slice(:cell) } }
         end
         @candidates = Candidates.build(place:, grid: context[:grid], explore_log: @explore_log, talk_log: @talk_log, leads: @leads, cards: @cards,
-                                       entities: @entities, signs:, stamp: stamp(state))
+                                       entities: @entities, signs:, stamp: stamp(state), link: state.cell)
       end
 
       def satisfied?(predicate, state, place)
@@ -685,7 +685,7 @@ module Koholint
         when 'exit' then { choice: { skill: 'explore', params: { direction: target[:direction] } } } if here
         when 'door' then { choice: EXPLORE, aim: { door: target[:cell] } } if here
         when 'person', 'sign'
-          return { choice: EXPLORE, aim: { place: target[:place] } } unless here
+          return (@objectives.current.dig(:predicate, :kind).to_s == 'reach_place' ? { choice: EXPLORE, aim: { place: target[:place] } } : nil) unless here
 
           cell = target[:kind] == 'person' ? entities_now.find { |entity| entity[:type] == target[:type] && entity[:cell] }&.dig(:cell) : target[:cell]
           { choice: { skill: 'talk_to', params: { row: cell[0], col: cell[1] } } } if cell

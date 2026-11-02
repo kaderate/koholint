@@ -37,6 +37,8 @@ class CandidatesTest < Minitest::Test
     assert_match(/2 moves away/, found.last[:label])
     assert_equal '- door-3-5: enter the door at (3,5), never entered', Koholint::Candidates.lines(found)[3]
     assert_equal found[4], Koholint::Candidates.find(found, ' person-t62 ')
+    [[3, 5], [4, 5]].each { |link| refute_includes build(signs:, link:).map { |c| c[:id] }, 'door-3-5' }
+    assert_includes build(signs:, link: [5, 5]).map { |c| c[:id] }, 'door-3-5'
   end
 
   def test_people_and_signs_of_other_places_and_lead_places_use_names_and_routes

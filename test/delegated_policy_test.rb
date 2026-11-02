@@ -1801,6 +1801,7 @@ class DelegatedAutopilotTest < Minitest::Test
     talk = p.decide(p.decision_point_for(state), state, { grid:, entities:, objects: })
     assert_equal({ skill: 'talk_to', params: { row: 2, col: 3 } }, talk[:choice])
     assert talk[:autopilot]
+    assert_nil p.send(:follow_choice, state(room_id: 9))
   end
 
   def test_a_place_name_is_noted_once_and_shown_in_the_next_prompt

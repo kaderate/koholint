@@ -8,10 +8,10 @@ module Koholint
 
     module_function
 
-    def build(place:, grid:, explore_log:, talk_log:, leads:, cards: {}, entities: [], signs: [], stamp: nil)
+    def build(place:, grid:, explore_log:, talk_log:, leads:, cards: {}, entities: [], signs: [], stamp: nil, link: nil)
       hops = explore_log.hops(place)
       named = ->(where) { leads.name_of(where) }
-      exits(place, grid, explore_log) + doors(place, signs, explore_log) + people_here(place, entities, talk_log, stamp) + signs_here(place, signs, talk_log) +
+      exits(place, grid, explore_log) + doors(place, signs, explore_log, link) + people_here(place, entities, talk_log, stamp) + signs_here(place, signs, talk_log) +
         places(place, hops, explore_log, named) + people_away(place, hops, cards, talk_log, named) + signs_away(place, hops, cards, talk_log, named) +
         lead_places(place, hops, leads, named)
     end
@@ -29,8 +29,9 @@ module Koholint
       end
     end
 
-    def doors(place, signs, explore_log)
-      signs.select { |object| object[:kind].to_s == 'door' && !explore_log.door_tried?(place, object[:cell]) }.map do |door|
+    def doors(place, signs, explore_log, link = nil)
+      came_out = ->(cell) { link && [cell, [cell[0] + 1, cell[1]]].include?(link) }
+      signs.select { |object| object[:kind].to_s == 'door' && !explore_log.door_tried?(place, object[:cell]) && !came_out.(object[:cell]) }.map do |door|
         row, col = door[:cell]
         { id: "door-#{row}-#{col}", label: "enter the door at (#{row},#{col}), never entered", title: "Enter the door at (#{row},#{col})",
           predicate: { kind: 'leave_place', place: }, target: { kind: 'door', place:, cell: [row, col] } }
