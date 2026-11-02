@@ -10,14 +10,12 @@
 - Data provenance: good. `data/addresses.json` 33 entries and `data/entities.json` 15 entries, none `verified` with count < 2; 9 addresses and 5 entities sit at count 1 (hypotheses).
 - Docs accuracy: mixed. `ARCHITECTURE.md` and README commands match `lib/koholint/cli.rb` (`ab-plan`, `ab-report`, `prune-heavy` exist); `ROADMAP.md` is 39 lines but about 60 percent is dense loose-end paragraphs (several 1,000+ characters), and item 1 still lists work as "next" with the goal line saying "shield is done".
 - Flakiness: moderate risk; tests depend on ROM and a shared `tmp/emulator_cache` (cold cache in a new worktree is the main cost).
-- Repo hygiene: poor on branches. 12 worktrees, 10 non-main branches, 7 already merged into main.
+- Repo hygiene: fixed 2026-11-02 (was 12 worktrees and 10 non-main branches, 7 merged); now 5 worktrees, one unmerged branch (`jev-spike`).
 
 ## Delete / Prune now
-1. Remove merged worktrees and branches `agent-loop`, `agent-loop-tl`, `agent-loop-tn`, `agent-loop-ts`, `arrival-protocol`, `talk-reliability`, `feat/autonomous-recovery` (`git worktree list`, `git branch`; 0 commits ahead of main); `inventory-shield` sits at main HEAD with no work yet. Why: noise, stale checkouts. Effort S.
-2. Overwrite or delete the old `docs/RETROSPECTIVE.md` content (a September v1/gemboy review, 523 lines, commit 10582ad, contradicts v2 and `AGENTS.md`). Replaced by this file; git keeps it. Effort S.
-3. Triage the 3 unmerged branches `arrival-fixes` (10 ahead), `lot-b` (14 ahead), `jev-spike` (4 ahead): merge or drop; `docs/runs/2026-10-jev-spike.md` already records the Jev result (18 percent agreement vs 21 percent random). Effort S.
-4. Archive finished plans `docs/superpowers/plans/2026-10-16-*.md`, `2026-10-18-*.md`, `2026-10-19-*.md` (5 plans, 697 lines, all landed per ARCHITECTURE) and keep only the 3 specs; plans carry paths that rot. Effort S.
-5. Collapse the ROADMAP "Open decisions and loose ends" wall (about 20 bullets of measured history, e.g. talk_to, Explore, Readiness) into `docs/runs/` notes or `data/` and keep one line per open item. Why: AGENTS.md says "only what is left"; most of it is a changelog. Effort M.
+Done 2026-11-02: merged worktrees and branches removed (`arrival`, `fixes`, `lotb`, `retro`, `tl`, `tn`, `ts`; branches `arrival-protocol`, `arrival-fixes`, `lot-b`, `retrospective`, `agent-loop-t*`, `feat/autonomous-recovery`); the September v1 content of this file replaced (git keeps it). Kept: `agent-loop` (holds the `.env` copied into new worktrees), `jev-spike` (4 unique commits, result already in `docs/runs/2026-10-jev-spike.md`: decide merge or drop), `inventory-shield` and `talk-reliability` (agents at work).
+1. Archive finished plans `docs/superpowers/plans/2026-10-16-*.md`, `2026-10-18-*.md`, `2026-10-19-*.md` (5 plans, 697 lines, all landed per ARCHITECTURE) and keep only the 3 specs; plans carry paths that rot. Effort S.
+2. Collapse the ROADMAP "Open decisions and loose ends" wall (about 20 bullets of measured history, e.g. talk_to, Explore, Readiness) into `docs/runs/` notes or `data/` and keep one line per open item. Why: AGENTS.md says "only what is left"; most of it is a changelog. Planned right after `inventory-shield` and `talk-reliability` merge (they edit ROADMAP too). Effort M.
 
 ## Fix drift
 1. `bin/measure_speed` and `bin/generate_start_fixture` are referenced only by old plans/spec, not by README or tests; document or delete (`bin/`). Effort S.
@@ -27,10 +25,10 @@
 5. `GRID_ROWS`/`GRID_COLS` duplicate `Geometry`, goto centring duplicates perpendicular logic (ROADMAP "Parked code smells"); cheap, do while touching them. Effort S.
 
 ## Do next
-1. Inventory in the context plus `item_gained` by inventory diff (RAM slots `item_a`/`item_b` are already read in `lib/koholint/perception.rb:25` but never reach the agent or the milestone): this is the single missing signal for the sword. Effort M.
+1. In progress (agent on branch `inventory-shield`): inventory in the context plus `item_gained` by inventory diff (RAM slots `item_a`/`item_b` are already read in `lib/koholint/perception.rb:25` but never reach the agent or the milestone): this is the single missing signal for the sword. Effort M.
 2. Enemy census and avoidance (`lib/koholint/probes/entity_census.rb`, `data/entities.json` has kind `enemy` never measured): sword needs a place Link can survive. Effort M.
 3. Add a goal-progress metric to `summary.json` (milestone, new items, hearts) and stop archiving runs whose milestone stays `shield`; the last 10 runs all stay at `shield` and 7 ended on `dollars`. Effort S.
 4. Split `lib/koholint/policies/delegated.rb` (arrival/revisit/autopilot hooks vs. decision cycle) and `test/delegated_policy_test.rb`; target under 400 lines per file and a suite under 2 min. Effort L.
 5. Freeze new flows for the sword work: batch navigation fixes (explore/talk) into one flow bump per live run instead of one per defect (16 flows since 2026-10-19). Effort S.
 
-Questions for the owner: (1) Is the sword reachable by the current agent without combat, or should combat precede inventory? (2) Keep the unmerged branches `lot-b`/`arrival-fixes`, and is the September v1 `docs/RETROSPECTIVE.md` to be deleted? (3) Is a hard per-run cap below 1 USD acceptable for runs that show no milestone gain?
+Questions for the owner: (1) Is the sword reachable by the current agent without combat, or should combat precede inventory? (2) Merge or drop `jev-spike`? (3) Is a hard per-run cap below 1 USD acceptable for runs that show no milestone gain?
