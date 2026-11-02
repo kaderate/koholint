@@ -14,9 +14,10 @@ module Koholint
       TALK_STANDING_CELLS = 3
       TRACK_REPLANS = 6
       OVERLAP_PIXELS = 4
-      REACH_PIXELS = 16
+      REACH = Geometry.fact(:talk_reach).transform_keys(&:to_sym).freeze
       HALF = 8
       FREE_CAUSE = 'target cell was walkable: it may not hold a person any more'.freeze
+      NOT_A_PERSON_CAUSE = 'only entity type %d is at the target and the entity census found no dialogue for that type'.freeze
 
       class Run < Goto::Run
         def initialize(person:, context: {}, **rest)
@@ -41,10 +42,13 @@ module Koholint
           @entities = context[:entities]
           @entity = nil
           @tracks = 0
+          @object = object_at(context[:objects], person)
           @who = person_entity(person)
           @cells = @who ? covered(@who) : [person]
-          @faces = faces_for(context[:objects], person)
+          @faces = Array(@object&.dig(:faces)).map(&:to_sym)
+          @non_person = !@who && !@object && non_person_at(person)
           super(target: nil, context:, **rest)
+          @cause = format(NOT_A_PERSON_CAUSE, @non_person[:type]) if @non_person
           @facing = facing_from(@standing) if @standing
         end
 
@@ -76,10 +80,20 @@ module Koholint
 
         def planner_for(context)
           @grid = context[:grid]
-          super
+          planner = super or return nil
+          Array(context[:objects]&.call).select { |object| object[:kind].to_s == 'door' }.each do |door|
+            Array(door[:faces]).each do |face|
+              dr, dc = Navigation::Planner::DELTAS.fetch(face.to_sym)
+              planner.avoid(door[:cell], face.to_sym)
+              planner.avoid([door[:cell][0] - dr, door[:cell][1] - dc], face.to_sym)
+            end
+          end
+          planner
         end
 
         def initial_plan
+          return nil if @non_person
+
           from = @start.cell
           return choose(from) if from && @planner
 
@@ -179,13 +193,24 @@ module Koholint
           Navigation::Planner.direction_between(cell, person)
         end
 
+        # A room object answers only to Link pressed against it, so a sprite on or next to it is not what is talked to unless it covers the cell.
         def person_entity(cell)
-          near = Array(@entities&.call).select { |entity| entity[:cell] && entity[:kind].to_s != 'enemy' }
+          near = Array(@entities&.call).select { |entity| entity[:cell] && entity[:kind].to_s != 'enemy' && !non_person?(entity) }
           people = near.select { |entity| entity[:kind].to_s == 'npc' && (entity[:cell][0] - cell[0]).abs <= 1 && (entity[:cell][1] - cell[1]).abs <= 1 }
+          people = people.select { |entity| covered(entity).include?(cell) } if @object
           found = people.min_by do |entity|
             [covered(entity).include?(cell) ? 0 : 1, (entity[:cell][0] - cell[0]).abs + (entity[:cell][1] - cell[1]).abs, entity[:moves] ? 1 : 0, entity[:slot]]
-          end || Entities.near(near, cell, within: 0)
+          end || (Entities.near(near, cell, within: 0) unless @object)
           found&.slice(:slot, :type, :x, :y, :kind)
+        end
+
+        def non_person?(entity)
+          known = Entities.catalogue[entity[:type]]
+          known && known[:kind] != :npc
+        end
+
+        def non_person_at(cell)
+          Array(@entities&.call).find { |entity| entity[:cell] == cell && non_person?(entity) }
         end
 
         def covered(entity)
@@ -213,10 +238,7 @@ module Koholint
           !adjacent
         end
 
-        def faces_for(objects, person)
-          found = objects && Array(objects.call).find { |object| object[:cell] == person }
-          Array(found&.dig(:faces)).map(&:to_sym)
-        end
+        def object_at(objects, person) = objects && Array(objects.call).find { |object| object[:cell] == person }
 
         def turns(path)
           directions = path.each_cons(2).map { |a, b| Navigation::Planner.direction_between(a, b) }
@@ -235,6 +257,7 @@ module Koholint
         end
 
         def input_for(state)
+          return idle(:no_response) if @non_person && @frames.zero?
           return super if @phase == :walk
           return finish(:room_change) if room(state) != room(@start)
           return finish(:damage) if state.hp.to_i < @start.hp.to_i
@@ -252,6 +275,7 @@ module Koholint
           return finish(:target_free) if @face_frames.zero? && (@who ? current_who.nil? : believed_free?)
 
           position = [state.x, state.y]
+          refresh_who
           align = align_with_person(position)
           return align if align
 
@@ -297,7 +321,12 @@ module Koholint
           sign = %i[right down].include?(@facing) ? 1 : -1
           along = horizontal ? @who[:x] - position[0] : @who[:y] - position[1]
           cross = horizontal ? @who[:y] - position[1] : @who[:x] - position[0]
-          (along * sign).between?(1, REACH_PIXELS + slack) && cross.abs <= HALF + slack
+          (along * sign).between?(1, REACH.fetch(@facing)) && cross.abs <= HALF + slack
+        end
+
+        def refresh_who
+          now = @who && current_who or return
+          @who = @who.merge(now.slice(:x, :y))
         end
 
         def passed?(position)
@@ -336,6 +365,8 @@ module Koholint
             note_tried(:done)
             return finish(:done)
           end
+          refresh_who
+          return out_of_reach(state) if @who && !within_reach?([state.x, state.y], slack: Geometry::ALIGN_TOLERANCE)
           if @response_frames >= RESPONSE_FRAMES
             note_tried(:no_response)
             @failed << @standing

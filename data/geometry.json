@@ -7,5 +7,10 @@
     },
     "verified_count": 1,
     "provenance": "ROM probe by button inputs only from EmulatorCache.interactive (Link at (70,52), place [163,16]): after N frames of up, 70 frames of left. Free to x=20 for y 38..28, blocked at x=68 for y 39..52, so the free row-1 band is y 26..38 (center 32, offsets -6..+6; 26 is also the top limit of the room, so the lower edge 38/39 is the measured one). Right walk at y=26 stops at x=108. Width 8 is inferred from the left stop x=20 against the 16 px wall cell, not measured separately; the row band is generalised from row 1 to other rows by the 16 px cell, not measured."
+  },
+  "talk_reach": {
+    "value": { "up": 19, "down": 20, "left": 15, "right": 16 },
+    "verified_count": 2,
+    "provenance": "talk reach probe 2026-11-02 on restored copies: Link poked to the person's position plus 8..24 px along one axis and aligned on the other, the facing byte set without a step, A for 3 frames, a dialogue within 40 frames; run 20261102-075426-e333 frame 7990 (type 115 at (40,96), room 179/0) and frame 6420 (types 62 at (88,64) and 63 at (120,80), room 163/16): the farthest distance that opened a dialogue was 19 px facing up, 20 down, 15 left and 16 right for all three, and every distance from 14 up to it opened one. Distance is the person's x or y minus Link's, in the RAM coordinates of link_x/link_y and entity_x/entity_y."
   }
 }
