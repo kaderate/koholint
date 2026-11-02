@@ -1,11 +1,12 @@
 {
-  "v": 3,
+  "v": 4,
   "run_id": "20261024-211104-7315",
   "flow_version": "flow-12",
   "tag": "ready-gate",
   "harness_sha": "92d93eedb8e1d3cec391e26d89bc67d71184f1ce",
   "prompts_sha": "0a7f5abbbc742ae2776590032fb234ba0040da4e7f3f8553aa9af226103c0980",
   "model": "sonnet",
+  "autopilot": null,
   "frames": 11281,
   "dollars": 1.50054,
   "calls": 87,
@@ -56,7 +57,8 @@
     "leads": {
       "high": 2,
       "normal": 4,
-      "low": 0
+      "low": 0,
+      "tip": 0
     },
     "lead_rejected": 0,
     "objectives_by_kind": {
@@ -69,6 +71,8 @@
     "talks_to_known": 10,
     "dialogues": 5,
     "not_ready_frames": 1260,
-    "not_ready_waits": 32
+    "not_ready_waits": 32,
+    "autopilot_decisions": 0,
+    "chain_max": 0
   }
 }

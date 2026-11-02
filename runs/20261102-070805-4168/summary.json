@@ -1,0 +1,90 @@
+{
+  "v": 4,
+  "run_id": "20261102-070805-4168",
+  "flow_version": "flow-15",
+  "tag": "flow15-live",
+  "harness_sha": "d5ee995714b7d39ba2845dac745d555122a60fd4",
+  "prompts_sha": "2193c9d6bc04429f16638be23dd499eeffa4d860d84448b38b04ada91aa51de6",
+  "model": "sonnet",
+  "autopilot": true,
+  "frames": 10316,
+  "dollars": 1.010887,
+  "calls": 58,
+  "calls_per_1000f": 5.622334,
+  "usd_per_1000f": 0.097992,
+  "latency_ms": {
+    "median": 2881,
+    "p90": 7108
+  },
+  "highest_milestone": "shield",
+  "places_seen": 11,
+  "objectives": {
+    "count": 14,
+    "achieved": 13
+  },
+  "stop_reason": "dollars",
+  "symptoms": [],
+  "starred": false,
+  "cost_by_skill": {
+    "advance_dialogue": {
+      "calls": 2,
+      "usd": 0.039564
+    },
+    "choose_objective": {
+      "calls": 14,
+      "usd": 0.2009
+    },
+    "explore": {
+      "calls": 17,
+      "usd": 0.251164
+    },
+    "goto": {
+      "calls": 6,
+      "usd": 0.117586
+    },
+    "press": {
+      "calls": 2,
+      "usd": 0.041787
+    },
+    "step": {
+      "calls": 2,
+      "usd": 0.037027
+    },
+    "talk_to": {
+      "calls": 6,
+      "usd": 0.147207
+    },
+    "walk": {
+      "calls": 9,
+      "usd": 0.175651
+    }
+  },
+  "decisions_by_agent": {
+    "start_game": 50,
+    "claude": 58,
+    "delegated": 196
+  },
+  "usage": {
+    "goal_changes": 2,
+    "leads": {
+      "high": 1,
+      "normal": 3,
+      "low": 0,
+      "tip": 1
+    },
+    "lead_rejected": 0,
+    "objectives_by_kind": {
+      "dialogue_closed": 3,
+      "new_place": 10,
+      "new_text": 1
+    },
+    "because_used": 12,
+    "talks": 10,
+    "talks_to_known": 5,
+    "dialogues": 13,
+    "not_ready_frames": 1149,
+    "not_ready_waits": 27,
+    "autopilot_decisions": 14,
+    "chain_max": 6
+  }
+}

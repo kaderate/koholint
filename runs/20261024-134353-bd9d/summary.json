@@ -1,11 +1,12 @@
 {
-  "v": 3,
+  "v": 4,
   "run_id": "20261024-134353-bd9d",
   "flow_version": "flow-10",
   "tag": "lock-fix",
   "harness_sha": "94be2ac72c858736e8597e2276f5c70c9a36be91",
   "prompts_sha": "704acd1d93b61a2fb105b92ed21a277afaa4f3bbb121309ab1789a050b409ce3",
   "model": "sonnet",
+  "autopilot": null,
   "frames": 10119,
   "dollars": 1.091754,
   "calls": 75,
@@ -52,7 +53,8 @@
     "leads": {
       "high": 0,
       "normal": 2,
-      "low": 0
+      "low": 0,
+      "tip": 0
     },
     "lead_rejected": 0,
     "objectives_by_kind": {
@@ -64,6 +66,8 @@
     "talks_to_known": 0,
     "dialogues": 2,
     "not_ready_frames": 0,
-    "not_ready_waits": 0
+    "not_ready_waits": 0,
+    "autopilot_decisions": 0,
+    "chain_max": 0
   }
 }

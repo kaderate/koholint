@@ -1,11 +1,12 @@
 {
-  "v": 3,
+  "v": 4,
   "run_id": "20261019-203438-7635",
   "flow_version": "flow-3",
   "tag": null,
   "harness_sha": null,
   "prompts_sha": null,
   "model": null,
+  "autopilot": null,
   "frames": 6664,
   "dollars": 1.024189,
   "calls": 62,
@@ -68,7 +69,8 @@
     "leads": {
       "high": 0,
       "normal": 0,
-      "low": 0
+      "low": 0,
+      "tip": 0
     },
     "lead_rejected": 0,
     "objectives_by_kind": {
@@ -80,6 +82,8 @@
     "talks_to_known": 4,
     "dialogues": 16,
     "not_ready_frames": 0,
-    "not_ready_waits": 0
+    "not_ready_waits": 0,
+    "autopilot_decisions": 0,
+    "chain_max": 0
   }
 }

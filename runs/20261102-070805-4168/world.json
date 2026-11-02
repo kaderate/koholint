@@ -1,0 +1,1501 @@
+{
+  "goal": "Follow the south road to the beach, then explore Cocolint island and find the first dungeon.",
+  "leads": [
+    {
+      "id": "lead-1",
+      "place": [
+        163,
+        16
+      ],
+      "source": null,
+      "quote": "Tu es sur l'île Cocolint!",
+      "claim": "The island Link is on is called Cocolint.",
+      "importance": "normal"
+    },
+    {
+      "id": "lead-2",
+      "place": [
+        163,
+        16
+      ],
+      "source": {
+        "row": 3,
+        "col": 5,
+        "entity": 62
+      },
+      "quote": "Suis la route du Sud, vers la plage là où je t'ai trouvé.",
+      "claim": "Follow the south road toward the beach where Link was found.",
+      "importance": "high"
+    },
+    {
+      "id": "lead-3",
+      "place": [
+        163,
+        16
+      ],
+      "source": {
+        "row": 3,
+        "col": 5,
+        "entity": 62
+      },
+      "quote": "des monstres terribles rôdent dans le coin",
+      "claim": "Dangerous monsters roam nearby; be careful.",
+      "importance": "normal"
+    },
+    {
+      "id": "lead-4",
+      "place": [
+        163,
+        16
+      ],
+      "source": null,
+      "quote": "Vous récupérez votre bouclier!",
+      "claim": "Link recovers his shield; use it to repel enemies.",
+      "importance": "tip"
+    },
+    {
+      "id": "lead-5",
+      "place": [
+        163,
+        16
+      ],
+      "source": {
+        "row": 4,
+        "col": 7,
+        "entity": 63
+      },
+      "quote": "Si tu y vas, fais attention aux monstres!",
+      "claim": "Another item was left on the beach; beware of monsters.",
+      "importance": "normal"
+    }
+  ],
+  "places": {
+    "163-16": {
+      "place": [
+        163,
+        16
+      ],
+      "visits": 2,
+      "first_frame": 351,
+      "last_frame": 5684,
+      "people": [
+        {
+          "type": 62,
+          "cell": [
+            3,
+            5
+          ],
+          "verified": true,
+          "status": "exhausted"
+        },
+        {
+          "type": 63,
+          "cell": [
+            4,
+            7
+          ],
+          "verified": true,
+          "name": "Tarkin",
+          "status": "new"
+        }
+      ],
+      "enemies": [],
+      "unknown": [
+        {
+          "type": 45,
+          "cell": [
+            6,
+            1
+          ],
+          "moves": false
+        },
+        {
+          "type": 45,
+          "cell": [
+            6,
+            2
+          ],
+          "moves": false
+        }
+      ],
+      "signs": [],
+      "objects": [
+        {
+          "cell": [
+            0,
+            7
+          ],
+          "object": 153
+        },
+        {
+          "cell": [
+            1,
+            7
+          ],
+          "object": 154
+        }
+      ],
+      "doors": [],
+      "exits": {
+        "down": [
+          [
+            7,
+            4
+          ],
+          [
+            7,
+            5
+          ]
+        ]
+      }
+    },
+    "162-0": {
+      "place": [
+        162,
+        0
+      ],
+      "visits": 6,
+      "first_frame": 5436,
+      "last_frame": 7989,
+      "people": [],
+      "enemies": [],
+      "unknown": [
+        {
+          "type": 47,
+          "cell": [
+            3,
+            8
+          ],
+          "moves": null
+        },
+        {
+          "type": 108,
+          "cell": [
+            5,
+            3
+          ],
+          "moves": true
+        }
+      ],
+      "signs": [],
+      "objects": [],
+      "doors": [
+        {
+          "cell": [
+            4,
+            5
+          ],
+          "object": 226,
+          "verified": true
+        }
+      ],
+      "exits": {
+        "up": [
+          [
+            0,
+            1
+          ],
+          [
+            0,
+            2
+          ],
+          [
+            0,
+            3
+          ],
+          [
+            0,
+            4
+          ],
+          [
+            0,
+            5
+          ],
+          [
+            0,
+            6
+          ],
+          [
+            0,
+            7
+          ],
+          [
+            0,
+            8
+          ],
+          [
+            0,
+            9
+          ]
+        ],
+        "down": [
+          [
+            7,
+            0
+          ],
+          [
+            7,
+            1
+          ],
+          [
+            7,
+            2
+          ],
+          [
+            7,
+            3
+          ],
+          [
+            7,
+            4
+          ],
+          [
+            7,
+            5
+          ],
+          [
+            7,
+            6
+          ],
+          [
+            7,
+            7
+          ],
+          [
+            7,
+            8
+          ],
+          [
+            7,
+            9
+          ]
+        ],
+        "left": [
+          [
+            1,
+            0
+          ],
+          [
+            2,
+            0
+          ],
+          [
+            3,
+            0
+          ],
+          [
+            4,
+            0
+          ],
+          [
+            5,
+            0
+          ],
+          [
+            6,
+            0
+          ],
+          [
+            7,
+            0
+          ]
+        ],
+        "right": [
+          [
+            0,
+            9
+          ],
+          [
+            1,
+            9
+          ],
+          [
+            2,
+            9
+          ],
+          [
+            3,
+            9
+          ],
+          [
+            4,
+            9
+          ],
+          [
+            5,
+            9
+          ],
+          [
+            6,
+            9
+          ],
+          [
+            7,
+            9
+          ]
+        ]
+      }
+    },
+    "178-0": {
+      "place": [
+        178,
+        0
+      ],
+      "visits": 4,
+      "first_frame": 5529,
+      "last_frame": 8414,
+      "people": [],
+      "enemies": [],
+      "unknown": [
+        {
+          "type": 110,
+          "cell": [
+            2,
+            3
+          ],
+          "moves": true
+        },
+        {
+          "type": 108,
+          "cell": [
+            2,
+            7
+          ],
+          "moves": true
+        }
+      ],
+      "signs": [],
+      "objects": [],
+      "doors": [
+        {
+          "cell": [
+            4,
+            5
+          ],
+          "object": 225,
+          "verified": false
+        }
+      ],
+      "exits": {
+        "up": [
+          [
+            0,
+            0
+          ],
+          [
+            0,
+            1
+          ],
+          [
+            0,
+            2
+          ],
+          [
+            0,
+            3
+          ],
+          [
+            0,
+            4
+          ],
+          [
+            0,
+            5
+          ],
+          [
+            0,
+            6
+          ],
+          [
+            0,
+            7
+          ],
+          [
+            0,
+            8
+          ],
+          [
+            0,
+            9
+          ]
+        ],
+        "left": [
+          [
+            0,
+            0
+          ],
+          [
+            1,
+            0
+          ],
+          [
+            2,
+            0
+          ],
+          [
+            3,
+            0
+          ],
+          [
+            4,
+            0
+          ],
+          [
+            5,
+            0
+          ],
+          [
+            6,
+            0
+          ]
+        ],
+        "right": [
+          [
+            0,
+            9
+          ],
+          [
+            1,
+            9
+          ],
+          [
+            2,
+            9
+          ],
+          [
+            3,
+            9
+          ],
+          [
+            4,
+            9
+          ],
+          [
+            5,
+            9
+          ],
+          [
+            6,
+            9
+          ]
+        ]
+      }
+    },
+    "163-0": {
+      "place": [
+        163,
+        0
+      ],
+      "visits": 2,
+      "first_frame": 6955,
+      "last_frame": 7054,
+      "people": [],
+      "enemies": [],
+      "unknown": [
+        {
+          "type": 61,
+          "cell": [
+            3,
+            5
+          ],
+          "moves": null
+        },
+        {
+          "type": 110,
+          "cell": [
+            1,
+            3
+          ],
+          "moves": true
+        },
+        {
+          "type": 110,
+          "cell": [
+            3,
+            2
+          ],
+          "moves": true
+        },
+        {
+          "type": 110,
+          "cell": [
+            5,
+            7
+          ],
+          "moves": true
+        }
+      ],
+      "signs": [],
+      "objects": [],
+      "doors": [],
+      "exits": {
+        "up": [
+          [
+            0,
+            0
+          ],
+          [
+            0,
+            1
+          ],
+          [
+            0,
+            2
+          ],
+          [
+            0,
+            3
+          ],
+          [
+            0,
+            4
+          ],
+          [
+            0,
+            5
+          ],
+          [
+            0,
+            6
+          ],
+          [
+            0,
+            7
+          ],
+          [
+            0,
+            8
+          ]
+        ],
+        "down": [
+          [
+            7,
+            0
+          ],
+          [
+            7,
+            1
+          ],
+          [
+            7,
+            2
+          ],
+          [
+            7,
+            3
+          ],
+          [
+            7,
+            4
+          ],
+          [
+            7,
+            5
+          ],
+          [
+            7,
+            6
+          ],
+          [
+            7,
+            7
+          ],
+          [
+            7,
+            8
+          ]
+        ],
+        "left": [
+          [
+            0,
+            0
+          ],
+          [
+            1,
+            0
+          ],
+          [
+            2,
+            0
+          ],
+          [
+            3,
+            0
+          ],
+          [
+            4,
+            0
+          ],
+          [
+            5,
+            0
+          ],
+          [
+            6,
+            0
+          ],
+          [
+            7,
+            0
+          ]
+        ]
+      }
+    },
+    "179-0": {
+      "place": [
+        179,
+        0
+      ],
+      "visits": 2,
+      "first_frame": 7010,
+      "last_frame": 8361,
+      "people": [
+        {
+          "type": 111,
+          "cell": [
+            2,
+            2
+          ],
+          "verified": true,
+          "status": "never"
+        },
+        {
+          "type": 115,
+          "cell": [
+            5,
+            2
+          ],
+          "verified": true,
+          "status": "never"
+        }
+      ],
+      "enemies": [],
+      "unknown": [
+        {
+          "type": 110,
+          "cell": [
+            2,
+            6
+          ],
+          "moves": true
+        },
+        {
+          "type": 110,
+          "cell": [
+            3,
+            3
+          ],
+          "moves": true
+        },
+        {
+          "type": 110,
+          "cell": [
+            4,
+            7
+          ],
+          "moves": true
+        }
+      ],
+      "signs": [],
+      "objects": [],
+      "doors": [
+        {
+          "cell": [
+            4,
+            5
+          ],
+          "object": 226,
+          "verified": true
+        }
+      ],
+      "exits": {
+        "up": [
+          [
+            0,
+            0
+          ],
+          [
+            0,
+            1
+          ],
+          [
+            0,
+            2
+          ],
+          [
+            0,
+            3
+          ],
+          [
+            0,
+            4
+          ],
+          [
+            0,
+            5
+          ],
+          [
+            0,
+            6
+          ],
+          [
+            0,
+            7
+          ],
+          [
+            0,
+            8
+          ]
+        ],
+        "left": [
+          [
+            0,
+            0
+          ],
+          [
+            1,
+            0
+          ],
+          [
+            2,
+            0
+          ],
+          [
+            3,
+            0
+          ],
+          [
+            4,
+            0
+          ],
+          [
+            5,
+            0
+          ],
+          [
+            6,
+            0
+          ]
+        ]
+      }
+    },
+    "146-0": {
+      "place": [
+        146,
+        0
+      ],
+      "visits": 1,
+      "first_frame": 7297,
+      "last_frame": 7297,
+      "people": [
+        {
+          "type": 111,
+          "cell": [
+            6,
+            3
+          ],
+          "verified": true,
+          "status": "new"
+        }
+      ],
+      "enemies": [],
+      "unknown": [
+        {
+          "type": 110,
+          "cell": [
+            1,
+            1
+          ],
+          "moves": true
+        },
+        {
+          "type": 110,
+          "cell": [
+            1,
+            7
+          ],
+          "moves": true
+        },
+        {
+          "type": 110,
+          "cell": [
+            2,
+            3
+          ],
+          "moves": true
+        },
+        {
+          "type": 220,
+          "cell": [
+            4,
+            5
+          ],
+          "moves": null
+        }
+      ],
+      "signs": [
+        {
+          "cell": [
+            4,
+            5
+          ],
+          "object": 94,
+          "verified": false,
+          "status": "never"
+        }
+      ],
+      "objects": [],
+      "doors": [],
+      "exits": {
+        "up": [
+          [
+            0,
+            1
+          ]
+        ],
+        "down": [
+          [
+            7,
+            1
+          ],
+          [
+            7,
+            2
+          ],
+          [
+            7,
+            3
+          ],
+          [
+            7,
+            4
+          ],
+          [
+            7,
+            5
+          ],
+          [
+            7,
+            6
+          ],
+          [
+            7,
+            7
+          ],
+          [
+            7,
+            8
+          ],
+          [
+            7,
+            9
+          ]
+        ],
+        "right": [
+          [
+            1,
+            9
+          ],
+          [
+            2,
+            9
+          ],
+          [
+            3,
+            9
+          ],
+          [
+            4,
+            9
+          ],
+          [
+            5,
+            9
+          ],
+          [
+            6,
+            9
+          ],
+          [
+            7,
+            9
+          ]
+        ]
+      }
+    },
+    "161-0": {
+      "place": [
+        161,
+        0
+      ],
+      "visits": 4,
+      "first_frame": 7597,
+      "last_frame": 9889,
+      "people": [
+        {
+          "type": 111,
+          "cell": [
+            1,
+            7
+          ],
+          "verified": true,
+          "status": "new"
+        }
+      ],
+      "enemies": [],
+      "unknown": [
+        {
+          "type": 110,
+          "cell": [
+            2,
+            3
+          ],
+          "moves": true
+        },
+        {
+          "type": 110,
+          "cell": [
+            5,
+            8
+          ],
+          "moves": true
+        },
+        {
+          "type": 109,
+          "cell": [
+            5,
+            4
+          ],
+          "moves": true
+        }
+      ],
+      "signs": [],
+      "objects": [],
+      "doors": [
+        {
+          "cell": [
+            3,
+            3
+          ],
+          "object": 226,
+          "verified": true
+        },
+        {
+          "cell": [
+            3,
+            5
+          ],
+          "object": 226,
+          "verified": true
+        }
+      ],
+      "exits": {
+        "up": [
+          [
+            0,
+            4
+          ],
+          [
+            0,
+            5
+          ],
+          [
+            0,
+            6
+          ]
+        ],
+        "down": [
+          [
+            7,
+            1
+          ],
+          [
+            7,
+            2
+          ],
+          [
+            7,
+            3
+          ],
+          [
+            7,
+            4
+          ],
+          [
+            7,
+            5
+          ],
+          [
+            7,
+            6
+          ],
+          [
+            7,
+            7
+          ],
+          [
+            7,
+            8
+          ],
+          [
+            7,
+            9
+          ]
+        ],
+        "left": [
+          [
+            1,
+            0
+          ],
+          [
+            2,
+            0
+          ],
+          [
+            3,
+            0
+          ],
+          [
+            4,
+            0
+          ],
+          [
+            5,
+            0
+          ],
+          [
+            6,
+            0
+          ]
+        ],
+        "right": [
+          [
+            1,
+            9
+          ],
+          [
+            2,
+            9
+          ],
+          [
+            3,
+            9
+          ],
+          [
+            4,
+            9
+          ],
+          [
+            5,
+            9
+          ],
+          [
+            6,
+            9
+          ],
+          [
+            7,
+            9
+          ]
+        ]
+      }
+    },
+    "177-0": {
+      "place": [
+        177,
+        0
+      ],
+      "visits": 3,
+      "first_frame": 7871,
+      "last_frame": 9465,
+      "people": [
+        {
+          "type": 117,
+          "cell": [
+            5,
+            7
+          ],
+          "verified": false,
+          "status": "never"
+        }
+      ],
+      "enemies": [],
+      "unknown": [
+        {
+          "type": 108,
+          "cell": [
+            0,
+            3
+          ],
+          "moves": true
+        }
+      ],
+      "signs": [],
+      "objects": [],
+      "doors": [
+        {
+          "cell": [
+            5,
+            4
+          ],
+          "object": 226,
+          "verified": true
+        }
+      ],
+      "exits": {
+        "up": [
+          [
+            0,
+            1
+          ],
+          [
+            0,
+            2
+          ],
+          [
+            0,
+            3
+          ],
+          [
+            0,
+            4
+          ],
+          [
+            0,
+            5
+          ],
+          [
+            0,
+            6
+          ],
+          [
+            0,
+            7
+          ],
+          [
+            0,
+            8
+          ],
+          [
+            0,
+            9
+          ]
+        ],
+        "right": [
+          [
+            0,
+            9
+          ],
+          [
+            1,
+            9
+          ],
+          [
+            2,
+            9
+          ],
+          [
+            3,
+            9
+          ],
+          [
+            4,
+            9
+          ],
+          [
+            5,
+            9
+          ],
+          [
+            6,
+            9
+          ]
+        ]
+      }
+    },
+    "178-18": {
+      "place": [
+        178,
+        18
+      ],
+      "visits": 1,
+      "first_frame": 9815,
+      "last_frame": 9815,
+      "people": [],
+      "enemies": [],
+      "unknown": [
+        {
+          "type": 120,
+          "cell": [
+            4,
+            4
+          ],
+          "moves": null
+        },
+        {
+          "type": 61,
+          "cell": [
+            6,
+            6
+          ],
+          "moves": null
+        }
+      ],
+      "signs": [],
+      "objects": [],
+      "doors": [],
+      "exits": {}
+    },
+    "160-0": {
+      "place": [
+        160,
+        0
+      ],
+      "visits": 1,
+      "first_frame": 10176,
+      "last_frame": 10176,
+      "people": [],
+      "enemies": [],
+      "unknown": [
+        {
+          "type": 110,
+          "cell": [
+            1,
+            3
+          ],
+          "moves": true
+        },
+        {
+          "type": 110,
+          "cell": [
+            2,
+            6
+          ],
+          "moves": true
+        },
+        {
+          "type": 110,
+          "cell": [
+            5,
+            2
+          ],
+          "moves": true
+        },
+        {
+          "type": 45,
+          "cell": [
+            2,
+            4
+          ],
+          "moves": false
+        },
+        {
+          "type": 45,
+          "cell": [
+            2,
+            5
+          ],
+          "moves": false
+        },
+        {
+          "type": 45,
+          "cell": [
+            2,
+            6
+          ],
+          "moves": false
+        }
+      ],
+      "signs": [],
+      "objects": [],
+      "doors": [],
+      "exits": {
+        "up": [
+          [
+            0,
+            4
+          ],
+          [
+            0,
+            5
+          ],
+          [
+            0,
+            6
+          ],
+          [
+            0,
+            7
+          ]
+        ],
+        "down": [
+          [
+            7,
+            2
+          ],
+          [
+            7,
+            3
+          ],
+          [
+            7,
+            4
+          ],
+          [
+            7,
+            5
+          ],
+          [
+            7,
+            6
+          ],
+          [
+            7,
+            7
+          ],
+          [
+            7,
+            8
+          ]
+        ],
+        "right": [
+          [
+            1,
+            9
+          ],
+          [
+            2,
+            9
+          ],
+          [
+            3,
+            9
+          ],
+          [
+            4,
+            9
+          ],
+          [
+            5,
+            9
+          ],
+          [
+            6,
+            9
+          ]
+        ]
+      }
+    },
+    "176-0": {
+      "place": [
+        176,
+        0
+      ],
+      "visits": 1,
+      "first_frame": 10260,
+      "last_frame": 10260,
+      "people": [],
+      "enemies": [],
+      "unknown": [
+        {
+          "type": 113,
+          "cell": [
+            4,
+            4
+          ],
+          "moves": null
+        },
+        {
+          "type": 114,
+          "cell": [
+            4,
+            7
+          ],
+          "moves": null
+        },
+        {
+          "type": 110,
+          "cell": [
+            1,
+            5
+          ],
+          "moves": true
+        },
+        {
+          "type": 110,
+          "cell": [
+            1,
+            7
+          ],
+          "moves": true
+        },
+        {
+          "type": 113,
+          "cell": [
+            4,
+            7
+          ],
+          "moves": null
+        }
+      ],
+      "signs": [],
+      "objects": [],
+      "doors": [
+        {
+          "cell": [
+            2,
+            3
+          ],
+          "object": 226,
+          "verified": true
+        }
+      ],
+      "exits": {
+        "up": [
+          [
+            0,
+            2
+          ],
+          [
+            0,
+            3
+          ],
+          [
+            0,
+            4
+          ],
+          [
+            0,
+            5
+          ],
+          [
+            0,
+            6
+          ],
+          [
+            0,
+            7
+          ],
+          [
+            0,
+            8
+          ]
+        ],
+        "down": [
+          [
+            7,
+            4
+          ],
+          [
+            7,
+            5
+          ],
+          [
+            7,
+            6
+          ]
+        ]
+      }
+    }
+  }
+}

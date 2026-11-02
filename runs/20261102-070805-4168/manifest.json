@@ -1,0 +1,16 @@
+{
+  "flow_version": "flow-15",
+  "rom_sha256": "211a1d1559dc2684d63d87f62a6b1e9109201a6383b4004e9dd5e18ee926ee83",
+  "seed": 0,
+  "budget": {
+    "active_seconds": 1800.0,
+    "dollars": 1.0
+  },
+  "status": "stopped",
+  "parent": null,
+  "tag": "flow15-live",
+  "harness_sha": "d5ee995714b7d39ba2845dac745d555122a60fd4",
+  "prompts_sha": "2193c9d6bc04429f16638be23dd499eeffa4d860d84448b38b04ada91aa51de6",
+  "model": "sonnet",
+  "autopilot": true
+}
