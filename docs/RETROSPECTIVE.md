@@ -6,7 +6,7 @@
 - Architecture: good. 82 lib files, 10.3k lines, 72 test files (14.4k lines); only 4 files over 340 lines; one real god object, `lib/koholint/policies/delegated.rb` (764 lines, 44 methods) paired with `test/delegated_policy_test.rb` (1846 lines, ~170 s warm).
 - Test cost: weak. About 5 min full suite (`ROADMAP.md` last line); `Rakefile` already runs one process per file in parallel, so the cost is the ROM-booting tests (10 files) and the one giant file.
 - Determinism/replay: good by design (frame-only time, `verify` replays from boot); `verify` from boot does not scale (`ROADMAP.md` Viewer); fork copies a parent of an older flow into the current one with only an assumed-compatible prefix.
-- flow_version: good. `FLOW_VERSION = 'flow-16'` in `lib/koholint.rb`; 16 flows in 13 days is high churn but each is tagged in `docs/runs/index.md`.
+- flow_version: good. `FLOW_VERSION = 'flow-16'` in `lib/koholint.rb`; 16 flows since 2026-10-19 is high churn but each is tagged in `docs/runs/index.md`.
 - Data provenance: good. `data/addresses.json` 33 entries and `data/entities.json` 15 entries, none `verified` with count < 2; 9 addresses and 5 entities sit at count 1 (hypotheses).
 - Docs accuracy: mixed. `ARCHITECTURE.md` and README commands match `lib/koholint/cli.rb` (`ab-plan`, `ab-report`, `prune-heavy` exist); `ROADMAP.md` is 39 lines but about 60 percent is dense loose-end paragraphs (several 1,000+ characters), and item 1 still lists work as "next" with the goal line saying "shield is done".
 - Flakiness: moderate risk; tests depend on ROM and a shared `tmp/emulator_cache` (cold cache in a new worktree is the main cost).
@@ -29,8 +29,8 @@
 ## Do next
 1. Inventory in the context plus `item_gained` by inventory diff (RAM slots `item_a`/`item_b` are already read in `lib/koholint/perception.rb:25` but never reach the agent or the milestone): this is the single missing signal for the sword. Effort M.
 2. Enemy census and avoidance (`lib/koholint/probes/entity_census.rb`, `data/entities.json` has kind `enemy` never measured): sword needs a place Link can survive. Effort M.
-3. Add a goal-progress metric to `summary.json` (milestone, new items, hearts) and stop archiving runs whose milestone stays `shield`; 11 of the last 12 runs ended on `dollars` with no progress beyond shield. Effort S.
+3. Add a goal-progress metric to `summary.json` (milestone, new items, hearts) and stop archiving runs whose milestone stays `shield`; the last 10 runs all stay at `shield` and 7 ended on `dollars`. Effort S.
 4. Split `lib/koholint/policies/delegated.rb` (arrival/revisit/autopilot hooks vs. decision cycle) and `test/delegated_policy_test.rb`; target under 400 lines per file and a suite under 2 min. Effort L.
-5. Freeze new flows for the sword work: batch navigation fixes (explore/talk) into one flow bump per live run instead of one per defect (16 flows, 14 in 13 days). Effort S.
+5. Freeze new flows for the sword work: batch navigation fixes (explore/talk) into one flow bump per live run instead of one per defect (16 flows since 2026-10-19). Effort S.
 
-Questions for the owner: (1) Is the sword reachable by the current agent without combat, or should combat precede inventory? (2) Keep the unmerged branches `lot-b`/`arrival-fixes`, and is the June-era `docs/RETROSPECTIVE.md` to be deleted? (3) Is a 5 USD/week cap acceptable for runs that show no milestone gain?
+Questions for the owner: (1) Is the sword reachable by the current agent without combat, or should combat precede inventory? (2) Keep the unmerged branches `lot-b`/`arrival-fixes`, and is the September v1 `docs/RETROSPECTIVE.md` to be deleted? (3) Is a hard per-run cap below 1 USD acceptable for runs that show no milestone gain?
