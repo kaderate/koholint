@@ -59,7 +59,7 @@ class RevisitTest < Minitest::Test
   end
 
   def test_round_cap_per_npc_and_stamp
-    @revisit = Koholint::Revisit.new(talk_log: @log, visit_engagements: 10, visit_frames: 10_000)
+    @revisit = Koholint::Revisit.new(talk_log: @log, visit_frames: 10_000)
     rounds = (1..Koholint::Revisit::ROUND_CAP).map do |i|
       action = act(entities: [people.first], frame: 100 + i)
       say(62, "Text number #{%w[one two three four five six seven][i - 1]}.")
@@ -180,24 +180,39 @@ class RevisitTest < Minitest::Test
     assert_equal %w[no_dialogue unreachable], @revisit.notes.map { |note| note[:detail][:outcome] }
   end
 
-  def test_a_visit_engages_at_most_its_cap_then_waits_for_the_next_visit
+  def test_a_visit_engages_every_sign_and_person_without_a_round_cap_per_visit
     signs = [[1, 1], [1, 3], [1, 5], [1, 7], [1, 9]].map { |cell| sign(cell) }
-    cells = Array.new(Koholint::Revisit::VISIT_ENGAGEMENTS) do |i|
+    cells = Array.new(5) do |i|
       cell = act(entities: [], signs:, frame: 100 + i)[:params].values_at(:row, :col)
-      read_sign(cell, "Sign number #{%w[one two three four][i]}.")
+      read_sign(cell, "Sign number #{%w[one two three four five][i]}.")
       cell
     end
-    assert_equal 4, cells.uniq.size
+    assert_equal 5, cells.uniq.size
     assert_nil act(entities: [], signs:, frame: 110)
-    assert_equal 'visit_cap', @revisit.notes.last[:detail][:outcome]
-    @revisit.next_action(state: state(room_id: 162), entities: [], stamp: STAMP)
-    refute_nil act(entities: [], signs:, frame: 200)
   end
 
-  def test_a_visit_engages_for_at_most_its_frame_cap
+  def test_a_visit_engages_for_at_most_its_frame_cap_of_free_play
+    @revisit = Koholint::Revisit.new(talk_log: @log, visit_frames: 500)
     act(entities: [], signs: [sign([1, 1]), sign([1, 3])], frame: 100)
-    assert_nil act(entities: [], signs: [sign([1, 1]), sign([1, 3])], frame: 100 + Koholint::Revisit::VISIT_FRAMES)
-    assert_nil @revisit.candidate(state: state(frame: 100 + Koholint::Revisit::VISIT_FRAMES), entities: [], signs: [sign([1, 3])], stamp: STAMP)
+    assert_nil act(entities: [], signs: [sign([1, 1]), sign([1, 3])], frame: 600)
+    assert_nil @revisit.candidate(state: state(frame: 600), entities: [], signs: [sign([1, 3])], stamp: STAMP)
+    assert_equal 'visit_cap', @revisit.notes.last[:detail][:outcome]
+  end
+
+  def test_frames_spent_in_dialogue_or_locked_do_not_count_toward_the_caps
+    @revisit = Koholint::Revisit.new(talk_log: @log, visit_frames: 500)
+    act(frame: 100)
+    @revisit.observe(state(frame: 130, dialog_state: 3))
+    @revisit.observe(state(frame: 1500, motion_blocked: 2))
+    @revisit.observe(state(frame: 2400))
+    say(62, 'One.')
+    assert_equal 62, act(frame: 2400)[:npc][:type]
+    @revisit.observe(state(frame: 2430, dialog_state: 3))
+    @revisit.observe(state(frame: 4400))
+    say(62, 'Two.')
+    assert_equal 62, act(frame: 4420)[:npc][:type]
+    assert_nil act(frame: 4900)
+    assert_equal({ place: PLACE, round: 0, outcome: 'visit_cap', engagements: 3, frames: 560 }, @revisit.notes.last[:detail])
   end
 
   def test_unverified_signs_are_not_engaged

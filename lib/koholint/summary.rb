@@ -12,7 +12,7 @@ module Koholint
     TERMINAL = %w[achieved abandoned failed].freeze
     DETERMINISTIC_AGENTS = %w[start_game walk_and_talk].freeze
     FILE = 'summary.json'.freeze
-    VERSION = 4
+    VERSION = 5
     LEAD_TIERS = %w[high normal low tip].freeze
     MANIFEST_KEYS = %w[flow_version tag harness_sha prompts_sha model autopilot].freeze
 
@@ -50,6 +50,7 @@ module Koholint
       calls = events.select { |e| model_call?(e) }
       latencies = latencies(events)
       objectives = events.select { |e| e['type'] == 'objective' }
+      unexhausted = unexhausted_departures(events)
       {
         v: VERSION, run_id: File.basename(dir), **MANIFEST_KEYS.to_h { |key| [key.to_sym, manifest[key]] },
         frames:, dollars: base[:cost_usd].round(6), calls: calls.size,
@@ -58,10 +59,33 @@ module Koholint
         highest_milestone: base[:highest_milestone], places_seen: visited_places(events).size,
         objectives: { count: objectives.map { |e| e['id'] }.uniq.size, achieved: objectives.select { |e| e['status'] == 'achieved' }.map { |e| e['id'] }.uniq.size },
         stop_reason: events.reverse_each.find { |e| e['type'] == 'stop' }&.fetch('reason'),
-        symptoms: [], starred: File.exist?(File.join(dir, 'star.json')),
+        symptoms: symptoms(unexhausted), starred: File.exist?(File.join(dir, 'star.json')),
         cost_by_skill: cost_by_skill(calls), decisions_by_agent: events.select { |e| e['type'] == 'decision' }.map { |e| e['agent'] }.tally,
-        usage: usage(events)
+        usage: usage(events).merge(left_with_unexhausted_people: unexhausted.size)
       }
+    end
+
+    def symptoms(unexhausted)
+      return [] if unexhausted.empty?
+
+      [{ kind: 'left_with_unexhausted_people', count: unexhausted.size, evidence: unexhausted }]
+    end
+
+    def unexhausted_departures(events)
+      require 'koholint/talk_log'
+      people = {}
+      place = nil
+      events.each_with_index.filter_map do |event, index|
+        people[event['place']] = Array(event['people']).reject { |person| person['verified'] == false }.map { |person| person['type'] }.uniq if event['type'] == 'place_card'
+        now = perceived_place(event) or next
+        left = place
+        place = now
+        next if left.nil? || left == now || people.fetch(left, []).empty?
+
+        log = TalkLog.from_events(events.first(index))
+        waiting = people[left].reject { |type| log.last_status(place: left, entity: type) == :exhausted }
+        { frame: event['frame'], place: left, people: waiting } unless waiting.empty?
+      end
     end
 
     def cost_by_skill(calls)

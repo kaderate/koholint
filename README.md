@@ -76,7 +76,7 @@ place, so the grid went dark). The live view has a grid toggle that overlays the
 visited places from the trace; `fork` branches a run at a frame (the parent may be of an older flow; `--tag`, `--autopilot` and `--root` set the child's). Both work on an archived run, also on a fresh clone
 (see Run storage).
 
-## Agent skills (`flow-17`)
+## Agent skills (`flow-19`)
 
 - Between decisions the engine waits, with no input, until Link is ready (no screen scroll, door walk, jump or
   knockback, then 2 settled frames): the screen is never mapped and the model never called mid-scroll or mid-jump
@@ -103,10 +103,11 @@ visited places from the trace; `fork` branches a run at a frame (the parent may 
   dropped. Both are trace events (`goal`, `lead`), shown in the context and the live view and written to `world.json`;
   an objective can cite the lead behind it (`because`). A lead may carry `where` (a place id such as `161-0` or a name the agent gave).
 - At `choose_objective` the context lists candidate objectives with ids (`candidates.rb`): untried exits by side (`exit-up`) and doors
-  (`door-R-C`) of this place, people (`person-tT`) and unread signs (`sign-R-C`) here worth a visit, known places with untried exits
+  (`door-R-C`) of this place, people (`person-tT`, listed first) and unread signs (`sign-R-C`) here worth a visit, known places with untried exits
   (`place-R-M`), people and unread signs of other known places (from their place cards) and places tied to a lead by its `where`
   (`lead-N`), nearest first by moves over exits explore took. The agent answers with `candidate` (or still a free title and predicate);
-  the objective event carries `candidate` and its `target`, which the autopilot follows.
+  the objective event carries `candidate` and its `target`, which the autopilot follows. While a person here is not
+  exhausted, every candidate that leaves the place says `leaves unexhausted people here: ...`.
 - The agent may name the current place (`place_name`, any call): a `place_name` trace event, shown in the context header,
   `world.json` `places` (`name`) and the viewer's map.
 - Screens are modes of the catalogue `data/modes.json`: the context names the open screen, how to leave it, its inputs,
@@ -129,8 +130,9 @@ visited places from the trace; `fork` branches a run at a frame (the parent may 
   model call to decide it): when a verified `npc` of the current place is not exhausted for the current world stamp
   (milestone, places visited) or a verified sign was never read, the policy issues `talk_to` itself (agent `delegated`,
   cost 0), lets the pages advance, and repeats until two conversations in a row are identical (a sign is read once), at
-  most 4 engagements and 900 frames per visit, 6 rounds per person, 2 per sign, 1800 frames per stamp, 3 stamps per
-  visit, or 2 failed talks per visit; never when hurt, hemmed, or near a hostile or moving unknown entity; each round is
+  most 6 rounds per person, 2 per sign, 1800 frames of free play per stamp and 2700 per visit (frames spent in
+  dialogue pages or locked are not counted, so long dialogues never cut it short), 3 stamps per visit, or 2 failed
+  talks per visit; while one is due it replaces any choice, so no exit (model, autopilot, harness objective) happens first; never when hurt, hemmed, or near a hostile or moving unknown entity; each round is
   a `notable` `revisit` event (`{npc|sign, round, outcome}`). Each new place also gets a `place_card` (people, enemies,
   signs, objects, exits) kept in `world.json` `places`. A conversation is identified by a signature of its pages' text pixels; a conversation
   already read is not sent to the model again (its stored text is reused, `dialogue` events with `cached: true`).
@@ -226,7 +228,7 @@ Every finished run is kept in git as a light bundle under `runs/<id>/` (about 60
 `harness_sha`, `prompts_sha`, `model`), `inputs.log`, `trace.jsonl.gz`, `world.json`, `suggestions.md`, `summary.json`
 (written by the engine at every stop), `star.json` when starred and `notes.md` when the owner wrote notes in the viewer, and `screens/<room>-<map>.png` (one 160x144 screenshot per place, about 3-8 KB each, taken by the engine 20 frames after the place became playable and ready). `bin/koholint screens <run_dir>` writes the missing ones for an older run by replaying its journal from boot (about one minute per 6000 frames; idempotent). `prune-heavy` keeps `screens/`. `summary.json` (`v: 3`) also holds `cost_by_skill`
 (model calls and dollars per skill), `decisions_by_agent` (free decisions included) and `usage` (goal changes, leads
-by importance, rejected leads, objectives by kind, `because` uses, talks, talks to a known target, dialogues, `not_ready_frames` waited by the readiness gate, `not_ready_waits` longer than 5 frames, `autopilot_decisions` and `chain_max`, the longest run of consecutive autopilot decisions); `v: 4` adds `autopilot` from the manifest. `prompts/`, `keyframes/`, `save/`, `video/`,
+by importance, rejected leads, objectives by kind, `because` uses, talks, talks to a known target, dialogues, `not_ready_frames` waited by the readiness gate, `not_ready_waits` longer than 5 frames, `autopilot_decisions` and `chain_max`, the longest run of consecutive autopilot decisions); `v: 4` adds `autopilot` from the manifest; `v: 5` adds `usage.left_with_unexhausted_people` (place changes away from a place whose place card listed a verified person whose last talk verdict was not `exhausted`) and the matching `symptoms` entry with its evidence (`frame`, `place`, `people`). `prompts/`, `keyframes/`, `save/`, `video/`,
 `activity.json`, `run.lock` and the plain `trace.jsonl` are gitignored: saves and keyframes are derivable by replay.
 
 | Command | Effect |

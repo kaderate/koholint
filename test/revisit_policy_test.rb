@@ -87,6 +87,43 @@ class RevisitPolicyTest < Minitest::Test
     assert_includes @client.calls.last[:prompt], '- at (4,7): entity type 63 (npc, name Tarkin): talked to 2 times (dialogue opened 2)'
   end
 
+  MARINE = { slot: 0, type: 62, x: 88, y: 64, cell: [3, 5], kind: :npc, verified: true, moves: false }.freeze
+
+  def long_conversation(policy, page, from:)
+    [0, 400, 800].each do |offset|
+      at = state(frame: from + offset, **OPEN)
+      result = step(policy, at, page)
+      assert_equal 'advance_dialogue', result[:choice][:skill]
+      policy.after_action(choice: result[:choice], outcome: { stopped_by: 'done' }, state: at, frame: at.frame + 30)
+    end
+    waited = step(policy, state(frame: from + 870), page)
+    assert_equal 'wait', waited[:choice][:skill]
+    policy.after_action(choice: waited[:choice], outcome: { stopped_by: 'done' }, state: state(frame: from + 880), frame: from + 880)
+    step(policy, state(frame: from + 880), page)
+  end
+
+  def test_long_dialogues_never_let_link_leave_before_every_person_is_exhausted
+    leave = ok('skill' => 'explore', 'params' => { 'direction' => 'down' }, 'transcription' => 'Words.')
+    p = setup_revisit(skill: Array.new(8) { leave }, entities: [MARINE, TARKIN])
+    talks = []
+    step(p, state)
+    result = step(p, state)
+    frame = 100
+    5.times do
+      assert_equal 'talk_to', result[:choice][:skill], result[:justification]
+      who = result[:choice][:params] == { row: 3, col: 5 } ? 62 : 63
+      talks << who
+      p.after_action(choice: result[:choice], outcome: { stopped_by: 'done', talked: true, entity: { type: who, slot: who - 62, kind: 'npc' } },
+                     state: state(frame: frame + 20), frame: frame + 20)
+      result = long_conversation(p, text_page(who == 62 ? 40 : 60), from: frame + 30)
+      frame += 1000
+      break if result[:choice][:skill] != 'talk_to'
+    end
+    assert_equal [62, 62, 63, 63], talks
+    assert_equal 'explore', result[:choice][:skill]
+    assert_equal %i[exhausted exhausted], [62, 63].map { |type| @talk_log.last_status(place: [163, 16], entity: type) }
+  end
+
   def test_no_revisit_without_an_npc_entity_or_while_a_dialogue_is_open
     p = setup_revisit(skill: [walk, walk], entities: [TARKIN.merge(kind: :unknown)])
     step(p, state)

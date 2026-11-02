@@ -129,9 +129,10 @@ objects that hold no entity as a fallback, and the signs with their reading stat
 current place that are not exhausted for the current stamp, and the `verified` `sign` room objects not read yet (a sign
 is read once: a text remembered on its cell with no entity; `TalkLog#sign_status` is `never`, `tried` or `read`), it
 gives the next `talk_to` (nearest target first, the same target until done, each person of a type shared by several
-tried once per stamp), with caps of 4 engagements and 900 frames per visit of the place (`VISIT_ENGAGEMENTS`,
-`VISIT_FRAMES`, then one `visit_cap` note), 6 rounds per person and stamp, 2 rounds per sign, 1800 frames per stamp, 3
-stamps per visit and 2 failed talks per target and visit (then unreachable); it never acts outside free play, with
+tried once per stamp), with caps counted in rounds and in frames of free play only (`Revisit#observe`, fed by the policy
+at every iteration, adds the frames since the last state when that state was `playing`; dialogue pages and locked
+scenes do not count): 2700 frames per visit of the place (`VISIT_FRAMES`, then one `visit_cap` note), 6 rounds per
+person and stamp, 2 rounds per sign, 1800 frames per stamp, 3 stamps per visit and 2 failed talks per target and visit (then unreachable); it never acts outside free play, with
 health below the maximum minus one heart, within 300 frames of a hit, while hemmed, or with an `enemy` or a moving or
 unmeasured `unknown` entity within 3 cells. Its talks are journaled like any decision (agent `delegated`, cost 0), are
 not objective attempts and are hidden from the explore autopilot. It records one `notable` `revisit`
@@ -174,8 +175,9 @@ with `unknown_mode_stuck` after 600 consecutive frames on an uncatalogued screen
 frames waited for readiness. `choose_option` refuses (`refused`) the
 catalogue options flagged `quits` (save and quit to the title), and the context lists only the other options.
 
-**Candidates** — `candidates.rb` builds the `choose_objective` menu: untried exits by side and untried doors of the place, people
-(`npc`, status never/new/changed) and unread signs here, known places with untried exits, people (never/new) and unread signs of
+**Candidates** — `candidates.rb` builds the `choose_objective` menu: people here first (`npc`, status never/new/changed/repeat),
+unread signs here, untried exits by side and untried doors of the place (every candidate that leaves the place is labelled
+`leaves unexhausted people here` while such a person is listed), known places with untried exits, people (never/new) and unread signs of
 other places from their last place card (`PlaceCard.latest`, kept current by the policy), and places a lead's `where` resolves to (a
 place id or a place name); remote ones are nearest first by `ExploreLog#hops`, 4 per kind. Each candidate carries an id, a label, a
 title, a predicate and a `target` (`exit`, `door`, `person`, `sign`, `place`, `lead`); an unknown id is a refusal. Place names (`place_name`
@@ -202,7 +204,8 @@ sha, model, `autopilot` for agent runs; `resume` keeps it), `inputs.log`, `trace
 observability only, no trace event, the set of captured places is rebuilt from the directory; `screens <run_dir>` backfills older runs by replay),
 `world.json` (`{ goal, leads, places }`, rewritten from the trace at every stop), `summary.json` (written at every stop by
 `summary.rb` from the trace only, versioned by `Summary::VERSION`: totals, cost by skill, decisions by agent and
-feature usage, with `autopilot_decisions` and `chain_max`; `archive` rewrites an outdated one), `star.json`, `notes.md` (owner notes from the viewer). Trace events (`dialogue` may carry `speaker`, `conversation` and `cached`; a `talk_to` result may carry `entity`; a `perception` may carry `not_ready_frames`; a `decision` may carry `autopilot`): `perception`, `decision`, `action`, `objective`, `dialogue`, `lead`, `goal`,
+feature usage, with `autopilot_decisions` and `chain_max`, and `symptoms`: `left_with_unexhausted_people`, place changes
+away from a place whose last place card listed a verified person whose `TalkLog#last_status` was not `exhausted`; `archive` rewrites an outdated one), `star.json`, `notes.md` (owner notes from the viewer). Trace events (`dialogue` may carry `speaker`, `conversation` and `cached`; a `talk_to` result may carry `entity`; a `perception` may carry `not_ready_frames`; a `decision` may carry `autopilot`): `perception`, `decision`, `action`, `objective`, `dialogue`, `lead`, `goal`,
 `notable`, `place_card`, `place_name`, `item_gained`, `screen`, `screen_changed`, `affordance`, `grid_contradiction`, `keyframe`, `save`, `budget_stop`, `stop`. `budget.rb` enforces frames,
 minutes, dollars and objective steps. `archive.rb` keeps a light bundle per run in git (trace gzipped, `screens/` included);
 heavy artifacts stay local. A run resumes only with the same `flow_version` and ROM hash; a change to the
