@@ -29,8 +29,9 @@ deterministic, so *ROM + journal* is the whole run. Time is the frame; wall cloc
 pacing (`pacer.rb`) and observability.
 
 **Perception** — `perception.rb`, `addresses.rb`, `game_state.rb`, `data/addresses.json`: a typed `GameState`
-(position, room/map, HP, phase such as dialogue or locked, milestone, inventory cursor, menu option, A/B items) read from RAM. Every address carries
+(position, room/map, HP, phase such as dialogue or locked, milestone, inventory cursor, menu option, A/B items, the 10 inventory slots, `shield_raised`) read from RAM. Every address carries
 provenance and a `verified_count`; `verified` needs two independent checks. No RAM writes to gameplay state.
+`items.rb` and `data/items.json` name item ids (with provenance; unmeasured names are shown with a `?`); the milestone is the best of `shield_level` and the `milestone` of the items held (`none`, `shield`, `sword`). The engine runs an `ItemWatch` on every frame and emits `item_gained` (`item`, `name`, `place`, `held`) the first time an item id appears among the held items after the first play frame (once per id per run, rebuilt from the trace on resume).
 `GameState` also carries the readiness signals (`room_transition`, `link_airborne`, `link_z`, `link_knockback`,
 measured by `probes/readiness_census.rb`, `bin/koholint census ready <run_dir>`). `entities.rb` reads the game's entity table (16 slots: status, type, x, y, state) into `{ slot, type, x, y, status, state,
 cell, kind }` for the active slots; the kind per type id (`npc`, `enemy`, `object`, `unknown`) comes from
@@ -94,7 +95,7 @@ model. Unknown cells are unknown, not walls.
 with the fewest turns over known cells), `skills/` (`walk`, `goto`, `step`, `talk_to`, `explore`, `press`,
 `advance_dialogue`, `wait`, and the screen skills of `skills/screens.rb`: `open_menu`, `close_menu`, `menu_move`,
 `menu_assign`, `open_map`, `close_map`, `choose_option`, which check the current mode from the catalogue, stop with
-`wrong_mode` elsewhere and repeat a press the game ignored) behind `skills/registry.rb`. `explore` chains goto legs by itself: it walks to the
+`wrong_mode` elsewhere and repeat a press the game ignored; and `skills/use_item.rb`: `use_item` and `guard`, which put the item on a button through those menu skills when it is on none, wait the 16 frames the game ignores A and B after the menu, then hold the button and report `raised_frames` from `shield_raised`; `refused` for an item not held) behind `skills/registry.rb`. `explore` chains goto legs by itself: it walks to the
 nearest untried border exit (a side never left from this place) or untried door (it walks up from the cell below and waits,
 with no input, through the walk-in and the loading); when the place has none, to the exit or door that leads, over the
 places and exits it has taken (`explore_log.rb` route: breadth-first, the destination of each exit taken is recorded), to
@@ -202,7 +203,7 @@ observability only, no trace event, the set of captured places is rebuilt from t
 `world.json` (`{ goal, leads, places }`, rewritten from the trace at every stop), `summary.json` (written at every stop by
 `summary.rb` from the trace only, versioned by `Summary::VERSION`: totals, cost by skill, decisions by agent and
 feature usage, with `autopilot_decisions` and `chain_max`; `archive` rewrites an outdated one), `star.json`, `notes.md` (owner notes from the viewer). Trace events (`dialogue` may carry `speaker`, `conversation` and `cached`; a `talk_to` result may carry `entity`; a `perception` may carry `not_ready_frames`; a `decision` may carry `autopilot`): `perception`, `decision`, `action`, `objective`, `dialogue`, `lead`, `goal`,
-`notable`, `place_card`, `place_name`, `screen`, `screen_changed`, `affordance`, `grid_contradiction`, `keyframe`, `save`, `budget_stop`, `stop`. `budget.rb` enforces frames,
+`notable`, `place_card`, `place_name`, `item_gained`, `screen`, `screen_changed`, `affordance`, `grid_contradiction`, `keyframe`, `save`, `budget_stop`, `stop`. `budget.rb` enforces frames,
 minutes, dollars and objective steps. `archive.rb` keeps a light bundle per run in git (trace gzipped, `screens/` included);
 heavy artifacts stay local. A run resumes only with the same `flow_version` and ROM hash; a change to the
 play flow means a new `flow_version`.

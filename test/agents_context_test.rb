@@ -85,7 +85,7 @@ class AgentsContextTest < Minitest::Test
     refute_includes build(triggers:), 'opened by itself'
     triggers.record(place: [163, 16], cell: link, skill: 'goto')
     text = build(triggers:)
-    assert_includes text, "Health: 3 of 3 hearts\nA dialogue opened by itself 2 times while Link was on this cell (the game triggers it; repeating the same action here does not change that).\n\nGrid"
+    assert_includes text, "Health: 3 of 3 hearts\nItems (a ? marks a name not yet measured): A empty, B empty; inventory slots: all empty\nA dialogue opened by itself 2 times while Link was on this cell (the game triggers it; repeating the same action here does not change that).\n\nGrid"
     other = Koholint::Triggers.new
     2.times { other.record(place: [163, 16], cell: [0, 0], skill: 'walk') }
     refute_includes build(triggers: other), 'opened by itself'
@@ -176,6 +176,7 @@ class AgentsContextTest < Minitest::Test
       Link: row 3, col 4 (pixel x=68, y=60), facing up
       Link offset from cell centre (positive = right of / below the centre): dx=-4, dy=-4
       Health: 3 of 3 hearts
+      Items (a ? marks a name not yet measured): A empty, B empty; inventory slots: all empty
 
       Grid (rows 0-7 top to bottom, cols 0-9 left to right):
           0 1 2 3 4 5 6 7 8 9

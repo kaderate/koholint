@@ -25,7 +25,8 @@ module Koholint
       lead: %i[id place source quote claim importance],
       goal: %i[text],
       place_card: %i[place people enemies signs objects exits],
-      place_name: %i[place name]
+      place_name: %i[place name],
+      item_gained: %i[item name place held]
     }.freeze
     SPEAKER_MAX = 40
     ALLOWED = { dialogue: { source: %w[agent] }, lead: { importance: %w[high normal low tip] } }.freeze
