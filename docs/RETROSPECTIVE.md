@@ -10,10 +10,10 @@
 - Data provenance: good. `data/addresses.json` 33 entries and `data/entities.json` 15 entries, none `verified` with count < 2; 9 addresses and 5 entities sit at count 1 (hypotheses).
 - Docs accuracy: mixed. `ARCHITECTURE.md` and README commands match `lib/koholint/cli.rb` (`ab-plan`, `ab-report`, `prune-heavy` exist); `ROADMAP.md` is 39 lines but about 60 percent is dense loose-end paragraphs (several 1,000+ characters), and item 1 still lists work as "next" with the goal line saying "shield is done".
 - Flakiness: moderate risk; tests depend on ROM and a shared `tmp/emulator_cache` (cold cache in a new worktree is the main cost).
-- Repo hygiene: fixed 2026-11-02 (was 12 worktrees and 10 non-main branches, 7 merged); now 5 worktrees, one unmerged branch (`jev-spike`).
+- Repo hygiene: fixed 2026-11-02 (was 12 worktrees and 10 non-main branches, 7 merged); now 4 worktrees, no unmerged branch.
 
 ## Delete / Prune now
-Done 2026-11-02: merged worktrees and branches removed (`arrival`, `fixes`, `lotb`, `retro`, `tl`, `tn`, `ts`; branches `arrival-protocol`, `arrival-fixes`, `lot-b`, `retrospective`, `agent-loop-t*`, `feat/autonomous-recovery`); the September v1 content of this file replaced (git keeps it). Kept: `agent-loop` (holds the `.env` copied into new worktrees), `jev-spike` (4 unique commits, result already in `docs/runs/2026-10-jev-spike.md`: decide merge or drop), `inventory-shield` and `talk-reliability` (agents at work).
+Done 2026-11-02: branch `jev-spike` dropped by owner decision (result kept in `docs/runs/2026-10-jev-spike.md`); merged worktrees and branches removed (`arrival`, `fixes`, `lotb`, `retro`, `tl`, `tn`, `ts`; branches `arrival-protocol`, `arrival-fixes`, `lot-b`, `retrospective`, `agent-loop-t*`, `feat/autonomous-recovery`); the September v1 content of this file replaced (git keeps it). Kept: `agent-loop` (holds the `.env` copied into new worktrees), `inventory-shield` and `talk-reliability` (agents at work).
 1. Archive finished plans `docs/superpowers/plans/2026-10-16-*.md`, `2026-10-18-*.md`, `2026-10-19-*.md` (5 plans, 697 lines, all landed per ARCHITECTURE) and keep only the 3 specs; plans carry paths that rot. Effort S.
 2. Collapse the ROADMAP "Open decisions and loose ends" wall (about 20 bullets of measured history, e.g. talk_to, Explore, Readiness) into `docs/runs/` notes or `data/` and keep one line per open item. Why: AGENTS.md says "only what is left"; most of it is a changelog. Planned right after `inventory-shield` and `talk-reliability` merge (they edit ROADMAP too). Effort M.
 
@@ -31,4 +31,4 @@ Done 2026-11-02: merged worktrees and branches removed (`arrival`, `fixes`, `lot
 4. Split `lib/koholint/policies/delegated.rb` (arrival/revisit/autopilot hooks vs. decision cycle) and `test/delegated_policy_test.rb`; target under 400 lines per file and a suite under 2 min. Effort L.
 5. Freeze new flows for the sword work: batch navigation fixes (explore/talk) into one flow bump per live run instead of one per defect (16 flows since 2026-10-19). Effort S.
 
-Questions for the owner: (1) Is the sword reachable by the current agent without combat, or should combat precede inventory? (2) Merge or drop `jev-spike`? (3) Is a hard per-run cap below 1 USD acceptable for runs that show no milestone gain?
+Owner answers (2026-11-02): (1) the sword is reachable without combat, enemies can be dodged, so inventory then enemy avoidance, no combat before; (2) Jev abandoned, the spike note stays in `docs/runs/2026-10-jev-spike.md`; (3) a per-run cap below 1 USD is accepted if it proves useful: evaluate it with the goal-progress metric (Do next 3) before enforcing it.
