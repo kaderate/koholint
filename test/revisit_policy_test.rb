@@ -157,6 +157,7 @@ class RevisitPolicyTest < Minitest::Test
     def acted(skill:, outcome:) = @calls << [skill, outcome]
     def model_called(**) = nil
     def next_choice(**) = nil
+    def objective_hold(**) = 'spy'
   end
 
   def test_an_unread_sign_is_engaged_before_the_model_and_hidden_from_the_autopilot

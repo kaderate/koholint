@@ -81,7 +81,7 @@ screen change 53-66, a knockback 15-16, a door 62 (walk in, loading, walk out).
 table and the room objects and emits a `place_card` event: people (`npc` entities, verified or not), enemies, unknown
 entities, signs, objects (`object` entities and room objects) with their cells, doors (room objects of kind `door`), and exits
 (border cells believed walkable, by side). `world.json` `places` keeps per place the last card, the visits, the first and last card frames, the
-names and talk status of the people and whether each sign was read (from the talk log rebuilt from the trace). The
+place name the agent gave (`name`), the names and talk status of the people and whether each sign was read (from the talk log rebuilt from the trace). The
 agent's context lists the doors of the screen with the cell to walk up from.
 
 **Vision** (`vision/`) — what RAM does not give: `screen_vision` and `screen_snapshot` read the screen,
@@ -149,11 +149,16 @@ the first decision of a visit or a run engages too) and the reuse of conversatio
 as sheets, its stored text is emitted again with `cached: true`; when a revisit is due it replaces the model's skill choice,
 also right after a sheet reading; and the explore autopilot, `autopilot.rb`: after an `explore` that stopped with
 `new_place`, `known_place` (not counted in the 6-explore chain; a third return to the same place goes back to the
-model) or `budget`, the policy issues the next `explore` with no direction itself (agent `delegated`, cost 0,
+model), `budget` or `untried_object`, the policy issues the next `explore` with no direction itself (agent `delegated`, cost 0,
 `decision` event with `autopilot: true`), after the revisit, the hemmed wait and pending dialogue pages; the model is called again
-on any other stop (`untried_object` included) or action, a new lead or goal from the last call, a phase other than `playing`, health lower than at the
-last call, an objective that changed or whose kind is not `new_place`, `leave_place` or `new_text`, and after 6 autopilot
-explores or 2400 frames since the last call. Autopilot explores are objective attempts like any other (loop and stall
+on any other stop or action, a new lead or goal from the last call, a phase other than `playing`, health lower than at the
+last call, an objective that changed or whose kind is not `new_place`, `leave_place` or `new_text` (unless it has a target), and after 6 autopilot
+explores or 2400 frames since the last call. An objective with a `target` (picked from the candidate menu) is followed from the first
+skill decision after the model's call: `explore` with the exit's direction, or with an `aim` in the skill context (a door to enter first,
+a place to route to through `ExploreLog#route(goal:)`), or one `talk_to` of a person or sign of the current place; a new goal
+from that call does not hold it. When a chain stopped `new_place` or `known_place` and achieved the model's objective, the next
+`choose_objective` is answered by the policy (`new_place`, `autopilot: true` on the objective) while the place or a routed place has
+untried exits and the caps allow it. Results of autopilot decisions are marked `(autopilot)` in the context's results and attempts. Autopilot explores are objective attempts like any other (loop and stall
 abandonment still apply) and leave the engine's consecutive failure and refusal counters untouched; `--autopilot off`
 (manifest `autopilot`) disables it),
 `policies/walk_and_talk.rb` and `start_game.rb` (deterministic baselines and the intro), `with_fallback.rb`
@@ -168,10 +173,17 @@ with `unknown_mode_stuck` after 600 consecutive frames on an uncatalogued screen
 frames waited for readiness. `choose_option` refuses (`refused`) the
 catalogue options flagged `quits` (save and quit to the title), and the context lists only the other options.
 
+**Candidates** — `candidates.rb` builds the `choose_objective` menu: untried exits by side and untried doors of the place, people
+(`npc`, status never/new/changed) and unread signs here, known places with untried exits, people (never/new) and unread signs of
+other places from their last place card (`PlaceCard.latest`, kept current by the policy), and places a lead's `where` resolves to (a
+place id or a place name); remote ones are nearest first by `ExploreLog#hops`, 4 per kind. Each candidate carries an id, a label, a
+title, a predicate and a `target` (`exit`, `door`, `person`, `sign`, `place`, `lead`); an unknown id is a refusal. Place names (`place_name`
+events) live in `leads.rb` with the leads and resolve `where`.
+
 **Objectives** — `objectives.rb`: a short goal with a predicate the harness checks from memory
 (`leave_place`, `reach_place`, `reach_cell`, `dialogue_closed`, `new_place`, `new_text`: a text not read before in
 the run, compared whitespace-insensitively on the stitched text, the read texts rebuilt from `dialogue` events on resume); the engine emits started and
-achieved/abandoned/failed events; a `started` event may carry `because`, the id of the lead that motivated it. The
+achieved/abandoned/failed events; a `started` event may carry `because`, the id of the lead that motivated it, `candidate` and `target`, and `autopilot`. The
 long-term direction is the agent's own `goal` (a short text it restates or revises at every objective; the context shows
 when it was set). `leads.rb` holds the leads: claims the
 agent extracts from texts it read (dialogue, signs, objects), each with a verbatim `quote`, a `claim` and an importance
@@ -190,7 +202,7 @@ observability only, no trace event, the set of captured places is rebuilt from t
 `world.json` (`{ goal, leads, places }`, rewritten from the trace at every stop), `summary.json` (written at every stop by
 `summary.rb` from the trace only, versioned by `Summary::VERSION`: totals, cost by skill, decisions by agent and
 feature usage, with `autopilot_decisions` and `chain_max`; `archive` rewrites an outdated one), `star.json`, `notes.md` (owner notes from the viewer). Trace events (`dialogue` may carry `speaker`, `conversation` and `cached`; a `talk_to` result may carry `entity`; a `perception` may carry `not_ready_frames`; a `decision` may carry `autopilot`): `perception`, `decision`, `action`, `objective`, `dialogue`, `lead`, `goal`,
-`notable`, `place_card`, `screen`, `screen_changed`, `affordance`, `grid_contradiction`, `keyframe`, `save`, `budget_stop`, `stop`. `budget.rb` enforces frames,
+`notable`, `place_card`, `place_name`, `screen`, `screen_changed`, `affordance`, `grid_contradiction`, `keyframe`, `save`, `budget_stop`, `stop`. `budget.rb` enforces frames,
 minutes, dollars and objective steps. `archive.rb` keeps a light bundle per run in git (trace gzipped, `screens/` included);
 heavy artifacts stay local. A run resumes only with the same `flow_version` and ROM hash; a change to the
 play flow means a new `flow_version`.

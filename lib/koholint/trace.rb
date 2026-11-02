@@ -24,16 +24,21 @@ module Koholint
       dialogue: %i[place text source page],
       lead: %i[id place source quote claim importance],
       goal: %i[text],
-      place_card: %i[place people enemies signs objects exits]
+      place_card: %i[place people enemies signs objects exits],
+      place_name: %i[place name]
     }.freeze
     SPEAKER_MAX = 40
     ALLOWED = { dialogue: { source: %w[agent] }, lead: { importance: %w[high normal low tip] } }.freeze
+    LABEL = ->(max) { ->(v) { v.is_a?(String) && v.length.between?(1, max) && !v.match?(/[[:cntrl:]]/) } }
     OPTIONAL = { perception: { not_ready_frames: ->(v) { v.is_a?(Integer) && v.positive? } },
                  decision: { prompt_sha: ->(v) { v.is_a?(String) && v.match?(/\A\h{64}\z/) }, image: ->(v) { [true, false].include?(v) },
                               plan: ->(v) { v.is_a?(String) && v.length <= 200 && !v.match?(/[[:cntrl:]]/) }, autopilot: ->(v) { v == true } },
                  dialogue: { speaker: ->(v) { v.is_a?(String) && v.length.between?(1, SPEAKER_MAX) && !v.match?(/[[:cntrl:]]/) },
                              conversation: ->(v) { v.is_a?(String) && v.match?(/\A\h{16}\z/) }, cached: ->(v) { [true, false].include?(v) } },
-                 objective: { because: ->(v) { v.is_a?(String) && v.match?(/\Alead-\d+\z/) },
+                 lead: { where: LABEL.(40) },
+                 place_name: { name: LABEL.(40), place: ->(v) { v.is_a?(Array) && v.size == 2 && v.all?(Integer) } },
+                 objective: { because: ->(v) { v.is_a?(String) && v.match?(/\Alead-\d+\z/) }, autopilot: ->(v) { v == true },
+                              candidate: LABEL.(40), target: ->(v) { v.is_a?(Hash) && %w[exit door person sign place lead].include?((v[:kind] || v['kind']).to_s) },
                               predicate: ->(v) { (kind = v.is_a?(Hash) && (v[:kind] || v['kind'])) ? Objectives::PREDICATES.key?(kind.to_s) : true } } }.freeze
 
     def self.read(path)

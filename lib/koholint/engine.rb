@@ -191,6 +191,7 @@ module Koholint
       rejected = result[:leads_rejected].to_i
       @run.trace.emit(:notable, frame: state.frame, kind: 'lead_rejected', detail: "#{rejected} leads whose quote is not in the transcription") if rejected.positive?
       @run.trace.emit(:goal, frame: state.frame, text: result[:goal]) if result[:goal]
+      @run.trace.emit(:place_name, frame: state.frame, **result[:place_name]) if result[:place_name]
       Array(result[:notables]).each { |note| @run.trace.emit(:notable, frame: state.frame, kind: note[:kind], detail: note[:detail]) }
     end
 

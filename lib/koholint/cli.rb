@@ -8,6 +8,7 @@ require 'koholint/budget'
 require 'koholint/engine'
 require 'koholint/agents/claude_cli'
 require 'koholint/leads'
+require 'koholint/place_card'
 require 'koholint/explore_log'
 require 'koholint/ledger'
 require 'koholint/talk_log'
@@ -240,7 +241,7 @@ module Koholint
         events = events_for(run)
         autopilot = Autopilot.new unless run.manifest['autopilot'] == false
         delegated = Policies::Delegated.new(client:, autopilot:, registry: Skills::Registry.default, objectives: objectives_for(run, events), ledger: ledger_for(run, events),
-                                            triggers: Triggers.from_events(events), talk_log: TalkLog.from_events(events), explore_log: ExploreLog.from_events(events), leads: Leads.from_events(events), manual:, on_step: budget.method(:step_done), budget:,
+                                            triggers: Triggers.from_events(events), talk_log: TalkLog.from_events(events), explore_log: ExploreLog.from_events(events), leads: Leads.from_events(events), manual:, on_step: budget.method(:step_done), budget:, cards: PlaceCard.latest(events),
                                             on_activity: run.method(:write_activity))
         Policies::StartGame.new(delegated, ready: ->(state) { %i[playing dialogue].include?(state.phase) }, probe:, played: GameState.played?(events))
       end

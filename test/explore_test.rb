@@ -206,6 +206,29 @@ class ExploreTest < Minitest::Test
     assert_equal({ direction: :up }, result[:params])
   end
 
+  def test_an_aim_direction_acts_as_the_hint_and_an_aimed_door_comes_first
+    rows = with(CLOSED, [4, 7], '?', [1, 5], '?')
+    result, = explore(rows, aim: { direction: :up }, limit: 3)
+    assert_equal({ kind: :frontier, row: 2, col: 5, direction: :up }, result[:target])
+    door = [{ object: 226, cell: [2, 2], kind: :door, verified: true }, { object: 226, cell: [5, 6], kind: :door, verified: true }]
+    result, = explore(CLOSED, objects: -> { door }, limit: 2)
+    assert_equal [6, 6], result[:target].values_at(:row, :col)
+    result, = explore(CLOSED, objects: -> { door }, aim: { door: [2, 2] }, limit: 2)
+    assert_equal [:door, 3, 2], result[:target].values_at(:kind, :row, :col)
+  end
+
+  def test_an_aimed_place_is_routed_to_before_local_untried_exits
+    rows = with(CLOSED, [7, 5], '.', [0, 5], '.')
+    log = Koholint::ExploreLog.new
+    log.absorb({ from: { room: 1, map: 0 }, exits: [{ row: 0, col: 5, direction: :up, outcome: :left, to: [3, 0] }, { row: 7, col: 5, direction: :down, outcome: :left, to: [2, 0] }] })
+    log.absorb({ from: { room: 3, map: 0 }, exits: [{ row: 7, col: 5, direction: :down, outcome: :left, to: [1, 0] }], survey: { sides: { down: [{ row: 7, col: 5 }] }, doors: [] } })
+    assert_equal({ 1 => 0, 2 => 1, 3 => 1 }, log.hops([1, 0]).transform_keys(&:first))
+    assert_equal({ goal: [3, 0], next: [3, 0], via: :up }, log.route([1, 0], goal: [3, 0]))
+    result, = explore(rows, exits: [[[0, 5], :up]], explore_log: log, aim: { place: [3, 0] })
+    assert_equal({ goal: [3, 0], next: [3, 0] }, result[:route])
+    assert_equal({ kind: :exit, row: 0, col: 5, direction: :up }, result[:target])
+  end
+
   def test_a_closed_known_place_is_no_frontier_after_one_idle_frame
     result, inputs = explore(CLOSED)
     assert_equal :no_frontier, result[:stopped_by]

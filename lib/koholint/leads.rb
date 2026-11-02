@@ -12,8 +12,11 @@ module Koholint
     QUOTE_MIN = 8
     QUOTE_MAX = 300
     GOAL_MAX = 120
+    WHERE_MAX = 40
+    NAME_MAX = 40
+    PLACE_ID = /\A\[?\s*(\d+)\s*[-,\/ ]\s*(\d+)\s*\]?\z/
 
-    attr_reader :all, :goal, :goal_frame, :goal_objectives
+    attr_reader :all, :goal, :goal_frame, :goal_objectives, :names
 
     def self.from_events(events)
       leads = new
@@ -21,6 +24,7 @@ module Koholint
       events.each do |event|
         case Ledger.pick(event, :type).to_s
         when 'lead' then leads.restore(event)
+        when 'place_name' then leads.name_place(Ledger.pick(event, :place), Ledger.pick(event, :name))
         when 'goal' then leads.change_goal(Ledger.pick(event, :text), frame: Ledger.pick(event, :frame), objectives: done)
         when 'objective' then done += 1 if Objectives::TERMINAL.include?(Ledger.pick(event, :status).to_s)
         end
@@ -38,18 +42,40 @@ module Koholint
       events = Trace.read(File.join(dir, 'trace.jsonl'))
       leads = from_events(events)
       path = File.join(dir, 'world.json')
-      File.write("#{path}.tmp", "#{JSON.pretty_generate({ goal: leads.goal, leads: leads.all, places: PlaceCard.world(events) })}\n")
+      File.write("#{path}.tmp", "#{JSON.pretty_generate({ goal: leads.goal, leads: leads.all, places: PlaceCard.world(events, names: leads.names) })}\n")
       File.rename("#{path}.tmp", path)
     end
 
     def initialize
       @all = []
       @goal = nil
+      @names = {}
     end
 
     def restore(event)
       lead = %w[id place source quote claim importance].to_h { |key| [key.to_sym, Ledger.pick(event, key)] }
+      where = Ledger.pick(event, :where)
+      lead[:where] = where if where
       @all << lead unless known?(lead[:id])
+    end
+
+    def name_place(place, name)
+      name = self.class.clean(name, NAME_MAX)
+      return unless place.is_a?(Array) && place.size == 2 && place.all?(Integer) && !name.empty? && @names[place] != name
+
+      @names[place] = name
+    end
+
+    def name_of(place) = @names[place]
+
+    def place_for(lead)
+      where = lead[:where].to_s.strip
+      return if where.empty?
+
+      found = where.match(PLACE_ID)
+      return [found[1].to_i, found[2].to_i] if found
+
+      @names.find { |_, name| self.class.normalize(name) == self.class.normalize(where) }&.first
     end
 
     def absorb(raw, transcription:, place:, source:)
@@ -68,6 +94,8 @@ module Koholint
         next if @all.any? { |known| self.class.compact(known[:quote]) == key }
 
         added = { id: "lead-#{@all.size + 1}", place:, source:, quote: self.class.clean(quote), claim: self.class.clean(claim, CLAIM_MAX), importance: }
+        where = self.class.clean(lead['where'], WHERE_MAX)
+        added[:where] = where unless where.empty?
         @all << added
         accepted << added
       end

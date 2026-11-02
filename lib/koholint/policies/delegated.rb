@@ -1,6 +1,7 @@
 require 'koholint/agents/context'
 require 'koholint/agents/prompts'
 require 'koholint/autopilot'
+require 'koholint/candidates'
 require 'koholint/decision'
 require 'koholint/dialogues'
 require 'koholint/explore_log'
@@ -49,9 +50,13 @@ module Koholint
       SPEAKER_LIMIT = Trace::SPEAKER_MAX
       REVISIT_BUDGET_SHARE = 0.05
       HURT_FRAMES = 300
+      EXPLORE = { skill: 'explore', params: {} }.freeze
+      AUTO_OBJECTIVE = { title: 'Explore the nearest untried exits (picked by the harness)', predicate: { kind: 'new_place' } }.freeze
 
       def initialize(client:, registry:, objectives:, manual: '', on_step: nil, on_activity: nil, ledger: nil, triggers: nil, talk_log: nil, leads: nil, explore_log: nil, revisit: nil,
-                     budget: nil, autopilot: nil)
+                     budget: nil, autopilot: nil, cards: {})
+        @cards = cards.dup
+        @candidates = []
         @budget = budget
         @autopilot = autopilot
         @explore_log = explore_log || ExploreLog.new
@@ -120,6 +125,7 @@ module Koholint
       def decide_with(decision_point, state, context)
         @prompt = @image = @images = @reading = nil
         @revisit_acting = false
+        @autopilot_acting = false
         prepare(context)
         context[:ledger] = @ledger
         context[:triggers] = @triggers
@@ -148,14 +154,18 @@ module Koholint
             @locks.clear
           end
 
-          autopilot = autopilot_choice(decision_point, state)
+          autopilot = autopilot_choice(decision_point, state, context)
           return autopilot if autopilot
+
+          auto = auto_objective(decision_point, state)
+          return auto if auto
         end
 
         reply = ask(decision_point, state, context)
         raise Failure, reply.error if reply.error
 
-        choice = decision_point.validate(reply.output).slice(*decision_point.output_schema)
+        output = decision_point.name == :choose_objective ? resolve_candidate(reply.output) : reply.output
+        choice = decision_point.validate(output).slice(*decision_point.output_schema)
         start_objective(choice, state, context, reply.output['because']) if decision_point.name == :choose_objective
         plan = remember_plan(reply.output)
         transcription = @reading || transcription_for(reply.output, state, decision_point)
@@ -189,7 +199,9 @@ module Koholint
         revisiting = @revisit_acting && choice[:skill] == 'talk_to'
         @revisit.talked(outcome) if revisiting
         @revisit_acting = false
-        @last_results << outcome
+        autopiloted = @autopilot_acting
+        @autopilot_acting = false
+        @last_results << (autopiloted ? outcome.merge(autopilot: true) : outcome)
         @last_results.shift while @last_results.size > RESULT_LIMIT
         note_lock(choice, outcome, state)
         note_talk_source(choice, outcome)
@@ -200,7 +212,7 @@ module Koholint
         @explore_log.absorb(outcome) if choice[:skill] == 'explore'
         note_no_path(choice, outcome, frame) unless revisiting
         unless @waiting || revisiting
-          @objectives.record_attempt(skill: choice[:skill], params: choice[:params], result_summary: summary(outcome, opened))
+          @objectives.record_attempt(skill: choice[:skill], params: choice[:params], result_summary: "#{'(autopilot) ' if autopiloted}#{summary(outcome, opened)}")
         end
         @waiting = false
         track { @objectives.update(state, frame:) }
@@ -315,7 +327,32 @@ module Koholint
         clear_hemmed
         @refusals.clear
         because = nil unless @leads.known?(because)
-        @objectives.start(frame: state.frame, title: choice[:title], predicate: choice[:predicate], because:)
+        picked = @candidate
+        @objectives.start(frame: state.frame, title: choice[:title], predicate: choice[:predicate], because:, candidate: picked&.dig(:id), target: picked&.dig(:target))
+      end
+
+      def resolve_candidate(output)
+        @candidate = nil
+        id = output['candidate']
+        return output unless id.is_a?(String) && !id.strip.empty?
+
+        found = Candidates.find(@candidates, id)
+        raise Refusal, "unknown candidate #{id.strip}: pick an id from the candidate list, or give title and predicate without a candidate" unless found
+
+        @candidate = found
+        title = output['title'].is_a?(String) && !output['title'].strip.empty? ? output['title'] : found[:title]
+        output.merge('title' => title, 'predicate' => found[:predicate].transform_keys(&:to_s))
+      end
+
+      def build_candidates(state, context)
+        place = [state.room_id, state.map_id]
+        signs = objects_now
+        if state.phase(booted: true) == :playing
+          @cards[place] = { people: @entities.select { |entity| entity[:kind].to_s == 'npc' && entity[:cell] }.map { |entity| entity.slice(:type, :cell) },
+                            signs: signs.select { |object| object[:kind].to_s == 'sign' }.map { |object| object.slice(:cell) } }
+        end
+        @candidates = Candidates.build(place:, grid: context[:grid], explore_log: @explore_log, talk_log: @talk_log, leads: @leads, cards: @cards,
+                                       entities: @entities, signs:, stamp: stamp(state))
       end
 
       def satisfied?(predicate, state, place)
@@ -489,10 +526,14 @@ module Koholint
       end
 
       def ask(decision_point, state, context)
-        @prompt = Agents::Context.build(state:, grid: grid_for(state, context), objective: @objectives.current, history: @objectives.history, entities: entities_now,
+        entities_now
+        @candidates = decision_point.name == :choose_objective ? build_candidates(state, context) : []
+        @prompt = Agents::Context.build(state:, grid: grid_for(state, context), objective: @objectives.current, history: @objectives.history, entities: @entities,
                                        attempts: @objectives.attempts_for_prompt, manual: @manual, last_results: @last_results, ledger: @ledger, refusals: @refusals, plan: @plan,
                                        triggers: @triggers, talk_log: @talk_log, signs: objects_now, locked: (@hemmed[:attempts] if @hemmed && hemmed?(state)),
-                                       locked_frames: (locked_frames(state) if WAIT_PHASES.include?(state.phase)), goal: goal_line, leads: @leads.all, stamp: stamp(state))
+                                       locked_frames: (locked_frames(state) if WAIT_PHASES.include?(state.phase)), goal: goal_line, leads: @leads.all, stamp: stamp(state),
+                                       place_name: @leads.name_of([state.room_id, state.map_id]), candidates: (Candidates.lines(@candidates) if decision_point.name == :choose_objective),
+                                       resolve: @leads.method(:place_for))
         if @reading
           text = Dialogues.text(@reading[:transcription].map { |entry| entry[:text] })
           @prompt += "\nThe dialogue that just closed repeated a text already read (not sent again): #{clean(text.tr("\n", ' '), cap: TRANSCRIPTION_LIMIT)}"
@@ -542,6 +583,9 @@ module Koholint
       def notes_for(output, transcription, state)
         goal = @leads.change_goal(output['goal'], frame: state.frame, objectives: @objectives.finished)
         notes = goal ? { goal: } : {}
+        here = [state.room_id, state.map_id]
+        name = @leads.name_place(here, output['place_name']) if output['place_name'].is_a?(String) && state.phase(booted: true) != :loading
+        notes[:place_name] = { place: here, name: } if name
         return notes unless output.key?('leads')
 
         pages = [transcription].flatten(1).compact
@@ -624,10 +668,42 @@ module Koholint
 
       def objects_now = @objects_reader ? Array(@objects_reader.call) : []
 
-      def autopilot_choice(decision_point, state)
+      def autopilot_choice(decision_point, state, context)
         return unless @autopilot && decision_point.name == :choose_skill && !@sequence && !@reading && !hemmed?(state)
 
-        @autopilot.next_choice(state:, objective: @objectives.current)
+        follow = follow_choice(state)
+        result = @autopilot.next_choice(state:, objective: @objectives.current, follow: follow&.dig(:choice)) or return
+        context[:aim] = follow[:aim] if follow&.dig(:aim)
+        @autopilot_acting = true
+        result
+      end
+
+      def follow_choice(state)
+        target = @objectives.current&.dig(:target) or return
+        here = target[:place] == [state.room_id, state.map_id]
+        case target[:kind]
+        when 'exit' then { choice: { skill: 'explore', params: { direction: target[:direction] } } } if here
+        when 'door' then { choice: EXPLORE, aim: { door: target[:cell] } } if here
+        when 'person', 'sign'
+          return { choice: EXPLORE, aim: { place: target[:place] } } unless here
+
+          cell = target[:kind] == 'person' ? entities_now.find { |entity| entity[:type] == target[:type] && entity[:cell] }&.dig(:cell) : target[:cell]
+          { choice: { skill: 'talk_to', params: { row: cell[0], col: cell[1] } } } if cell
+        when 'place', 'lead' then { choice: EXPLORE, aim: { place: target[:place] } } unless here
+        end
+      end
+
+      def auto_objective(decision_point, state)
+        return unless @autopilot && decision_point.name == :choose_objective
+        return if @autopilot.objective_hold(state:, last: @objectives.history.last)
+
+        place = [state.room_id, state.map_id]
+        return unless @explore_log.untried?(place) || @explore_log.route(place)
+
+        @objectives.start(frame: state.frame, **AUTO_OBJECTIVE, autopilot: true)
+        @autopilot.adopt(@objectives.current)
+        { choice: AUTO_OBJECTIVE.dup, justification: 'autopilot: the last explore chain reached a place and achieved its objective; keep exploring', confidence: 1.0,
+          agent: 'delegated', latency_ms: 0, cost_usd: 0.0, fallback: false, autopilot: true, prompt: nil, image: nil }
       end
 
       def revisit_low? = @budget ? @budget.nearly_exhausted?(frames: Revisit::CYCLE_FRAMES, share: REVISIT_BUDGET_SHARE) : false

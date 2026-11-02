@@ -53,7 +53,7 @@ module Koholint
         properties: registry.schema.merge(justification: { type: 'string' },
                                            confidence: { type: 'number', minimum: 0, maximum: 1 },
                                            transcription: { type: 'string' }, speaker: { type: 'string', maxLength: Trace::SPEAKER_MAX },
-                                           leads: LEADS_SCHEMA, goal: GOAL_SCHEMA, plan: PLAN_SCHEMA),
+                                           leads: LEADS_SCHEMA, goal: GOAL_SCHEMA, plan: PLAN_SCHEMA, place_name: NAME_SCHEMA),
         required: %w[skill params justification confidence plan], additionalProperties: false }
     end
 
@@ -63,10 +63,13 @@ module Koholint
     PLAN_MAX = 200
     PLAN_SCHEMA = { type: 'string', maxLength: PLAN_MAX }.freeze
     GOAL_SCHEMA = { type: 'string', maxLength: Leads::GOAL_MAX }.freeze
+    NAME_SCHEMA = { type: 'string', maxLength: Leads::NAME_MAX }.freeze
+    CANDIDATE_MAX = 40
     LEADS_SCHEMA = { type: 'array', maxItems: Leads::LIMIT,
                      items: { type: 'object',
                               properties: { quote: { type: 'string', minLength: 1 },
-                                            claim: { type: 'string', minLength: 1 }, importance: { type: 'string', enum: Leads::IMPORTANCE } },
+                                            claim: { type: 'string', minLength: 1 }, importance: { type: 'string', enum: Leads::IMPORTANCE },
+                                            where: { type: 'string', maxLength: Leads::WHERE_MAX } },
                               required: %w[quote claim importance], additionalProperties: false } }.freeze
     PLACE_SCHEMA = { type: 'array', items: { type: 'integer' }, minItems: 2, maxItems: 2 }.freeze
     FIELD_SCHEMAS = { place: PLACE_SCHEMA, row: { type: 'integer', minimum: 0, maximum: 7 },
@@ -78,10 +81,10 @@ module Koholint
           required: ['kind', *fields.map(&:to_s)], additionalProperties: false }
       end
       { type: 'object',
-        properties: { title: { type: 'string', minLength: 1, maxLength: TITLE_MAX }, predicate: { oneOf: predicates },
+        properties: { candidate: { type: 'string', maxLength: CANDIDATE_MAX }, title: { type: 'string', minLength: 1, maxLength: TITLE_MAX }, predicate: { oneOf: predicates },
                       justification: { type: 'string' }, confidence: { type: 'number', minimum: 0, maximum: 1 },
-                      goal: GOAL_SCHEMA, because: { type: 'string' }, plan: PLAN_SCHEMA },
-        required: %w[title predicate justification confidence plan goal], additionalProperties: false }
+                      goal: GOAL_SCHEMA, because: { type: 'string' }, plan: PLAN_SCHEMA, place_name: NAME_SCHEMA },
+        required: %w[justification confidence plan goal], additionalProperties: false }
     end
 
     def validate_objective(choice)

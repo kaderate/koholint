@@ -95,4 +95,34 @@ class LeadsTest < Minitest::Test
       assert_raises(Koholint::Trace::InvalidEvent) { trace.emit(:objective, frame: 1, **started, predicate: { kind: 'find_item' }) }
     end
   end
+
+  def test_a_where_hint_is_kept_and_resolves_to_a_place_id_or_a_place_name
+    leads = Koholint::Leads.new
+    accepted, = absorb(leads, [lead('north cave').merge('where' => " north\ncave "), lead('Shops sell', 'low').merge('where' => '161-0'), lead('Hello, Link').merge('where' => '')])
+    assert_equal ['north cave', '161-0', nil], accepted.map { |l| l[:where] }
+    assert_nil leads.place_for(accepted[0])
+    assert_equal [161, 0], leads.place_for(accepted[1])
+    assert_equal 'North Cave', leads.name_place([5, 0], ' North  Cave ')
+    assert_nil leads.name_place([5, 0], 'North Cave')
+    assert_nil leads.name_place('5-0', 'x')
+    assert_equal [5, 0], leads.place_for(accepted[0])
+    assert_equal({ [5, 0] => 'North Cave' }, leads.names)
+  end
+
+  def test_place_names_and_where_hints_are_rebuilt_from_the_trace_and_written_in_world_json
+    Dir.mktmpdir do |dir|
+      trace = Koholint::Trace.new(File.join(dir, 'trace.jsonl'))
+      trace.emit(:lead, frame: 1, id: 'lead-1', place: [1, 2], source: nil, quote: 'Hello, Link', claim: 'a greeting', importance: 'low', where: 'beach')
+      trace.emit(:place_card, frame: 2, place: [1, 2], people: [], enemies: [], unknown: [], signs: [], objects: [], doors: [], exits: {})
+      trace.emit(:place_name, frame: 3, place: [1, 2], name: 'Beach')
+      assert_raises(Koholint::Trace::InvalidEvent) { trace.emit(:place_name, frame: 3, place: [1, 2], name: '') }
+      assert_raises(Koholint::Trace::InvalidEvent) { trace.emit(:lead, frame: 1, id: 'lead-2', place: [1, 2], source: nil, quote: 'q', claim: 'c', importance: 'low', where: 'x' * 41) }
+      leads = Koholint::Leads.from_events(Koholint::Trace.read(File.join(dir, 'trace.jsonl')))
+      assert_equal [1, 2], leads.place_for(leads.all.first)
+      Koholint::Leads.write_world(dir)
+      world = JSON.parse(File.read(File.join(dir, 'world.json')))
+      assert_equal 'Beach', world['places']['1-2']['name']
+      assert_equal 'beach', world['leads'].first['where']
+    end
+  end
 end

@@ -22,13 +22,15 @@ module Koholint
       TIP_LEADS = 4
       QUOTE_LIMIT = 80
 
-      def self.build(state:, grid:, objective:, history:, attempts:, manual:, last_results:, max_chars: 9000, ledger: nil, refusals: [], plan: nil, triggers: nil, talk_log: nil, locked: nil, locked_frames: nil, goal: nil, leads: [], stamp: nil, entities: [], signs: [])
+      def self.build(state:, grid:, objective:, history:, attempts:, manual:, last_results:, max_chars: 9000, ledger: nil, refusals: [], plan: nil, triggers: nil, talk_log: nil, locked: nil, locked_frames: nil, goal: nil, leads: [], stamp: nil, entities: [], signs: [],
+                     place_name: nil, candidates: nil, resolve: nil)
         link = state.cell
         place = [state.room_id, state.map_id]
         results = last_results.last(RESULT_LIMIT).map { |r| r.transform_keys(&:to_sym) }
-        fixed = [header(state, link, triggers, place, locked, locked_frames), grid_block(grid, link, ledger, place), neighbours(grid, link, results, ledger, place),
-                 *things_block(grid, talk_log, place, stamp, entities, signs), objective_block(objective, attempts, plan, goal), *leads_block(leads, place)]
-        finished = history.map { |h| "- #{h[:id]} #{h[:outcome]}#{h[:reason] ? " (#{h[:reason]})" : ''}: #{h[:title]}" }
+        fixed = [header(state, link, triggers, place, locked, locked_frames, place_name), grid_block(grid, link, ledger, place), neighbours(grid, link, results, ledger, place),
+                 *things_block(grid, talk_log, place, stamp, entities, signs), objective_block(objective, attempts, plan, goal), *leads_block(leads, place, resolve),
+                 *candidates_block(candidates)]
+        finished = history.map { |h| "- #{h[:id]} #{h[:outcome]}#{h[:reason] ? " (#{h[:reason]})" : ''}: #{h[:title]}#{' (picked by the harness)' if h[:autopilot]}" }
         refused = refusals.last(KEEP_REFUSALS).map { |r| "- #{r[:title]} #{r[:predicate].to_json}: #{r[:reason]}" }
         lines = results.map { |r| "- #{result_line(r)}" }
         notes = trim_manual(manual.to_s)
@@ -64,10 +66,11 @@ module Koholint
       end
       private_class_method :render
 
-      def self.header(state, link, triggers = nil, place = nil, locked = nil, locked_frames = nil)
+      def self.header(state, link, triggers = nil, place = nil, locked = nil, locked_frames = nil, place_name = nil)
         where = link ? "row #{link[0]}, col #{link[1]}" : 'outside the grid (doorway or screen edge)'
         phase = state.phase(booted: true)
-        lines = ["Phase: #{phase}", "Place: room #{state.room_id}, map #{state.map_id}",
+        named = place_name ? ", named by you: #{place_name}" : ', not named yet (you may name it in place_name)'
+        lines = ["Phase: #{phase}", "Place: room #{state.room_id}, map #{state.map_id}#{named}",
                  "Link: #{where} (pixel x=#{state.x}, y=#{state.y}), facing #{state.direction}"]
         lines.concat(screen_lines(state, phase))
         lines << "Link has been locked for #{locked_frames} frames (cause unknown)" if locked_frames
@@ -203,14 +206,23 @@ module Koholint
       def self.blocked_at(r) = r[:blocked_at].is_a?(Hash) ? r[:blocked_at].transform_keys(&:to_sym) : nil
       private_class_method :blocked_at
 
-      def self.leads_block(leads, place)
+      def self.candidates_block(candidates)
+        return [] if candidates.nil?
+        return ['Candidate objectives: none listed; give title and predicate.'] if candidates.empty?
+
+        ["Candidate objectives (give one id in candidate; the harness then follows it by itself):\n#{candidates.join("\n")}"]
+      end
+      private_class_method :candidates_block
+
+      def self.leads_block(leads, place, resolve = nil)
         newest = leads.reverse
         high = newest.select { |lead| lead[:importance] == 'high' }.first(HIGH_LEADS)
         normal = newest.select { |lead| lead[:importance] == 'normal' && lead[:place] == place }.first(NORMAL_LEADS)
         tips = newest.select { |lead| lead[:importance] == 'tip' }.first(TIP_LEADS)
         lines = (high + normal + tips).map do |lead|
           quote = lead[:quote].size > QUOTE_LIMIT ? "#{lead[:quote][0, QUOTE_LIMIT - 3]}..." : lead[:quote]
-          "- [#{lead[:id]} #{lead[:importance]}] #{lead[:claim]} — \"#{quote}\""
+          where = lead[:where] ? " (where: #{lead[:where]}#{(found = resolve&.call(lead)) ? ", place #{found.join('-')}" : ''})" : ''
+          "- [#{lead[:id]} #{lead[:importance]}] #{lead[:claim]}#{where} — \"#{quote}\""
         end
         lines.empty? ? [] : ["Leads from texts you read (all high ones, normal ones of this place, the newest how-to-play tips):\n#{lines.join("\n")}"]
       end
@@ -218,7 +230,7 @@ module Koholint
 
       def self.objective_block(objective, attempts, plan = nil, goal = nil)
         lines = [goal ? "Goal (yours, long-term): #{goal}" : 'Goal: none set yet — set one in goal when you have a reason (a lead, an observation).']
-        lines += objective ? ["Current objective: #{objective[:title]}", "Predicate: #{objective[:predicate].to_json}"] : ['Current objective: none']
+        lines += objective ? ["Current objective: #{objective[:title]}#{" (candidate #{objective[:candidate]})" if objective[:candidate]}", "Predicate: #{objective[:predicate].to_json}"] : ['Current objective: none']
         lines << "Your plan from your last call (written by you; follow it unless the situation changed): #{plan}" if plan
         return lines.join("\n") unless objective
 
@@ -240,7 +252,7 @@ module Koholint
 
       def self.result_line(r)
         cause = r[:cause] ? " (cause: #{r[:cause]})" : ''
-        line = "#{r[:skill]} #{r[:params].to_json}: stopped_by #{r[:stopped_by]}#{cause}, #{r[:frames]} frames, " \
+        line = "#{'(autopilot) ' if r[:autopilot]}#{r[:skill]} #{r[:params].to_json}: stopped_by #{r[:stopped_by]}#{cause}, #{r[:frames]} frames, " \
                "moved #{r[:moved_px] ? "#{r[:moved_px]} px" : cells(r[:moved_cells])}, " \
                "room_changed #{r[:room_changed]}, hp_delta #{r[:hp_delta]}, dialogue open before #{r[:dialog_before]}, after #{r[:dialog_after]}"
         line += ", path #{r[:path_length]}, steps #{r[:steps_done]}, aligned #{r[:aligned]}" if %w[goto talk_to].include?(r[:skill].to_s)

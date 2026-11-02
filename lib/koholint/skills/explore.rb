@@ -48,7 +48,8 @@ module Koholint
       class Run < Execution
         def initialize(direction:, context:, **rest)
           super(**rest)
-          @hint = direction
+          @aim = context[:aim] || {}
+          @hint = direction || @aim[:direction]
           @place = room(@start)
           @ledger = context[:ledger]
           @talk_log = context[:talk_log]
@@ -286,6 +287,10 @@ module Koholint
         def candidates(from)
           paths = {}
           path_to = ->(cell) { paths.fetch(cell) { paths[cell] = @planner.path(from:, to: cell) } }
+          if @aim[:place] && @aim[:place] != @place
+            aimed = routed(from, path_to)
+            return order(aimed) if aimed.any?
+          end
           local = untried(from, path_to)
           return order(local) if local.any?
 
@@ -311,7 +316,7 @@ module Koholint
         end
 
         def routed(from, path_to)
-          hop = @log&.route(@place) or return []
+          hop = @log&.route(@place, goal: (@aim[:place] if @aim[:place] != @place)) or return []
 
           @route = { goal: hop[:goal], next: hop[:next] }
           via = hop[:via]
@@ -347,8 +352,9 @@ module Koholint
         end
 
         def order(found)
+          door = @aim[:door] && [@aim[:door][0] + 1, @aim[:door][1]]
           found.sort_by do |c|
-            [@hint.nil? || c[:direction] == @hint ? 0 : 1, c[:path].size, c[:kind] == :frontier ? 1 : 0, *c[:cell], DIRECTIONS.index(c[:direction])]
+            [door && c[:kind] == :door && c[:cell] == door ? 0 : 1, @hint.nil? || c[:direction] == @hint ? 0 : 1, c[:path].size, c[:kind] == :frontier ? 1 : 0, *c[:cell], DIRECTIONS.index(c[:direction])]
           end
         end
 

@@ -39,7 +39,9 @@ class InsightsTest < Minitest::Test
       seen(trace, 31, 5)
       walk(trace, 40, 5, 7, [80, 131])
       trace.emit(:lead, frame: 41, id: 'lead-1', place: [7, 0], source: nil, quote: 'q', claim: 'go <b>north</b>', importance: 'high')
+      trace.emit(:place_name, frame: 42, place: [6, 0], name: 'Beach')
       map = Koholint::Viewer::Feed.insight(:map, dir, Follower.new(100, 100, 0, :in_sync))
+      assert_equal [nil, 'Beach', nil], map[:places].map { |n| n[:name] }
       assert_equal [[5, 0], [6, 0], [7, 0]], map[:places].map { |n| n[:place] }
       assert_equal [1, 2, 3], map[:places].map { |n| n[:order] }
       assert_equal [7, 0], map[:current]

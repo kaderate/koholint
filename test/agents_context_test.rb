@@ -172,7 +172,7 @@ class AgentsContextTest < Minitest::Test
                  last_results: [result])
     expected = <<~TEXT.chomp
       Phase: playing
-      Place: room 163, map 16
+      Place: room 163, map 16, not named yet (you may name it in place_name)
       Link: row 3, col 4 (pixel x=68, y=60), facing up
       Link offset from cell centre (positive = right of / below the centre): dx=-4, dy=-4
       Health: 3 of 3 hearts
@@ -383,5 +383,16 @@ class AgentsContextTest < Minitest::Test
     text = screen_header(game_mode: 0x0D, game_submode: 1)
     assert_includes text, 'Phase: unknown'
     assert_includes text, 'An uncatalogued screen is open (game mode 13, submode 1); only press and wait work here.'
+  end
+
+  def test_candidates_where_hints_and_autopilot_results_are_shown
+    leads = [{ id: 'lead-1', importance: 'high', claim: 'a key in the cave', quote: 'the key', where: 'cave', place: [1, 0] }]
+    text = build(leads:, resolve: ->(_) { [5, 0] }, last_results: [{ skill: 'explore', params: {}, stopped_by: 'budget', frames: 600, moved_cells: 3, autopilot: true }],
+                 candidates: ['- exit-up: leave by the up side'], place_name: 'Home')
+    assert_includes text, 'Place: room 163, map 16, named by you: Home'
+    assert_includes text, "Candidate objectives (give one id in candidate; the harness then follows it by itself):\n- exit-up: leave by the up side"
+    assert_includes text, '[lead-1 high] a key in the cave (where: cave, place 5-0)'
+    assert_includes text, '- (autopilot) explore {}: stopped_by budget'
+    assert_includes build(candidates: []), 'Candidate objectives: none listed; give title and predicate.'
   end
 end

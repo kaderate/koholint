@@ -46,11 +46,15 @@ agent saw to `runs/<id>/prompts/<frame>-<decision_point>.txt` (and `.png` when a
 of replay); the `decision` trace event carries its `prompt_sha`. `--tag NAME` labels a run.
 
 **Autopilot.** `--autopilot on|off` (default `on`, agent runs only) is recorded in the manifest (`autopilot`); `resume`
-keeps the recorded value and refuses a different one. With it on, an `explore` that stops at a new place, a known place or at its frame
-budget is followed by another `explore` with no direction that the harness issues itself (agent `delegated`, cost 0, the
+keeps the recorded value and refuses a different one. With it on, an `explore` that stops at a new place, a known place, at its frame
+budget or near an object never tried (`untried_object`) is followed by another `explore` with no direction that the harness issues itself (agent `delegated`, cost 0, the
 `decision` event carries `autopilot: true`); the model decides again on any other stop or action, after a new lead or goal,
 outside free play, after damage, when the objective changes or is not `new_place`, `leave_place` or `new_text`, and after
-6 such explores or 2400 frames since its last call.
+6 such explores or 2400 frames since its last call. When such a chain reaches a place and achieves its objective, the harness also
+starts the next objective itself (`new_place`, "Explore the nearest untried exits", `autopilot: true` on the `objective` and
+`decision` events) instead of a paid `choose_objective`, under the same caps, as long as this place or a place routed to has untried exits.
+An objective picked from the candidate menu (see Agent skills) is followed the same way: `explore` towards its exit, door or place, or one
+`talk_to` of the person or sign here. Results chosen this way are marked `(autopilot)` in the model's context.
 
 **A/B.** `ab-plan <run_dir> --at-frame N [--arms autopilot,off] [--forks 3] [--max-dollars 0.8] [--frames 3000] [--tag ab]
 [--root tmp/ab/runs] [--model M]` checks the frame and writes `tmp/ab/plan.json` and `tmp/ab/run.sh`, the `fork` and
@@ -72,7 +76,7 @@ place, so the grid went dark). The live view has a grid toggle that overlays the
 visited places from the trace; `fork` branches a run at a frame (the parent may be of an older flow; `--tag`, `--autopilot` and `--root` set the child's). Both work on an archived run, also on a fresh clone
 (see Run storage).
 
-## Agent skills (`flow-15`)
+## Agent skills (`flow-16`)
 
 - Between decisions the engine waits, with no input, until Link is ready (no screen scroll, door walk, jump or
   knockback, then 2 settled frames): the screen is never mapped and the model never called mid-scroll or mid-jump
@@ -97,7 +101,14 @@ visited places from the trace; `fork` branches a run at a frame (the parent may 
 - The agent sets its own long-term `goal`, restates or revises it at every objective (the context says when it was set) and, in the call that transcribes a text (dialogue, sign, object), extracts up
   to five leads (`quote`, `claim`, importance `high|normal|low|tip`, `tip` for how-to-play advice); a lead whose quote is not in that transcription is
   dropped. Both are trace events (`goal`, `lead`), shown in the context and the live view and written to `world.json`;
-  an objective can cite the lead behind it (`because`).
+  an objective can cite the lead behind it (`because`). A lead may carry `where` (a place id such as `161-0` or a name the agent gave).
+- At `choose_objective` the context lists candidate objectives with ids (`candidates.rb`): untried exits by side (`exit-up`) and doors
+  (`door-R-C`) of this place, people (`person-tT`) and unread signs (`sign-R-C`) here worth a visit, known places with untried exits
+  (`place-R-M`), people and unread signs of other known places (from their place cards) and places tied to a lead by its `where`
+  (`lead-N`), nearest first by moves over exits explore took. The agent answers with `candidate` (or still a free title and predicate);
+  the objective event carries `candidate` and its `target`, which the autopilot follows.
+- The agent may name the current place (`place_name`, any call): a `place_name` trace event, shown in the context header,
+  `world.json` `places` (`name`) and the viewer's map.
 - Screens are modes of the catalogue `data/modes.json`: the context names the open screen, how to leave it, its inputs,
   cursor and options, and offers only the skills that work there. `open_menu`/`close_menu` (START), `menu_move slot`
   (inventory cursor 0-9), `menu_assign a|b` (swap the selected item with that button's item), `open_map`/`close_map`

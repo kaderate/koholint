@@ -67,12 +67,13 @@ module Koholint
       @last_frame = 0
     end
 
-    def start(frame:, title:, predicate:, because: nil)
+    def start(frame:, title:, predicate:, because: nil, candidate: nil, target: nil, autopilot: false)
       raise ArgumentError, "invalid predicate #{predicate.inspect}" unless self.class.valid_predicate?(predicate)
 
       @counter += 1
       id = "obj-#{@counter}"
-      @current = { id:, title:, predicate: self.class.normalize(predicate), started_frame: frame, attempts: [] }
+      extra = { candidate:, target:, autopilot: (true if autopilot) }.compact
+      @current = { id:, title:, predicate: self.class.normalize(predicate), started_frame: frame, attempts: [], **extra }
       @signature = nil
       @last_change_frame = frame
       @seen_alive = false
@@ -85,7 +86,7 @@ module Koholint
       @blocked_total = 0
       @no_path = 0
       @blocked_pairs = Hash.new(0)
-      @trace.emit(:objective, frame:, id:, status: 'started', title:, predicate: @current[:predicate], **(because ? { because: } : {}))
+      @trace.emit(:objective, frame:, id:, status: 'started', title:, predicate: @current[:predicate], **(because ? { because: } : {}), **extra)
       id
     end
 
@@ -212,7 +213,7 @@ module Koholint
       fields[:reason] = reason if reason
       @trace.emit(:objective, frame:, **fields)
       @history << { id: done[:id], title: done[:title], predicate: done[:predicate], outcome:, reason:,
-                    started_frame: done[:started_frame], ended_frame: frame }
+                    started_frame: done[:started_frame], ended_frame: frame, **done.slice(:target, :autopilot) }
       outcome
     end
   end

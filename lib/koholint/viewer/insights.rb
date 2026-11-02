@@ -106,6 +106,7 @@ module Koholint
         capabilities = Vision::Capabilities.new
         people = people(trace)
         leads = trace.select { |e| e['type'] == 'lead' && e['place'].is_a?(Array) }.group_by { |e| e['place'] }
+        names = trace.select { |e| e['type'] == 'place_name' && e['place'].is_a?(Array) }.to_h { |e| [e['place'], e['name']] }
         nodes = places.map do |entry|
           cells = cells(world.grid_for(entry[:place], capabilities))
           known = cells&.flatten&.count { |state| state != 'unknown' }
@@ -113,7 +114,7 @@ module Koholint
                       cell: PlaceKinds.grid?(entry[:place]) ? PlaceKinds.cell(entry[:place]) : nil, parent: placed[:parents][entry[:place]],
                       current: entry[:place] == found[:current], screenshot: shots.key?(entry[:place]),
                       coverage: known && (known * 100.0 / (ROWS * COLS)).round, cells:,
-                      people: people.fetch(entry[:place], []),
+                      people: people.fetch(entry[:place], []), name: names[entry[:place]],
                       leads: leads.fetch(entry[:place], []).last(LEADS_PER_PLACE).map { |e| { id: e['id'], importance: e['importance'], claim: clip(e['claim']) } })
         end
         links = moves.group_by { |m| [m[:from], m[:to]].sort }.map do |(a, b), group|

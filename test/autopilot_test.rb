@@ -18,7 +18,7 @@ class AutopilotTest < Minitest::Test
   end
 
   def test_a_benign_stop_continues_with_an_undirected_free_explore
-    %i[new_place known_place budget].each do |stop|
+    %i[new_place known_place budget untried_object].each do |stop|
       result = primed(stop:).next_choice(state: state(frame: 400), objective: objective)
       assert_equal({ skill: 'explore', params: {} }, result[:choice])
       assert_equal [0.0, 'delegated', true, false], result.values_at(:cost_usd, :agent, :autopilot, :fallback)
@@ -46,7 +46,7 @@ class AutopilotTest < Minitest::Test
   end
 
   def test_other_stops_go_back_to_the_model
-    %i[dialogue no_frontier blocked stalled locked untried_object damage].each do |stop|
+    %i[dialogue no_frontier blocked stalled locked damage].each do |stop|
       pilot = primed(stop:)
       assert_nil pilot.next_choice(state: state, objective: objective), stop
       assert_equal "last stop #{stop}", pilot.hold_reason(state: state, objective: objective)
@@ -98,5 +98,42 @@ class AutopilotTest < Minitest::Test
     pilot = primed
     assert_nil pilot.hold_reason(state: state(frame: 100 + Koholint::Autopilot::CHAIN_FRAMES - 1), objective: objective)
     assert_equal 'frame cap', pilot.hold_reason(state: state(frame: 100 + Koholint::Autopilot::CHAIN_FRAMES), objective: objective)
+  end
+
+  def test_a_target_is_followed_right_after_the_model_call_then_only_by_explores
+    target = objective('reach_place').merge(target: { kind: 'place', place: [1, 0] })
+    pilot = Koholint::Autopilot.new
+    pilot.model_called(state: state, objective: target)
+    follow = { skill: 'explore', params: {} }
+    assert_nil pilot.next_choice(state: state, objective: target)
+    result = pilot.next_choice(state: state, objective: target, follow:)
+    assert_equal follow, result[:choice]
+    assert_match(/follow the objective target/, result[:justification])
+    pilot.acted(skill: 'explore', outcome: { stopped_by: :budget })
+    assert pilot.next_choice(state: state, objective: target, follow:)
+    pilot.acted(skill: 'explore', outcome: { stopped_by: :blocked })
+    assert_equal 'last stop blocked', pilot.hold_reason(state: state, objective: target, follow:)
+    talk = { skill: 'talk_to', params: { row: 2, col: 3 } }
+    person = objective('new_text').merge(target: { kind: 'person', place: [163, 16] })
+    pilot.model_called(state: state, objective: person)
+    assert_equal talk, pilot.next_choice(state: state, objective: person, follow: talk)[:choice]
+    pilot.acted(skill: 'talk_to', outcome: { stopped_by: :done })
+    assert_equal 'last stop not an explore', pilot.hold_reason(state: state, objective: person, follow: talk)
+    pilot.model_called(state: state, objective: target)
+    pilot.acted(skill: 'walk', outcome: { stopped_by: :done })
+    assert_equal 'last stop not an explore', pilot.hold_reason(state: state, objective: target, follow:)
+  end
+
+  def test_the_next_objective_is_picked_after_a_chain_arrives_and_achieves_the_objective
+    pilot = primed
+    done = { id: 'obj-1', outcome: :achieved }
+    assert_nil pilot.objective_hold(state: state(frame: 400), last: done)
+    assert_equal 'last objective not achieved by the chain', pilot.objective_hold(state: state, last: done.merge(outcome: :abandoned))
+    assert_equal 'last objective not achieved by the chain', pilot.objective_hold(state: state, last: done.merge(id: 'obj-0'))
+    assert_equal 'last stop budget', primed(stop: :budget).objective_hold(state: state, last: done)
+    assert_equal 'new lead or goal', primed(news: true).objective_hold(state: state, last: done)
+    assert_equal 'frame cap', pilot.objective_hold(state: state(frame: 100 + Koholint::Autopilot::CHAIN_FRAMES), last: done)
+    pilot.adopt({ id: 'obj-2' })
+    assert pilot.next_choice(state: state(frame: 400), objective: objective(id: 'obj-2'))
   end
 end

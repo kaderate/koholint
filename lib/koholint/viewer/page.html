@@ -642,7 +642,7 @@
     var leads = Array.isArray(node.leads) ? node.leads.length : 0;
     var kind = typeof node.kind === 'string' && node.kind !== 'world' ? node.kind + ' ' : '';
     return {
-      title: kind + '#' + node.order + ' ' + formatPlace(node.place),
+      title: kind + '#' + node.order + ' ' + (typeof node.name === 'string' && node.name ? node.name : formatPlace(node.place)),
       detail: (typeof node.coverage === 'number' ? node.coverage + '% known' : 'no grid') + (people ? ' · ' + plural(people, 'person') : '') + (leads ? ' · ' + plural(leads, 'lead') : '')
     };
   }
@@ -672,7 +672,7 @@
   function nodeTip(node) {
     var cell = Array.isArray(node.cell) ? ' · world cell (' + node.cell.join(', ') + ')' : '';
     var parent = Array.isArray(node.parent) ? ' · entered from ' + formatPlace(node.parent) : '';
-    return 'visit #' + node.order + ' ' + formatPlace(node.place) + ' · ' + String(node.kind || 'other') + cell + parent +
+    return 'visit #' + node.order + ' ' + formatPlace(node.place) + (typeof node.name === 'string' && node.name ? ' "' + node.name + '"' : '') + ' · ' + String(node.kind || 'other') + cell + parent +
       ' · first f' + node.first_frame + ' · ' + plural(node.arrivals || 0, 'arrival');
   }
 

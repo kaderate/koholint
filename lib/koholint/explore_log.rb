@@ -78,12 +78,12 @@ module Koholint
         survey[:doors].any? { |cell| !door_tried?(place, cell) }
     end
 
-    def route(from)
+    def route(from, goal: nil)
       seen = { from => nil }
       queue = [from]
       until queue.empty?
         place = queue.shift
-        return first_hop(seen, place, from) if place != from && untried?(place)
+        return first_hop(seen, place, from) if place != from && (goal ? place == goal : untried?(place))
 
         @edges.fetch(place, {}).each do |key, to|
           next if seen.key?(to)
@@ -93,6 +93,21 @@ module Koholint
         end
       end
       nil
+    end
+
+    def hops(from)
+      found = { from => 0 }
+      queue = [from]
+      until queue.empty?
+        place = queue.shift
+        @edges.fetch(place, {}).each_value do |to|
+          next if found.key?(to)
+
+          found[to] = found[place] + 1
+          queue << to
+        end
+      end
+      found
     end
 
     def walls(place) = @walls.fetch(place, []).dup

@@ -34,7 +34,14 @@ module Koholint
       end.to_h
     end
 
-    def world(events)
+    def latest(events)
+      events.select { |event| event['type'] == 'place_card' && event['place'].is_a?(Array) }.to_h do |event|
+        [event['place'], { people: Array(event['people']).map { |person| { type: person['type'], cell: person['cell'] } },
+                           signs: Array(event['signs']).map { |sign| { cell: sign['cell'] } } }]
+      end
+    end
+
+    def world(events, names: {})
       log = TalkLog.from_events(events)
       cards = events.select { |event| event['type'] == 'place_card' }
       cards.group_by { |event| event['place'] }.to_h do |place, seen|
@@ -45,7 +52,8 @@ module Koholint
           person.merge(**(name ? { 'name' => name } : {}), 'status' => log.last_status(place:, entity: person['type']).to_s)
         end
         card['signs'] = card['signs'].map { |sign| sign.merge('status' => log.sign_status(place:, cell: sign['cell']).to_s) }
-        [place.join('-'), { 'place' => place, 'visits' => seen.size, 'first_frame' => seen.first['frame'], 'last_frame' => last['frame'], **card }]
+        name = names[place]
+        [place.join('-'), { 'place' => place, **(name ? { 'name' => name } : {}), 'visits' => seen.size, 'first_frame' => seen.first['frame'], 'last_frame' => last['frame'], **card }]
       end
     end
   end
