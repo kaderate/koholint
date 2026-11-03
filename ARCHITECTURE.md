@@ -112,13 +112,18 @@ validated parameters (the perpendicular settle of `goto` and the centring after 
 it reports how it stopped (`done`, `blocked`, `no_path`, `no_response`…). `ledger.rb`
 counts blocked edges per place (doubtful edges), `triggers.rb` forbids inputs that re-fire a scripted event,
 `talk_to` resolves the person to the entity at or next to the target cell
-(an `npc`, else any non-enemy entity in that cell): the cells its 16-pixel box covers by at least 4 pixels are the person
+(an `npc`, else any non-enemy entity in that cell; never an entity type the census found mute, i.e. catalogued with a kind
+other than `npc`: a target holding only such an entity stops `no_response` after one idle frame, with a cause): the cells its 16-pixel box covers by at least 4 pixels are the person
 (a person between four cells is four cells), the standing cell is next to one of them, the walk re-plans when the entity
 moves away (up to 6 times), Link aligns with the entity's pixel position and presses A at contact or once facing it
-within 16 pixels (type 111 does not block Link; A opened from up to 19 pixels), the target is free only when the entity
-is gone or Link walked past it, a standing cell where Link stops short of reach (furniture) counts as no response, a
+within the measured reach (`talk_reach` in `data/geometry.json`: 19 pixels facing up, 20 down, 15 left, 16 right), the
+target is free only when the entity is gone or Link walked past it, a standing cell where Link stops out of reach
+(furniture) or where the entity walks out of reach while A is pressed counts as no response, a
 person who stays put wins over a walker on the same cells, and A is pressed again every 12 frames for 48 frames (the game ignores A for 24 frames after a
-dialogue closes: `dialogue_cooldown`); without an entity it falls back on the grid. `talk_log.rb` remembers which sides of a person gave no response and, per person (the entity type that `talk_to` faced when the
+dialogue closes: `dialogue_cooldown`); without an entity it falls back on the grid. A catalogued room object (sign,
+furniture, door) on the target cell is the target even with a sprite on or next to it (only an `npc` covering the cell
+replaces it): Link presses toward it until he stops moving, since a sign answers only once he is pressed against it.
+Its walk never goes up into or out of a door cell (that enters the building). `talk_log.rb` remembers which sides of a person gave no response and, per person (the entity type that `talk_to` faced when the
 dialogue opened, reported in its result, else the last `talk_to` target cell), the key (letters
 and digits only, as for `new_text`) of each stitched text read, its conversation signature and speaker name, and a world stamp (milestone, places visited): the context says whether the last talk gave
 new text, how many talks in a row gave nothing new, and `worth retrying` (the stamp changed or the last talk was new) or

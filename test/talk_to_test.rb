@@ -179,7 +179,7 @@ class TalkToTest < Minitest::Test
     end
     result = execution.result(state(x:, y:, dialog_state: 3))
     assert_equal :done, result[:stopped_by], result.inspect
-    assert_includes 1..Koholint::Skills::TalkTo::REACH_PIXELS, person[:x] - x
+    assert_includes 1..Koholint::Skills::TalkTo::REACH.fetch(:right), person[:x] - x
   end
 
   def test_a_person_who_leaves_the_screen_is_target_free
@@ -264,6 +264,85 @@ class TalkToTest < Minitest::Test
     assert_equal [{ row: 5, col: 8 }, :up], result.values_at(:standing_cell, :facing)
     other, = talk(4, 8, objects: -> { [sign.first.merge(cell: [1, 1])] })
     assert_equal({ row: 4, col: 7 }, other[:standing_cell])
+  end
+
+  def sign_run(entities)
+    x, y = centre(5, 8)
+    sign = [{ object: 94, cell: [4, 8], kind: :sign, verified: false, faces: [:up] }]
+    execution = registry.start('talk_to', state(x:, y:), { row: 4, col: 8 }, { grid: FakeGrid.new(sprites: [[4, 8]]), objects: -> { sign }, entities: -> { entities } })
+    inputs = []
+    dialog = 0
+    200.times do
+      buttons = execution.next_input(state(x:, y:, dialog_state: dialog)) or break
+      inputs << buttons
+      dialog = 3 if buttons == [:a] && y == centre(5, 8)[1] - 6
+      y -= 1 if buttons == [:up] && y > centre(5, 8)[1] - 6
+    end
+    [execution.result(state(x:, y:, dialog_state: dialog)), inputs]
+  end
+
+  def test_a_sign_is_read_pressed_against_it_even_with_a_sprite_on_it_and_a_person_beside_it
+    on_it = { slot: 8, type: 220, x: 136, y: 80, cell: [4, 8], kind: :unknown }
+    beside = person_at(152, 88, slot: 4, type: 111)
+    [[on_it], [beside], [on_it, beside]].each do |entities|
+      result, inputs = sign_run(entities)
+      assert_equal :done, result[:stopped_by], "#{entities.map { |e| e[:type] }}: #{result.inspect}"
+      assert_equal [{ row: 5, col: 8 }, :up], result.values_at(:standing_cell, :facing)
+      refute result.key?(:person_cells)
+      assert_equal [[:up]] * 9, inputs.drop_while(&:empty?).take_while { |b| b != [:a] }
+    end
+  end
+
+  def test_an_entity_type_the_census_found_mute_is_no_response_at_once
+    butterfly = { slot: 2, type: 110, x: 136, y: 80, cell: [4, 8], kind: :unknown }
+    result, inputs = talk(4, 8, entities: -> { [butterfly] })
+    assert_equal :no_response, result[:stopped_by], result.inspect
+    assert_equal [[]], inputs
+    assert_match(/type 110/, result[:cause])
+    assert_empty result[:standing_cells_tried]
+  end
+
+  def test_a_mute_entity_on_the_target_does_not_hide_a_person_next_to_it
+    butterfly = { slot: 2, type: 110, x: 136, y: 80, cell: [4, 8], kind: :unknown }
+    result, = talk(4, 8, entities: -> { [butterfly, person_at(136, 80, slot: 3, type: 111)] })
+    assert_equal :done, result[:stopped_by], result.inspect
+    assert_equal({ type: 111, slot: 3, kind: 'npc' }, result[:entity])
+  end
+
+  def test_the_way_to_the_standing_cell_does_not_walk_up_into_a_door
+    door = [{ object: 226, cell: [4, 5], kind: :door, verified: true, faces: [:up] }]
+    result, = talk(1, 5, from: [5, 5], objects: -> { door })
+    assert_equal :done, result[:stopped_by], result.inspect
+    walked_up = result[:crossed].select { |_, col, direction| col == 5 && direction == :up }.map(&:first)
+    refute_includes walked_up, 5
+    refute_includes walked_up, 4
+  end
+
+  def test_a_person_farther_than_the_measured_reach_is_not_pressed_at
+    reach = Koholint::Skills::TalkTo::REACH
+    assert_equal({ up: 19, down: 20, left: 15, right: 16 }, reach)
+    x, = centre(4, 7)
+    person = person_at(x - reach[:left] - 1, 80)
+    result, inputs = talk(4, 6, from: [4, 7], grid: FakeGrid.new, entities: -> { [person] }, opens_after: nil)
+    refute result[:talked]
+    assert_equal [4, 7, :no_response], tried(result).first
+    refute_equal [:a], inputs.find { |b| b != [:left] }
+  end
+
+  def test_a_person_who_walks_out_of_reach_while_a_is_pressed_is_left_for_another_side
+    frames = 0
+    x, y = centre(4, 5)
+    walker = -> { frames < 12 ? person_at(*centre(4, 6)) : person_at(*centre(4, 6).zip([0, 40]).map(&:sum)) }
+    execution = registry.start('talk_to', state(x:, y:), { row: 4, col: 6 }, { grid: FakeGrid.new, entities: -> { [walker.call] } })
+    a = 0
+    100.times do
+      buttons = execution.next_input(state(x:, y:)) or break
+      frames += 1
+      a += 1 if buttons == [:a]
+    end
+    result = execution.result(state(x:, y:))
+    assert_equal [4, 5, :no_response], tried(result).first, result.inspect
+    assert_operator a, :<=, Koholint::Skills::TalkTo::PRESS_FRAMES
   end
 
   def test_when_every_side_is_known_the_exclusion_does_not_prevent_a_retry
