@@ -7,17 +7,17 @@ module Koholint
     FAILURE_CAP = 2
     VISIT_STAMPS = 3
     DANGER_PIXELS = 48
-    VISIT_ENGAGEMENTS = 4
-    VISIT_FRAMES = 900
+    VISIT_FRAMES = 2700
     SIGN_ROUNDS = 2
     PHASES = %i[playing].freeze
 
     attr_reader :open
 
-    def initialize(talk_log:, visit_engagements: VISIT_ENGAGEMENTS, visit_frames: VISIT_FRAMES)
+    def initialize(talk_log:, visit_frames: VISIT_FRAMES)
       @talk_log = talk_log
-      @visit_engagements = visit_engagements
       @visit_frames = visit_frames
+      @clock = 0
+      @seen = nil
       @sign_rounds = Hash.new(0)
       @npcs = Hash.new { |hash, key| hash[key] = { rounds: 0, slots: [] } }
       @failures = Hash.new(0)
@@ -27,19 +27,26 @@ module Koholint
       @notes = []
     end
 
+    def observe(state)
+      frame = state.frame.to_i
+      @clock += frame - @seen[0] if @seen && @seen[1] == :playing && frame > @seen[0]
+      @seen = [frame, state.phase(booted: true)]
+    end
+
     def candidate(state:, entities:, stamp:, signs: [], budget_low: false, danger: false)
+      observe(state)
       return if budget_low || danger || !PHASES.include?(state.phase(booted: true)) || hurt?(state) || threatened?(state, entities)
 
       place = [state.room_id, state.map_id]
       visit = visit_for(place)
-      cap(visit, stamp, state) if over_frames?(visit, stamp, state.frame)
-      return if blocked?(visit, stamp, state.frame)
+      cap(visit, stamp) if over_frames?(visit, stamp)
+      return if blocked?(visit, stamp)
 
       people = entities.select { |entity| npc?(entity) }
       pending = people.select { |entity| pending?(place, entity, stamp, people, visit) }
       unread = signs.select { |sign| sign?(sign) && unread?(place, sign, visit) }
       return if pending.empty? && unread.empty?
-      return spent(visit, state) if spent?(visit, state.frame)
+      return spent(visit) if spent?(visit)
 
       current = unread.find { |sign| [:sign, sign[:cell]] == visit[:current] }
       return current if current
@@ -56,8 +63,8 @@ module Koholint
       visit = visit_for(place)
       target = candidate(state:, entities:, stamp:, signs:, budget_low:, danger:) or return
 
-      visit[:cycles][stamp] ||= state.frame
-      visit[:started] ||= state.frame
+      visit[:cycles][stamp] ||= @clock
+      visit[:started] ||= @clock
       visit[:engaged] += 1
       return engage_sign(place, visit, target, stamp) if sign?(target)
 
@@ -109,14 +116,13 @@ module Koholint
       { skill: 'talk_to', params: { row: sign[:cell][0], col: sign[:cell][1] }, sign: { place:, cell: sign[:cell] }, round: }
     end
 
-    def spent?(visit, frame) = visit[:engaged] >= @visit_engagements || (visit[:started] && frame - visit[:started] >= @visit_frames)
+    def spent?(visit) = visit[:started] && @clock - visit[:started] >= @visit_frames
 
-    def spent(visit, state)
+    def spent(visit)
       return if visit[:spent]
 
       visit[:spent] = true
-      @notes << { kind: 'revisit', detail: { place: visit[:place], round: 0, outcome: 'visit_cap', engagements: visit[:engaged],
-                                             frames: visit[:started] ? state.frame - visit[:started] : 0 } }
+      @notes << { kind: 'revisit', detail: { place: visit[:place], round: 0, outcome: 'visit_cap', engagements: visit[:engaged], frames: @clock - visit[:started] } }
       nil
     end
 
@@ -136,11 +142,11 @@ module Koholint
       @visit = { place:, id: @visits, cycles: {}, capped: [], current: nil, engaged: 0, started: nil, spent: false }
     end
 
-    def blocked?(visit, stamp, frame)
-      visit[:capped].include?(stamp) || over_frames?(visit, stamp, frame) || (!visit[:cycles].key?(stamp) && visit[:cycles].size >= VISIT_STAMPS)
+    def blocked?(visit, stamp)
+      visit[:capped].include?(stamp) || over_frames?(visit, stamp) || (!visit[:cycles].key?(stamp) && visit[:cycles].size >= VISIT_STAMPS)
     end
 
-    def over_frames?(visit, stamp, frame) = visit[:cycles].key?(stamp) && frame - visit[:cycles][stamp] >= CYCLE_FRAMES
+    def over_frames?(visit, stamp) = visit[:cycles].key?(stamp) && @clock - visit[:cycles][stamp] >= CYCLE_FRAMES
 
     def pending?(place, entity, stamp, people, visit)
       entry = @npcs[[place, entity[:type], stamp]]
@@ -150,12 +156,12 @@ module Koholint
       people.count { |other| other[:type] == entity[:type] } > 1 && !entry[:slots].include?(entity[:slot])
     end
 
-    def cap(visit, stamp, state)
+    def cap(visit, stamp)
       return if visit[:capped].include?(stamp)
 
       visit[:capped] << stamp
       @notes << { kind: 'revisit', detail: { npc: { place: visit[:place], type: visit[:current] }, round: 0, outcome: 'cycle_frame_cap',
-                                             frames: state.frame - visit[:cycles][stamp] } }
+                                             frames: @clock - visit[:cycles][stamp] } }
     end
 
     def close(outcome)

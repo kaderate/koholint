@@ -3,7 +3,7 @@ require 'koholint/place_card'
 module Koholint
   module Candidates
     PER_KIND = 4
-    HERE_WORTH = %i[never new changed].freeze
+    HERE_WORTH = %i[never new changed repeat].freeze
     AWAY_WORTH = %i[never new].freeze
 
     module_function
@@ -11,9 +11,17 @@ module Koholint
     def build(place:, grid:, explore_log:, talk_log:, leads:, cards: {}, entities: [], signs: [], stamp: nil, link: nil)
       hops = explore_log.hops(place)
       named = ->(where) { leads.name_of(where) }
-      exits(place, grid, explore_log) + doors(place, signs, explore_log, link) + people_here(place, entities, talk_log, stamp) + signs_here(place, signs, talk_log) +
-        places(place, hops, explore_log, named) + people_away(place, hops, cards, talk_log, named) + signs_away(place, hops, cards, talk_log, named) +
-        lead_places(place, hops, leads, named)
+      people = people_here(place, entities, talk_log, stamp)
+      leaving = exits(place, grid, explore_log) + doors(place, signs, explore_log, link) + places(place, hops, explore_log, named) +
+                people_away(place, hops, cards, talk_log, named) + signs_away(place, hops, cards, talk_log, named) + lead_places(place, hops, leads, named)
+      people + signs_here(place, signs, talk_log) + warn(leaving, people)
+    end
+
+    def warn(leaving, people)
+      return leaving if people.empty?
+
+      who = people.map { |person| person[:who] }.join(', ')
+      leaving.map { |candidate| candidate.merge(label: "#{candidate[:label]} (leaves unexhausted people here: #{who})") }
     end
 
     def lines(candidates) = candidates.map { |candidate| "- #{candidate[:id]}: #{candidate[:label]}" }
@@ -45,7 +53,7 @@ module Koholint
 
         row, col = entity[:cell]
         who = talk_log.name_of(place, entity[:type]) || "person (type #{entity[:type]})"
-        { id: "person-t#{entity[:type]}", label: "talk to #{who} at (#{row},#{col}), #{status_text(status)}", title: "Talk to #{who}"[0, 80],
+        { id: "person-t#{entity[:type]}", who:, label: "talk to #{who} at (#{row},#{col}), #{status_text(status)}", title: "Talk to #{who}"[0, 80],
           predicate: { kind: 'new_text' }, target: { kind: 'person', place:, type: entity[:type], cell: [row, col] } }
       end
     end
@@ -107,6 +115,9 @@ module Koholint
 
     def moves(count) = "#{count} #{count == 1 ? 'move' : 'moves'} away"
 
-    def status_text(status) = { never: 'never talked to', new: 'last talk gave new text', changed: 'something changed since the last talk' }.fetch(status)
+    def status_text(status)
+      { never: 'never talked to', new: 'last talk gave new text', changed: 'something changed since the last talk',
+        repeat: 'last talk repeated an older text, not exhausted yet' }.fetch(status)
+    end
   end
 end

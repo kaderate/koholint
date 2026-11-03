@@ -28,17 +28,33 @@ class CandidatesTest < Minitest::Test
     signs = [{ kind: 'door', cell: [3, 5], object: 226 }, { kind: 'sign', cell: [5, 1], object: 212 }]
     found = build(entities:, signs:)
     ids = found.map { |candidate| candidate[:id] }
-    assert_equal %w[exit-down exit-left exit-right door-3-5 person-t62 sign-5-1 place-4-0], ids
-    exit = found.first
+    assert_equal %w[person-t62 sign-5-1 exit-down exit-left exit-right door-3-5 place-4-0], ids
+    exit = found[2]
     assert_equal({ kind: 'leave_place', place: HERE }, exit[:predicate])
     assert_equal({ kind: 'exit', place: HERE, direction: 'down' }, exit[:target])
-    assert_equal({ kind: 'new_text' }, found[4][:predicate])
+    assert_equal({ kind: 'new_text' }, found[0][:predicate])
     assert_equal({ kind: 'reach_place', place: [4, 0] }, found.last[:predicate])
     assert_match(/2 moves away/, found.last[:label])
-    assert_equal '- door-3-5: enter the door at (3,5), never entered', Koholint::Candidates.lines(found)[3]
-    assert_equal found[4], Koholint::Candidates.find(found, ' person-t62 ')
+    assert_equal '- door-3-5: enter the door at (3,5), never entered (leaves unexhausted people here: person (type 62))', Koholint::Candidates.lines(found)[5]
+    assert_equal found[0], Koholint::Candidates.find(found, ' person-t62 ')
+    assert(found.drop(2).all? { |candidate| candidate[:label].end_with?('(leaves unexhausted people here: person (type 62))') })
     [[3, 5], [4, 5]].each { |link| refute_includes build(signs:, link:).map { |c| c[:id] }, 'door-3-5' }
     assert_includes build(signs:, link: [5, 5]).map { |c| c[:id] }, 'door-3-5'
+  end
+
+  def test_exits_are_marked_until_every_person_here_is_exhausted
+    talk_log = Koholint::TalkLog.new
+    stamp = ['none', 1]
+    entities = [{ type: 62, kind: 'npc', cell: [2, 3] }, { type: 63, kind: 'npc', cell: [4, 7] }]
+    2.times { talk_log.remember(place: HERE, cell: [2, 3], text: 'Follow the south road.', stamp:, entity: 62, conversation: 'm' * 16) }
+    talk_log.remember(place: HERE, cell: [4, 7], text: 'Take this shield.', stamp:, entity: 63, conversation: 't' * 16)
+    found = Koholint::Candidates.build(place: HERE, grid: OpenGrid.new, explore_log: log, talk_log:, leads: Koholint::Leads.new, entities:, stamp:)
+    assert_equal 'person-t63', found.first[:id]
+    refute(found.any? { |candidate| candidate[:id] == 'person-t62' })
+    assert_match(/leaves unexhausted people here: person \(type 63\)\)\z/, found.find { |candidate| candidate[:id] == 'exit-down' }[:label])
+    talk_log.remember(place: HERE, cell: [4, 7], text: 'Take this shield.', stamp:, entity: 63, conversation: 't' * 16)
+    found = Koholint::Candidates.build(place: HERE, grid: OpenGrid.new, explore_log: log, talk_log:, leads: Koholint::Leads.new, entities:, stamp:)
+    refute(found.any? { |candidate| candidate[:label].include?('unexhausted') })
   end
 
   def test_people_and_signs_of_other_places_and_lead_places_use_names_and_routes

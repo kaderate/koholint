@@ -136,9 +136,27 @@ class SummaryTest < Minitest::Test
                      cost_by_skill: { 'choose_skill' => { calls: 4, usd: 1.0 } }, decisions_by_agent: { 'claude' => 4, 'start_game' => 1 },
                      usage: { goal_changes: 0, leads: { high: 0, normal: 0, low: 0, tip: 0 }, lead_rejected: 0, objectives_by_kind: { 'unknown' => 2 },
                               because_used: 0, talks: 0, talks_to_known: 0, dialogues: 0, not_ready_frames: 0, not_ready_waits: 0,
-                              autopilot_decisions: 0, chain_max: 0 } },
+                              autopilot_decisions: 0, chain_max: 0, left_with_unexhausted_people: 0 } },
                    Koholint::Summary.record(run.dir))
     end
+  end
+
+  def test_leaving_a_place_before_its_people_repeat_themselves_is_a_symptom
+    house = PLAYING.merge('room_id' => 163, 'map_id' => 16)
+    talk = lambda do |type, row, col, conversation|
+      [{ 'type' => 'action', 'frame' => 0, 'skill' => 'talk_to', 'params' => { 'row' => row, 'col' => col },
+         'result' => { 'talked' => true, 'stopped_by' => 'done', 'from' => { 'room' => 163, 'map' => 16 }, 'entity' => { 'type' => type } } },
+       { 'type' => 'dialogue', 'frame' => 0, 'place' => [163, 16], 'text' => "Words of #{conversation}.", 'conversation' => conversation }]
+    end
+    events = [{ 'type' => 'perception', 'frame' => 10, 'state' => house },
+              { 'type' => 'place_card', 'frame' => 10, 'place' => [163, 16], 'people' => [{ 'type' => 62, 'verified' => true }, { 'type' => 63, 'verified' => true }] },
+              *talk.(62, 3, 5, 'm' * 16), *talk.(62, 3, 5, 'm' * 16), *talk.(63, 4, 7, 't' * 16),
+              { 'type' => 'perception', 'frame' => 500, 'state' => PLAYING.merge('room_id' => 162, 'map_id' => 0) },
+              { 'type' => 'perception', 'frame' => 600, 'state' => house }, *talk.(63, 4, 7, 't' * 16), *talk.(63, 4, 7, 't' * 16),
+              { 'type' => 'perception', 'frame' => 900, 'state' => PLAYING.merge('room_id' => 162, 'map_id' => 0) }]
+    assert_equal [{ frame: 500, place: [163, 16], people: [63] }], Koholint::Summary.unexhausted_departures(events)
+    assert_equal [{ kind: 'left_with_unexhausted_people', count: 1, evidence: [{ frame: 500, place: [163, 16], people: [63] }] }],
+                 Koholint::Summary.symptoms(Koholint::Summary.unexhausted_departures(events))
   end
 
   def test_write_stores_the_record_and_sees_a_star
@@ -188,7 +206,7 @@ class SummaryTest < Minitest::Test
       assert_equal({ 'claude' => 3, 'delegated' => 1, 'start_game' => 1 }, record[:decisions_by_agent])
       assert_equal({ goal_changes: 2, leads: { high: 1, normal: 1, low: 0, tip: 0 }, lead_rejected: 1, objectives_by_kind: { 'dialogue_closed' => 2 },
                      because_used: 1, talks: 4, talks_to_known: 1, dialogues: 2, not_ready_frames: 41, not_ready_waits: 1,
-                     autopilot_decisions: 0, chain_max: 0 }, record[:usage])
+                     autopilot_decisions: 0, chain_max: 0, left_with_unexhausted_people: 0 }, record[:usage])
     end
   end
 

@@ -109,6 +109,7 @@ module Koholint
         track_locked(state)
         @hurt_at = state.frame if @last_hp && state.hp.to_i < @last_hp && !state.loading?
         @last_hp = state.hp.to_i
+        @revisit.observe(state)
         track { @objectives.update(state, frame:) }
       end
 
