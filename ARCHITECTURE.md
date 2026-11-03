@@ -34,10 +34,11 @@ provenance and a `verified_count`; `verified` needs two independent checks. No R
 `items.rb` and `data/items.json` name item ids (with provenance; unmeasured names are shown with a `?`); the milestone is the best of `shield_level` and the `milestone` of the items held (`none`, `shield`, `sword`). The engine runs an `ItemWatch` on every frame and emits `item_gained` (`item`, `name`, `place`, `held`) the first time an item id appears among the held items after the first play frame (once per id per run, rebuilt from the trace on resume).
 `GameState` also carries the readiness signals (`room_transition`, `link_airborne`, `link_z`, `link_knockback`,
 measured by `probes/readiness_census.rb`, `bin/koholint census ready <run_dir>`). `entities.rb` reads the game's entity table (16 slots: status, type, x, y, state) into `{ slot, type, x, y, status, state,
-cell, kind }` for the active slots; the kind per type id (`npc`, `enemy`, `object`, `unknown`) comes from
+cell, kind }` for the active slots; the kind per type id (`npc`, `enemy`, `object`, `creature`, `unknown`) comes from
 `data/entities.json`, measured by `probes/entity_census.rb` (`bin/koholint census entities`): A pressed next to the
 entity opens a dialogue that does not open with its slot cleared in a control copy (`npc`); contact damage against the
-same control (`enemy`, never observed so far); otherwise `unknown`. The engine passes `Entities.read` to the policy and
+same control (`enemy`, never observed so far); neither, measured (`creature`: not a person, never a talk target, no danger);
+an uncatalogued type is `unknown`. The engine passes `Entities.read` to the policy and
 skills as the `entities` context entry. `Entities.objects` reads the room object table (`room_objects`, one id per cell)
 and keeps the ids that `data/entities.json` lists with an `object` key and a kind (`sign`: shows a text when read with A,
 `object`, `door`: walking up into it from the cell below enters a building) and the directions Link faced when it answered (`faces`, which restrict the standing cells of `talk_to`); it is
@@ -79,7 +80,7 @@ screen change 53-66, a knockback 15-16, a door 62 (walk in, loading, walk out).
 
 **Place cards** — `place_card.rb`: on the first ready observation in the `playing` phase of each visit of a place
 (a new place since the last card; rebuilt from the trace on resume), after the grid builder, the engine scans the entity
-table and the room objects and emits a `place_card` event: people (`npc` entities, verified or not), enemies, unknown
+table and the room objects and emits a `place_card` event: people (`npc` entities, verified or not), enemies, creatures, unknown
 entities, signs, objects (`object` entities and room objects) with their cells, doors (room objects of kind `door`), and exits
 (border cells believed walkable, by side). `world.json` `places` keeps per place the last card, the visits, the first and last card frames, the
 place name the agent gave (`name`), the names and talk status of the people and whether each sign was read (from the talk log rebuilt from the trace). The
@@ -125,11 +126,13 @@ furniture, door) on the target cell is the target even with a sprite on or next 
 replaces it): Link presses toward it until he stops moving, since a sign answers only once he is pressed against it.
 Its walk never goes up into or out of a door cell (that enters the building). `talk_log.rb` remembers which sides of a person gave no response and, per person (the entity type that `talk_to` faced when the
 dialogue opened, reported in its result, else the last `talk_to` target cell), the key (letters
-and digits only, as for `new_text`) of each stitched text read, its conversation signature and speaker name, and a world stamp (milestone, places visited): the context says whether the last talk gave
+and digits only, as for `new_text`) of each stitched text read, its conversation signature and speaker name, and a world stamp (milestone, item ids held, count of `high` and `normal` leads; places visited do not count): the context says whether the last talk gave
 new text, how many talks in a row gave nothing new, and `worth retrying` (the stamp changed or the last talk was new) or
-`exhausted` (the last two talks repeated under the same stamp, by text or by signature). It also keeps the page texts per
+`exhausted` (the last two talks repeated under the same stamp, by text or by signature, or both gave nothing new: a person cycling through older texts). It also keeps the page texts per
 conversation signature. The listing of things on screen shows entities first (cell, type, kind, name), the sprite
-objects that hold no entity as a fallback, and the signs with their reading status.
+objects that hold no entity as a fallback, and the signs with their reading status; `creature` and `unknown` entities are
+not in it (nor among the candidates, the place card people or the revisit targets) but on a separate informational
+`Creatures on screen` line.
 `revisit.rb` is the deterministic revisit and arrival engagement: for the `npc` entities of a `verified` kind in the
 current place that are not exhausted for the current stamp, and the `verified` `sign` room objects not read yet (a sign
 is read once: a text remembered on its cell with no entity; `TalkLog#sign_status` is `never`, `tried` or `read`), it
@@ -137,9 +140,9 @@ gives the next `talk_to` (nearest target first, the same target until done, each
 tried once per stamp), with caps counted in rounds and in frames of free play only (`Revisit#observe`, fed by the policy
 at every iteration, adds the frames since the last state when that state was `playing`; dialogue pages and locked
 scenes do not count): 2700 frames per visit of the place (`VISIT_FRAMES`, then one `visit_cap` note), 6 rounds per
-person and stamp, 2 rounds per sign, 1800 frames per stamp, 3 stamps per visit and 2 failed talks per target and visit (then unreachable); it never acts outside free play, with
+person and stamp, 2 rounds per sign, 1800 frames per stamp, 3 stamps per visit (these caps key the stamp by milestone and items only, so a new lead reopens people without opening a new cycle) and 2 failed talks per target and visit (then unreachable); it never acts outside free play, with
 health below the maximum minus one heart, within 300 frames of a hit, while hemmed, or with an `enemy` or a moving or
-unmeasured `unknown` entity within 3 cells. Its talks are journaled like any decision (agent `delegated`, cost 0), are
+unmeasured `unknown` entity within 3 cells (a `creature` never gates it). Its talks are journaled like any decision (agent `delegated`, cost 0), are
 not objective attempts and are hidden from the explore autopilot. It records one `notable` `revisit`
 `{npc|sign, round, outcome}` per round.
 `vision/dialogue_shot.rb` also reduces a captured page to the text pixel rows of its dialogue box; a conversation's

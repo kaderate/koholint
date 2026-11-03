@@ -98,6 +98,16 @@ class AgentsContextTest < Minitest::Test
     assert_includes build(talk_log: log), '- at (1,2): talked to 1 time (dialogue opened 1)'
   end
 
+  def test_creatures_are_listed_apart_and_never_as_things_to_talk_to
+    entities = [{ slot: 1, type: 110, x: 56, y: 64, cell: [3, 3], kind: :creature, verified: true, moves: true },
+                { slot: 2, type: 47, x: 120, y: 48, cell: [2, 7], kind: :unknown, verified: false, moves: nil }]
+    text = build(talk_log: Koholint::TalkLog.new, entities:)
+    refute_includes text, 'entity type 110'
+    refute_includes text, 'entity type 47'
+    assert_includes text, "- at (1,2): never tried\n\nCreatures on screen, not people (for information, not talk targets): " \
+                          'type 47 at (2,7) (not identified), type 110 at (3,3) (gives no dialogue)'
+  end
+
   def test_signs_on_screen_are_listed_with_their_reading_status
     log = Koholint::TalkLog.new
     signs = [{ object: 99, cell: [3, 4], kind: :sign, verified: true }, { object: 99, cell: [5, 6], kind: :sign, verified: true }]

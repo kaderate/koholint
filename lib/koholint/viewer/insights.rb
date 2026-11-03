@@ -171,9 +171,8 @@ module Koholint
       end
 
       def stamp(trace)
-        places = Summary.visited_places(trace).size
-        milestone = trace.reverse_each.find { |e| e['type'] == 'perception' }&.dig('state', 'milestone')
-        Dialogues.stamp(milestone:, places:)
+        state = trace.reverse_each.find { |e| e['type'] == 'perception' && e['state'].is_a?(Hash) }&.dig('state') || {}
+        Dialogues.stamp_of(state, trace.select { |e| e['type'] == 'lead' })
       end
 
       def dialogue_states(trace)

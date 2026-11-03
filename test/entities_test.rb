@@ -81,7 +81,7 @@ class EntitiesTest < Minitest::Test
     skip_without_rom!
     emulator = EmulatorCache.replayed(STARTING_HOUSE_RUN, 2500)
     entities = Koholint::Entities.read(emulator)
-    assert_equal [[62, [3, 5], :npc], [63, [4, 7], :npc], [45, [6, 1], :unknown], [45, [6, 2], :unknown]], entities.map { |e| e.values_at(:type, :cell, :kind) }
+    assert_equal [[62, [3, 5], :npc], [63, [4, 7], :npc], [45, [6, 1], :creature], [45, [6, 2], :creature]], entities.map { |e| e.values_at(:type, :cell, :kind) }
     state = Koholint::Perception.read(emulator)
     sprites = Koholint::Vision::ScreenVision.sprites(emulator, emulator.read(Koholint::Vision::ScreenVision::LCDC))
                                              .reject { |sprite| Koholint::Vision::GridBuilder.link_sprite?(sprite, state) }

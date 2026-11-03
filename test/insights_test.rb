@@ -117,6 +117,8 @@ class InsightsTest < Minitest::Test
       person = Koholint::Viewer::Feed.insight(:map, dir, Follower.new(100, 100, 0, :in_sync))[:places].first[:people]
       assert_equal [{ row: 2, col: 3, attempts: 3, texts: 3, state: 'exhausted', last_frame: 30 }], person
       seen(trace, 40, 6)
+      assert_equal 'exhausted', Koholint::Viewer::Feed.for(dir, Follower.new(100, 100, 0, :in_sync))[:dialogues].first[:npc][:state]
+      trace.emit(:lead, frame: 41, id: 'lead-1', place: [6, 0], source: nil, quote: 'Go north', claim: 'north', importance: 'high')
       assert_equal 'worth retrying: something changed since', Koholint::Viewer::Feed.for(dir, Follower.new(100, 100, 0, :in_sync))[:dialogues].first[:npc][:state]
     end
   end

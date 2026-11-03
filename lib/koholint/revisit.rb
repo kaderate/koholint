@@ -6,6 +6,7 @@ module Koholint
     CYCLE_FRAMES = 1800
     FAILURE_CAP = 2
     VISIT_STAMPS = 3
+    CYCLE_KEY = 2
     DANGER_PIXELS = 48
     VISIT_FRAMES = 2700
     SIGN_ROUNDS = 2
@@ -39,11 +40,13 @@ module Koholint
 
       place = [state.room_id, state.map_id]
       visit = visit_for(place)
+      world = stamp
+      stamp = cycle_of(stamp)
       cap(visit, stamp) if over_frames?(visit, stamp)
       return if blocked?(visit, stamp)
 
       people = entities.select { |entity| npc?(entity) }
-      pending = people.select { |entity| pending?(place, entity, stamp, people, visit) }
+      pending = people.select { |entity| pending?(place, entity, stamp, world, people, visit) }
       unread = signs.select { |sign| sign?(sign) && unread?(place, sign, visit) }
       return if pending.empty? && unread.empty?
       return spent(visit) if spent?(visit)
@@ -62,6 +65,7 @@ module Koholint
       place = [state.room_id, state.map_id]
       visit = visit_for(place)
       target = candidate(state:, entities:, stamp:, signs:, budget_low:, danger:) or return
+      stamp = cycle_of(stamp)
 
       visit[:cycles][stamp] ||= @clock
       visit[:started] ||= @clock
@@ -148,10 +152,12 @@ module Koholint
 
     def over_frames?(visit, stamp) = visit[:cycles].key?(stamp) && @clock - visit[:cycles][stamp] >= CYCLE_FRAMES
 
-    def pending?(place, entity, stamp, people, visit)
+    def cycle_of(stamp) = stamp.is_a?(Array) ? stamp.first(CYCLE_KEY) : stamp
+
+    def pending?(place, entity, stamp, world, people, visit)
       entry = @npcs[[place, entity[:type], stamp]]
       return false if entry[:rounds] >= ROUND_CAP || @failures[[visit[:id], entity[:type]]] >= FAILURE_CAP
-      return true unless @talk_log.status(place:, entity: entity[:type], stamp:) == :exhausted
+      return true unless @talk_log.status(place:, entity: entity[:type], stamp: world) == :exhausted
 
       people.count { |other| other[:type] == entity[:type] } > 1 && !entry[:slots].include?(entity[:slot])
     end

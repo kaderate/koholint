@@ -1,5 +1,3 @@
-require 'koholint/summary'
-
 module Koholint
   module Dialogues
     OVERLAP_MIN = 7
@@ -53,12 +51,20 @@ module Koholint
       page.size
     end
 
-    def stamp(milestone:, places:) = [milestone.to_s, places]
+    STAMP_LEADS = %w[high normal].freeze
+
+    def stamp(milestone:, items:, leads:) = [milestone.to_s, items, leads]
+
+    def items(inventory, item_a, item_b) = [*Array(inventory), item_a, item_b].map(&:to_i).reject(&:zero?).uniq.sort
+
+    def leads_count(leads) = leads.count { |lead| STAMP_LEADS.include?((lead[:importance] || lead['importance']).to_s) }
+
+    def stamp_of(state, leads) = stamp(milestone: state['milestone'], items: items(state['inventory'], state['item_a'], state['item_b']), leads: leads_count(leads))
 
     def from_events(events)
       source = nil
-      places = []
-      milestone = nil
+      now = {}
+      leads = []
       found = []
       events.each do |event|
         type = event['type']
@@ -66,9 +72,9 @@ module Koholint
         found.last[:open] = false if found.last && !open
         case type
         when 'perception'
-          place = Summary.perceived_place(event)
-          places << place if place && !places.include?(place)
-          milestone = event.dig('state', 'milestone')
+          now = event['state'] if event['state'].is_a?(Hash)
+        when 'lead'
+          leads << event
         when 'action'
           next unless MOVES.include?(event['skill'].to_s)
 
@@ -84,7 +90,7 @@ module Koholint
             last[:cached] ||= (true if event['cached'] == true)
           else
             found << { frame: event['frame'], place: event['place'], source:, pages: [event['text'].to_s], open: true,
-                       stamp: stamp(milestone:, places: places.size), conversation: event['conversation'], speaker: event['speaker'],
+                       stamp: stamp_of(now, leads), conversation: event['conversation'], speaker: event['speaker'],
                        cached: (true if event['cached'] == true) }
           end
         end

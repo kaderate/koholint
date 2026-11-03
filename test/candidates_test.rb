@@ -24,7 +24,8 @@ class CandidatesTest < Minitest::Test
   end
 
   def test_exits_skip_sides_already_left_and_doors_people_and_signs_of_this_place_are_listed
-    entities = [{ type: 62, kind: 'npc', cell: [2, 3] }, { type: 62, kind: 'npc', cell: [2, 6] }, { type: 9, kind: 'enemy', cell: [4, 4] }]
+    entities = [{ type: 62, kind: 'npc', cell: [2, 3] }, { type: 62, kind: 'npc', cell: [2, 6] }, { type: 9, kind: 'enemy', cell: [4, 4] },
+                { type: 110, kind: 'creature', cell: [1, 1] }, { type: 47, kind: 'unknown', cell: [6, 6] }]
     signs = [{ kind: 'door', cell: [3, 5], object: 226 }, { kind: 'sign', cell: [5, 1], object: 212 }]
     found = build(entities:, signs:)
     ids = found.map { |candidate| candidate[:id] }
