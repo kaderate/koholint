@@ -128,7 +128,7 @@ Its walk never goes up into or out of a door cell (that enters the building). `t
 dialogue opened, reported in its result, else the last `talk_to` target cell), the key (letters
 and digits only, as for `new_text`) of each stitched text read, its conversation signature and speaker name, and a world stamp (milestone, item ids held, count of `high` and `normal` leads; places visited do not count): the context says whether the last talk gave
 new text, how many talks in a row gave nothing new, and `worth retrying` (the stamp changed or the last talk was new) or
-`exhausted` (the last two talks repeated under the same stamp, by text or by signature). It also keeps the page texts per
+`exhausted` (the last two talks repeated under the same stamp, by text or by signature, or both gave nothing new: a person cycling through older texts). It also keeps the page texts per
 conversation signature. The listing of things on screen shows entities first (cell, type, kind, name), the sprite
 objects that hold no entity as a fallback, and the signs with their reading status; `creature` and `unknown` entities are
 not in it (nor among the candidates, the place card people or the revisit targets) but on a separate informational
@@ -140,7 +140,7 @@ gives the next `talk_to` (nearest target first, the same target until done, each
 tried once per stamp), with caps counted in rounds and in frames of free play only (`Revisit#observe`, fed by the policy
 at every iteration, adds the frames since the last state when that state was `playing`; dialogue pages and locked
 scenes do not count): 2700 frames per visit of the place (`VISIT_FRAMES`, then one `visit_cap` note), 6 rounds per
-person and stamp, 2 rounds per sign, 1800 frames per stamp, 3 stamps per visit and 2 failed talks per target and visit (then unreachable); it never acts outside free play, with
+person and stamp, 2 rounds per sign, 1800 frames per stamp, 3 stamps per visit (these caps key the stamp by milestone and items only, so a new lead reopens people without opening a new cycle) and 2 failed talks per target and visit (then unreachable); it never acts outside free play, with
 health below the maximum minus one heart, within 300 frames of a hit, while hemmed, or with an `enemy` or a moving or
 unmeasured `unknown` entity within 3 cells (a `creature` never gates it). Its talks are journaled like any decision (agent `delegated`, cost 0), are
 not objective attempts and are hidden from the explore autopilot. It records one `notable` `revisit`

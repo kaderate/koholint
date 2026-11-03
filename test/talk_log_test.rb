@@ -148,7 +148,15 @@ class TalkLogTest < Minitest::Test
     talk(log, 'go north')
     assert_equal '2 texts read, last talk gave nothing new (1 talk in a row with nothing new), exhausted', memory_line(log)
     talk(log, 'Go north... then east')
-    assert_equal '3 texts read, last talk gave nothing new (2 talks in a row with nothing new)', memory_line(log)
+    assert_equal '3 texts read, last talk gave nothing new (2 talks in a row with nothing new), exhausted', memory_line(log)
+  end
+
+  def test_a_person_cycling_through_older_texts_is_exhausted_after_two_talks_with_nothing_new
+    log = Koholint::TalkLog.new
+    %w[Save\ with\ all\ buttons. Check\ the\ map. Save\ with\ all\ buttons.].each { |text| talk(log, text) }
+    refute_includes memory_line(log), 'exhausted'
+    talk(log, 'Check the map.')
+    assert_equal '4 texts read, last talk gave nothing new (2 talks in a row with nothing new), exhausted', memory_line(log)
   end
 
   def entity(type, cell, kind: :npc, slot: 0) = { slot:, type:, x: (cell[1] * 16) + 8, y: (cell[0] * 16) + 16, cell:, kind: }

@@ -76,7 +76,7 @@ place, so the grid went dark). The live view has a grid toggle that overlays the
 visited places from the trace; `fork` branches a run at a frame (the parent may be of an older flow; `--tag`, `--autopilot` and `--root` set the child's). Both work on an archived run, also on a fresh clone
 (see Run storage).
 
-## Agent skills (`flow-20`)
+## Agent skills (`flow-21`)
 
 - Between decisions the engine waits, with no input, until Link is ready (no screen scroll, door walk, jump or
   knockback, then 2 settled frames): the screen is never mapped and the model never called mid-scroll or mid-jump
@@ -130,9 +130,9 @@ visited places from the trace; `fork` branches a run at a frame (the parent may 
 - On arrival in a place, before the model is called, people and signs are engaged deterministically (`revisit.rb`, no
   model call to decide it): when a verified `npc` of the current place is not exhausted for the current world stamp
   (milestone, items held, number of high and normal leads; a place visited does not count) or a verified sign was never read, the policy issues `talk_to` itself (agent `delegated`,
-  cost 0), lets the pages advance, and repeats until two conversations in a row are identical (a sign is read once), at
+  cost 0), lets the pages advance, and repeats until two conversations in a row are identical or give nothing new (a sign is read once), at
   most 6 rounds per person, 2 per sign, 1800 frames of free play per stamp and 2700 per visit (frames spent in
-  dialogue pages or locked are not counted, so long dialogues never cut it short), 3 stamps per visit, or 2 failed
+  dialogue pages or locked are not counted, so long dialogues never cut it short), 3 stamps per visit (counted by milestone and items, not leads), or 2 failed
   talks per visit; while one is due it replaces any choice, so no exit (model, autopilot, harness objective) happens first; never when hurt, hemmed, or near a hostile or moving unknown entity (a measured `creature` that gives no dialogue does not count); each round is
   a `notable` `revisit` event (`{npc|sign, round, outcome}`). Each new place also gets a `place_card` (people, enemies,
   creatures, signs, objects, exits) kept in `world.json` `places`. A conversation is identified by a signature of its pages' text pixels; a conversation

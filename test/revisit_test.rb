@@ -152,6 +152,20 @@ class RevisitTest < Minitest::Test
     assert act
   end
 
+  def test_new_leads_reopen_people_without_spending_the_stamps_of_the_visit
+    stamps = (0..4).map { |leads| ['shield', [4], leads] }
+    act(entities: [people.first], stamp: stamps[0])
+    2.times do
+      say(62, 'Hello there.', stamp: stamps[0])
+      act(entities: [people.first], stamp: stamps[0])
+    end
+    assert_nil act(entities: [people.first], stamp: stamps[0])
+    stamps.drop(1).each do |stamp|
+      assert_equal 62, act(entities: [people.first], stamp:)[:npc][:type]
+      2.times { say(62, 'Hello there.', stamp:) }
+    end
+  end
+
   def test_a_moving_creature_next_to_link_does_not_block_the_engagement
     creature = npc(110, [3, 5], slot: 9, kind: :creature, moves: true)
     assert_equal 62, act(entities: people + [creature])[:npc][:type]

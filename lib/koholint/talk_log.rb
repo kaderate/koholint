@@ -215,7 +215,7 @@ module Koholint
       dry = fresh.reverse.take_while { |new| !new }.size
       changed = stamp && stamp != talks.last[:stamp]
       same = talks.size >= 2 && talks[-1][:stamp] == talks[-2][:stamp] &&
-             ((!fresh.last && Dialogues.known?(keys[-1], [keys[-2]])) || (talks[-1][:conversation] && talks[-1][:conversation] == talks[-2][:conversation]))
+             (dry >= 2 || (!fresh.last && Dialogues.known?(keys[-1], [keys[-2]])) || (talks[-1][:conversation] && talks[-1][:conversation] == talks[-2][:conversation]))
       status = if changed then :changed
                elsif fresh.last then :new
                elsif same then :exhausted
