@@ -7,7 +7,8 @@ module Koholint
     class Invalid < Error; end
 
     SLOTS = 16
-    KINDS = %w[npc enemy object unknown].freeze
+    KINDS = %w[npc enemy object creature unknown].freeze
+    NOT_PEOPLE = %w[creature unknown].freeze
     OBJECT_KINDS = %w[sign object door].freeze
     FACES = %w[up down left right].freeze
     DEFAULT_PATH = File.expand_path('../../data/entities.json', __dir__)
@@ -73,6 +74,8 @@ module Koholint
 
       raise Invalid, "entity #{entry['type']}: verified needs verified_count >= 2"
     end
+
+    def creature?(entity) = NOT_PEOPLE.include?(entity[:kind].to_s)
 
     def near(entities, cell, within: 1)
       entities.select { |entity| entity[:cell] && (entity[:cell][0] - cell[0]).abs <= within && (entity[:cell][1] - cell[1]).abs <= within }

@@ -90,14 +90,14 @@ class DialoguesTest < Minitest::Test
       { 'type' => 'action', 'frame' => 2, 'skill' => 'talk_to', 'params' => { 'row' => 3, 'col' => 4 }, 'result' => { 'talked' => true } },
       { 'type' => 'action', 'frame' => 3, 'skill' => 'advance_dialogue', 'params' => {}, 'result' => {} },
       *SHOP.first(3).map { |text| { 'type' => 'dialogue', 'frame' => 2, 'place' => [1, 0], 'text' => text } },
-      { 'type' => 'lead', 'frame' => 5 },
+      { 'type' => 'lead', 'frame' => 5, 'importance' => 'high' },
       { 'type' => 'action', 'frame' => 6, 'skill' => 'walk', 'params' => {}, 'result' => {} },
       { 'type' => 'dialogue', 'frame' => 7, 'place' => [1, 0], 'text' => 'A sign.' }
     ]
     first, second = Koholint::Dialogues.from_events(events)
-    assert_equal({ frame: 2, place: [1, 0], source: { row: 3, col: 4 }, text: "M' sieu! Pour sauvegarder,", stamp: ['none', 1] },
+    assert_equal({ frame: 2, place: [1, 0], source: { row: 3, col: 4 }, text: "M' sieu! Pour sauvegarder,", stamp: ['none', [], 0] },
                  first.except(:pages))
-    assert_equal [nil, 'A sign.', ['none', 1]], second.values_at(:source, :text, :stamp)
+    assert_equal [nil, 'A sign.', ['none', [], 1]], second.values_at(:source, :text, :stamp)
   end
 
   def test_an_explore_between_a_talk_and_a_text_clears_the_source
@@ -118,5 +118,14 @@ class DialoguesTest < Minitest::Test
     group = Koholint::Dialogues.from_events(events).first
     assert_equal({ row: 4, col: 7, entity: 63 }, group[:source])
     assert_equal ['ab' * 8, 'Bob', true], group.values_at(:conversation, :speaker, :cached)
+  end
+
+  def test_the_stamp_changes_with_the_milestone_items_or_leads_but_not_with_places
+    state = { 'milestone' => 'shield', 'inventory' => [4, 0, 0], 'item_a' => 0, 'item_b' => 4, 'room_id' => 1 }
+    base = Koholint::Dialogues.stamp_of(state, [])
+    assert_equal ['shield', [4], 0], base
+    assert_equal base, Koholint::Dialogues.stamp_of(state.merge('room_id' => 9), [{ 'importance' => 'low' }, { importance: 'tip' }])
+    assert_equal ['shield', [4], 1], Koholint::Dialogues.stamp_of(state, [{ importance: 'high' }])
+    assert_equal ['shield', [2, 4], 0], Koholint::Dialogues.stamp_of(state.merge('item_a' => 2), [])
   end
 end

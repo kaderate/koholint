@@ -21,8 +21,8 @@ class PlaceCardTest < Minitest::Test
   end
 
   def card
-    entities = [entity(115, [5, 2], :npc), entity(117, [5, 7], :npc, verified: false), entity(110, [2, 2], :unknown, moves: true),
-                entity(9, [6, 6], :enemy), entity(45, [6, 1], :object), entity(1, nil, :npc)]
+    entities = [entity(115, [5, 2], :npc), entity(117, [5, 7], :npc, verified: false), entity(110, [2, 2], :creature, moves: true),
+                entity(47, [1, 4], :unknown, moves: nil), entity(9, [6, 6], :enemy), entity(45, [6, 1], :object), entity(1, nil, :npc)]
     objects = [{ object: 212, cell: [3, 3], kind: :sign, verified: true }, { object: 40, cell: [1, 1], kind: :object, verified: false },
                { object: 226, cell: [4, 5], kind: :door, verified: true }]
     Koholint::PlaceCard.build(place: PLACE, entities:, objects:, grid: grid(true))
@@ -30,7 +30,8 @@ class PlaceCardTest < Minitest::Test
 
   def test_a_card_sorts_entities_and_room_objects_by_kind_and_lists_open_border_cells
     assert_equal({ place: PLACE, people: [{ type: 115, cell: [5, 2], verified: true }, { type: 117, cell: [5, 7], verified: false }],
-                   enemies: [{ type: 9, cell: [6, 6] }], unknown: [{ type: 110, cell: [2, 2], moves: true }],
+                   enemies: [{ type: 9, cell: [6, 6] }], unknown: [{ type: 47, cell: [1, 4], moves: nil }],
+                   creatures: [{ type: 110, cell: [2, 2], moves: true }],
                    signs: [{ cell: [3, 3], object: 212, verified: true }], objects: [{ cell: [6, 1], type: 45 }, { cell: [1, 1], object: 40 }],
                    doors: [{ cell: [4, 5], object: 226, verified: true }], exits: { up: [[0, 4], [0, 5]], right: [[3, 9]] } }, card)
   end

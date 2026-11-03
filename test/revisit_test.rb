@@ -141,7 +141,7 @@ class RevisitTest < Minitest::Test
   end
 
   def test_danger_gates_the_revisit
-    near = npc(110, [3, 5], slot: 9, kind: :unknown, moves: true)
+    near = npc(47, [3, 5], slot: 9, kind: :unknown, moves: true)
     assert_nil act(entities: people + [near])
     assert_nil act(entities: people + [near.merge(kind: :enemy, moves: false)])
     assert_nil act(entities: people + [near.merge(moves: nil)])
@@ -150,6 +150,22 @@ class RevisitTest < Minitest::Test
     assert_nil @revisit.next_action(state: state(hp: 15), entities: people, stamp: STAMP)
     assert_nil act(danger: true)
     assert act
+  end
+
+  def test_a_moving_creature_next_to_link_does_not_block_the_engagement
+    creature = npc(110, [3, 5], slot: 9, kind: :creature, moves: true)
+    assert_equal 62, act(entities: people + [creature])[:npc][:type]
+  end
+
+  def test_a_person_who_walked_away_is_followed_to_the_cell_it_stands_on_now
+    walker = npc(111, [2, 2], slot: 7, moves: true)
+    assert_equal [2, 2], act(entities: [walker])[:npc][:cell]
+    @revisit.talked({ talked: false, stopped_by: 'no_response' })
+    again = act(entities: [walker.merge(cell: [5, 6], x: 104, y: 96)])
+    assert_equal({ place: PLACE, type: 111, cell: [5, 6] }, again[:npc])
+    assert_equal({ row: 5, col: 6 }, again[:params])
+    @revisit.talked({ talked: false, stopped_by: 'target_free' })
+    assert_nil act(entities: [walker.merge(cell: [1, 1], x: 24, y: 32)])
   end
 
   def sign(cell) = { cell:, object: 0xD4, kind: :sign, verified: true }

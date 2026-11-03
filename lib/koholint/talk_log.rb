@@ -1,4 +1,5 @@
 require 'koholint/dialogues'
+require 'koholint/entities'
 require 'koholint/ledger'
 require 'koholint/vision/grid'
 
@@ -149,7 +150,7 @@ module Koholint
         stats[owner][1] += @talked[[where, cell]]
         stats[owner][2] |= @silent.fetch([where, cell], [])
       end
-      things = shown_entities.map { |entity| [:entity, entity] } + objects.map { |cells| [:sprite, cells] }
+      things = shown_entities.reject { |entity| Entities.creature?(entity) }.map { |entity| [:entity, entity] } + objects.map { |cells| [:sprite, cells] }
       tried = ->((what, it)) { what == :entity ? @attempts[[place, [:entity, it[:type]]]] : stats[it][0] }
       shown = limit && things.size > limit ? things.partition { |thing| tried.(thing).positive? }.flatten(1).first(limit).sort_by { |what, it| [what == :entity ? 0 : 1, what == :entity ? it[:cell] : it] } : things
       out = shown.map do |what, it|
@@ -244,8 +245,8 @@ module Koholint
 
     def entity_label(place, entity)
       name = name_of(place, entity[:type])
-      kind = entity[:kind].to_s == 'unknown' ? 'kind unknown' : entity[:kind].to_s
-      kind += ', unverified' if entity[:kind].to_s != 'unknown' && entity[:verified] == false
+      kind = entity[:kind].to_s
+      kind += ', unverified' if entity[:verified] == false
       "entity type #{entity[:type]} (#{kind}#{name ? ", name #{name}" : ''})"
     end
 

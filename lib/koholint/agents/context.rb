@@ -1,5 +1,6 @@
 require 'json'
 require 'koholint/game_state'
+require 'koholint/entities'
 require 'koholint/geometry'
 require 'koholint/items'
 require 'koholint/perception'
@@ -132,9 +133,23 @@ module Koholint
         end
         people = talk_log.people(place, entities)
         lines.unshift("People on screen: #{people.join(', ')}") if people.any?
-        lines.empty? ? [] : ["Things on screen you can interact with:\n#{lines.join("\n")}"]
+        block = lines.empty? ? [] : ["Things on screen you can interact with:\n#{lines.join("\n")}"]
+        creatures = creatures_line(entities)
+        creatures ? block + [creatures] : block
       end
       private_class_method :things_block
+
+      def self.creatures_line(entities)
+        shown = entities.select { |entity| entity[:cell] && Entities.creature?(entity) }.sort_by { |entity| [entity[:cell], entity[:slot].to_i] }
+        return if shown.empty?
+
+        listed = shown.map do |entity|
+          what = entity[:kind].to_s == 'creature' ? 'gives no dialogue' : 'not identified'
+          "type #{entity[:type]} at (#{entity[:cell][0]},#{entity[:cell][1]}) (#{what})"
+        end
+        "Creatures on screen, not people (for information, not talk targets): #{listed.join(', ')}"
+      end
+      private_class_method :creatures_line
 
       def self.hearts(hp) = (hp.to_f / Perception::HP_PER_HEART).to_s.delete_suffix('.0')
       private_class_method :hearts

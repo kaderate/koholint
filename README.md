@@ -76,7 +76,7 @@ place, so the grid went dark). The live view has a grid toggle that overlays the
 visited places from the trace; `fork` branches a run at a frame (the parent may be of an older flow; `--tag`, `--autopilot` and `--root` set the child's). Both work on an archived run, also on a fresh clone
 (see Run storage).
 
-## Agent skills (`flow-19`)
+## Agent skills (`flow-20`)
 
 - Between decisions the engine waits, with no input, until Link is ready (no screen scroll, door walk, jump or
   knockback, then 2 settled frames): the screen is never mapped and the model never called mid-scroll or mid-jump
@@ -124,17 +124,18 @@ visited places from the trace; `fork` branches a run at a frame (the parent may 
   again is worth it; `new_text` is an objective predicate; the live view lists the dialogues read.
 - People on screen come from the game's entity table in RAM (`entities.rb`): the context lists each entity with its cell,
   type id and measured kind (`data/entities.json`), sprites without an entity as a fallback, and the names people gave
-  (`speaker`, asked in the transcription call). People are remembered by (place, entity type), so a person who moved
+  (`speaker`, asked in the transcription call); creatures (measured to give no dialogue) and unidentified entities are
+  listed apart for information and are never offered as people to talk to. People are remembered by (place, entity type), so a person who moved
   keeps their memory.
 - On arrival in a place, before the model is called, people and signs are engaged deterministically (`revisit.rb`, no
   model call to decide it): when a verified `npc` of the current place is not exhausted for the current world stamp
-  (milestone, places visited) or a verified sign was never read, the policy issues `talk_to` itself (agent `delegated`,
+  (milestone, items held, number of high and normal leads; a place visited does not count) or a verified sign was never read, the policy issues `talk_to` itself (agent `delegated`,
   cost 0), lets the pages advance, and repeats until two conversations in a row are identical (a sign is read once), at
   most 6 rounds per person, 2 per sign, 1800 frames of free play per stamp and 2700 per visit (frames spent in
   dialogue pages or locked are not counted, so long dialogues never cut it short), 3 stamps per visit, or 2 failed
-  talks per visit; while one is due it replaces any choice, so no exit (model, autopilot, harness objective) happens first; never when hurt, hemmed, or near a hostile or moving unknown entity; each round is
+  talks per visit; while one is due it replaces any choice, so no exit (model, autopilot, harness objective) happens first; never when hurt, hemmed, or near a hostile or moving unknown entity (a measured `creature` that gives no dialogue does not count); each round is
   a `notable` `revisit` event (`{npc|sign, round, outcome}`). Each new place also gets a `place_card` (people, enemies,
-  signs, objects, exits) kept in `world.json` `places`. A conversation is identified by a signature of its pages' text pixels; a conversation
+  creatures, signs, objects, exits) kept in `world.json` `places`. A conversation is identified by a signature of its pages' text pixels; a conversation
   already read is not sent to the model again (its stored text is reused, `dialogue` events with `cached: true`).
 
 ## Mode census

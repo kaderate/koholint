@@ -139,7 +139,7 @@ class TalkLogTest < Minitest::Test
               said.call('A sign')]
     log = Koholint::TalkLog.from_events(events)
     assert_equal ['- at (4,7): talked to 2 times (dialogue opened 2); 2 texts read, last talk gave nothing new (1 talk in a row with nothing new), exhausted'],
-                 log.lines(grid([sprite(4, 7)]), PLACE, stamp: ['none', 1])
+                 log.lines(grid([sprite(4, 7)]), PLACE, stamp: ['none', [], 0])
   end
   def test_punctuation_or_a_re_read_contained_in_an_earlier_text_is_not_new
     log = Koholint::TalkLog.new
@@ -169,10 +169,10 @@ class TalkLogTest < Minitest::Test
 
   def test_entities_come_first_and_sprites_without_an_entity_stay_as_fallback
     log = Koholint::TalkLog.new
-    g = grid([sprite(2, 4, height: 32), sprite(2, 5, height: 32), sprite(6, 8)])
-    lines = log.lines(g, PLACE, entities: [entity(62, [3, 5]), entity(45, [6, 1], kind: :unknown, slot: 2), entity(117, [0, 0], slot: 3).merge(verified: false)])
-    assert_equal ['- at (0,0): entity type 117 (npc, unverified): never tried', '- at (3,5): entity type 62 (npc): never tried',
-                  '- at (6,1): entity type 45 (kind unknown): never tried', '- at (6,8): never tried'], lines
+    g = grid([sprite(2, 4, height: 32), sprite(2, 5, height: 32), sprite(6, 8), sprite(6, 1), sprite(1, 1)])
+    lines = log.lines(g, PLACE, entities: [entity(62, [3, 5]), entity(110, [6, 1], kind: :creature, slot: 2), entity(117, [0, 0], slot: 3).merge(verified: false),
+                                           entity(47, [1, 1], kind: :unknown, slot: 4)])
+    assert_equal ['- at (0,0): entity type 117 (npc, unverified): never tried', '- at (3,5): entity type 62 (npc): never tried', '- at (6,8): never tried'], lines
   end
 
   def test_identical_conversation_signatures_exhaust_even_when_transcriptions_differ
@@ -196,7 +196,7 @@ class TalkLogTest < Minitest::Test
     assert_equal 'Tarkin', log.name_of(PLACE, 63)
     assert_equal 2, log.attempts(PLACE, [[:entity, 63]])
     assert_equal ['Tarkin (4,7)'], log.people(PLACE, [entity(63, [4, 7])])
-    assert_equal :exhausted, log.status(place: PLACE, entity: 63, stamp: ['none', 1])
+    assert_equal :exhausted, log.status(place: PLACE, entity: 63, stamp: ['none', [], 0])
   end
 
   def test_a_sign_is_read_once_a_text_without_an_entity_is_remembered_on_its_cell
