@@ -217,7 +217,7 @@ observability only, no trace event, the set of captured places is rebuilt from t
 `world.json` (`{ goal, leads, places }`, rewritten from the trace at every stop), `summary.json` (written at every stop by
 `summary.rb` from the trace only, versioned by `Summary::VERSION`: totals, cost by skill, decisions by agent and
 feature usage, with `autopilot_decisions`, `chain_max`, `deaths` and `damage_events`, and `symptoms`: `left_with_unexhausted_people`, place changes
-away from a place whose last place card listed a verified person whose `TalkLog#last_status` was not `exhausted`; `archive` rewrites an outdated one), `star.json`, `notes.md` (owner notes from the viewer). Trace events (`dialogue` may carry `speaker`, `conversation` and `cached`; a `talk_to` result may carry `entity`; a `perception` may carry `not_ready_frames`; a `decision` may carry `autopilot`): `perception`, `decision`, `action`, `objective`, `dialogue`, `lead`, `goal`,
+away from a place whose last place card listed a verified person whose `TalkLog#last_status` was not `exhausted`; `archive` rewrites an outdated one), `star.json`, `notes.md` (owner notes from the viewer). Trace events (`dialogue` may carry `speaker`, `conversation` and `cached`; a `talk_to` result may carry `entity`; a `perception` may carry `not_ready_frames`; a `decision` may carry `autopilot`; a `choose_objective` decision lists the offered candidates in `options` as `{id, label, leaves_unexhausted, picked}`): `perception`, `decision`, `action`, `objective`, `dialogue`, `lead`, `goal`,
 `notable`, `place_card`, `place_name`, `item_gained`, `screen`, `screen_changed`, `affordance`, `grid_contradiction`, `keyframe`, `save`, `budget_stop`, `stop`. `budget.rb` enforces frames,
 minutes, dollars and objective steps. `archive.rb` keeps a light bundle per run in git (trace gzipped, `screens/` included);
 heavy artifacts stay local. A run resumes only with the same `flow_version` and ROM hash; a change to the
@@ -228,7 +228,7 @@ run and seeks by restoring the nearest keyframe; `Feed` derives status, mode and
 goal, leads and the stitched dialogue history (newest first, with the person talked to and their state) from the trace
 up to the shown frame, and `Insights` the world map (places on the overworld grid or attached to the screen they were
 entered from, kinds from `data/place_kinds.json` via `place_kinds.rb`; exits taken, belief grids, people, leads, and a `screenshot` flag per place served by `/screens/<room>-<map>.png`), the timeline
-markers and the cost series, cached by trace and shown frame. `Explorer` and `Registry` serve past runs (list,
+markers and the cost series, cached by trace and shown frame, and the `cockpit` (KPIs against the manifest budget, the health band, HUD, current objective with its offered candidates, reasoning, symptoms, the place card of the current place, interiors with their entry door, leads and the dialogues grouped by person) that feeds the page: a top bar, a sticky chronological strip, three columns (screen with people, sign and door overlays, HUD and reasoning; objective and dialogues; symptoms, place card, leads) and, below, the world map in an exterior and an interiors tab, the complete inventory and the dialogue history. `Explorer` and `Registry` serve past runs (list,
 read-only replays with pacing and seek, comparison via `run_compare.rb`, star, the run header and `notes.md`). It
 never writes game state; the only files it writes are `star.json`, `summary.json`'s `starred` and `notes.md`.
 

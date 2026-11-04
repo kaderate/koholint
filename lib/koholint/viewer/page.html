@@ -119,11 +119,12 @@
   .bub.dim { opacity: 0.55; }
   .bub.tipped { border-color: #6b5524; background: #1d1a12; }
   #leads { margin: 0; padding-left: 0; list-style: none; font-size: 13px; }
+  #leads .badge { flex: none; white-space: nowrap; align-self: flex-start; }
   #leads li { padding: 4px 0; border-bottom: 1px solid #22262e; display: flex; gap: 8px; justify-content: space-between; }
   .tabs u { text-decoration: none; cursor: pointer; margin-left: 10px; padding: 1px 10px; border-radius: 99px; border: 1px solid var(--line); font-size: 11.5px; }
   .tabs u.on { background: var(--acc); color: #000; border-color: var(--acc); }
-  #map { display: grid; gap: 4px; }
-  .cell { aspect-ratio: 1; border-radius: 5px; background: #181b21; border: 1px solid #232733; font-size: 9px; color: #555; padding: 2px; position: relative; overflow: hidden; text-align: left; line-height: 1.1; }
+  #map { display: grid; gap: 4px; justify-content: start; }
+  .cell { font-size: 10px; aspect-ratio: 1; border-radius: 5px; background: #181b21; border: 1px solid #232733; color: #555; padding: 2px; position: relative; overflow: hidden; text-align: left; line-height: 1.1; }
   .cell.v { background: #25392f; border-color: #35574a; color: #9fd5bd; cursor: pointer; }
   .cell.cur { outline: 2px solid var(--warn); }
   .cell.picked { background: #2a3550; }
@@ -1237,7 +1238,7 @@
   function renderPlaceCard(p) {
     var table = document.getElementById('pc-table');
     table.replaceChildren();
-    document.getElementById('pc-title').textContent = p ? 'Ici : ' + (p.name || formatPlace(p.place)) + ' ' + formatPlace(p.place) : 'Ici';
+    document.getElementById('pc-title').textContent = p ? 'Ici : ' + (p.name ? p.name + ' ' : '') + formatPlace(p.place) : 'Ici';
     document.getElementById('pc-visits').textContent = p && p.visits ? 'visite ' + p.visits : '';
     if (!p) return;
     p.people.forEach(function (x) { var b = verdictBadge(x.verdict); table.appendChild(row(personLabel(x), b.text, b.className.replace('badge ', ''))); });
@@ -1449,7 +1450,7 @@
     if (picked === null && map.current) picked = placeKey(map.current);
     var width = 0, height = 0, at = {};
     cells.forEach(function (n) { width = Math.max(width, n.x + 1); height = Math.max(height, n.y + 1); at[n.x + ',' + n.y] = n; });
-    box.style.gridTemplateColumns = 'repeat(' + Math.max(width, 1) + ', minmax(0, 1fr))';
+    box.style.gridTemplateColumns = 'repeat(' + Math.max(width, 1) + ', minmax(0, 72px))';
     for (var y = 0; y < height; y++) {
       for (var x = 0; x < width; x++) {
         var n = at[x + ',' + y];
