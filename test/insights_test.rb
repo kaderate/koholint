@@ -176,4 +176,35 @@ class InsightsTest < Minitest::Test
               { 'type' => 'stop', 'frame' => 4, 'reason' => 'stuck_boot' }]
     assert_equal [{ kind: 'unknown_mode', frame: 2, detail: 'game_mode=9' }, { kind: 'stuck_boot', frame: 4, detail: 'run stopped: stuck_boot' }], Insights.alerts(trace)
   end
+
+  def test_cockpit_gathers_the_numbers_the_page_shows
+    trace = [
+      { 'type' => 'perception', 'frame' => 5, 'state' => PLAY.merge('room_id' => 1, 'map_id' => 0, 'hp' => 24, 'item_b' => 4, 'inventory' => [4, 0], 'milestone' => 'shield') },
+      { 'type' => 'place_card', 'frame' => 6, 'place' => [1, 0], 'people' => [{ 'type' => 62, 'cell' => [3, 5] }], 'enemies' => [], 'creatures' => [{ 'type' => 45, 'cell' => [6, 1] }],
+        'unknown' => [], 'signs' => [{ 'cell' => [1, 1] }], 'objects' => [], 'doors' => [{ 'cell' => [4, 5], 'object' => 226 }], 'exits' => {} },
+      { 'type' => 'lead', 'frame' => 7, 'id' => 'lead-1', 'place' => [1, 0], 'quote' => 'Use it to repel', 'claim' => 'The shield repels', 'importance' => 'tip' },
+      { 'type' => 'dialogue', 'frame' => 8, 'place' => [1, 0], 'text' => 'Use it to repel enemies.', 'speaker' => 'Tarkin' },
+      { 'type' => 'decision', 'frame' => 9, 'decision_point' => 'choose_objective', 'agent' => 'claude', 'cost_usd' => 0.5, 'prompt_sha' => 'x', 'justification' => 'because',
+        'confidence' => 0.8, 'choice' => { 'title' => 'Talk' },
+        'options' => [{ 'id' => 'a', 'label' => 'one', 'leaves_unexhausted' => false, 'picked' => true }, { 'id' => 'b', 'label' => 'two', 'leaves_unexhausted' => true, 'picked' => false }] },
+      { 'type' => 'objective', 'frame' => 10, 'id' => 'obj-1', 'status' => 'started', 'title' => 'Talk', 'predicate' => { 'kind' => 'new_text' } },
+      { 'type' => 'notable', 'frame' => 11, 'kind' => 'damage', 'detail' => 'x' },
+      { 'type' => 'item_gained', 'frame' => 12, 'item' => 4, 'name' => 'shield' }
+    ]
+    view = Insights.cockpit(trace, manifest: { 'budget' => { 'dollars' => 10, 'active_seconds' => 600 } }, frame: 3600)
+    assert_equal [0.5, 10, 1, 1, 1.0, 10.0], view[:kpis].values_at(:spent, :cap, :calls, :places, :minutes, :cap_minutes)
+    assert_equal [{ frame: 5, hp: 24, max_hp: 24 }], view[:health][:points]
+    assert_equal [{ frame: 11, kind: 'damage' }], view[:health][:hits]
+    assert_equal ['shield', true, false], [view[:hud][:item_b][:name], view[:hud][:ladder][0][:reached], view[:hud][:ladder][1][:reached]]
+    assert_equal %w[a b], view[:now][:candidates].map { |c| c[:id] }
+    assert_equal [true, false], view[:now][:candidates].map { |c| c[:picked] }
+    assert_equal 'because', view[:now][:why][:text]
+    assert_equal true, view[:reasoning][:paid][:paid]
+    assert_equal [1, 0], view[:symptoms].values_at(:damage_events, :left_with_unexhausted_people)
+    assert_equal ['revisit', [[1, 1]], [[4, 5]]], [view[:place][:people][0][:verdict], view[:place][:signs].map { |s| s[:cell] }, view[:place][:doors].map { |d| d[:cell] }]
+    assert_equal [false], view[:place][:signs].map { |s| s[:read] }
+    group = view[:dialogues].first
+    assert_equal ['Tarkin', true], [group[:name], group[:talks][0][:tip]]
+    assert_equal [], view[:interiors]
+  end
 end
