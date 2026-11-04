@@ -73,6 +73,11 @@ class AgentsContextTest < Minitest::Test
     assert_includes build(locked_frames: 930), 'Link has been locked for 930 frames (cause unknown)'
   end
 
+  def test_the_health_line_shows_hp_lost_and_a_death_since_the_last_decision
+    assert_includes build(hp_lost: 4), "Health: 3 of 3 hearts, 0.5 lost since your last decision\n"
+    assert_includes build(hp_lost: 24, died: true), 'Health: 3 of 3 hearts, 3 lost since your last decision (Link died; the harness chose continue)'
+  end
+
   def test_the_movement_lock_line_appears_only_when_locked
     refute_includes build, 'Link has not moved'
     assert_includes build(locked: 3), "Link has not moved in the last 3 attempts in different directions and no dialogue is open: movement may be locked by an animation or an event; waiting a few seconds is usually enough before trying again."

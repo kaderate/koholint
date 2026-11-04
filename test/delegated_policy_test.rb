@@ -942,6 +942,36 @@ class DelegatedPolicyTest < Minitest::Test
     started = Koholint::Trace.read(File.join(@dir, 'trace.jsonl')).select { |e| e['status'] == 'started' }
     assert_equal ['lead-1', nil], started.map { |e| e['because'] }
   end
+
+  def test_the_game_over_screen_continues_without_a_model_call_and_never_quits
+    client = ScriptedClient.new(objective: objective, skill: walk)
+    p = policy(client)
+    over = state(hp: 0, link_motion_state: 7, game_over_stage: 4)
+    p.observe(over, frame: 100)
+    _point, result = decide(p, over)
+    assert_empty client.calls
+    assert_equal({ skill: 'choose_option', params: { option: 0 } }, result[:choice])
+    refute Koholint::Modes.for(over).quits?(result[:choice][:params][:option])
+    assert_equal [0.0, 'delegated'], result.values_at(:cost_usd, :agent)
+    assert_includes result[:notables], { kind: 'death', detail: 'game over: save and continue' }
+    p.observe(over, frame: 110)
+    refute decide(p, over).last[:notables]&.any? { |note| note[:kind] == 'death' }
+  end
+
+  def test_hp_drops_emit_a_damage_notable_and_show_in_the_next_prompt
+    client = ScriptedClient.new(objective: objective, default: walk)
+    p = policy(client)
+    p.observe(state(hp: 16), frame: 100)
+    decide(p, state(hp: 16))
+    p.observe(state(frame: 200, hp: 12), frame: 200)
+    _point, result = decide(p, state(frame: 200, hp: 12))
+    assert_includes result[:notables], { kind: 'damage', detail: 'hp 16 -> 12' }
+    assert_includes client.calls.last[:prompt], 'Health: 1.5 of 3 hearts, 0.5 lost since your last decision'
+    p.observe(state(frame: 300, hp: 12), frame: 300)
+    _point, result = decide(p, state(frame: 300, hp: 12))
+    assert_nil result[:notables]
+    assert_includes client.calls.last[:prompt], "Health: 1.5 of 3 hearts\n"
+  end
 end
 
 class DelegatedEngineTest < Minitest::Test

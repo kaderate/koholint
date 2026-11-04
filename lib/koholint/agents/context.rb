@@ -25,11 +25,11 @@ module Koholint
       QUOTE_LIMIT = 80
 
       def self.build(state:, grid:, objective:, history:, attempts:, manual:, last_results:, max_chars: 9000, ledger: nil, refusals: [], plan: nil, triggers: nil, talk_log: nil, locked: nil, locked_frames: nil, goal: nil, leads: [], stamp: nil, entities: [], signs: [],
-                     place_name: nil, candidates: nil, resolve: nil)
+                     place_name: nil, candidates: nil, resolve: nil, hp_lost: 0, died: false)
         link = state.cell
         place = [state.room_id, state.map_id]
         results = last_results.last(RESULT_LIMIT).map { |r| r.transform_keys(&:to_sym) }
-        fixed = [header(state, link, triggers, place, locked, locked_frames, place_name), grid_block(grid, link, ledger, place), neighbours(grid, link, results, ledger, place),
+        fixed = [header(state, link, triggers, place, locked, locked_frames, place_name, hp_lost, died), grid_block(grid, link, ledger, place), neighbours(grid, link, results, ledger, place),
                  *things_block(grid, talk_log, place, stamp, entities, signs), objective_block(objective, attempts, plan, goal), *leads_block(leads, place, resolve),
                  *candidates_block(candidates)]
         finished = history.map { |h| "- #{h[:id]} #{h[:outcome]}#{h[:reason] ? " (#{h[:reason]})" : ''}: #{h[:title]}#{' (picked by the harness)' if h[:autopilot]}" }
@@ -68,7 +68,7 @@ module Koholint
       end
       private_class_method :render
 
-      def self.header(state, link, triggers = nil, place = nil, locked = nil, locked_frames = nil, place_name = nil)
+      def self.header(state, link, triggers = nil, place = nil, locked = nil, locked_frames = nil, place_name = nil, hp_lost = 0, died = false)
         where = link ? "row #{link[0]}, col #{link[1]}" : 'outside the grid (doorway or screen edge)'
         phase = state.phase(booted: true)
         named = place_name ? ", named by you: #{place_name}" : ', not named yet (you may name it in place_name)'
@@ -80,7 +80,8 @@ module Koholint
           dx, dy = Geometry.offset(state.x, state.y, link)
           lines << "Link offset from cell centre (positive = right of / below the centre): dx=#{dx}, dy=#{dy}"
         end
-        lines << "Health: #{hearts(state.hp)} of #{hearts(state.max_hp)} hearts"
+        lost = ", #{hearts(hp_lost)} lost since your last decision" if hp_lost.positive?
+        lines << "Health: #{hearts(state.hp)} of #{hearts(state.max_hp)} hearts#{lost}#{' (Link died; the harness chose continue)' if died}"
         lines << items_line(state)
         known = link && triggers ? triggers.forbidden(place, link) : []
         known.each do |input|
