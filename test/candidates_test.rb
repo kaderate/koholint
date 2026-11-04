@@ -43,6 +43,15 @@ class CandidatesTest < Minitest::Test
     assert_includes build(signs:, link: [5, 5]).map { |c| c[:id] }, 'door-3-5'
   end
 
+  def test_the_offered_list_keeps_id_label_warning_and_pick_for_the_trace
+    entities = [{ type: 62, kind: 'npc', cell: [2, 3] }]
+    found = build(entities:)
+    offered = Koholint::Candidates.offered(found, found.last)
+    assert_equal found.map { |c| c[:id] }, offered.map { |c| c[:id] }
+    assert_equal [false] * (found.size - 1) + [true], offered.map { |c| c[:picked] }
+    assert_equal [false] + [true] * (found.size - 1), offered.map { |c| c[:leaves_unexhausted] }
+  end
+
   def test_exits_are_marked_until_every_person_here_is_exhausted
     talk_log = Koholint::TalkLog.new
     stamp = ['none', 1]

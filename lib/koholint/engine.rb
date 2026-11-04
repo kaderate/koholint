@@ -124,7 +124,7 @@ module Koholint
       emit_dialogue(result[:transcription], state)
       emit_notes(result, state)
       seen = record_prompt(result, state.frame, chosen.name)
-      @run.trace.emit(:decision, frame: state.frame, decision_point: chosen.name.to_s, input: state.to_h, options: chosen.options || [],
+      @run.trace.emit(:decision, frame: state.frame, decision_point: chosen.name.to_s, input: state.to_h, options: offered(chosen),
                                  choice: choice, justification: result[:justification], confidence: result[:confidence],
                                  agent: result[:agent], latency_ms: result[:latency_ms].to_i, cost_usd: result[:cost_usd].to_f, fallback: result[:fallback] || false,
                                  **seen, **(result[:plan] ? { plan: result[:plan] } : {}), **(result[:autopilot] ? { autopilot: true } : {}),
@@ -140,6 +140,13 @@ module Koholint
         @run.trace.emit(:action, frame: @emulator.frame, skill: 'press', params: choice, result: { frames: frames })
       end
       activity(:idle, 'between decisions')
+    end
+
+    def offered(chosen)
+      return chosen.options if chosen.options
+      return [] unless chosen.name == :choose_objective && @policy.respond_to?(:offered_candidates)
+
+      @policy.offered_candidates
     end
 
     def note_place(state, grid)

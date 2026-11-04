@@ -1,0 +1,126 @@
+<!doctype html><html lang="fr"><meta charset="utf-8"><title>Koholint — maquette UI v2</title><style>
+:root{--bg:#14161a;--panel:#1c1f26;--line:#2a2e38;--ink:#e8e6df;--mut:#8b90a0;--acc:#6ec1a2;--warn:#e0a84a;--bad:#e06c6c;--ok:#6ec1a2;--blue:#6aa3e0}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font:14px/1.5 -apple-system,system-ui,sans-serif}
+.note{background:#2b2417;color:#f0d9a0;padding:8px 16px;font-size:12.5px;border-bottom:1px solid #4a3d22}
+.top{display:flex;align-items:center;gap:14px;padding:10px 16px;border-bottom:1px solid var(--line);background:var(--panel)}
+.top b{letter-spacing:.04em}.pill{padding:2px 10px;border-radius:99px;font-size:12px;border:1px solid var(--line);color:var(--mut)}
+.pill.live{color:#fff;background:#b83a3a;border-color:#b83a3a}.pill.ok{color:var(--ok);border-color:#2f5d4a}
+.spacer{flex:1}.kpi{display:flex;gap:18px;font-size:12.5px;color:var(--mut)}.kpi b{color:var(--ink);font-size:14px}
+.wrap{display:grid;grid-template-columns:420px 1fr 340px;gap:14px;padding:14px}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:12px 14px;margin-bottom:14px}
+.card h3{margin:0 0 8px;font-size:11.5px;text-transform:uppercase;letter-spacing:.1em;color:var(--mut);font-weight:600;display:flex;justify-content:space-between}
+.screen{aspect-ratio:160/144;background:linear-gradient(#5b8f5a,#3f6f45);border-radius:8px;position:relative;overflow:hidden;border:1px solid #000}
+.screen .link{position:absolute;left:46%;top:52%;width:22px;height:22px;background:#e0c46e;border-radius:4px}
+.screen .npc{position:absolute;width:22px;height:22px;border-radius:4px;border:2px dashed #fff;background:rgba(110,193,162,.35)}
+.screen .cr{position:absolute;width:20px;height:20px;border-radius:50%;border:2px dashed var(--bad);background:rgba(224,108,108,.25)}
+.screen .sign{position:absolute;width:18px;height:18px;border:2px dashed var(--blue);background:rgba(106,163,224,.3)}
+.screen .door{position:absolute;width:26px;height:18px;border:2px dashed var(--warn);background:rgba(224,168,74,.3)}
+.tag{position:absolute;font-size:10px;background:#000a;padding:0 4px;border-radius:3px}
+.hud{display:flex;align-items:center;gap:14px;margin-top:10px}
+.hearts{font-size:18px;letter-spacing:2px;color:#e06c6c}.hearts span{color:#444}
+.slot{width:34px;height:34px;border:1px solid var(--line);border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:11px;color:var(--mut);background:#15171c;position:relative}
+.slot.has{color:var(--ink);border-color:#3c4252}.slot em{position:absolute;top:-7px;left:-5px;background:var(--acc);color:#000;font-size:10px;font-style:normal;padding:0 4px;border-radius:3px;font-weight:700}
+.ladder{display:flex;gap:6px;margin-top:10px;align-items:center;font-size:12px}
+.step{padding:3px 10px;border-radius:99px;border:1px solid var(--line);color:var(--mut)}.step.done{color:#000;background:var(--acc);border-color:var(--acc)}.step.next{border-color:var(--warn);color:var(--warn)}
+.now h2{margin:0 0 4px;font-size:18px}.why{color:var(--mut);font-size:13px}
+.cands{display:grid;gap:6px;margin-top:10px}.cand{display:flex;gap:10px;align-items:center;padding:7px 10px;border:1px solid var(--line);border-radius:8px;background:#171a20}
+.cand.picked{border-color:var(--acc);background:#1a2823}.cand .id{font-family:ui-monospace,monospace;color:var(--mut);width:30px}.cand .k{margin-left:auto;font-size:11.5px;color:var(--mut)}
+.k.warn{color:var(--warn)}
+table{width:100%;border-collapse:collapse;font-size:13px}td{padding:5px 0;border-bottom:1px solid #22262e}td:last-child{text-align:right}
+.badge{font-size:11px;padding:1px 8px;border-radius:99px}.b-ok{background:#1d3a2f;color:var(--ok)}.b-warn{background:#3b3017;color:var(--warn)}.b-mut{background:#252932;color:var(--mut)}.b-bad{background:#3d1f1f;color:var(--bad)}
+.tl{height:54px;position:relative;background:#15171c;border-radius:8px;border:1px solid var(--line);overflow:hidden}
+.tl i{position:absolute;top:8px;width:3px;height:16px;border-radius:2px}.tl .band{position:absolute;left:0;right:0;bottom:6px;height:10px}
+.bar{height:10px;border-radius:5px;background:#252932;overflow:hidden;margin-top:6px}.bar div{height:100%;background:var(--acc)}
+.map{display:grid;grid-template-columns:repeat(8,1fr);gap:4px}.cell{aspect-ratio:1;border-radius:5px;background:#181b21;border:1px solid #232733;font-size:9px;color:#555;padding:2px;position:relative}
+.cell.v{background:#25392f;border-color:#35574a;color:#9fd5bd}.cell.cur{outline:2px solid var(--warn)}.cell.d{background:#3b3017;border-color:#6b5524;color:#e0a84a}
+.sym{display:flex;gap:8px;flex-wrap:wrap}.sym .badge{font-size:11.5px}
+.ico{font-size:20px;width:40px;height:40px}.ico.dim{color:#3a3f4c}
+.seg{display:flex;border:1px solid var(--line);border-radius:99px;overflow:hidden}.seg span{padding:3px 14px;font-size:12.5px;color:var(--mut);cursor:pointer}.seg .on{background:#b83a3a;color:#fff}
+.tip{position:relative;cursor:help}.pop{display:none;position:absolute;right:0;top:26px;z-index:5;width:260px;background:#0f1115;border:1px solid var(--line);border-radius:10px;padding:10px 12px;color:var(--ink);line-height:1.5;box-shadow:0 8px 24px #000a}.tip:hover .pop{display:block}
+.dlg .who{margin:10px 0 4px;font-weight:600;font-size:13px}.dlg .who .lg{color:var(--mut);font-weight:400;font-size:12px;margin-left:6px}
+.bub{background:#171a20;border:1px solid var(--line);border-radius:10px 10px 10px 2px;padding:7px 10px;margin:4px 0;font-size:13px;color:#d6d9e2}.bub small{display:block;color:var(--mut);font-size:11px;margin-bottom:2px}
+.bub.dim{opacity:.55}.bub.tip{border-color:#6b5524;background:#1d1a12}
+.dn{position:absolute;right:2px;bottom:1px;font-size:9px;color:#e0a84a}.cell{position:relative}
+.tabs u{text-decoration:none;cursor:pointer;margin-left:10px;padding:1px 10px;border-radius:99px;border:1px solid var(--line);font-size:11.5px;text-transform:none;letter-spacing:0}.tabs u.on{background:var(--acc);color:#000;border-color:var(--acc)}
+.int{border:1px solid var(--line);border-radius:10px;padding:8px 10px;margin-bottom:8px;background:#171a20}.ihead{display:flex;justify-content:space-between;align-items:center}.ilink{color:var(--mut);font-size:12.5px;margin-top:3px}.ilink u{color:var(--blue);cursor:pointer}.irow{display:flex;gap:10px;align-items:center;margin-top:6px}
+.ov i{font-style:normal;cursor:pointer;margin-left:6px;padding:1px 6px;border-radius:6px;border:1px solid var(--line);opacity:.45}.ov i.on{opacity:1;border-color:var(--acc)}
+.legend{font-size:11.5px;color:var(--mut);margin-top:8px}
+.chg{font-size:12.5px;color:var(--mut)}.chg li{margin:3px 0}.chg b{color:var(--ink)}
+
+.wrap{grid-template-columns:400px 1fr 330px;align-items:start}
+.fold{position:relative;height:0;border-top:2px dashed #e0a84a;margin:6px 14px 14px}
+.fold span{position:absolute;right:0;top:-11px;background:var(--bg);color:#e0a84a;font-size:11.5px;padding:0 8px;letter-spacing:.04em}
+.strip{position:sticky;top:0;z-index:4;background:#101216;border-bottom:1px solid var(--line);padding:6px 16px;display:flex;align-items:center;gap:12px}
+.strip .tl{flex:1;height:26px}.strip .tl i{top:3px;height:12px}.strip .tl .band{bottom:3px;height:5px}.strip small{color:var(--mut);font-size:11.5px;white-space:nowrap}
+.mini{display:flex;gap:4px}.mini .slot{width:26px;height:26px;font-size:14px}
+.scroll{max-height:210px;overflow:auto}
+.lower{display:grid;grid-template-columns:1.25fr 1fr;gap:14px;padding:0 14px}
+.zone{font-size:11px;color:#e0a84a;text-transform:uppercase;letter-spacing:.12em;margin:0 14px 6px}
+.cols2{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+</style>
+<div class="top"><b>KOHOLINT</b><div class="seg"><span class="on">● Live</span><span>Historique</span><span>Comparer</span></div><span class="pill">run 20261104-153743-acc2</span><span class="pill">flow-22</span><span class="pill ok">jeu libre</span>
+<span class="spacer"></span><div class="kpi"><div>frame <b>41 280</b></div><div class="tip">coût <b>3,42 $</b> / 10<div class="pop"><b>Budget</b><br>3,42 $ sur 10 $ (34 %)<div class="bar"><div style="width:34%"></div></div>118 appels · 5,1 / 1000 frames<br>0,08 $ / 1000 frames<br>41 min sur 180</div></div><div>lieux <b>31</b></div></div></div>
+<div class="strip"><small>chronologie</small><div class="tl">
+<i style="left:4%;background:#6aa3e0"></i><i style="left:9%;background:#6ec1a2"></i><i style="left:18%;background:#e0a84a"></i><i style="left:30%;background:#e06c6c"></i><i style="left:46%;background:#e0a84a"></i><i style="left:58%;background:#6aa3e0"></i><i style="left:71%;background:#e06c6c"></i><i style="left:84%;background:#6aa3e0"></i>
+<div class="band" style="background:linear-gradient(90deg,#2b6a4f 0 28%,#7a5a1a 28% 36%,#2b6a4f 36% 70%,#7a2a2a 70% 76%,#2b6a4f 76%)"></div></div><small>▶ replay · 1×</small></div>
+
+<div class="wrap">
+<div>
+  <div class="card"><h3>Écran <span class="ov"><i class="on" title="Personnes">👤</i><i class="on" title="Pancartes">🪧</i><i class="on" title="Portes">🚪</i></span></h3>
+    <div class="screen" style="max-height:340px;aspect-ratio:160/130">
+      <div class="npc" style="left:20%;top:28%"></div><span class="tag" style="left:20%;top:20%">Tarkin · épuisé</span>
+      <div class="sign" style="left:62%;top:30%"></div><div class="door" style="left:38%;top:8%"></div><div class="link"></div></div>
+    <div class="hud"><div class="hearts">♥♥♥♥♥♥<span>♥♥</span></div><span style="flex:1"></span>
+      <div class="slot has ico" style="width:34px;height:34px"><em>B</em>🛡</div><div class="slot ico dim" style="width:34px;height:34px"><em>A</em>·</div>
+      <div class="mini"><div class="slot has">🛡</div><div class="slot dim">·</div><div class="slot dim">·</div><div class="slot dim">·</div><div class="slot dim">·</div></div></div>
+    <div class="ladder"><span class="step done">Bouclier</span>→<span class="step next">Épée</span>→<span class="step">…</span></div>
+  </div>
+  <div class="card"><h3>Raisonnement <span>#118 · 0,8</span></h3>
+    <div class="scroll" style="max-height:150px;font-size:13px;color:#cfd2dc">Tarkin et Marine sont épuisés. La fillette a donné un nouveau texte, elle vaut un retour. La piste « Suis la route du Sud » est plus pressante : le village ne s'ouvre vers la plage que par l'ouest. Sortie ouest après avoir re-parlé à la fillette.</div></div>
+</div>
+<div>
+  <div class="card now"><h3>Maintenant <span>#118 · payante · 4,1 s</span></h3>
+    <h2>Aller vers la plage par la sortie ouest</h2>
+    <div class="why">Piste #7 (haute) : « Suis la route du Sud, vers la plage »</div>
+    <div class="cands">
+      <div class="cand"><span class="id">c1</span>Parler à la fillette (179,0) <span class="k warn">non épuisée</span></div>
+      <div class="cand"><span class="id">c2</span>Lire la pancarte (146,0) <span class="k">non lue</span></div>
+      <div class="cand picked"><span class="id">c3</span>Sortie ouest → (161,0) <span class="k">choisi</span></div>
+      <div class="cand"><span class="id">c4</span>Porte 226 (178,0) <span class="k">jamais franchie</span></div>
+      <div class="cand"><span class="id">c5</span>Sortie sud <span class="k warn">laisse des PNJ non épuisés</span></div></div></div>
+  <div class="card"><h3>Dialogues <span>derniers · défilement</span></h3>
+    <div class="scroll dlg" style="max-height:230px">
+      <div class="who">Fillette <span class="badge b-warn">à revoir</span><span class="lg">(179,0) · talk 4</span></div>
+      <div class="bub tip"><small>f26916 · nouveau · 💡 conseil</small>« Si vos cœurs diminuent trop, entrez dans une maison ou une grotte… »</div>
+      <div class="who">Tarkin <span class="badge b-ok">épuisé</span><span class="lg">Maison · 3 talks</span></div>
+      <div class="bub"><small>f4217 · talk 2 · nouveau</small>« La route du Sud mène à la plage. »</div>
+      <div class="bub dim"><small>f4745 · talk 3 · répété</small>(même texte)</div></div></div>
+</div>
+<div>
+  <div class="card"><h3>Symptômes <span>0 critique</span></h3>
+    <div class="sym"><span class="badge b-ok">PNJ non épuisés : 0</span><span class="badge b-warn">dégâts : 3</span><span class="badge b-ok">morts : 0</span><span class="badge b-mut">talk_to 41/43</span></div></div>
+  <div class="card"><h3>Ici : Village (161,0) <span>visite 2</span></h3>
+    <table><tr><td>Tarkin</td><td><span class="badge b-ok">épuisé</span></td></tr><tr><td>Marine</td><td><span class="badge b-ok">épuisée</span></td></tr><tr><td>Fillette</td><td><span class="badge b-warn">à revoir</span></td></tr><tr><td>Pancarte (4,5)</td><td><span class="badge b-mut">non lue</span></td></tr><tr><td>Porte 226</td><td><span class="badge b-mut">jamais franchie</span></td></tr><tr><td>Créature 110</td><td><span class="badge b-mut">créature</span></td></tr></table></div>
+  <div class="card"><h3>Pistes &amp; conseils <span>3 hautes</span></h3>
+    <table><tr><td>Suis la route du Sud</td><td><span class="badge b-warn">haute</span></td></tr><tr><td>Objet resté sur la plage</td><td><span class="badge b-warn">haute</span></td></tr><tr><td>💡 SELECT = carte</td><td><span class="badge b-mut">conseil</span></td></tr></table></div>
+</div>
+</div>
+
+<div class="lower">
+  <div class="card"><h3>Carte du monde <span class="tabs"><u id="t1" class="on" onclick="tab(1)">Extérieur · 24</u><u id="t2" onclick="tab(2)">Intérieurs · 7</u></span></h3>
+    <div id="p1"><div class="map" style="grid-template-columns:repeat(10,1fr)"><div class="cell "></div><div class="cell v">Plage</div><div class="cell "></div><div class="cell "></div><div class="cell "></div><div class="cell "></div><div class="cell "></div><div class="cell "></div><div class="cell "></div><div class="cell "></div><div class="cell "></div><div class="cell v">Rive</div><div class="cell v">Pont</div><div class="cell "></div><div class="cell "></div><div class="cell "></div><div class="cell "></div><div class="cell "></div><div class="cell "></div><div class="cell "></div><div class="cell v">Village O</div><div class="cell v cur">Village<b class="dn" title="1 intérieur">▣1</b></div><div class="cell v">Village E<b class="dn" title="1 intérieur">▣1</b></div><div class="cell v">Colline</div><div class="cell "></div><div class="cell "></div><div class="cell "></div><div class="cell "></div><div class="cell "></div><div class="cell "></div><div class="cell "></div><div class="cell v">Départ<b class="dn" title="2 intérieurs">▣2</b></div><div class="cell v">Côte</div><div class="cell "></div><div class="cell "></div><div class="cell "></div><div class="cell "></div><div class="cell "></div><div class="cell "></div><div class="cell "></div><div class="cell "></div><div class="cell "></div><div class="cell "></div><div class="cell "></div><div class="cell "></div><div class="cell "></div><div class="cell "></div></div>
+    <div class="legend">▣n = n intérieurs reliés à cette case (clic : ouvre l'onglet Intérieurs filtré sur la case) · contour = position actuelle · survol = capture d'écran</div></div>
+    <div id="p2" style="display:none">
+      <div class="int"><div class="ihead"><b>Maison de Marine</b><span class="badge b-ok">épuisés 2/2</span></div><div class="ilink">⤴ entrée : <u>Départ (162,0)</u> · porte 226 en (7,3)</div>
+        <div class="irow"><div class="cell v" style="width:46px">Salle</div><span class="legend" style="margin:0">8×10 · 2 personnes · 1 commode</span></div></div>
+      <div class="int"><div class="ihead"><b>Maison de Tarkin</b><span class="badge b-warn">à revoir</span></div><div class="ilink">⤴ entrée : <u>Départ (162,0)</u> · porte 226 en (4,6)</div></div>
+      <div class="int"><div class="ihead"><b>Boutique</b><span class="badge b-mut">non explorée</span></div><div class="ilink">⤴ entrée : <u>Village E (177,0)</u> · porte 225 en (2,3)</div></div>
+      <div class="legend">Chaque intérieur indique sa porte d'entrée (lieu, case, id de porte) ; cliquer le lien revient à l'extérieur, case surlignée. Une grotte ou un donjon (carte inconnue) apparaît ici avec un type « autre ».</div>
+    </div>
+  </div>
+  <div>
+    <div class="card"><h3>Inventaire complet</h3><div style="display:flex;gap:8px;flex-wrap:wrap"><div class="slot has ico" title="Bouclier">🛡<em>B</em></div><div class="slot ico dim">·</div><div class="slot ico dim">·</div><div class="slot ico dim">·</div><div class="slot ico dim">·</div><div class="slot ico dim">·</div><div class="slot ico dim">·</div><div class="slot ico dim">·</div><div class="slot ico dim">·</div><div class="slot ico dim">·</div></div></div>
+    <div class="card"><h3>Dialogues — historique par personne <span>filtre : nouveaux</span></h3><div class="legend" style="margin:0">même contenu que le fil du centre, groupé par personne et lieu, avec recherche ; clic = saut à la frame.</div></div>
+  </div>
+</div>
+<script>function tab(n){for(const i of [1,2]){document.getElementById("p"+i).style.display=i==n?"":"none";document.getElementById("t"+i).className=i==n?"on":""}}</script></html>

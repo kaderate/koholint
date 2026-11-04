@@ -21,10 +21,14 @@ module Koholint
       return leaving if people.empty?
 
       who = people.map { |person| person[:who] }.join(', ')
-      leaving.map { |candidate| candidate.merge(label: "#{candidate[:label]} (leaves unexhausted people here: #{who})") }
+      leaving.map { |candidate| candidate.merge(label: "#{candidate[:label]} (leaves unexhausted people here: #{who})", leaves_unexhausted: true) }
     end
 
     def lines(candidates) = candidates.map { |candidate| "- #{candidate[:id]}: #{candidate[:label]}" }
+
+    def offered(candidates, picked = nil)
+      candidates.map { |c| { id: c[:id], label: c[:label], leaves_unexhausted: c[:leaves_unexhausted] == true, picked: c[:id] == picked&.dig(:id) } }
+    end
 
     def find(candidates, id) = candidates.find { |candidate| candidate[:id] == id.to_s.strip }
 
