@@ -1,8 +1,12 @@
 require_relative 'test_helper'
+require 'tmpdir'
 require 'support/emulator_cache'
 require 'koholint/game_state'
 require 'koholint/perception'
 require 'koholint/skills/registry'
+require 'koholint/objectives'
+require 'koholint/policies/delegated'
+require 'koholint/probes/mode_census'
 
 class ScreensTest < Minitest::Test
   SHIELD_RUN = File.expand_path('../runs/20261020-085011-8330', __dir__)
@@ -160,5 +164,28 @@ class ScreensTest < Minitest::Test
     assert_equal :map, Koholint::Perception.read(emulator).phase(booted: true)
     assert_equal :done, run_skill(emulator, 'close_map', {})[:stopped_by]
     assert_equal :playing, Koholint::Perception.read(emulator).phase(booted: true)
+  end
+
+  def test_a_death_on_the_rom_continues_through_the_harness_choice
+    skip_without_rom!
+    skip 'shield run journal not available' unless File.file?(File.join(SHIELD_RUN, 'inputs.log'))
+    emulator = Koholint::Emulator.restore(EmulatorCache.replayed(SHIELD_RUN, OUTDOORS_FRAME).dump)
+    Koholint::Probes::ModeCensus.poke(emulator, Koholint::Probes::ModeCensus::DAMAGE_BUFFER, 0xFF)
+    phases = []
+    600.times do
+      emulator.step([])
+      phases << Koholint::Perception.read(emulator).phase(booted: true)
+      break if phases.last == :game_over
+    end
+    assert_equal %i[playing cutscene game_over], phases.uniq
+    over = Koholint::Perception.read(emulator)
+    policy = Koholint::Policies::Delegated.new(client: nil, registry:, objectives: Koholint::Objectives.new(trace: Koholint::Trace.new(File.join(Dir.mktmpdir, 'trace.jsonl'))))
+    policy.observe(over, frame: over.frame)
+    point = policy.decision_point_for(over)
+    choice = policy.decide(point, over, {})[:choice]
+    assert_equal :done, run_skill(emulator, choice[:skill], choice[:params])[:stopped_by]
+    60.times { emulator.step([]) }
+    after = Koholint::Perception.read(emulator)
+    assert_equal [:playing, after.max_hp], [after.phase(booted: true), after.hp]
   end
 end

@@ -8,11 +8,11 @@ module Koholint
   module Summary
     STALL_FRAMES = 3600
     HP_PER_HEART = Perception::HP_PER_HEART.to_f
-    DIAGNOSTIC_NOTABLE_KINDS = %w[grid_overlay_stuck lead_rejected not_ready_wait revisit unknown_mode].freeze
+    DIAGNOSTIC_NOTABLE_KINDS = %w[damage death grid_overlay_stuck lead_rejected not_ready_wait revisit unknown_mode].freeze
     TERMINAL = %w[achieved abandoned failed].freeze
     DETERMINISTIC_AGENTS = %w[start_game walk_and_talk].freeze
     FILE = 'summary.json'.freeze
-    VERSION = 5
+    VERSION = 6
     LEAD_TIERS = %w[high normal low tip].freeze
     MANIFEST_KEYS = %w[flow_version tag harness_sha prompts_sha model autopilot].freeze
 
@@ -113,6 +113,8 @@ module Koholint
         dialogues: events.select { |e| e['type'] == 'dialogue' }.map { |e| [e['frame'], e['place']] }.uniq.size,
         not_ready_frames: events.sum { |e| e['type'] == 'perception' ? e['not_ready_frames'].to_i : 0 },
         not_ready_waits: events.count { |e| e['type'] == 'notable' && e['kind'] == 'not_ready_wait' },
+        deaths: events.count { |e| e['type'] == 'notable' && e['kind'] == 'death' },
+        damage_events: events.count { |e| e['type'] == 'notable' && e['kind'] == 'damage' },
         **autopilot(events.select { |e| e['type'] == 'decision' }) }
     end
 

@@ -175,9 +175,12 @@ abandonment still apply) and leave the engine's consecutive failure and refusal 
 (an invalid answer falls back deterministically, 5 consecutive fallbacks stop the run). Phases come from the mode
 catalogue (see Game modes): the boot script owns `boot` and `loading`; once the run has played (a `perception` in play
 mode, rebuilt from the trace on resume) the screens go to the agent with their own skills only (`menu`: `menu_move`,
-`menu_assign`, `close_menu`; `map`: `close_map`; `save` and `game_over`: `choose_option`; `unknown`: `press` and `wait`;
-all with `press` and `wait`), after a deterministic wait while the screen is still opening; `cutscene` waits like
-`locked`. The play skill set has no screen-only skill. The engine stops the run with
+`menu_assign`, `close_menu`; `map`: `close_map`; `save`: `choose_option`; `unknown`: `press` and `wait`;
+all with `press` and `wait`), after a deterministic wait while the screen is still opening; `cutscene` (the dying
+animation included) waits like `locked`. The game-over screen is never sent to the model: the policy picks its first
+catalogue option not flagged `quits` with `choose_option` (agent `delegated`, no prompt) and emits one `notable` `death`
+per screen. A drop of `hp` between two observations emits a `notable` `damage` (`hp 16 -> 12`), and the next prompt's
+health line adds the hearts lost (and a death) since the last model call. The play skill set has no screen-only skill. The engine stops the run with
 `stuck_boot` when the boot script decides for over 900 consecutive frames in a non-play mode past boot, or 3600 in any case. It stops
 with `unknown_mode_stuck` after 600 consecutive frames on an uncatalogued screen, and with `not_ready_stuck` after 600
 frames waited for readiness. `choose_option` refuses (`refused`) the
@@ -212,7 +215,7 @@ sha, model, `autopilot` for agent runs; `resume` keeps it), `inputs.log`, `trace
 observability only, no trace event, the set of captured places is rebuilt from the directory; `screens <run_dir>` backfills older runs by replay),
 `world.json` (`{ goal, leads, places }`, rewritten from the trace at every stop), `summary.json` (written at every stop by
 `summary.rb` from the trace only, versioned by `Summary::VERSION`: totals, cost by skill, decisions by agent and
-feature usage, with `autopilot_decisions` and `chain_max`, and `symptoms`: `left_with_unexhausted_people`, place changes
+feature usage, with `autopilot_decisions`, `chain_max`, `deaths` and `damage_events`, and `symptoms`: `left_with_unexhausted_people`, place changes
 away from a place whose last place card listed a verified person whose `TalkLog#last_status` was not `exhausted`; `archive` rewrites an outdated one), `star.json`, `notes.md` (owner notes from the viewer). Trace events (`dialogue` may carry `speaker`, `conversation` and `cached`; a `talk_to` result may carry `entity`; a `perception` may carry `not_ready_frames`; a `decision` may carry `autopilot`): `perception`, `decision`, `action`, `objective`, `dialogue`, `lead`, `goal`,
 `notable`, `place_card`, `place_name`, `item_gained`, `screen`, `screen_changed`, `affordance`, `grid_contradiction`, `keyframe`, `save`, `budget_stop`, `stop`. `budget.rb` enforces frames,
 minutes, dollars and objective steps. `archive.rb` keeps a light bundle per run in git (trace gzipped, `screens/` included);

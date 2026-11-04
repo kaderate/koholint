@@ -83,6 +83,8 @@ module Koholint
         @agent_driven = false
         @locked_since = nil
         @skill_point = DecisionPoint.choose_skill(subset(registry, registry.names - SCREEN_ONLY))
+        @notes = []
+        @hp_lost = 0
         @screen_points = SCREEN_SKILLS.transform_values { |names| DecisionPoint.choose_skill(subset(registry, names)) }
       end
 
@@ -107,8 +109,8 @@ module Koholint
         @screen_since = nil unless screen(state)
         release_hemmed(state)
         track_locked(state)
-        @hurt_at = state.frame if @last_hp && state.hp.to_i < @last_hp && !state.loading?
-        @last_hp = state.hp.to_i
+        @over = false unless screen(state) == :game_over
+        note_damage(state)
         @revisit.observe(state)
         track { @objectives.update(state, frame:) }
       end
@@ -119,7 +121,8 @@ module Koholint
         @asked = false
         result = decide_with(decision_point, state, context)
         @autopilot&.model_called(state:, objective: @objectives.current, news: !Array(result[:leads]).empty? || !result[:goal].nil?) if @asked
-        notes = @revisit.notes
+        notes = @revisit.notes + @notes
+        @notes = []
         notes.empty? ? result : result.merge(notables: notes)
       end
 
@@ -136,6 +139,7 @@ module Koholint
         drop_stale_sequence(state)
         if screen(state)
           return screen_wait(state) if screen_settling?(state)
+          return game_over_continue(state) if screen(state) == :game_over
         else
           automatic = automatic_advance(decision_point, state, context)
           return automatic if automatic
@@ -236,6 +240,24 @@ module Koholint
         @locked_wait = true
         { choice: SCREEN_WAIT, justification: "#{state.mode.name}: waiting for the screen to settle", confidence: 1.0, agent: 'delegated',
           latency_ms: 0, cost_usd: 0.0, fallback: false, prompt: nil, image: nil }
+      end
+
+      def game_over_continue(state)
+        option, text = state.mode.choices.first
+        @notes << { kind: 'death', detail: "game over: #{text}" } unless @over
+        @over = @died = @locked_wait = true
+        { choice: { skill: 'choose_option', params: { option: } }, justification: "game over: #{text} (picked by the harness)", confidence: 1.0,
+          agent: 'delegated', latency_ms: 0, cost_usd: 0.0, fallback: false, prompt: nil, image: nil }
+      end
+
+      def note_damage(state)
+        hp = state.hp.to_i
+        if @last_hp && hp < @last_hp && !state.loading?
+          @hurt_at = state.frame
+          @hp_lost += @last_hp - hp
+          @notes << { kind: 'damage', detail: "hp #{@last_hp} -> #{hp}" }
+        end
+        @last_hp = hp
       end
 
       def hook_doubt(ledger)
@@ -534,7 +556,9 @@ module Koholint
                                        triggers: @triggers, talk_log: @talk_log, signs: objects_now, locked: (@hemmed[:attempts] if @hemmed && hemmed?(state)),
                                        locked_frames: (locked_frames(state) if WAIT_PHASES.include?(state.phase)), goal: goal_line, leads: @leads.all, stamp: stamp(state),
                                        place_name: @leads.name_of([state.room_id, state.map_id]), candidates: (Candidates.lines(@candidates) if decision_point.name == :choose_objective),
-                                       resolve: @leads.method(:place_for))
+                                       resolve: @leads.method(:place_for), hp_lost: @hp_lost, died: @died)
+        @hp_lost = 0
+        @died = false
         if @reading
           text = Dialogues.text(@reading[:transcription].map { |entry| entry[:text] })
           @prompt += "\nThe dialogue that just closed repeated a text already read (not sent again): #{clean(text.tr("\n", ' '), cap: TRANSCRIPTION_LIMIT)}"

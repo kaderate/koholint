@@ -34,7 +34,7 @@ module Koholint
         goto walks several cells along a path planned over the grid and stops when blocked. Cells marked ! may be doubtful: they looked free but blocked Link repeatedly; goto avoids a doubtful edge, and the neighbour lines say how many times each direction was blocked.
         talk_to walks next to a person or object at (row, col), faces it and presses A; use it instead of composing walk and press yourself. If it gets no response from one side, the listing of things on screen shows which sides failed: the skill tries another side by itself, and you can also walk next to a person from a specific side and press A.
         step moves Link a few pixels (1 to 16) along one axis and does not recentre him; the offset line shows how far he is from the centre of his cell, and a passage may be offset from the cell grid.
-        Screens: when the phase is a screen (menu, map, save, game_over) the context names it, says how to leave it and lists only the skills that work there; a screen skill used elsewhere stops with wrong_mode.
+        Screens: when the phase is a screen (menu, map, save) the context names it, says how to leave it and lists only the skills that work there; a screen skill used elsewhere stops with wrong_mode.
         open_menu opens the inventory with START during free play; close_menu closes it.
         menu_move moves the inventory cursor to a slot (0-9, two columns, left to right then top to bottom).
         menu_assign swaps the item under the inventory cursor with the item on the A or B button.
