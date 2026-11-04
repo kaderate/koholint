@@ -24,6 +24,7 @@ module Koholint
   class Engine
     SAVE_CHECK_EVERY = 60
     AGENT_FAILURE_LIMIT = 5
+    ENGINE_ERROR_LIMIT = 5
     AGENT_REFUSAL_LIMIT = 10
     STUCK_BOOT_FRAMES = 900
     STUCK_BOOT_ANY_FRAMES = 3600
@@ -54,6 +55,7 @@ module Koholint
       @pacer = pacer
       @fallbacks = 0
       @refusals = 0
+      @engine_errors = 0
       @emulator = emulator || Emulator.boot
       @readiness = Readiness.new
       @readiness.observe(previous) if previous
@@ -125,7 +127,8 @@ module Koholint
       @run.trace.emit(:decision, frame: state.frame, decision_point: chosen.name.to_s, input: state.to_h, options: chosen.options || [],
                                  choice: choice, justification: result[:justification], confidence: result[:confidence],
                                  agent: result[:agent], latency_ms: result[:latency_ms].to_i, cost_usd: result[:cost_usd].to_f, fallback: result[:fallback] || false,
-                                 **seen, **(result[:plan] ? { plan: result[:plan] } : {}), **(result[:autopilot] ? { autopilot: true } : {}))
+                                 **seen, **(result[:plan] ? { plan: result[:plan] } : {}), **(result[:autopilot] ? { autopilot: true } : {}),
+                                 **(result[:engine_error] ? { engine_error: true } : {}))
       if choice.key?(:skill)
         activity(:acting, "acting: #{choice[:skill]}", skill: choice[:skill], params: choice[:params])
         outcome = execute(choice, state, chosen.registry, context)
@@ -208,6 +211,10 @@ module Koholint
 
     def note_fallback(result)
       return if @budget.exhausted || result[:autopilot]
+
+      @engine_errors = result[:engine_error] ? @engine_errors + 1 : 0
+      return @budget.stop!(:engine_errors) if @engine_errors >= ENGINE_ERROR_LIMIT
+      return if result[:engine_error]
 
       if result[:refused]
         @refusals += 1

@@ -178,9 +178,17 @@ module Koholint
         raise
       rescue StandardError => e
         note_refusal(e, choice) if e.is_a?(Refusal)
-        { choice: FALLBACK_CHOICE, justification: e.is_a?(Failure) ? e.message : "#{e.class}: #{e.message}", confidence: 0.0, agent: 'claude', latency_ms: 0,
+        engine = !@asked && !e.is_a?(Failure) && !e.is_a?(Refusal)
+        { choice: FALLBACK_CHOICE, justification: failure_text(e), confidence: 0.0, agent: engine ? 'engine' : 'claude', latency_ms: 0,
           cost_usd: cost_of(reply), fallback: true, decision_point: @skill_point, prompt: @prompt, image: @image, images: @images,
-          **(e.is_a?(Refusal) ? { refused: true } : {}) }
+          **(e.is_a?(Refusal) ? { refused: true } : {}), **(engine ? { engine_error: true } : {}) }
+      end
+
+      def failure_text(error)
+        return error.message if error.is_a?(Failure)
+
+        where = error.backtrace&.first&.sub(%r{\A.*/(?=lib/koholint/)}, '')
+        "#{error.class}: #{error.message}#{" at #{where}" if where}"
       end
 
       def after_action(choice:, outcome:, state:, frame:)

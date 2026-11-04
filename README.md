@@ -39,7 +39,8 @@ Commands: `run`, `resume <run_dir>`, `fork <run_dir> --at-frame N`, `verify <run
 **Budgets.** `run`/`resume` accept `--frames N`, `--minutes N`, `--dollars X` (or `--max-dollars X`, default 1.5 with
 `--agent`) and `--steps N` (finished objectives, only meaningful with `--agent`). Ctrl-C stops cleanly and cancels an
 in-flight agent call. A run that hits the Claude subscription session limit stops as `agent_failures`; five
-consecutive fallbacks stop a run the same way.
+consecutive fallbacks stop a run the same way. An exception in the engine's own code before the agent is called is a free
+fallback marked `engine_error` (class, message and origin in the justification); five in a row stop the run as `engine_errors`.
 
 **Agent.** `--agent` uses `claude -p` (`--model`, default `sonnet`; `--claude-command PATH`). The engine writes what the
 agent saw to `runs/<id>/prompts/<frame>-<decision_point>.txt` (and `.png` when an image was sent; gitignored, not part
