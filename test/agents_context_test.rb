@@ -248,6 +248,16 @@ class AgentsContextTest < Minitest::Test
     assert_includes text, 'blocked 2 times'
   end
 
+  def test_doubt_at_the_grid_edge_is_skipped
+    ledger = Koholint::Ledger.new
+    2.times { ledger.record(place: [163, 16], blocked_at: { row: 0, col: 7, direction: :up }) }
+    text = build(state: state(x: 123, y: 20), ledger:)
+    assert_includes text, ' 0  # ~ ? ! . . . @ . .'
+    assert_includes text, '- up: edge of the screen'
+    %i[up left].each { |d| 2.times { ledger.record(place: [163, 16], blocked_at: { row: 0, col: 0, direction: d }) } }
+    assert_includes build(state: state(x: 8, y: 20), ledger:), '- left: edge of the screen'
+  end
+
   def test_no_objective_and_edge_neighbours
     text = Context.build(state: state(x: 0, y: 8), grid:, objective: nil, history: [], attempts: [], manual: '', last_results: [])
     assert_includes text, 'Current objective: none'

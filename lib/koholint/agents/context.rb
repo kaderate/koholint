@@ -187,7 +187,12 @@ module Koholint
       def self.doubtful_cells(grid, ledger, place, link)
         return [] unless ledger && link
 
-        DIRECTIONS.select { |d| ledger.doubtful?(place, link, d) && grid.passable(link[0] + DELTAS[d][0], link[1] + DELTAS[d][1], d) == :yes }.map { |d| [link[0] + DELTAS[d][0], link[1] + DELTAS[d][1]] }
+        DIRECTIONS.filter_map do |d|
+          cell = [link[0] + DELTAS[d][0], link[1] + DELTAS[d][1]]
+          next unless cell[0].between?(0, Vision::Grid::ROWS - 1) && cell[1].between?(0, Vision::Grid::COLS - 1)
+
+          cell if ledger.doubtful?(place, link, d) && grid.passable(*cell, d) == :yes
+        end
       end
       private_class_method :doubtful_cells
 

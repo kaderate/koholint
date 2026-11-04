@@ -83,6 +83,28 @@ class DelegatedPolicyTest < Minitest::Test
     assert_kind_of Integer, seen.last[:frame]
   end
 
+  def test_an_error_while_building_the_context_is_an_engine_error_with_its_origin
+    client = ScriptedClient.new(objective: objective, skill: walk)
+    p = policy(client)
+    decide(p)
+    p.instance_variable_get(:@ledger).define_singleton_method(:doubtful?) { |*| raise ArgumentError, 'cell out of range: -1, 7' }
+    _, result = decide(p)
+    assert result[:fallback]
+    assert result[:engine_error]
+    assert_equal 'engine', result[:agent]
+    assert_match(/\AArgumentError: cell out of range: -1, 7 at .+:\d+/, result[:justification])
+    assert_equal 1, client.calls.size
+  end
+
+  def test_a_client_failure_stays_an_agent_failure
+    p = policy(ScriptedClient.new(objective: objective, default: failing('transport down')))
+    decide(p)
+    _, result = decide(p)
+    assert result[:fallback]
+    refute result[:engine_error]
+    assert_equal 'transport down', result[:justification]
+  end
+
   def test_asks_for_an_objective_first_then_for_skills
     p = policy(ScriptedClient.new(objective: objective, skill: walk))
     point, result = decide(p)
@@ -464,7 +486,9 @@ class DelegatedPolicyTest < Minitest::Test
 
   def test_unexpected_errors_name_their_class
     p = policy(ScriptedClient.new(objective: ArgumentError.new('odd')))
-    assert_equal 'ArgumentError: odd', decide(p).last[:justification]
+    result = decide(p).last
+    assert_match(/\AArgumentError: odd at .+delegated_policy_test\.rb:\d+/, result[:justification])
+    refute result[:engine_error]
   end
 
   def test_grid_is_dropped_when_the_room_changes
@@ -929,10 +953,10 @@ class DelegatedEngineTest < Minitest::Test
 
   QuietRevisit = Class.new(Koholint::Revisit) { def candidate(**) = nil }
 
-  def agent_engine(run, client, emulator: nil, **limits)
+  def agent_engine(run, client, emulator: nil, revisit: QuietRevisit, **limits)
     delegated = Koholint::Policies::Delegated.new(client:, registry: Koholint::Skills::Registry.default,
                                                   objectives: Koholint::Objectives.new(trace: run.trace), manual: '',
-                                                  revisit: QuietRevisit.new(talk_log: Koholint::TalkLog.new))
+                                                  revisit: revisit.new(talk_log: Koholint::TalkLog.new))
     policy = Koholint::Policies::StartGame.new(delegated, ready: ->(s) { %i[playing dialogue].include?(s.phase) })
     Koholint::Engine.new(run:, policy:, budget: Koholint::Budget.new(**limits), grid: true, emulator:)
   end
@@ -985,6 +1009,21 @@ class DelegatedEngineTest < Minitest::Test
       engine = agent_engine(run, client, emulator: EmulatorCache.interactive)
       assert_equal :stopped, engine.run
       assert_equal 5, client.calls.size
+    end
+  end
+
+  def test_engine_errors_stop_as_engine_errors_and_never_as_agent_failures
+    skip_without_rom!
+    broken = Class.new(QuietRevisit) { def next_action(**) = raise(ArgumentError, 'cell out of range: -1, 7') }
+    with_run do |run|
+      client = ScriptedClient.new(objective: objective(kind: 'reach_place', place: [1, 2]), default: walk)
+      assert_equal :engine_errors, agent_engine(run, client, emulator: EmulatorCache.interactive, revisit: broken).run
+      assert_equal 1, client.calls.size
+      failed = events(run, :decision).select { |e| e['fallback'] }
+      assert_equal 5, failed.size
+      assert(failed.all? { |e| e['engine_error'] && e['agent'] == 'engine' && e['cost_usd'].zero? })
+      assert_match(/\AArgumentError: cell out of range: -1, 7 at .+delegated_policy_test\.rb:\d+/, failed.first['justification'])
+      assert_equal ['engine_errors'], events(run, :budget_stop).map { |e| e['kind'] }
     end
   end
 
