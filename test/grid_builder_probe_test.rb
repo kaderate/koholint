@@ -189,6 +189,22 @@ class GridBuilderProbeTest < Minitest::Test
     assert_equal %w[up no], trace.of(:affordance).last.values_at(:direction, :result)
   end
 
+  # Run 20261104-153743-acc2, room 165/16: the one-cell stairs at (4,3) stop Link at x 52 (offset -4) but admit him from x 53..60.
+  def test_a_stop_four_pixels_left_of_a_one_cell_gap_is_misaligned_not_a_wall
+    moves = { left: { to: { x: 36, y: 64 } } }
+    prober = StubProber.new { |direction| moves.fetch(direction, {}) }
+    prober.at = { x: 52, y: 64 }
+    trace = FakeTrace.new
+    builder = Builder.new(trace:, prober:)
+    emulator = FakeEmulator.new
+    2.times { fake_observe(builder, emulator, link: [52, 64]) }
+    assert_equal [%w[left yes], %w[right no]], trace.of(:affordance).map { |e| e.values_at(:direction, :result) }
+    moves[:down] = { to: { x: 56, y: 81 } }
+    prober.at = { x: 56, y: 64 }
+    fake_observe(builder, emulator, link: [56, 64])
+    assert_equal %w[down yes], trace.of(:affordance).find { |e| e[:direction] == 'down' }&.values_at(:direction, :result)
+  end
+
   def test_a_sprite_ahead_of_link_voids_a_stop_but_not_one_beside_or_far
     prober = StubProber.new { |direction| direction == :up ? { to: { x: 70, y: 30 } } : {} }
     trace = FakeTrace.new

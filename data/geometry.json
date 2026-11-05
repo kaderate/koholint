@@ -8,6 +8,11 @@
     "verified_count": 1,
     "provenance": "ROM probe by button inputs only from EmulatorCache.interactive (Link at (70,52), place [163,16]): after N frames of up, 70 frames of left. Free to x=20 for y 38..28, blocked at x=68 for y 39..52, so the free row-1 band is y 26..38 (center 32, offsets -6..+6; 26 is also the top limit of the room, so the lower edge 38/39 is the measured one). Right walk at y=26 stops at x=108. Width 8 is inferred from the left stop x=20 against the 16 px wall cell, not measured separately; the row band is generalised from row 1 to other rows by the 16 px cell, not measured."
   },
+  "gap_entry": {
+    "value": { "min_offset": -3, "max_offset": 4 },
+    "verified_count": 1,
+    "provenance": "ROM probe 2026-11-05 on a restored copy of keyframe 32400 of run 20261104-153743-acc2 (room 165/16, Link at y 64 on row 3 above the one-cell stairs at (4,3), tiles 78 78 78 78, between ledge cells of tiles 29 29 39 39): holding down from x 53..60 entered the stairs (the game slides Link to x 56 or 57, then 0.5 px per frame on the stairs), from x 52 (offset -4) Link did not move in 90 frames. Offsets are x minus the cell centre (col * 16 + 8)."
+  },
   "talk_reach": {
     "value": { "up": 19, "down": 20, "left": 15, "right": 16 },
     "verified_count": 2,

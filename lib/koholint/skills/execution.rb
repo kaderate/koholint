@@ -117,7 +117,7 @@ module Koholint
 
         dx, dy = Geometry.offset(state.x, state.y, state.cell)
         wanted = []
-        wanted << (dx.positive? ? :left : :right) if dx.abs > Geometry::ALIGN_TOLERANCE
+        wanted << (dx.positive? ? :left : :right) unless Geometry.x_aligned?(dx)
         wanted << (dy.positive? ? :up : :down) if dy.abs > Geometry::ALIGN_TOLERANCE
         blocked = forbidden_at(state)
         direction = wanted.find { |d| d != avoid && !blocked.include?(d) }

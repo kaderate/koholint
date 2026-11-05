@@ -20,6 +20,8 @@ module Koholint
 
     def controllable? = hp.to_i.positive? && x.to_i.positive?
 
+    def low_health? = max_hp.to_i.positive? && hp.to_i.positive? && hp.to_i * 3 <= max_hp.to_i
+
     def dialog_open? = dialog_state.to_i.positive?
 
     def loading? = game_mode == PLAY_MODE && game_submode != PLAY_SETTLED_SUBMODE

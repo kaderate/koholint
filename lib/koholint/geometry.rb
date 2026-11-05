@@ -21,6 +21,10 @@ module Koholint
 
     def center_of(row, col) = [(col * CELL) + 8, (row * CELL) + 16]
 
+    def x_aligned?(dx) = gap_entry.cover?(dx)
+
+    def gap_entry = @gap_entry ||= fact(:gap_entry).then { |gap| gap['min_offset']..gap['max_offset'] }
+
     def offset(x, y, cell)
       cx, cy = center_of(*cell)
       [x - cx, y - cy]
@@ -29,9 +33,9 @@ module Koholint
     def aligned?(x, y, cell, axis: :both)
       dx, dy = offset(x, y, cell)
       case axis
-      when :x then dx.abs <= ALIGN_TOLERANCE
+      when :x then x_aligned?(dx)
       when :y then dy.abs <= ALIGN_TOLERANCE
-      when :both then dx.abs <= ALIGN_TOLERANCE && dy.abs <= ALIGN_TOLERANCE
+      when :both then x_aligned?(dx) && dy.abs <= ALIGN_TOLERANCE
       else raise ArgumentError, "unknown axis #{axis.inspect}"
       end
     end

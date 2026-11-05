@@ -74,6 +74,22 @@ class AutopilotTest < Minitest::Test
     %w[new_place leave_place new_text].each { |kind| assert_nil primed.hold_reason(state: state, objective: objective(kind)), kind }
   end
 
+  def test_low_health_holds_every_explore_but_the_way_to_a_shelter
+    low = primed(stop: :known_place)
+    low.model_called(state: state(hp: 4), objective: objective)
+    low.acted(skill: 'explore', outcome: { stopped_by: :known_place })
+    assert_equal 'low health', low.hold_reason(state: state(hp: 4), objective: objective)
+    assert_equal 'low health', low.objective_hold(state: state(hp: 8), last: { id: 'obj-1', outcome: 'achieved' })
+    assert_nil low.hold_reason(state: state(hp: 9), objective: objective)
+    shelter = { id: 'obj-1', predicate: { kind: 'reach_place' }, target: { kind: 'shelter', place: [166, 16] } }
+    assert_nil low.hold_reason(state: state(hp: 4), objective: shelter, follow: { skill: 'explore', params: {} })
+  end
+
+  def test_a_creature_near_after_damage_holds
+    assert_equal 'creature near after damage', primed.hold_reason(state: state, objective: objective, danger: true)
+    assert_nil primed.next_choice(state: state, objective: objective, danger: true)
+  end
+
   def test_a_model_call_resets_the_last_stop
     pilot = primed
     pilot.model_called(state: state, objective: objective)

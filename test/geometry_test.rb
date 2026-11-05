@@ -32,6 +32,10 @@ class GeometryTest < Minitest::Test
     refute G.aligned?(44, 37, [1, 2], axis: :y)
     assert G.aligned?(44, 36, [1, 2], axis: :y)
     refute G.aligned?(49, 32, [1, 2], axis: :x)
+    assert G.aligned?(44, 32, [1, 2], axis: :x)
+    assert G.aligned?(37, 32, [1, 2], axis: :x)
+    refute G.aligned?(36, 32, [1, 2], axis: :x)
+    refute G.aligned?(36, 32, [1, 2])
     assert_raises(ArgumentError) { G.aligned?(44, 32, [1, 2], axis: :z) }
   end
 

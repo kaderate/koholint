@@ -39,15 +39,16 @@ module Koholint
       @returns[[to[:room], to[:map]]] += 1 if to.is_a?(Hash) && @returns
     end
 
-    def hold_reason(state:, objective:, follow: nil)
+    def hold_reason(state:, objective:, follow: nil, danger: false)
       return 'no model call yet' unless @since
+      return 'creature near after damage' if danger
 
       target = objective&.dig(:target)
       first = follow && target && !@acted
       return "last stop #{@stop || 'not an explore'}" unless first || BENIGN.include?(@stop)
       return 'target followed' if target && @acted && follow && follow[:skill] != 'explore'
 
-      common = common_hold(state, news: !target)
+      common = common_hold(state, news: !target, shelter: target&.dig(:kind).to_s == 'shelter')
       return common if common
       return 'objective changed' unless objective && objective[:id] == @objective
 
@@ -58,8 +59,8 @@ module Koholint
       cap_hold(state)
     end
 
-    def next_choice(state:, objective:, follow: nil)
-      return if hold_reason(state:, objective:, follow:)
+    def next_choice(state:, objective:, follow: nil, danger: false)
+      return if hold_reason(state:, objective:, follow:, danger:)
 
       @chain += 1 unless @stop == 'known_place'
       @stop = nil
@@ -78,7 +79,8 @@ module Koholint
 
     private
 
-    def common_hold(state, news: true)
+    def common_hold(state, news: true, shelter: false)
+      return 'low health' if state.low_health? && !shelter
       return 'new lead or goal' if news && @news
       return 'explore loop' if @returns.values.max.to_i >= RETURNS
       return "phase #{state.phase}" unless state.phase == :playing

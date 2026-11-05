@@ -1783,6 +1783,48 @@ class DelegatedAutopilotTest < Minitest::Test
     assert_equal 3, client.calls.size
   end
 
+  def lap(policy, now, stop, ctx: { grid: }, to: { room: 163, map: 16, row: 3, col: 4 })
+    policy.observe(now, frame: now.frame)
+    result = policy.decide(policy.decision_point_for(now), now, ctx)
+    policy.after_action(choice: result[:choice], outcome: outcome(stop, now.frame).merge(to:), state: now, frame: now.frame + 20)
+    result
+  end
+
+  def test_at_one_heart_of_six_the_autopilot_never_relaunches_explore_and_the_context_says_low_health
+    client = ScriptedClient.new(objective: new_place, default: explore)
+    p = autopiloted(client)
+    p.instance_variable_get(:@explore_log).absorb({ from: { room: 1, map: 0 }, exits: [{ row: 7, col: 5, direction: :up, outcome: :left, to: [166, 16] }] })
+    results = (0..3).map { |i| lap(p, state(frame: 100 + (i * 300), room_id: 1, map_id: 0, hp: 4), :known_place, to: { room: 1, map: 0, row: 3, col: 4 }) }
+    refute(results.any? { |r| r[:autopilot] })
+    assert_includes client.calls.last[:prompt], 'LOW HEALTH: the harness no longer chains explores'
+    assert_includes client.calls.first[:prompt], '- shelter-166-16: LOW HEALTH: take shelter in place 166-16, 1 move away'
+  end
+
+  def test_after_damage_a_creature_within_three_cells_holds_the_autopilot
+    client = ScriptedClient.new(objective: new_place, default: explore)
+    p = autopiloted(client)
+    creature = [{ slot: 2, type: 45, cell: [3, 6], kind: :creature }]
+    far = [{ slot: 2, type: 45, cell: [7, 9], kind: :creature }]
+    lap(p, state(frame: 100), :budget)
+    lap(p, state(frame: 400, hp: 20), :new_place, to: { room: 163, map: 16, row: 3, col: 5 })
+    held = lap(p, state(frame: 450, hp: 20), :new_place, ctx: { grid:, entities: -> { creature } }, to: { room: 163, map: 16, row: 3, col: 6 })
+    refute held[:autopilot]
+    assert lap(p, state(frame: 500, hp: 20), :new_place, ctx: { grid:, entities: -> { far } })[:autopilot]
+  end
+
+  def test_six_fruitless_results_in_one_place_emit_stuck_and_a_reset_hint
+    client = ScriptedClient.new(objective: new_place, default: explore)
+    p = policy(client)
+    results = (0..8).map { |i| lap(p, state(frame: 100 + (i * 50)), i.even? ? :no_frontier : :no_path) }
+    stuck = results.flat_map { |r| Array(r[:notables]) }.select { |note| note[:kind] == 'stuck' }
+    assert_equal ['6 results in 163-16 without a new cell (1 times here)'], stuck.map { |note| note[:detail] }
+    assert_includes client.calls.last[:prompt], 'STUCK: 6 results in a row here'
+    refute_includes client.calls[7][:prompt], 'STUCK'
+    lap(p, state(frame: 900), :done, to: { room: 163, map: 16, row: 5, col: 5 })
+    lap(p, state(frame: 950), :no_path)
+    refute_includes client.calls.last[:prompt], 'STUCK'
+  end
+
   def test_untried_objects_continue_and_other_stops_go_to_the_model
     client = ScriptedClient.new(objective: new_place, default: explore)
     results = tours(autopiloted(client), 4, stop: :untried_object)

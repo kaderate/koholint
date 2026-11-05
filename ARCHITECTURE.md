@@ -92,7 +92,7 @@ builds a collision `grid`; `beliefs` and `world` accumulate per-place knowledge 
 doubtful, contradicted); `capabilities` records what Link can do; `dialogue_shot` crops dialogue boxes for the
 model. Unknown cells are unknown, not walls.
 
-**Navigation and skills** — `geometry.rb` (cell grid, pixel offsets), `navigation/planner.rb` (shortest path
+**Navigation and skills** — `geometry.rb` (cell grid, pixel offsets; x alignment uses the measured one-cell gap window `gap_entry`, -3..+4 px, for walk probes and the centring after a skill), `navigation/planner.rb` (shortest path
 with the fewest turns over known cells), `skills/` (`walk`, `goto`, `step`, `talk_to`, `explore`, `press`,
 `advance_dialogue`, `wait`, and the screen skills of `skills/screens.rb`: `open_menu`, `close_menu`, `menu_move`,
 `menu_assign`, `open_map`, `close_map`, `choose_option`, which check the current mode from the catalogue, stop with
@@ -162,7 +162,8 @@ also right after a sheet reading; and the explore autopilot, `autopilot.rb`: aft
 model), `budget` or `untried_object`, the policy issues the next `explore` with no direction itself (agent `delegated`, cost 0,
 `decision` event with `autopilot: true`), after the revisit, the hemmed wait and pending dialogue pages; the model is called again
 on any other stop or action, a new lead or goal from the last call, a phase other than `playing`, health lower than at the
-last call, an objective that changed or whose kind is not `new_place`, `leave_place` or `new_text` (unless it has a target), and after 6 autopilot
+last call, low health (hp at most a third of max hp; only a `shelter` target is still followed), damage in the last 300 frames with a
+creature, unknown or enemy entity within 3 cells, an objective that changed or whose kind is not `new_place`, `leave_place` or `new_text` (unless it has a target), and after 6 autopilot
 explores or 2400 frames since the last call. An objective with a `target` (picked from the candidate menu) is followed from the first
 skill decision after the model's call: `explore` with the exit's direction, or with an `aim` in the skill context (a door to enter first,
 a place to route to through `ExploreLog#route(goal:)`), or one `talk_to` of a person or sign of the current place (a `new_text` target left behind is not routed back to; a door Link stands on or just below is not a candidate); a new goal
@@ -181,7 +182,10 @@ all with `press` and `wait`), after a deterministic wait while the screen is sti
 animation included) waits like `locked`. The game-over screen is never sent to the model: the policy picks its first
 catalogue option not flagged `quits` with `choose_option` (agent `delegated`, no prompt) and emits one `notable` `death`
 per screen. A drop of `hp` between two observations emits a `notable` `damage` (`hp 16 -> 12`), and the next prompt's
-health line adds the hearts lost (and a death) since the last model call. The play skill set has no screen-only skill. The engine stops the run with
+health line adds the hearts lost (and a death) since the last model call. At low health the header adds a `LOW HEALTH` line
+with the nearest known interior and `choose_objective` lists a `shelter-<room>-<map>` candidate first (target `shelter`, followed
+like a place). Six `no_frontier`, `no_path`, `blocked` or `stalled` results in one place without reaching a new cell emit a
+`notable` `stuck` and add a `STUCK` reset hint to the header until Link reaches a new cell or leaves. The play skill set has no screen-only skill. The engine stops the run with
 `stuck_boot` when the boot script decides for over 900 consecutive frames in a non-play mode past boot, or 3600 in any case. It stops
 with `unknown_mode_stuck` after 600 consecutive frames on an uncatalogued screen, and with `not_ready_stuck` after 600
 frames waited for readiness. `choose_option` refuses (`refused`) the
@@ -216,7 +220,7 @@ sha, model, `autopilot` for agent runs; `resume` keeps it), `inputs.log`, `trace
 observability only, no trace event, the set of captured places is rebuilt from the directory; `screens <run_dir>` backfills older runs by replay),
 `world.json` (`{ goal, leads, places }`, rewritten from the trace at every stop), `summary.json` (written at every stop by
 `summary.rb` from the trace only, versioned by `Summary::VERSION`: totals, cost by skill, decisions by agent and
-feature usage, with `autopilot_decisions`, `chain_max`, `deaths` and `damage_events`, and `symptoms`: `left_with_unexhausted_people`, place changes
+feature usage, with `autopilot_decisions`, `chain_max`, `deaths`, `damage_events` and `stuck_events`, and `symptoms`: `left_with_unexhausted_people`, place changes
 away from a place whose last place card listed a verified person whose `TalkLog#last_status` was not `exhausted`; `archive` rewrites an outdated one), `star.json`, `notes.md` (owner notes from the viewer). Trace events (`dialogue` may carry `speaker`, `conversation` and `cached`; a `talk_to` result may carry `entity`; a `perception` may carry `not_ready_frames`; a `decision` may carry `autopilot`): `perception`, `decision`, `action`, `objective`, `dialogue`, `lead`, `goal`,
 `notable`, `place_card`, `place_name`, `item_gained`, `screen`, `screen_changed`, `affordance`, `grid_contradiction`, `keyframe`, `save`, `budget_stop`, `stop`. `budget.rb` enforces frames,
 minutes, dollars and objective steps. `archive.rb` keeps a light bundle per run in git (trace gzipped, `screens/` included);
