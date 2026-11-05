@@ -4,6 +4,7 @@ require 'koholint/autopilot'
 require 'koholint/candidates'
 require 'koholint/decision'
 require 'koholint/dialogues'
+require 'koholint/entities'
 require 'koholint/explore_log'
 require 'koholint/leads'
 require 'koholint/ledger'
@@ -50,6 +51,9 @@ module Koholint
       SPEAKER_LIMIT = Trace::SPEAKER_MAX
       REVISIT_BUDGET_SHARE = 0.05
       HURT_FRAMES = 300
+      DANGER_CELLS = 3
+      STUCK_STOPS = %w[no_frontier no_path blocked stalled].freeze
+      STUCK_AT = 6
       EXPLORE = { skill: 'explore', params: {} }.freeze
       AUTO_OBJECTIVE = { title: 'Explore the nearest untried exits (picked by the harness)', predicate: { kind: 'new_place' } }.freeze
 
@@ -224,6 +228,7 @@ module Koholint
         @explore_log.note(outcome)
         @explore_log.absorb(outcome) if choice[:skill] == 'explore'
         note_no_path(choice, outcome, frame) unless revisiting
+        note_stuck(outcome, state)
         unless @waiting || revisiting
           @objectives.record_attempt(skill: choice[:skill], params: choice[:params], result_summary: "#{'(autopilot) ' if autopiloted}#{summary(outcome, opened)}")
         end
@@ -297,6 +302,50 @@ module Koholint
         talked = choice[:skill] == 'talk_to' && outcome[:talked] == true
         entity = outcome[:entity].is_a?(Hash) ? outcome[:entity][:type] || outcome[:entity]['type'] : nil
         @talk_source = talked ? choice[:params].transform_keys(&:to_sym).slice(:row, :col).merge(entity ? { entity: } : {}) : nil
+      end
+
+      def note_stuck(outcome, state)
+        place = [state.room_id, state.map_id]
+        @stuck = { place:, cells: Set.new, count: 0 } unless @stuck && @stuck[:place] == place
+        cells = %i[from to].filter_map { |key| Ledger.pick(outcome, key) }.select { |at| Ledger.place_of(at) == place }
+                           .map { |at| [Ledger.pick(at, :row), Ledger.pick(at, :col)] }
+        fresh = cells.count { |cell| @stuck[:cells].add?(cell) }.positive?
+        if fresh
+          @stuck[:count] = 0
+          @stuck[:hint] = false
+        elsif STUCK_STOPS.include?(outcome[:stopped_by].to_s) && (@stuck[:count] += 1) >= STUCK_AT
+          @stuck[:count] = 0
+          @stuck[:hint] = true
+          @stuck[:times] = @stuck[:times].to_i + 1
+          @notes << { kind: 'stuck', detail: "#{STUCK_AT} results in #{place.join('-')} without a new cell (#{@stuck[:times]} times here)" }
+        end
+      end
+
+      def alerts(state)
+        place = [state.room_id, state.map_id]
+        lines = []
+        if state.low_health?
+          shelter = Candidates.shelter(place, @explore_log.hops(place), ->(where) { @leads.name_of(where) })
+          where = if shelter then "nearest shelter: #{shelter[:title]} (candidate #{shelter[:id]})"
+                  elsif PlaceKinds.kind(place) == 'interior' then 'Link is inside, away from the creatures outside'
+                  else 'no interior is known yet'
+                  end
+          lines << "LOW HEALTH: the harness no longer chains explores; avoid creatures, guard with the shield when one is close; #{where}."
+        end
+        if @stuck&.dig(:hint) && @stuck[:place] == place
+          lines << "STUCK: #{STUCK_AT} results in a row here found no frontier, no path or were blocked, without reaching a new cell. The grid may be wrong: " \
+                   'try the cells marked doubtful, step onto stairs or narrow gaps from the cell centre, and read the grid against the screen image.'
+        end
+        lines
+      end
+
+      def danger?(state)
+        return false unless @hurt_at && state.frame - @hurt_at < HURT_FRAMES && state.cell
+
+        entities_now.any? do |entity|
+          cell = entity[:cell]
+          cell && (Entities.creature?(entity) || entity[:kind].to_s == 'enemy') && (cell[0] - state.cell[0]).abs + (cell[1] - state.cell[1]).abs <= DANGER_CELLS
+        end
       end
 
       def note_no_path(choice, outcome, frame)
@@ -385,7 +434,7 @@ module Koholint
                             signs: signs.select { |object| object[:kind].to_s == 'sign' }.map { |object| object.slice(:cell) } }
         end
         @candidates = Candidates.build(place:, grid: context[:grid], explore_log: @explore_log, talk_log: @talk_log, leads: @leads, cards: @cards,
-                                       entities: @entities, signs:, stamp: stamp(state), link: state.cell)
+                                       entities: @entities, signs:, stamp: stamp(state), link: state.cell, low_health: state.low_health?)
       end
 
       def satisfied?(predicate, state, place)
@@ -566,7 +615,7 @@ module Koholint
                                        triggers: @triggers, talk_log: @talk_log, signs: objects_now, locked: (@hemmed[:attempts] if @hemmed && hemmed?(state)),
                                        locked_frames: (locked_frames(state) if WAIT_PHASES.include?(state.phase)), goal: goal_line, leads: @leads.all, stamp: stamp(state),
                                        place_name: @leads.name_of([state.room_id, state.map_id]), candidates: (Candidates.lines(@candidates) if decision_point.name == :choose_objective),
-                                       resolve: @leads.method(:place_for), hp_lost: @hp_lost, died: @died)
+                                       resolve: @leads.method(:place_for), hp_lost: @hp_lost, died: @died, alerts: alerts(state))
         @hp_lost = 0
         @died = false
         if @reading
@@ -707,7 +756,7 @@ module Koholint
         return unless @autopilot && decision_point.name == :choose_skill && !@sequence && !@reading && !hemmed?(state)
 
         follow = follow_choice(state)
-        result = @autopilot.next_choice(state:, objective: @objectives.current, follow: follow&.dig(:choice)) or return
+        result = @autopilot.next_choice(state:, objective: @objectives.current, follow: follow&.dig(:choice), danger: danger?(state)) or return
         context[:aim] = follow[:aim] if follow&.dig(:aim)
         @autopilot_acting = true
         result
@@ -724,7 +773,7 @@ module Koholint
 
           cell = target[:kind] == 'person' ? entities_now.find { |entity| entity[:type] == target[:type] && entity[:cell] }&.dig(:cell) : target[:cell]
           { choice: { skill: 'talk_to', params: { row: cell[0], col: cell[1] } } } if cell
-        when 'place', 'lead' then { choice: EXPLORE, aim: { place: target[:place] } } unless here
+        when 'place', 'lead', 'shelter' then { choice: EXPLORE, aim: { place: target[:place] } } unless here
         end
       end
 

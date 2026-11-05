@@ -1,4 +1,5 @@
 require 'koholint/place_card'
+require 'koholint/place_kinds'
 
 module Koholint
   module Candidates
@@ -8,13 +9,13 @@ module Koholint
 
     module_function
 
-    def build(place:, grid:, explore_log:, talk_log:, leads:, cards: {}, entities: [], signs: [], stamp: nil, link: nil)
+    def build(place:, grid:, explore_log:, talk_log:, leads:, cards: {}, entities: [], signs: [], stamp: nil, link: nil, low_health: false)
       hops = explore_log.hops(place)
       named = ->(where) { leads.name_of(where) }
       people = people_here(place, entities, talk_log, stamp)
       leaving = exits(place, grid, explore_log) + doors(place, signs, explore_log, link) + places(place, hops, explore_log, named) +
                 people_away(place, hops, cards, talk_log, named) + signs_away(place, hops, cards, talk_log, named) + lead_places(place, hops, leads, named)
-      people + signs_here(place, signs, talk_log) + warn(leaving, people)
+      [(shelter(place, hops, named) if low_health)].compact + people + signs_here(place, signs, talk_log) + warn(leaving, people)
     end
 
     def warn(leaving, people)
@@ -22,6 +23,14 @@ module Koholint
 
       who = people.map { |person| person[:who] }.join(', ')
       leaving.map { |candidate| candidate.merge(label: "#{candidate[:label]} (leaves unexhausted people here: #{who})", leaves_unexhausted: true) }
+    end
+
+    def shelter(place, hops, named)
+      return if PlaceKinds.kind(place) == 'interior'
+
+      where = away(place, hops).find { |known| PlaceKinds.kind(known) == 'interior' } or return
+      { id: "shelter-#{where.join('-')}", label: "LOW HEALTH: take shelter in #{describe(where, named)}, #{moves(hops[where])} (an interior; the tip that it restores hearts is not confirmed)",
+        title: "Take shelter in #{describe(where, named)}"[0, 80], predicate: { kind: 'reach_place', place: where }, target: { kind: 'shelter', place: where } }
     end
 
     def lines(candidates) = candidates.map { |candidate| "- #{candidate[:id]}: #{candidate[:label]}" }

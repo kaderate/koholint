@@ -50,7 +50,7 @@ of replay); the `decision` trace event carries its `prompt_sha`. `--tag NAME` la
 keeps the recorded value and refuses a different one. With it on, an `explore` that stops at a new place, a known place, at its frame
 budget or near an object never tried (`untried_object`) is followed by another `explore` with no direction that the harness issues itself (agent `delegated`, cost 0, the
 `decision` event carries `autopilot: true`); the model decides again on any other stop or action, after a new lead or goal,
-outside free play, after damage, when the objective changes or is not `new_place`, `leave_place` or `new_text`, and after
+outside free play, after damage, at low health (a third of max hp or less), after damage with a creature within 3 cells, when the objective changes or is not `new_place`, `leave_place` or `new_text`, and after
 6 such explores or 2400 frames since its last call. When such a chain reaches a place and achieves its objective, the harness also
 starts the next objective itself (`new_place`, "Explore the nearest untried exits", `autopilot: true` on the `objective` and
 `decision` events) instead of a paid `choose_objective`, under the same caps, as long as this place or a place routed to has untried exits.
@@ -77,7 +77,7 @@ place, so the grid went dark). The live view has a grid toggle that overlays the
 visited places from the trace; `fork` branches a run at a frame (the parent may be of an older flow; `--tag`, `--autopilot` and `--root` set the child's). Both work on an archived run, also on a fresh clone
 (see Run storage).
 
-## Agent skills (`flow-22`)
+## Agent skills (`flow-23`)
 
 - Between decisions the engine waits, with no input, until Link is ready (no screen scroll, door walk, jump or
   knockback, then 2 settled frames): the screen is never mapped and the model never called mid-scroll or mid-jump
@@ -118,7 +118,9 @@ visited places from the trace; `fork` branches a run at a frame (the parent may 
   uncatalogued screen gets `press` and `wait` and a `notable` `unknown_mode` in the trace; 600 frames on it stop the
   run as `unknown_mode_stuck`. Options that quit to the title are refused. The game-over screen is answered by the harness, free: it
   continues with the first option that does not quit (`notable` `death`); a health drop emits a `notable` `damage` and
-  the next prompt's health line shows the hearts lost since the last model call.
+  the next prompt's health line shows the hearts lost since the last model call. At a third of max hp or less a `LOW HEALTH`
+  line names the nearest known interior and a `shelter-<room>-<map>` candidate comes first; six fruitless results in one
+  place without a new cell emit a `notable` `stuck` and a `STUCK` reset hint.
 - The context header lists the items on A and B and in the inventory slots (`data/items.json` names; a `?` marks a name
   not measured yet). `use_item item [button] [frames]` uses a held item (assigning it through the START menu to `button`,
   default B, when it is on no button); `guard frames [direction]` raises the shield (Link walks at full speed and turns
@@ -232,7 +234,7 @@ Every finished run is kept in git as a light bundle under `runs/<id>/` (about 60
 `harness_sha`, `prompts_sha`, `model`), `inputs.log`, `trace.jsonl.gz`, `world.json`, `suggestions.md`, `summary.json`
 (written by the engine at every stop), `star.json` when starred and `notes.md` when the owner wrote notes in the viewer, and `screens/<room>-<map>.png` (one 160x144 screenshot per place, about 3-8 KB each, taken by the engine 20 frames after the place became playable and ready). `bin/koholint screens <run_dir>` writes the missing ones for an older run by replaying its journal from boot (about one minute per 6000 frames; idempotent). `prune-heavy` keeps `screens/`. `summary.json` (`v: 3`) also holds `cost_by_skill`
 (model calls and dollars per skill), `decisions_by_agent` (free decisions included) and `usage` (goal changes, leads
-by importance, rejected leads, objectives by kind, `because` uses, talks, talks to a known target, dialogues, `not_ready_frames` waited by the readiness gate, `not_ready_waits` longer than 5 frames, `autopilot_decisions` and `chain_max`, the longest run of consecutive autopilot decisions); `v: 4` adds `autopilot` from the manifest; `v: 5` adds `usage.left_with_unexhausted_people` (place changes away from a place whose place card listed a verified person whose last talk verdict was not `exhausted`) and the matching `symptoms` entry with its evidence (`frame`, `place`, `people`). `v: 6` adds `usage.deaths` and `usage.damage_events` (counts of those notables). `prompts/`, `keyframes/`, `save/`, `video/`,
+by importance, rejected leads, objectives by kind, `because` uses, talks, talks to a known target, dialogues, `not_ready_frames` waited by the readiness gate, `not_ready_waits` longer than 5 frames, `autopilot_decisions` and `chain_max`, the longest run of consecutive autopilot decisions); `v: 4` adds `autopilot` from the manifest; `v: 5` adds `usage.left_with_unexhausted_people` (place changes away from a place whose place card listed a verified person whose last talk verdict was not `exhausted`) and the matching `symptoms` entry with its evidence (`frame`, `place`, `people`). `v: 6` adds `usage.deaths` and `usage.damage_events` (counts of those notables); `v: 7` adds `usage.stuck_events`. `prompts/`, `keyframes/`, `save/`, `video/`,
 `activity.json`, `run.lock` and the plain `trace.jsonl` are gitignored: saves and keyframes are derivable by replay.
 
 | Command | Effect |
