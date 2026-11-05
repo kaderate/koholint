@@ -15,7 +15,7 @@ module Koholint
       MAX_LINE = 8192
       MAX_HEADERS = 100
       MAX_BODY = 32_768
-      INSIGHTS = { '/map.json' => :map, '/timeline.json' => :timeline, '/stats.json' => :stats }.freeze
+      INSIGHTS = { '/map.json' => :map, '/timeline.json' => :timeline, '/stats.json' => :stats, '/cockpit.json' => :cockpit }.freeze
       READ_TIMEOUT = 5
 
       attr_reader :listener

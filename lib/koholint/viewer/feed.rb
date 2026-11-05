@@ -100,7 +100,7 @@ module Koholint
         end
       end
 
-      INSIGHTS = %i[map timeline stats].freeze
+      INSIGHTS = %i[map timeline stats cockpit].freeze
       INSIGHT_CACHE = {}
       INSIGHT_LIMIT = MAX_RUNS * INSIGHTS.size
 
@@ -108,8 +108,8 @@ module Koholint
         raise ArgumentError, "unknown insight #{kind}" unless INSIGHTS.include?(kind)
 
         full = trace_events(run_dir)
-        shown = kind == :timeline ? full.size : visible(full, kind == :map ? follower.frame : upto)
-        frames = kind == :timeline ? follower.journal_frames : nil
+        shown = kind == :timeline ? full.size : visible(full, %i[map cockpit].include?(kind) ? follower.frame : upto)
+        frames = { timeline: follower.journal_frames, cockpit: follower.frame / COCKPIT_BUCKET }[kind]
         shots = kind == :map ? PlaceShots.names(run_dir).sort : nil
         CACHE_LOCK.synchronize do
           entry = INSIGHT_CACHE[[run_dir, kind]]
@@ -119,6 +119,8 @@ module Koholint
         CACHE_LOCK.synchronize { remember(INSIGHT_CACHE, [run_dir, kind], { source: WeakRef.new(full), key: [shown, frames, shots], value: }, limit: INSIGHT_LIMIT) }
         value
       end
+
+      COCKPIT_BUCKET = 120
 
       def visible(full, upto)
         return full.size unless upto
@@ -132,6 +134,7 @@ module Koholint
         when :map
           lists = grid_events(trace)
           Insights.map(trace, screens: lists[:screens], affordances: lists[:affordances], frame: follower.frame, shots: PlaceShots.places(run_dir))
+        when :cockpit then Insights.cockpit(trace, manifest: read_manifest(run_dir), frame: follower.frame).merge(run_id: File.basename(run_dir))
         when :timeline then Insights.timeline(trace, frames:).merge(run_id: File.basename(run_dir))
         when :stats then Insights.stats(trace).merge(run_id: File.basename(run_dir), frames: [follower.journal_frames.to_i, trace.last&.fetch('frame', 0).to_i].max)
         end

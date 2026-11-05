@@ -36,17 +36,47 @@ class PageTest < Minitest::Test
     assert_equal 'f8 · press start 3f', evaluate("formatEventPretty(#{JSON.generate(event)})")
   end
 
-  def test_blocks_are_equal_columns_on_desktop_and_one_column_in_reading_order_on_a_phone
-    base = PAGE.index('#blocks { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr))')
-    media = PAGE.index('@media (max-width: 900px)')
-    phone = PAGE.index('#blocks { grid-template-columns: minmax(0, 1fr)', media)
-    assert base < media, 'the base #blocks rule must come before the media query'
+  def test_three_columns_on_desktop_and_one_column_in_reading_order_on_a_phone
+    base = PAGE.index('#cols { display: grid; grid-template-columns: 400px minmax(0, 1fr) 330px')
+    media = PAGE.index('@media (max-width: 1100px)')
+    phone = PAGE.index('#cols, #lower { grid-template-columns: minmax(0, 1fr)', media)
+    assert base < media, 'the base #cols rule must come before the media query'
     assert media < phone
-    ids = %w[game objective reasoning leads-block dialogues-block stats timeline-block map-block header-block]
+    ids = %w[strip game reasoning objective dialogues-block symptoms-block place-card leads-block map-block header-block]
     positions = ids.map { |id| PAGE.index(%(id="#{id}")) }
     assert(positions.all?, 'every block is on the page')
     assert_equal positions.sort, positions
-    %w[timeline-block map-block header-block].each { |id| assert_match(/class="block wide" id="#{id}"/, PAGE) }
+    assert_operator PAGE.index('id="strip"'), :<, PAGE.index('id="cols"')
+    assert_match(/#strip \{ position: sticky; top: 0/, PAGE)
+  end
+
+  def test_the_cockpit_helpers_read_hearts_overlay_boxes_ladder_and_kpis
+    assert_equal %w[full half empty], evaluate('heartsView({hp: 12, max_hp: 24})').then { |a| a.size == 3 ? %w[full half empty] : a }
+    assert_equal %w[full half empty], evaluate('heartsView({hp: 12, max_hp: 24})')
+    assert_equal [], evaluate('heartsView({hp: 0, max_hp: 0})')
+    assert_equal({ 'left' => 30, 'top' => 100.0 / 9 * 2, 'width' => 10, 'height' => 100.0 / 9 }, evaluate('cellBox(2, 3)'))
+    ladder = evaluate("ladderView({ladder: [{name: 'shield', reached: true}, {name: 'sword', reached: false}]})")
+    assert_equal [['Bouclier', 'step done'], ['Épée', 'step next']], ladder.map { |s| [s['text'], s['className']] }
+    view = evaluate("kpiView({spent: 3.42, cap: 10, calls: 118, free: 500, calls_per_1000f: 5.1, usd_per_1000f: 0.08, minutes: 41, cap_minutes: 180, places: 31})")
+    assert_equal ['$3.42 / 10', 34, '31'], view.values_at('cost', 'percent', 'places')
+    assert_includes view['detail'], '41 min sur 180'
+    assert_equal '-', evaluate('kpiView({}).places')
+  end
+
+  def test_the_health_band_follows_the_hearts_and_a_bubble_flags_tips_and_repeats
+    segments = evaluate("healthSegments({points: [{frame: 0, hp: 24, max_hp: 24}, {frame: 500, hp: 4, max_hp: 24}]}, 1000, 1000)")
+    assert_equal [[0, 500, '#2b6a4f'], [500, 500, '#7a2a2a']], segments.map { |s| [s['x'], s['w'], s['color']] }
+    bubble = evaluate("bubbleView({frame: 9, talk: 2, new_text: false, tip: true, text: '<b>x</b>'})")
+    assert_equal ['f9 · talk 2 · répété · conseil', 'bub dim tipped', '<b>x</b>'], bubble.values_at('head', 'className', 'text')
+    assert_equal({ 'text' => 'à revoir', 'className' => 'badge b-warn' }, evaluate("verdictBadge('revisit')"))
+    assert_equal 'personne type 62', evaluate('personLabel({type: 62})')
+    assert_equal 'Tarkin', evaluate("personLabel({type: 62, name: 'Tarkin'})")
+    assert_equal ['choisi', 'cand picked'], evaluate("candidateView({id: 'c3', label: 'x', picked: true})").values_at('note', 'className')
+    assert_equal 'laisse des PNJ non épuisés', evaluate("candidateView({id: 'c5', label: 'x', leaves_unexhausted: true})")['note']
+    group = { name: 'Tarkin', talks: [{ text: 'La route du Sud' }] }
+    assert_equal [true, false, true], %w[tark plage sud].map { |f| evaluate("groupMatches(#{JSON.generate(group)}, '#{f}')") }
+    assert_equal({ 'parent' => 'Village', 'door' => ' · porte 226 en (4,5)' }, evaluate("interiorLink({parent: [1, 0], parent_name: 'Village', door: {object: 226, cell: [4, 5]}})"))
+    assert_equal 'entrée inconnue', evaluate('interiorLink({})')
   end
 
   def test_a_decision_shows_its_reasoning_as_visible_text
@@ -62,7 +92,7 @@ class PageTest < Minitest::Test
     assert_equal [{ 'head' => 'f40 · [1,2]', 'npc' => '', 'text' => 'A <b>sign</b>' }, { 'head' => 'f5 · [1,2] · from (2, 3)', 'npc' => '', 'text' => 'Hi' }],
                  evaluate("dialoguesView(#{JSON.generate(list)})")
     assert_equal [], evaluate('dialoguesView(undefined)')
-    assert_includes PAGE, '<section class="block" id="dialogues-block"><h2>Dialogues</h2><ul id="dialogues"></ul></section>'
+    assert_includes PAGE, '<div id="dialogues" class="scroll"></div>'
   end
 
   def test_a_dialogue_shows_the_npc_state_when_known
@@ -79,7 +109,8 @@ class PageTest < Minitest::Test
     assert_equal 'goal: find <b>it</b>', view['goal']
     assert_equal ["[high] #{'x' * 159}…", '[normal] go up'], view['leads']
     assert_equal({ 'goal' => 'goal: none yet', 'leads' => [] }, evaluate('memoryView({})'))
-    assert_includes PAGE, '<div id="goal"></div><div id="plan"></div>'
+    assert_includes PAGE, '<div id="goal"></div>'
+    assert_includes PAGE, '<div id="plan"></div>'
     assert_includes PAGE, '<ul id="leads"></ul>'
     assert_includes PAGE, 'item.textContent = text;'
   end
@@ -131,10 +162,6 @@ class PageTest < Minitest::Test
     assert_equal '-', evaluate('formatHearts({status: {hearts: null, max_hearts: null}})')
     assert_equal '-', evaluate('formatHearts({status: {hearts: 0, max_hearts: 0}})')
     assert_equal '2/3', evaluate('formatHearts({status: {hearts: 2, max_hearts: 3}})')
-  end
-
-  def test_unknown_health_is_styled_neutrally
-    assert_match(/health-unknown/, PAGE)
   end
 
   def test_error_field_of_a_failed_response_is_shown
@@ -432,9 +459,9 @@ class PageTest < Minitest::Test
     [PAGE, RUNS, COMPARE].each do |html|
       nav = html[%r{<nav id="nav">.*?</nav>}m] or flunk 'page has no nav'
       assert_match(%r{<a[^>]*href="/">Live</a>}, nav)
-      assert_match(%r{<a[^>]*href="/runs">Runs</a>}, nav)
+      assert_match(%r{<a[^>]*href="/runs">Historique</a>}, nav)
       assert_match(/id="compare"|id="nav-compare"/, nav)
-      assert_includes nav, 'Compare</a>'
+      assert_includes nav, 'Comparer</a>'
       assert_match(/name="viewport"/, html)
     end
     assert_includes PAGE, '<span id="nav-badge" class="badge">replay</span>'
@@ -573,7 +600,7 @@ class PageTest < Minitest::Test
   end
 
   def test_compare_link_needs_exactly_two_runs
-    assert_includes RUNS, '<a id="compare" href="#" hidden>Compare</a>'
+    assert_includes RUNS, '<a id="compare" href="#" hidden>Comparer</a>'
     assert_nil runs_eval("compareHref(['a'])")
     assert_equal '/compare/a/b%2Fc', runs_eval("compareHref(['a', 'b/c'])")
   end

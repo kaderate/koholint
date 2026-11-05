@@ -217,7 +217,7 @@ run and serves the watched run without it):
 | `/run/<id>` | The live page as a read-only replay of that run, from boot; `/frame.png?run=<id>` and `/state.json?run=<id>` serve it |
 | `/control?run=<id>&speed=1\|4\|16`, `&pause=0\|1` and `&seek=<frame>` | Drive a replay; `seek` restores the nearest keyframe at or before the frame (or replays from boot) and steps to it |
 | `/screens/<room>-<map>.png[?run=<id>]` | The screenshot taken the first time the run played that place (`runs/<id>/screens/`; 404 when missing; cached 30 s) |
-| `/map.json`, `/timeline.json`, `/stats.json`, `/header.json` | World map, run timeline, cost series and usage (with `reference`, the previous run's cost series), run header and notes |
+| `/map.json`, `/timeline.json`, `/stats.json`, `/cockpit.json`, `/header.json` | World map, run timeline, cost series and usage (with `reference`, the previous run's cost series), the cockpit data of the page (KPIs, health, HUD, objective and offered candidates, reasoning, symptoms, place card, interiors, leads, dialogues by person), run header and notes |
 | `/compare/<a>/<b>`, `/compare.json?a=&b=` | Summaries, usage and cost by skill side by side with differing fields marked, and the first frame at which each run reached each milestone and place |
 | `POST /star?run=<id>` (form body `why=...`) | Same as `bin/koholint star`; the `Host` header must name the viewer itself and an `Origin` header, if sent, must match |
 | `POST /notes?run=<id>` (form body `text=...`) | Writes `runs/<id>/notes.md` (at most 8 KB, no control characters but newlines and tabs; empty text deletes it), same origin check; only for runs under the runs root |

@@ -1,11 +1,15 @@
 require 'koholint'
 require 'koholint/dialogues'
 require 'koholint/game_state'
+require 'koholint/items'
 require 'koholint/modes'
+require 'koholint/perception'
+require 'koholint/place_card'
 require 'koholint/place_kinds'
 require 'koholint/summary'
 require 'koholint/vision/capabilities'
 require 'koholint/vision/grid'
+require 'koholint/vision/grid_builder'
 require 'koholint/vision/world'
 
 module Koholint
@@ -19,6 +23,11 @@ module Koholint
       BUCKETS = 150
       LABEL = 160
       SERIES = 200
+      FPS = 60
+      HEALTH_POINTS = 400
+      DIALOGUE_GROUPS = 60
+      TALKS_PER_PERSON = 20
+      TEXT = 500
       ALERT_STOPS = %w[stuck_boot unknown_mode_stuck].freeze
 
       module_function
@@ -255,6 +264,149 @@ module Koholint
         { phase: state.phase(booted: GameState.played?(trace)).to_s, name: Modes.for(state)&.name, frame: perception['frame'] }
       rescue StandardError
         { phase: 'unknown', name: nil }
+      end
+
+      def cockpit(trace, manifest: {}, frame: 0)
+        state = last_state(trace)
+        found = visits(trace)
+        names = trace.select { |e| e['type'] == 'place_name' && e['place'].is_a?(Array) }.to_h { |e| [e['place'], e['name']] }
+        world = PlaceCard.world(trace, names:)
+        shown = [frame.to_i, trace.last&.dig('frame').to_i].max
+        interiors = interiors(trace, found, world, names)
+        leads = trace.select { |e| e['type'] == 'lead' }
+        { frame: shown, kpis: kpis(trace, manifest, shown, found[:places].size), health: health(trace), hud: hud(state, trace),
+          now: now(trace, leads), reasoning: reasoning(trace), symptoms: symptoms(trace),
+          place: place_view(found[:current], world, names, interiors), interiors:, leads: leads_view(leads),
+          dialogues: dialogue_groups(trace, world, names, leads) }
+      end
+
+      def last_state(trace) = trace.reverse_each.find { |e| e['type'] == 'perception' && e['state'].is_a?(Hash) }&.dig('state') || {}
+
+      def kpis(trace, manifest, frame, places)
+        decisions = trace.select { |e| e['type'] == 'decision' }
+        calls = decisions.count { |e| Summary.model_call?(e) }
+        spent = decisions.sum { |e| e['cost_usd'].to_f }
+        budget = manifest['budget'].is_a?(Hash) ? manifest['budget'] : {}
+        per = ->(value) { frame.positive? ? (value * 1000.0 / frame).round(4) : nil }
+        { frame:, spent: spent.round(6), cap: budget['dollars'].is_a?(Numeric) ? budget['dollars'] : nil, calls:, free: decisions.size - calls,
+          calls_per_1000f: per.call(calls), usd_per_1000f: per.call(spent), minutes: (frame / FPS / 60.0).round(1),
+          cap_minutes: budget['active_seconds'].is_a?(Numeric) ? (budget['active_seconds'] / 60.0).round(1) : nil, places: }
+      end
+
+      def health(trace)
+        points = trace.filter_map do |event|
+          state = event['state']
+          next unless event['type'] == 'perception' && state.is_a?(Hash) && state['max_hp'].to_i.positive?
+
+          [event['frame'], state['hp'].to_i, state['max_hp'].to_i]
+        end
+        points = points.chunk_while { |a, b| a[1] == b[1] && a[2] == b[2] }.map(&:first)
+        points = points.each_slice((points.size / HEALTH_POINTS.to_f).ceil).map(&:first) if points.size > HEALTH_POINTS
+        hits = trace.select { |e| e['type'] == 'notable' && %w[damage death].include?(e['kind']) }.map { |e| { frame: e['frame'], kind: e['kind'] } }.last(MARKERS)
+        { points: points.map { |frame, hp, max| { frame:, hp:, max_hp: max } }, hits: }
+      end
+
+      def hud(state, trace)
+        item = ->(id) { id.to_i.zero? ? nil : { id: id.to_i, name: Items.name(id) } }
+        gained = trace.reverse_each.find { |e| e['type'] == 'item_gained' }
+        reached = Perception::MILESTONES.index(state['milestone'].to_s.to_sym) || 0
+        { hp: state['hp'], max_hp: state['max_hp'], item_a: item.call(state['item_a']), item_b: item.call(state['item_b']),
+          inventory: Array(state['inventory']).first(Items::SLOTS).map { |id| item.call(id) }, milestone: state['milestone'],
+          ladder: Perception::MILESTONES.each_with_index.reject { |_, index| index.zero? }.map { |name, index| { name: name.to_s, reached: index <= reached } },
+          last_item: gained && { frame: gained['frame'], id: gained['item'], name: gained['name'] } }
+      end
+
+      def now(trace, leads)
+        started = trace.reverse_each.find { |e| e['type'] == 'objective' && e['status'] == 'started' }
+        ended = started && trace.any? { |e| e['type'] == 'objective' && e['id'] == started['id'] && e['status'] != 'started' }
+        offered = started && trace.reverse_each.find { |e| e['type'] == 'decision' && e['decision_point'] == 'choose_objective' && e['frame'] <= started['frame'] }
+        because = started && leads.find { |lead| lead['id'] == started['because'] }
+        options = offered && offered['options'].is_a?(Array) ? offered['options'].select { |o| o.is_a?(Hash) } : []
+        { objective: started && { id: started['id'], title: started['title'], predicate: started['predicate'], frame: started['frame'], ended: ended },
+          why: { lead: because && { id: because['id'], importance: because['importance'], claim: clip(because['claim']) }, text: offered && clip(offered['justification']) },
+          candidates: options.map { |o| { id: o['id'], label: clip(o['label']), leaves_unexhausted: o['leaves_unexhausted'] == true, picked: o['picked'] == true } } }
+      end
+
+      def reasoning(trace)
+        decisions = trace.select { |e| e['type'] == 'decision' }
+        view = lambda do |event|
+          event && { frame: event['frame'], point: event['decision_point'], skill: Summary.skill_of(event), justification: event['justification'].to_s[0, TEXT],
+                     confidence: event['confidence'], agent: event['agent'], paid: Summary.model_call?(event), cost: event['cost_usd'].to_f }
+        end
+        { last: view.call(decisions.last), paid: view.call(decisions.reverse_each.find { |e| Summary.model_call?(e) }) }
+      end
+
+      def symptoms(trace)
+        usage = Summary.usage(trace)
+        { left_with_unexhausted_people: Summary.unexhausted_departures(trace).size, damage_events: usage[:damage_events], deaths: usage[:deaths],
+          talks: usage[:talks], talks_to_known: usage[:talks_to_known] }
+      end
+
+      def leads_view(leads)
+        leads.reject { |e| e['importance'] == 'low' }.last(40).reverse.map { |e| { id: e['id'], importance: e['importance'], claim: clip(e['claim']), place: e['place'], tip: e['importance'] == 'tip' } }
+      end
+
+      def place_view(current, world, names, interiors)
+        return nil unless current
+
+        card = world[current.join('-')] || {}
+        crossed = interiors.select { |i| i[:parent] == current && i[:door] }.map { |i| i[:door][:cell] }
+        { place: current, name: names[current], kind: PlaceKinds.kind(current), visits: card['visits'],
+          people: Array(card['people']).map { |p| { type: p['type'], cell: p['cell'], name: p['name'], verdict: p['status'] == 'exhausted' ? 'exhausted' : 'revisit' } },
+          signs: Array(card['signs']).map { |sign| { cell: sign['cell'], read: sign['status'] == 'read' } },
+          doors: Array(card['doors']).map { |door| { cell: door['cell'], object: door['object'], crossed: crossed.include?(door['cell']) } },
+          creatures: (Array(card['creatures']) + Array(card['enemies']) + Array(card['unknown'])).map { |c| { type: c['type'], cell: c['cell'] } } }
+      end
+
+      def interiors(trace, found, world, names)
+        grid = ->(place) { PlaceKinds.grid?(place) }
+        order = found[:places].keys
+        parents = parents(order, found[:moves], grid)
+        order.reject(&grid).map do |place|
+          parent = parents[place]
+          card = world[place.join('-')] || {}
+          people = Array(card['people'])
+          { place:, name: names[place], kind: PlaceKinds.kind(place), parent:, parent_name: parent && names[parent], frame: found[:places][place][:first_frame],
+            door: parent && door_between(trace, world, parent, place),
+            people: people.size, exhausted: people.count { |p| p['status'] == 'exhausted' } }
+        end
+      end
+
+      def door_between(trace, world, parent, place)
+        crossing = trace.find do |e|
+          e['type'] == 'action' && e['result'].is_a?(Hash) && spot(e['result']['from'])&.dig(:place) == parent && spot(e['result']['to'])&.dig(:place) == place
+        end
+        from = crossing && crossing['result']['from']
+        return nil unless from && from['x'].is_a?(Integer) && from['y'].is_a?(Integer)
+
+        row, col = Vision::GridBuilder.link_cell(from['x'], from['y'])
+        doors = Array(world.dig(parent.join('-'), 'doors'))
+        return nil unless row && !doors.empty?
+
+        door = doors.min_by { |d| (d['cell'][0] - row).abs + (d['cell'][1] - col).abs }
+        { cell: door['cell'], object: door['object'], frame: crossing['frame'] }
+      end
+
+      def dialogue_groups(trace, world, names, leads)
+        tips = leads.select { |e| e['importance'] == 'tip' }.map { |e| Dialogues.compact(e['quote']) }.reject(&:empty?)
+        states = dialogue_states(trace)
+        groups = Dialogues.from_events(trace.select { |e| %w[dialogue action].include?(e['type']) }).group_by do |d|
+          source = d[:source]
+          [d[:place], source ? [source[:row], source[:col]] : nil, source ? nil : d[:speaker]]
+        end
+        groups.map do |(place, cell, _), talks|
+          npc_states = talks.map { |d| states[[d[:frame], d[:place]]] }
+          type = talks.filter_map { |d| d.dig(:source, :entity) }.last
+          name = talks.filter_map { |d| d[:speaker] }.last || (type ? "personne type #{type}" : 'personne inconnue')
+          verdict = npc_states.compact.last&.dig(:state)
+          { place:, place_name: place && names[place], cell:, name:, type:, last_frame: talks.last[:frame],
+            verdict: verdict.nil? ? 'unknown' : (verdict == 'exhausted' ? 'exhausted' : 'revisit'),
+            talks: talks.each_with_index.map do |d, index|
+              npc = npc_states[index]
+              { frame: d[:frame], talk: npc ? npc[:talk] : index + 1, new_text: npc ? npc[:new_text] : true, text: d[:text].to_s[0, TEXT],
+                tip: tips.any? { |quote| Dialogues.compact(d[:text]).include?(quote) } }
+            end.last(TALKS_PER_PERSON) }
+        end.sort_by { |g| -g[:last_frame].to_i }.first(DIALOGUE_GROUPS)
       end
 
       def alerts(trace)

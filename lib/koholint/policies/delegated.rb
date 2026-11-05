@@ -231,6 +231,8 @@ module Koholint
         track { @objectives.update(state, frame:) }
       end
 
+      def offered_candidates = Candidates.offered(@candidates, @candidate)
+
       private
 
       def screen(state) = state.phase(booted: true).then { |phase| phase if SCREEN_SKILLS.key?(phase) }
