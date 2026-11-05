@@ -14,7 +14,7 @@ design in `docs/superpowers/specs/`, plans in `docs/superpowers/plans/` · v1 li
 Needs Ruby 4.0.1, an emu-gb checkout and the ROM. Copy `.env.example` to `.env` (gitignored) and set `EMU_GB_HOME` and
 `KOHOLINT_ROM`; real environment variables take precedence.
 
-Tests: `rake test` (one process per file, about 2.5 min; the first run builds an emulator state cache in `tmp/`);
+Tests: `rake test` (one process per file, ROM-heavy files one process per test, about 2 min; the first run builds an emulator state cache in `tmp/`); `rake test:fast` skips the ROM-heavy files (about 25 s);
 `rake test:e2e` also plays the full boot from frame 0.
 
 ## Quick start

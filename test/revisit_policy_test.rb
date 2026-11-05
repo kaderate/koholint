@@ -1,11 +1,8 @@
-require_relative 'delegated_policy_test'
+require_relative 'support/delegated_helpers'
 
 class RevisitPolicyTest < Minitest::Test
   include DelegatedHelpers
 
-  OPEN = DelegatedPolicyTest::OPEN
-  SHOT = DelegatedPolicyTest::SHOT
-  PAGE = DelegatedPolicyTest::PAGE
   DARK = [27, 42, 9].pack('C3')
   LIGHT = [154, 158, 63].pack('C3')
   TARKIN = { slot: 1, type: 63, x: 120, y: 80, cell: [4, 7], kind: :npc, verified: true, moves: false }.freeze
