@@ -5,24 +5,31 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Koholint compare</title>
 <style>
-  body { margin: 0; background: #111; color: #ddd; font: 13px/1.4 monospace; }
-  a { color: #8cf; }
-  #nav { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 16px; padding: 6px 12px; background: #1b1b1b; border-bottom: 1px solid #333; }
-  #nav a { text-decoration: none; }
-  #nav a.here { color: #fff; border-bottom: 2px solid #8cf; }
-  #nav-run { color: #fd8; overflow-wrap: anywhere; }
-  .scroll { overflow-x: auto; }
-  #error { display: none; padding: 8px 12px; background: #a60; color: #fff; }
-  h2 { margin: 16px 12px 4px; font-size: 0.85em; font-weight: normal; color: #888; text-transform: uppercase; letter-spacing: 0.08em; }
-  table { border-collapse: collapse; margin: 0 12px; }
-  th, td { padding: 3px 12px; border-bottom: 1px solid #2a2a2a; text-align: left; overflow-wrap: anywhere; }
-  th { color: #888; font-weight: normal; }
-  tr.diff td { background: #3a2a10; color: #fd8; }
+  :root { --bg: #14161a; --panel: #1c1f26; --line: #2a2e38; --ink: #e8e6df; --mut: #8b90a0; --acc: #6ec1a2; --warn: #e0a84a; --bad: #e06c6c; --blue: #6aa3e0; }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--ink); font: 14px/1.5 -apple-system, system-ui, sans-serif; }
+  a { color: var(--blue); }
+  button, input, select { background: #252932; color: var(--ink); border: 1px solid var(--line); border-radius: 6px; font: inherit; padding: 2px 10px; }
+  button { cursor: pointer; }
+  #nav { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 14px; padding: 10px 16px; background: var(--panel); border-bottom: 1px solid var(--line); }
+  #nav b { letter-spacing: 0.04em; }
+  .seg { display: flex; border: 1px solid var(--line); border-radius: 99px; overflow: hidden; }
+  .seg a { padding: 3px 14px; font-size: 12.5px; color: var(--mut); text-decoration: none; }
+  .seg a.here { background: #b83a3a; color: #fff; }
+  .pill { display: inline-block; padding: 1px 10px; border-radius: 99px; font-size: 12px; border: 1px solid var(--line); color: var(--mut); overflow-wrap: anywhere; }
+  .pill:empty { display: none; }
+  #error { display: none; padding: 8px 16px; background: #a60; color: #fff; }
+  .scroll { overflow-x: auto; margin: 0 14px; background: var(--panel); border: 1px solid var(--line); border-radius: 12px; }
+  h2 { margin: 16px 16px 6px; font-size: 11.5px; font-weight: 600; color: var(--mut); text-transform: uppercase; letter-spacing: 0.1em; }
+  table { border-collapse: collapse; width: 100%; font-size: 13px; }
+  th, td { padding: 5px 12px; border-bottom: 1px solid #22262e; text-align: left; overflow-wrap: anywhere; }
+  th { color: var(--mut); font-weight: 600; }
+  tr.diff td { background: #3b3017; color: var(--warn); }
   td.missing { color: #666; }
 </style>
 </head>
 <body>
-<nav id="nav"><b>Koholint</b><a href="/">Live</a><a href="/runs">Historique</a><a class="here" id="compare" href="#">Comparer</a><span id="nav-run"></span></nav>
+<nav id="nav"><b>KOHOLINT</b><span class="seg"><a href="/">Live</a><a href="/runs">Historique</a><a class="here" id="compare" href="#">Comparer</a></span><span id="nav-run" class="pill"></span></nav>
 <div id="error"></div>
 <h2>Summary</h2>
 <div class="scroll"><table><thead><tr><th>field</th><th id="head-a"></th><th id="head-b"></th></tr></thead><tbody id="summary"></tbody></table></div>
