@@ -26,6 +26,12 @@ module Koholint
       REOPEN_FRAMES = 10
       SECOND_TALK_GAP = 60
       PHASE_SHIFT = 7
+      TRACK_FRAMES = 300
+      HIT_FRAMES = 60
+      HIT_GAP = 10
+      VECTORS = { up: [0, -1], down: [0, 1], left: [-1, 0], right: [1, 0] }.freeze
+      OPPOSITE = { up: :down, down: :up, left: :right, right: :left }.freeze
+      TURN = { up: %i[left right], down: %i[right left], left: %i[down up], right: %i[up down] }.freeze
       ADDR = Perception::ADDRESSES
 
       module_function
@@ -118,6 +124,45 @@ module Koholint
           seen |= [[copy.read(ADDR.fetch(:entity_x) + entity[:slot]), copy.read(ADDR.fetch(:entity_y) + entity[:slot])]]
         end
         seen.size > 1
+      end
+
+      def trajectory(emulator, entity, frames: TRACK_FRAMES, link_at: nil)
+        copy = ModeCensus.copy(emulator)
+        place_link(copy, *link_at) if link_at
+        rows = [[copy.read(ADDR.fetch(:entity_x) + entity[:slot]), copy.read(ADDR.fetch(:entity_y) + entity[:slot]), copy.read(ADDR.fetch(:entity_state) + entity[:slot])]]
+        frames.times do
+          copy.step([])
+          rows << [copy.read(ADDR.fetch(:entity_x) + entity[:slot]), copy.read(ADDR.fetch(:entity_y) + entity[:slot]), copy.read(ADDR.fetch(:entity_state) + entity[:slot])]
+        end
+        rows
+      end
+
+      def motion_summary(rows)
+        steps = rows.each_cons(2).map { |a, b| [b[0] - a[0], b[1] - a[1]] }.reject { |dx, dy| dx.abs > 8 || dy.abs > 8 }
+        moving = steps.count { |dx, dy| dx != 0 || dy != 0 }
+        px = steps.sum { |dx, dy| dx.abs + dy.abs }
+        { frames: steps.size, moving_frames: moving, px_per_moving_frame: moving.zero? ? 0.0 : (px.to_f / moving).round(2), px_per_frame: (px.to_f / steps.size).round(2),
+          axes: steps.map { |dx, dy| dx.zero? ? (dy.zero? ? nil : :y) : (dy.zero? ? :x : :diag) }.compact.tally,
+          bounds: { x: rows.map(&:first).minmax, y: rows.map { |r| r[1] }.minmax }, states: rows.map(&:last).tally }
+      end
+
+      def relative(face, from) = { front: face, behind: OPPOSITE.fetch(face), left: TURN.fetch(face)[0], right: TURN.fetch(face)[1] }.fetch(from)
+
+      def hit_profile(emulator, entity, face, from:, shield:, gap: HIT_GAP)
+        copy = ModeCensus.copy(emulator)
+        dx, dy = VECTORS.fetch(relative(face, from))
+        hp = copy.read(ADDR.fetch(:hp))
+        first = nil
+        steps = []
+        HIT_FRAMES.times do |n|
+          place_link(copy, copy.read(ADDR.fetch(:entity_x) + entity[:slot]) - (dx * gap), copy.read(ADDR.fetch(:entity_y) + entity[:slot]) - (dy * gap))
+          copy.step(shield ? [face, :b] : [face])
+          now = copy.read(ADDR.fetch(:hp)) - hp
+          first ||= n if now.negative?
+          steps << [n, now] if steps.empty? || steps.last.last != now
+        end
+        { face:, from:, shield:, gap:, hp_delta: copy.read(ADDR.fetch(:hp)) - hp, first_hit_frame: first, hp_steps: steps,
+          shield_raised: Perception.read(copy).shield_raised }
       end
 
       def conversations(emulator, entity, talk)
