@@ -57,7 +57,7 @@ module Koholint
           @walked = (@log ? @log.walked(@place) : []) | [@start.cell].compact
           grid = context[:grid]
           @known = grid && Known.new(grid, @walked)
-          @planner = @known && Navigation::Planner.new(grid: @known, ledger: @ledger, place: @place, triggers: context[:triggers], mode: :free_only)
+          @planner = @known && Navigation::Planner.new(grid: @known, ledger: @ledger, place: @place, triggers: context[:triggers], mode: :free_only, danger: danger_of(context))
           @objects = grid ? TalkLog.objects(grid) : []
           @doors = Array(context[:objects]&.call).select { |object| object[:kind].to_s == 'door' && object[:cell][0] < Geometry::ROWS - 1 }.map { |object| object[:cell] }
           @survey = @known && survey

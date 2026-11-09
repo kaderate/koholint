@@ -17,6 +17,7 @@ module Koholint
       PROBE_HOLD_FRAMES = 32
       STEPS = { up: [-1, 0], down: [1, 0], left: [0, -1], right: [0, 1] }.freeze
       OVERLAY_STUCK_FRAMES = 600
+      HAZARD_MAX_CELLS = 8
 
       def self.link_sprite?(sprite, state)
         (sprite[:y] - state.y).abs <= LINK_SPRITE_TOLERANCE &&
@@ -72,6 +73,17 @@ module Koholint
         end
         @last = cell && { place:, cell:, grid: }
         grid
+      end
+
+      def note_fall(state)
+        place = [state.room_id, state.map_id]
+        cell = self.class.link_cell(state.x, state.y)
+        return unless @last && cell && @last[:place] == place
+
+        appearance = @last[:grid].appearance(*cell)
+        return if Grid::ROWS.times.sum { |row| Grid::COLS.times.count { |col| @last[:grid].appearance(row, col) == appearance } } > HAZARD_MAX_CELLS
+
+        Beliefs::DIRECTIONS.each { |direction| record(appearance, direction, :no, state.frame, method: 'fall', source: 'fall') }
       end
 
       private
@@ -186,10 +198,10 @@ module Koholint
         Geometry.aligned?(start[:x], start[:y], cell, axis: STEPS.fetch(direction)[0].zero? ? :y : :x)
       end
 
-      def record(appearance, direction, result, frame)
-        @beliefs.record(appearance:, action: :walk, direction:, result:, method: 'hold', context: @capabilities, frame:, source: 'probe')
-        @trace.emit(:affordance, frame:, appearance:, action: 'walk', direction: direction.to_s, result: result.to_s, method: 'hold',
-                                 context: @capabilities.to_a, source: 'probe')
+      def record(appearance, direction, result, frame, method: 'hold', source: 'probe')
+        @beliefs.record(appearance:, action: :walk, direction:, result:, method:, context: @capabilities, frame:, source:)
+        @trace.emit(:affordance, frame:, appearance:, action: 'walk', direction: direction.to_s, result: result.to_s, method:,
+                                 context: @capabilities.to_a, source:)
       end
 
       def grid_of(snapshot) = snapshot.cells.map { |row| row.map(&:appearance) }

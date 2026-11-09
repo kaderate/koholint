@@ -92,4 +92,18 @@ class EntitiesTest < Minitest::Test
     assert_equal objects.size, visible.size
     visible.each { |entity| assert(objects.any? { |cells| cells.include?(entity[:cell]) }, "no sprite object on #{entity[:cell]}") }
   end
+
+  def test_danger_cells_cover_the_contact_reach_of_enemies_only
+    enemy = { kind: :enemy, x: 56, y: 48, contact: 9 }
+    cells = Koholint::Entities.danger_cells([enemy, { kind: :npc, x: 120, y: 100, contact: 9 }, { kind: :enemy, x: 8, y: 8 }])
+    assert_includes cells, [2, 3]
+    assert_includes cells, [2, 4]
+    refute_includes cells, [2, 6]
+    refute_includes cells, [5, 7]
+  end
+
+  def test_catalogue_gives_the_measured_contact_range
+    assert_equal 9, Koholint::Entities.catalogue.dig(9, :contact)
+    assert_equal 14, Koholint::Entities.catalogue.dig(197, :contact)
+  end
 end

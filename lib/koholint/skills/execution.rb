@@ -1,3 +1,4 @@
+require 'koholint/entities'
 require 'koholint/geometry'
 
 module Koholint
@@ -53,6 +54,8 @@ module Koholint
       end
 
       private
+
+      def danger_of(context) = context[:entities] && -> { Entities.danger_cells(Array(context[:entities].call)) }
 
       def trigger_input
         return nil unless @stopped_by == :dialogue && !@start.dialog_open?

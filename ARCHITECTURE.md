@@ -37,7 +37,7 @@ measured by `probes/readiness_census.rb`, `bin/koholint census ready <run_dir>`)
 cell, kind }` for the active slots; the kind per type id (`npc`, `enemy`, `object`, `creature`, `unknown`) comes from
 `data/entities.json`, measured by `probes/entity_census.rb` (`bin/koholint census entities`): A pressed next to the
 entity opens a dialogue that does not open with its slot cleared in a control copy (`npc`); contact damage against the
-same control (`enemy`, never observed so far); neither, measured (`creature`: not a person, never a talk target, no danger);
+same control (`enemy`: types 9, 10 and 197 of the beach zone, measured with `EntityCensus.trajectory`, `motion_summary` and `hit_profile`: speed, contact gap, damage and whether the raised shield blocks it); neither, measured (`creature`: not a person, never a talk target, no danger);
 an uncatalogued type is `unknown`. The engine passes `Entities.read` to the policy and
 skills as the `entities` context entry. `Entities.objects` reads the room object table (`room_objects`, one id per cell)
 and keeps the ids that `data/entities.json` lists with an `object` key and a kind (`sign`: shows a text when read with A,
@@ -92,7 +92,7 @@ builds a collision `grid`; `beliefs` and `world` accumulate per-place knowledge 
 doubtful, contradicted); `capabilities` records what Link can do; `dialogue_shot` crops dialogue boxes for the
 model. Unknown cells are unknown, not walls.
 
-**Navigation and skills** — `geometry.rb` (cell grid, pixel offsets; x alignment uses the measured one-cell gap window `gap_entry`, -3..+4 px, for walk probes and the centring after a skill), `navigation/planner.rb` (shortest path
+**Navigation and skills** — `geometry.rb` (cell grid, pixel offsets; x alignment uses the measured one-cell gap window `gap_entry`, -3..+4 px, for walk probes and the centring after a skill), `navigation/planner.rb` (shortest path Flow-24 danger and holes: the planner takes a `danger:` lambda (cells within the measured `contact_px` of `enemy` entities, `Entities.danger_cells`) and plans around them first, falling back to the plain route; a hole fall (`link_motion_state` 6, not ready for 93 frames) makes `Engine#await_ready` call `GridBuilder#note_fall`, which records a `fall` affordance (walk `no`, all directions) for the appearance of the cell Link fell from, so every hole cell of that look is impassable; the STUCK detector ignores results taken during a fall and the policy alerts on places where Link died.
 with the fewest turns over known cells), `skills/` (`walk`, `goto`, `step`, `talk_to`, `explore`, `press`,
 `advance_dialogue`, `wait`, and the screen skills of `skills/screens.rb`: `open_menu`, `close_menu`, `menu_move`,
 `menu_assign`, `open_map`, `close_map`, `choose_option`, which check the current mode from the catalogue, stop with

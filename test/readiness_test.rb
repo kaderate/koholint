@@ -15,7 +15,7 @@ class ReadinessTest < Minitest::Test
 
   def test_each_signal_blocks_with_its_reason
     { { room_transition: 4 } => 'transition', { link_airborne: 1 } => 'airborne', { link_z: 12 } => 'airborne',
-      { link_knockback: 9 } => 'knockback', { link_motion_state: 3 } => 'forced', { game_submode: 2 } => 'loading' }.each do |fields, reason|
+      { link_knockback: 9 } => 'knockback', { link_motion_state: 3 } => 'forced', { link_motion_state: 6 } => 'forced', { game_submode: 2 } => 'loading' }.each do |fields, reason|
       readiness = Koholint::Readiness.new
       readiness.observe(play(1))
       assert_equal reason, readiness.reason(play(2, **fields)), fields.inspect

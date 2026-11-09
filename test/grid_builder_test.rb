@@ -327,4 +327,27 @@ class GridBuilderTest < Minitest::Test
       assert_empty Koholint::Replay.verify(run, every: 200).reject(&:last)
     end
   end
+
+  class FakeCells
+    def initialize(pit) = @pit = pit
+    def appearance(row, col) = [row, col] == @pit ? 'pit' : 'grass'
+  end
+
+  def fall_at(pit, link)
+    @builder.instance_variable_set(:@last, { place: [194, 0], cell: [3, 3], grid: FakeCells.new(pit) })
+    @builder.note_fall(State.new(10, 194, 0, *link))
+    @builder.instance_variable_get(:@beliefs)
+  end
+
+  def test_a_fall_makes_the_cell_appearance_impassable_in_every_direction
+    beliefs = fall_at([4, 3], [56, 81])
+    capabilities = @builder.instance_variable_get(:@capabilities)
+    %i[up down left right].each { |d| assert_equal :no, beliefs.query(appearance: 'pit', action: :walk, direction: d, context: capabilities) }
+    assert_equal 'fall', beliefs.evidence_for('pit', :walk).first[:source]
+  end
+
+  def test_a_fall_on_a_common_appearance_is_not_learned
+    beliefs = fall_at([4, 3], [10, 20])
+    assert_empty beliefs.evidence_for('grass', :walk)
+  end
 end

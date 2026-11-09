@@ -124,4 +124,13 @@ class PlannerTest < Minitest::Test
     assert_equal 'no route: doubtful edges (2,1) right',
                  planner(ledger: doubtful_ledger([2, 1], :right), walls: wall_line).why_not(from: [2, 1], to: [2, 3])
   end
+
+  def test_routes_around_danger_zones_and_falls_back_when_none_is_free
+    zone = [[2, 2]]
+    path = Planner.new(grid: FakeGrid.new, ledger: Koholint::Ledger.new, place: PLACE, danger: -> { zone }).path(from: [2, 1], to: [2, 3])
+    refute_includes path, [2, 2]
+    boxed = [[1, 2], [2, 2], [3, 2]]
+    walled = Planner.new(grid: FakeGrid.new(walls: [[0, 2], [4, 2], [5, 2], [6, 2], [7, 2]]), ledger: Koholint::Ledger.new, place: PLACE, danger: -> { boxed })
+    assert_includes walled.path(from: [2, 1], to: [2, 3]), [2, 2]
+  end
 end
