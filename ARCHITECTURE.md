@@ -37,7 +37,7 @@ measured by `probes/readiness_census.rb`, `bin/koholint census ready <run_dir>`)
 cell, kind }` for the active slots; the kind per type id (`npc`, `enemy`, `object`, `creature`, `unknown`) comes from
 `data/entities.json`, measured by `probes/entity_census.rb` (`bin/koholint census entities`): A pressed next to the
 entity opens a dialogue that does not open with its slot cleared in a control copy (`npc`); contact damage against the
-same control (`enemy`, never observed so far); neither, measured (`creature`: not a person, never a talk target, no danger);
+same control (`enemy`: types 9, 10 and 197 of the beach zone, measured with `EntityCensus.trajectory`, `motion_summary` and `hit_profile`: speed, contact gap, damage and whether the raised shield blocks it); neither, measured (`creature`: not a person, never a talk target, no danger);
 an uncatalogued type is `unknown`. The engine passes `Entities.read` to the policy and
 skills as the `entities` context entry. `Entities.objects` reads the room object table (`room_objects`, one id per cell)
 and keeps the ids that `data/entities.json` lists with an `object` key and a kind (`sign`: shows a text when read with A,
