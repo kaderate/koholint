@@ -62,6 +62,28 @@ module Koholint
 
     def note(result)
       %i[from to].each { |end_| (place = Ledger.place_of(Ledger.pick(result, end_))) && know(place) }
+      note_crossing(result)
+    end
+
+    # A place change by walk or goto is an exit taken too: the side left and the side arrived by both count as left.
+    def note_crossing(result)
+      from_at = Ledger.pick(result, :from)
+      from = Ledger.place_of(from_at)
+      to = Ledger.place_of(Ledger.pick(result, :to))
+      return unless from && to && from != to
+
+      cell = [Ledger.pick(from_at, :row), Ledger.pick(from_at, :col)]
+      direction = border_sides(cell, Ledger.pick(Ledger.pick(result, :params) || {}, :direction)) or return
+      @exits[[from, cell, direction]] = TRIED_AT
+      @edges[from][direction] = to
+      @edges[to][OPPOSITE.fetch(direction)] ||= from
+    end
+
+    def border_sides(cell, hint)
+      return nil unless cell.all?(Integer)
+
+      sides = { up: cell[0].zero?, down: cell[0] == Geometry::ROWS - 1, left: cell[1].zero?, right: cell[1] == Geometry::COLS - 1 }.select { |_, on| on }.keys
+      sides.include?(hint&.to_sym) ? hint.to_sym : (sides.first if sides.size == 1)
     end
 
     def walked(place) = @walked.fetch(place, []).dup

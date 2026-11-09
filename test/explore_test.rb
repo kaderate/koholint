@@ -248,6 +248,16 @@ class ExploreTest < Minitest::Test
     refute_equal :known_place, result[:stopped_by], result.inspect
   end
 
+  def test_a_walk_across_a_border_records_both_sides_as_left
+    log = Koholint::ExploreLog.new
+    log.note({ skill: 'walk', params: { direction: 'down', cells: 2 }, from: { room: 208, map: 0, row: 7, col: 2 }, to: { room: 224, map: 0, row: 7, col: 2 } })
+    assert log.side_left?([208, 0], :down)
+    assert log.side_left?([224, 0], :up)
+    assert log.tried?([208, 0], [7, 2], :down)
+    log.note({ skill: 'goto', params: {}, from: { room: 1, map: 0, row: 4, col: 4 }, to: { room: 2, map: 0, row: 4, col: 4 } })
+    refute log.side_left?([1, 0], :up)
+  end
+
   def test_a_closed_known_place_is_no_frontier_after_one_idle_frame
     result, inputs = explore(CLOSED)
     assert_equal :no_frontier, result[:stopped_by]
