@@ -5,28 +5,33 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Koholint runs</title>
 <style>
-  body { margin: 0; background: #111; color: #ddd; font: 13px/1.4 monospace; }
-  a { color: #8cf; }
-  #nav { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 16px; padding: 6px 12px; background: #1b1b1b; border-bottom: 1px solid #333; }
-  #nav a { text-decoration: none; }
-  #nav a.here { color: #fff; border-bottom: 2px solid #8cf; }
-  #nav-run { color: #fd8; overflow-wrap: anywhere; }
-  #filters { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 18px; padding: 6px 12px; background: #1a1a1a; border-bottom: 1px solid #333; }
-  #table { overflow-x: auto; }
-  input, select, button { background: #333; color: #ddd; border: 1px solid #555; font: inherit; padding: 2px 6px; }
+  :root { --bg: #14161a; --panel: #1c1f26; --line: #2a2e38; --ink: #e8e6df; --mut: #8b90a0; --acc: #6ec1a2; --warn: #e0a84a; --bad: #e06c6c; --blue: #6aa3e0; }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--ink); font: 14px/1.5 -apple-system, system-ui, sans-serif; }
+  a { color: var(--blue); }
+  button, input, select { background: #252932; color: var(--ink); border: 1px solid var(--line); border-radius: 6px; font: inherit; padding: 2px 10px; }
   button { cursor: pointer; }
-  #error { display: none; padding: 8px 12px; background: #a60; color: #fff; }
-  table { border-collapse: collapse; margin: 12px; }
-  th, td { padding: 3px 10px; border-bottom: 1px solid #2a2a2a; text-align: left; white-space: nowrap; }
-  th { color: #888; font-weight: normal; cursor: pointer; user-select: none; }
-  th.sorted { color: #fff; }
+  #nav { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 14px; padding: 10px 16px; background: var(--panel); border-bottom: 1px solid var(--line); }
+  #nav b { letter-spacing: 0.04em; }
+  .seg { display: flex; border: 1px solid var(--line); border-radius: 99px; overflow: hidden; }
+  .seg a { padding: 3px 14px; font-size: 12.5px; color: var(--mut); text-decoration: none; }
+  .seg a.here { background: #b83a3a; color: #fff; }
+  .pill { display: inline-block; padding: 1px 10px; border-radius: 99px; font-size: 12px; border: 1px solid var(--line); color: var(--mut); overflow-wrap: anywhere; }
+  .pill:empty { display: none; }
+  #error { display: none; padding: 8px 16px; background: #a60; color: #fff; }
+  #filters { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 18px; padding: 8px 16px; background: var(--panel); border-bottom: 1px solid var(--line); color: var(--mut); font-size: 12.5px; }
+  #table { overflow-x: auto; margin: 14px; background: var(--panel); border: 1px solid var(--line); border-radius: 12px; }
+  table { border-collapse: collapse; width: 100%; font-size: 13px; }
+  th, td { padding: 5px 10px; border-bottom: 1px solid #22262e; text-align: left; white-space: nowrap; }
+  th { color: var(--mut); font-weight: 600; font-size: 11.5px; text-transform: uppercase; letter-spacing: 0.08em; cursor: pointer; user-select: none; }
+  th.sorted { color: var(--acc); }
   td.num { text-align: right; font-variant-numeric: tabular-nums; }
-  td.why { white-space: normal; color: #9ab; max-width: 30em; overflow-wrap: anywhere; }
-  tr:hover td { background: #1b1b1b; }
+  td.why { white-space: normal; color: var(--mut); max-width: 30em; overflow-wrap: anywhere; }
+  tr:hover td { background: #20242c; }
 </style>
 </head>
 <body>
-<nav id="nav"><b>Koholint</b><a href="/">Live</a><a class="here" href="/runs">Historique</a><a id="compare" href="#" hidden>Comparer</a><span id="nav-run"></span><span id="count"></span></nav>
+<nav id="nav"><b>KOHOLINT</b><span class="seg"><a href="/">Live</a><a class="here" href="/runs">Historique</a><a id="compare" href="#" hidden>Comparer</a></span><span id="nav-run" class="pill"></span><span class="spacer" style="flex:1"></span><span id="count" class="pill"></span></nav>
 <div id="filters">
   <label>min milestone <select id="milestone"></select></label>
   <label>max dollars <input id="dollars" type="number" min="0" step="0.01"></label>
