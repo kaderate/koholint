@@ -28,7 +28,7 @@ module Koholint
         type = at.(:entity_type)
         known = kinds[type]
         { slot:, type:, x:, y:, status:, state: at.(:entity_state), cell: Geometry.cell_for(x, y), kind: known ? known[:kind] : :unknown,
-          verified: known ? known[:verified] : false, moves: known&.dig(:moves) }
+          verified: known ? known[:verified] : false, moves: known&.dig(:moves), **(known&.dig(:contact) ? { contact: known[:contact] } : {}) }
       end
     end
 
@@ -58,7 +58,7 @@ module Koholint
     def load(path = DEFAULT_PATH)
       JSON.parse(File.read(path)).reject { |entry| entry.key?('object') }.to_h do |entry|
         validate!(entry)
-        [Integer(entry.fetch('type')), { kind: entry.fetch('kind').to_sym, verified: entry['confidence'] == 'verified', moves: entry['moves'] }]
+        [Integer(entry.fetch('type')), { kind: entry.fetch('kind').to_sym, verified: entry['confidence'] == 'verified', moves: entry['moves'], contact: entry['contact_px'] }.compact]
       end
     end
 
@@ -73,6 +73,19 @@ module Koholint
       return unless entry['confidence'] == 'verified' && entry['verified_count'] < 2
 
       raise Invalid, "entity #{entry['type']}: verified needs verified_count >= 2"
+    end
+
+    # Link's centre may sit anywhere in a cell (half a cell) and a walker drifts a few pixels before the next plan.
+    DANGER_MARGIN = 4
+
+    def danger_cells(entities)
+      entities.select { |entity| entity[:kind].to_s == 'enemy' && entity[:contact] }.flat_map do |entity|
+        reach = entity[:contact] + (Geometry::CELL / 2) + DANGER_MARGIN
+        Geometry::ROWS.times.flat_map { |row| Geometry::COLS.times.map { |col| [row, col] } }.select do |row, col|
+          cx, cy = Geometry.center_of(row, col)
+          (cx - entity[:x]).abs <= reach && (cy - entity[:y]).abs <= reach
+        end
+      end.uniq
     end
 
     def creature?(entity) = NOT_PEOPLE.include?(entity[:kind].to_s)

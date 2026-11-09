@@ -54,6 +54,7 @@ module Koholint
       DANGER_CELLS = 3
       STUCK_STOPS = %w[no_frontier no_path blocked stalled].freeze
       STUCK_AT = 6
+      FALL_MOTION = 6
       EXPLORE = { skill: 'explore', params: {} }.freeze
       AUTO_OBJECTIVE = { title: 'Explore the nearest untried exits (picked by the harness)', predicate: { kind: 'new_place' } }.freeze
 
@@ -89,6 +90,7 @@ module Koholint
         @skill_point = DecisionPoint.choose_skill(subset(registry, registry.names - SCREEN_ONLY))
         @notes = []
         @hp_lost = 0
+        @deaths = Hash.new(0)
         @screen_points = SCREEN_SKILLS.transform_values { |names| DecisionPoint.choose_skill(subset(registry, names)) }
       end
 
@@ -259,7 +261,10 @@ module Koholint
 
       def game_over_continue(state)
         option, text = state.mode.choices.first
-        @notes << { kind: 'death', detail: "game over: #{text}" } unless @over
+        unless @over
+          @notes << { kind: 'death', detail: "game over: #{text}" }
+          @deaths[[state.room_id, state.map_id]] += 1
+        end
         @over = @died = @locked_wait = true
         { choice: { skill: 'choose_option', params: { option: } }, justification: "game over: #{text} (picked by the harness)", confidence: 1.0,
           agent: 'delegated', latency_ms: 0, cost_usd: 0.0, fallback: false, prompt: nil, image: nil }
@@ -305,6 +310,8 @@ module Koholint
       end
 
       def note_stuck(outcome, state)
+        return if state.link_motion_state.to_i == FALL_MOTION
+
         place = [state.room_id, state.map_id]
         @stuck = { place:, cells: Set.new, count: 0 } unless @stuck && @stuck[:place] == place
         cells = %i[from to].filter_map { |key| Ledger.pick(outcome, key) }.select { |at| Ledger.place_of(at) == place }
@@ -331,6 +338,10 @@ module Koholint
                   else 'no interior is known yet'
                   end
           lines << "LOW HEALTH: the harness no longer chains explores; avoid creatures, guard with the shield when one is close; #{where}."
+        end
+        if @deaths[place].positive?
+          lines << "DIED HERE #{@deaths[place]} time(s): the planner already routes around the contact zones of the creatures on screen; " \
+                   'keep two cells away from them, do not cross holes, and leave this place when hp is low.'
         end
         if @stuck&.dig(:hint) && @stuck[:place] == place
           lines << "STUCK: #{STUCK_AT} results in a row here found no frontier, no path or were blocked, without reaching a new cell. The grid may be wrong: " \

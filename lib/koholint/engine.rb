@@ -30,6 +30,7 @@ module Koholint
     STUCK_BOOT_ANY_FRAMES = 3600
     STUCK_UNKNOWN_FRAMES = 600
     NOT_READY_STUCK_FRAMES = 600
+    FALL_MOTION = 6
     NOT_READY_NOTABLE_FRAMES = 5
 
     def self.resume(run_path, budget:, policy: nil, policy_factory: nil, flow_version: Koholint::FLOW_VERSION, **options)
@@ -286,6 +287,7 @@ module Koholint
     # Between decisions only: a skill runs to its end, and the next observation waits here, stepping no input.
     def await_ready(state)
       waited = 0
+      falling = false
       reasons = Hash.new(0)
       while (reason = @readiness.reason(state))
         if waited >= NOT_READY_STUCK_FRAMES
@@ -294,6 +296,8 @@ module Koholint
         end
         break if @budget.exhausted
 
+        @builder&.note_fall(state) if state.link_motion_state == FALL_MOTION && !falling
+        falling = state.link_motion_state == FALL_MOTION
         reasons[reason] += 1
         state = step([])
         waited += 1

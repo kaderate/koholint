@@ -10,7 +10,8 @@ module Koholint
         DELTAS.find { |_, (dr, dc)| [from[0] + dr, from[1] + dc] == to }&.first
       end
 
-      def initialize(grid:, ledger:, place:, triggers: nil, mode: :explore)
+      def initialize(grid:, ledger:, place:, triggers: nil, mode: :explore, danger: nil)
+        @danger = danger
         @mode = mode
         @triggers = triggers
         @grid = grid
@@ -24,6 +25,11 @@ module Koholint
       end
 
       def path(from:, to:, mode: @mode, doubt: true, forbid: true)
+        zones = Array(@danger&.call)
+        (zones.any? && search(from:, to:, mode:, doubt:, forbid:, zones:)) || search(from:, to:, mode:, doubt:, forbid:, zones: [])
+      end
+
+      def search(from:, to:, mode:, doubt:, forbid:, zones:)
         return nil unless inside?(from) && inside?(to)
         return [from] if from == to
 
@@ -38,7 +44,7 @@ module Koholint
 
           DELTAS.each_key do |direction|
             target = step(cell, direction)
-            next unless target && walkable?(cell, target, direction, allowed, doubt, forbid)
+            next unless target && !zones.include?(target) && walkable?(cell, target, direction, allowed, doubt, forbid)
 
             cost = [steps + 1, turns + (heading && heading != direction ? 1 : 0)]
             key = [target, direction]
