@@ -1,4 +1,5 @@
 require 'etc'
+require 'fileutils'
 require 'json'
 require 'rake/testtask'
 require 'tempfile'
@@ -41,6 +42,7 @@ task :test do
     results[file] = [ok && status.success?, out + File.read(log.path)]
     log.close!
   end
+  FileUtils.mkdir_p(File.dirname(TIMES))
   File.write(TIMES, JSON.generate(times))
   failed = results.reject { |_, (ok, _)| ok }
   failed.each { |file, (_, output)| puts "== #{file}", output.lines.reject { |l| l.include?('warning:') }.join }
