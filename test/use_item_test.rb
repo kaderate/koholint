@@ -88,10 +88,11 @@ class UseItemTest < Minitest::Test
   end
 
   def test_guard_holds_the_shield_and_counts_the_raised_frames
-    result, _, inputs = drive('guard', { frames: 20, direction: 'left' }, state(item_a: 4))
+    result, _, inputs = drive('guard', { frames: 20 }, state(item_a: 4))
     assert_equal :done, result[:stopped_by]
     assert_equal 20, result[:raised_frames]
-    assert_equal 20, inputs.count(%i[a left])
+    assert_equal 20, inputs.count(%i[a])
+    assert_raises(ArgumentError) { registry.validate('guard', { frames: 5, direction: 'left' }) }
     start = state(inventory: [4] + Array.new(9, 0))
     result, after, = drive('guard', { frames: 5 }, start)
     assert_equal [:done, true, 5, 4], [result[:stopped_by], result[:equipped], result[:raised_frames], after.item_b]

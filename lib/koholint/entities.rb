@@ -1,6 +1,7 @@
 require 'json'
 require 'koholint/addresses'
 require 'koholint/geometry'
+require 'koholint/navigation/threat'
 
 module Koholint
   module Entities
@@ -78,15 +79,7 @@ module Koholint
     # Link's centre may sit anywhere in a cell (half a cell) and a walker drifts a few pixels before the next plan.
     DANGER_MARGIN = 4
 
-    def danger_cells(entities)
-      entities.select { |entity| entity[:kind].to_s == 'enemy' && entity[:contact] }.flat_map do |entity|
-        reach = entity[:contact] + (Geometry::CELL / 2) + DANGER_MARGIN
-        Geometry::ROWS.times.flat_map { |row| Geometry::COLS.times.map { |col| [row, col] } }.select do |row, col|
-          cx, cy = Geometry.center_of(row, col)
-          (cx - entity[:x]).abs <= reach && (cy - entity[:y]).abs <= reach
-        end
-      end.uniq
-    end
+    def danger_cells(entities, margin: DANGER_MARGIN) = Navigation::Threat.zone(Navigation::Threat.of(entities), margin:)
 
     def creature?(entity) = NOT_PEOPLE.include?(entity[:kind].to_s)
 

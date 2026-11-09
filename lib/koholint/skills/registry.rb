@@ -4,6 +4,7 @@ require 'koholint/skills/explore'
 require 'koholint/skills/goto'
 require 'koholint/skills/press'
 require 'koholint/skills/screens'
+require 'koholint/skills/shielded'
 require 'koholint/skills/step'
 require 'koholint/skills/talk_to'
 require 'koholint/skills/use_item'
@@ -44,6 +45,7 @@ module Koholint
       def start(name, state, params, context = {})
         execution = fetch(name).start(state, params, context)
         execution.triggers = context[:triggers] if execution.respond_to?(:triggers=)
+        execution = Shielded.new(execution, entities: context[:entities]) if Shielded::MOVING.include?(name.to_s) && context[:entities]
         execution
       end
 

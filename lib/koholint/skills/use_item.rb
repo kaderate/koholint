@@ -10,14 +10,12 @@ module Koholint
       # Measured: A and B do nothing for 16 frames after close_menu returns (runs 20261020-085011-8330, 20261101-141755-eca1).
       AFTER_MENU_FRAMES = 16
       IDLE_FRAMES = 10
-      DIRECTIONS = %i[up down left right].freeze
 
-      def initialize(item:, button:, hold:, direction: nil, **rest)
+      def initialize(item:, button:, hold:, **rest)
         super(**rest)
         @query = item
         @wanted = button
         @hold = hold
-        @direction = direction
         @steps = nil
         @held = 0
         @raised = 0
@@ -85,7 +83,7 @@ module Koholint
         return finish(:room_change) if room(state) != room(@base)
         if @held < @hold
           @held += 1
-          return [@button, *@direction]
+          return [@button]
         end
 
         @frames - @pressing >= @hold + IDLE_FRAMES ? finish(:done) : []
@@ -136,22 +134,21 @@ module Koholint
 
       def params_schema
         { type: 'object', title: name,
-          properties: { frames: { type: 'integer', minimum: 1, maximum: MAX_FRAMES }, direction: { type: 'string', enum: ItemRun::DIRECTIONS.map(&:to_s) } },
+          properties: { frames: { type: 'integer', minimum: 1, maximum: MAX_FRAMES } },
           required: %w[frames], additionalProperties: false }
       end
 
       def normalize(params)
-        params = Skills.symbolize(params, %i[frames direction])
+        params = Skills.symbolize(params, %i[frames])
         frames = params[:frames]
         raise ArgumentError, "guard: frames must be 1..#{MAX_FRAMES}" unless frames.is_a?(Integer) && frames.between?(1, MAX_FRAMES)
-        raise ArgumentError, 'guard: direction must be up, down, left or right' if params.key?(:direction) && !ItemRun::DIRECTIONS.map(&:to_s).include?(params[:direction].to_s)
 
-        { frames:, **(params.key?(:direction) ? { direction: params[:direction].to_s } : {}) }
+        { frames: }
       end
 
       def start(state, params, _context = {})
         params = normalize(params)
-        ItemRun.new(skill: name, params:, state:, item: Items::SHIELD, button: nil, hold: params[:frames], direction: params[:direction]&.to_sym)
+        ItemRun.new(skill: name, params:, state:, item: Items::SHIELD, button: nil, hold: params[:frames])
       end
     end
   end
