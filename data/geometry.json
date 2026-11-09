@@ -17,5 +17,10 @@
     "value": { "up": 19, "down": 20, "left": 15, "right": 16 },
     "verified_count": 2,
     "provenance": "talk reach probe 2026-11-02 on restored copies: Link poked to the person's position plus 8..24 px along one axis and aligned on the other, the facing byte set without a step, A for 3 frames, a dialogue within 40 frames; run 20261102-075426-e333 frame 7990 (type 115 at (40,96), room 179/0) and frame 6420 (types 62 at (88,64) and 63 at (120,80), room 163/16): the farthest distance that opened a dialogue was 19 px facing up, 20 down, 15 left and 16 right for all three, and every distance from 14 up to it opened one. Distance is the person's x or y minus Link's, in the RAM coordinates of link_x/link_y and entity_x/entity_y."
+  },
+  "shield_range": {
+    "value": { "cells": 3 },
+    "verified_count": 0,
+    "provenance": "hypothesis (owner decision 2026-11-09): hold the shield while walking when an enemy is within its contact_px plus 3 cells; the distance is chosen, not measured. The shield hold itself costs no speed and no turn (owner measurement); that it blocks a type 9 hit from the front while walking is the probe in data/entities.json."
   }
 }
