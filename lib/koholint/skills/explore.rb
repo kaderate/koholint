@@ -55,6 +55,7 @@ module Koholint
           @talk_log = context[:talk_log]
           @log = context[:explore_log]
           @walked = (@log ? @log.walked(@place) : []) | [@start.cell].compact
+          @fresh = @log && !@log.surveyed?(@place)
           grid = context[:grid]
           @known = grid && Known.new(grid, @walked)
           @planner = @known && Navigation::Planner.new(grid: @known, ledger: @ledger, place: @place, triggers: context[:triggers], mode: :free_only, danger: danger_of(context))
@@ -295,7 +296,7 @@ module Koholint
           return order(local) if local.any?
 
           frontier = gather(from, path_to) { |cell, direction| frontier_kind(cell, direction) }
-          return order(frontier) if frontier.any? && untried(from, nil).any?
+          return order(frontier) if frontier.any? && (@fresh || untried(from, nil).any?)
 
           routed = routed(from, path_to)
           return order(routed) if routed.any?

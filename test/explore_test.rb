@@ -229,6 +229,25 @@ class ExploreTest < Minitest::Test
     assert_equal({ kind: :exit, row: 0, col: 5, direction: :up }, result[:target])
   end
 
+  def test_the_side_a_place_was_entered_by_counts_as_left
+    log = Koholint::ExploreLog.new
+    log.absorb({ from: { room: 1, map: 0 }, exits: [{ row: 7, col: 5, direction: :down, outcome: :left, to: [2, 0] }] })
+    assert log.side_left?([2, 0], :up)
+    refute log.side_left?([2, 0], :down)
+    assert log.side_left?([1, 0], :down)
+    refute log.surveyed?([2, 0])
+  end
+
+  def test_a_place_never_surveyed_is_explored_before_leaving_for_another_place
+    rows = with(CLOSED, [0, 5], '.', [4, 7], '?')
+    log = Koholint::ExploreLog.new
+    log.absorb({ from: { room: 1, map: 0 }, exits: [{ row: 0, col: 5, direction: :up, outcome: :left, to: [3, 0] }] })
+    log.absorb({ from: { room: 3, map: 0 }, survey: { sides: { down: [{ row: 7, col: 5 }] }, doors: [], pending: true } })
+    result, = explore(rows, truth: with(rows, [4, 7], '#'), exits: [[[0, 5], :up]], explore_log: log, limit: 200)
+    assert_includes result[:walls], { row: 4, col: 7 }, result.inspect
+    refute_equal :known_place, result[:stopped_by], result.inspect
+  end
+
   def test_a_closed_known_place_is_no_frontier_after_one_idle_frame
     result, inputs = explore(CLOSED)
     assert_equal :no_frontier, result[:stopped_by]

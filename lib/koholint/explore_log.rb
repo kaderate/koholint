@@ -5,6 +5,7 @@ require 'koholint/navigation/planner'
 module Koholint
   class ExploreLog
     TRIED_AT = 2
+    OPPOSITE = { up: :down, down: :up, left: :right, right: :left }.freeze
 
     def self.from_events(events)
       log = new
@@ -47,6 +48,7 @@ module Koholint
         next unless left && to.is_a?(Array) && to.size == 2 && to.all?(Integer)
 
         @edges[place][edge_key(exit, cell, direction.to_sym)] = to
+        @edges[to][OPPOSITE.fetch(direction.to_sym)] ||= place if Ledger.pick(exit, :kind).to_s != 'door' && OPPOSITE.key?(direction.to_sym)
         know(to)
       end
       Array(Ledger.pick(result, :offered)).each { |object| offer(place, cell_of(object)) }
@@ -65,6 +67,8 @@ module Koholint
     def walked(place) = @walked.fetch(place, []).dup
 
     def known?(place) = @known.include?(place)
+
+    def surveyed?(place) = @surveys.key?(place)
 
     def side_left?(place, direction) = @edges.fetch(place, {}).key?(direction.to_sym)
 
