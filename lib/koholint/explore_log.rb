@@ -35,7 +35,7 @@ module Koholint
       place = Ledger.place_of(Ledger.pick(result, :from)) or return
       know(place)
       survey = Ledger.pick(result, :survey)
-      @surveys[place] = parse_survey(survey) if survey.is_a?(Hash)
+      keep(place, parse_survey(survey).merge(provisional: provisional?(result))) if survey.is_a?(Hash)
       Array(Ledger.pick(result, :exits)).each do |exit|
         cell = [Ledger.pick(exit, :row), Ledger.pick(exit, :col)]
         direction = Ledger.pick(exit, :direction)
@@ -87,7 +87,7 @@ module Koholint
       place = Ledger.place_of(Ledger.pick(result, :from)) or return
       know(place)
       survey = Ledger.pick(result, :survey)
-      @surveys[place] = parse_survey(survey) if survey.is_a?(Hash)
+      keep(place, parse_survey(survey).merge(provisional: provisional?(result))) if survey.is_a?(Hash)
       Array(Ledger.pick(result, :exits)).each do |exit|
         cell = [Ledger.pick(exit, :row), Ledger.pick(exit, :col)]
         direction = Ledger.pick(exit, :direction)
@@ -116,7 +116,7 @@ module Koholint
 
     def known?(place) = @known.include?(place)
 
-    def surveyed?(place) = @surveys.key?(place)
+    def surveyed?(place) = @surveys.key?(place) && !@surveys[place][:provisional]
 
     def side_left?(place, direction) = @edges.fetch(place, {}).key?(direction.to_sym)
 
@@ -124,6 +124,7 @@ module Koholint
 
     def untried?(place)
       survey = @surveys[place] or return true
+      return true if survey[:provisional]
       return survey[:pending] unless survey[:pending].nil?
 
       survey[:sides].any? { |side, cells| !side_left?(place, side) && cells.any? { |cell| !tried?(place, cell, side) } } ||
@@ -189,6 +190,17 @@ module Koholint
       place = goal
       place = seen[place][0] while seen[place][0] != from
       { goal:, next: place, via: seen[place][1] }
+    end
+
+    # A call that left the place after a few cells saw only the strip it arrived by: its survey stands until a longer one replaces it.
+    PROVISIONAL_CELLS = 3
+
+    def provisional?(result)
+      %w[known_place new_place].include?(Ledger.pick(result, :stopped_by).to_s) && Ledger.pick(result, :cells_walked).to_i < PROVISIONAL_CELLS
+    end
+
+    def keep(place, survey)
+      @surveys[place] = survey unless survey[:provisional] == true && @surveys[place] && !@surveys[place][:provisional]
     end
 
     def parse_survey(survey)
