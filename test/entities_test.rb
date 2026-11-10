@@ -105,5 +105,6 @@ class EntitiesTest < Minitest::Test
   def test_catalogue_gives_the_measured_contact_range
     assert_equal 9, Koholint::Entities.catalogue.dig(9, :contact)
     assert_equal 14, Koholint::Entities.catalogue.dig(197, :contact)
+    assert_equal [:enemy, 9], Koholint::Entities.catalogue.fetch(14).values_at(:kind, :contact)
   end
 end
