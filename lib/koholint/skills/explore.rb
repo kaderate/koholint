@@ -58,7 +58,8 @@ module Koholint
           @fresh = @log && !@log.surveyed?(@place)
           grid = context[:grid]
           @known = grid && Known.new(grid, @walked)
-          @planner = @known && Navigation::Planner.new(grid: @known, ledger: @ledger, place: @place, triggers: context[:triggers], mode: :free_only, danger: danger_of(context))
+          @planner = @known && Navigation::Planner.new(grid: @known, ledger: @ledger, place: @place, triggers: context[:triggers], mode: :free_only, danger: danger_of(context), pushable: pushable_of(context))
+          @pushable = Array(pushable_of(context)&.call)
           @objects = grid ? TalkLog.objects(grid) : []
           @doors = Array(context[:objects]&.call).select { |object| object[:kind].to_s == 'door' && object[:cell][0] < Geometry::ROWS - 1 }.map { |object| object[:cell] }
           @survey = @known && survey
@@ -370,7 +371,7 @@ module Koholint
           ahead = neighbour(cell, direction) or return nil
           return nil if @doors.include?(ahead) || (direction == :up && @doors.include?(cell))
 
-          :frontier if !@walls.include?(ahead) && !@known.static_sprite(*ahead) && UNKNOWN.include?(@known.passable(*ahead, direction))
+          :frontier if !@walls.include?(ahead) && !@known.static_sprite(*ahead) && (@pushable.include?(ahead) || UNKNOWN.include?(@known.passable(*ahead, direction)))
         end
 
         def open?(cell, direction)

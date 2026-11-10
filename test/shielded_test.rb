@@ -39,4 +39,14 @@ class ShieldedTest < Minitest::Test
     assert Koholint::Navigation::Threat.within?(threats, 100, 60, margin: 11)
     refute Koholint::Navigation::Threat.within?(threats, 100, 60, margin: 10)
   end
+
+  CellState = Struct.new(:x, :y, :item_a, :item_b, :cell)
+
+  def test_holds_the_shield_when_the_next_cell_is_a_pushable_object
+    objects = -> { [{ kind: :pushable, cell: [3, 3] }, { kind: :sign, cell: [3, 5] }] }
+    walk = Koholint::Skills::Shielded.new(Inner.new([[:right], [:right], [:up]]), entities: nil, objects:)
+    assert_equal %i[right b], walk.next_input(CellState.new(40, 64, 0, 4, [3, 2]))
+    assert_equal [:right], walk.next_input(CellState.new(72, 64, 0, 4, [3, 4]))
+    assert_equal [:up], walk.next_input(CellState.new(40, 64, 0, 4, [3, 3]))
+  end
 end
