@@ -40,7 +40,7 @@ module Koholint
           grid = context[:grid]
           return nil unless grid
 
-          Navigation::Planner.new(grid:, ledger: context[:ledger], place: [@start.room_id, @start.map_id], triggers: context[:triggers], danger: danger_of(context), pushable: pushable_of(context))
+          Navigation::Planner.new(grid:, ledger: context[:ledger], place: [@start.room_id, @start.map_id], triggers: context[:triggers], danger: danger_of(context))
         end
 
         def initial_plan = plan(@start.cell)

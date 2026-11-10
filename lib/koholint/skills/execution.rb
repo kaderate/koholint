@@ -55,8 +55,6 @@ module Koholint
 
       private
 
-      def pushable_of(context) = context[:objects] && -> { Array(context[:objects].call).select { |object| object[:kind].to_s == 'pushable' && object[:cell] }.map { |object| object[:cell] } }
-
       def danger_of(context) = context[:entities] && -> { Entities.danger_cells(Array(context[:entities].call)) }
 
       def trigger_input

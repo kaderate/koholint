@@ -9,10 +9,9 @@ module Koholint
       MOVING = %w[walk goto explore step].freeze
       DIRECTIONS = %i[up down left right].freeze
 
-      def initialize(inner, entities: nil, objects: nil)
+      def initialize(inner, entities:)
         super(inner)
         @entities = entities
-        @objects = objects
         @held = 0
       end
 
@@ -21,7 +20,7 @@ module Koholint
         return buttons unless buttons && buttons.intersect?(DIRECTIONS)
 
         button = Items.button_of(state, Items::SHIELD)
-        return buttons unless button && !buttons.include?(button) && (threatened?(state) || pushing?(state, buttons))
+        return buttons unless button && !buttons.include?(button) && threatened?(state)
 
         @held += 1
         [*buttons, button]
@@ -31,19 +30,7 @@ module Koholint
 
       private
 
-      DELTAS = { up: [-1, 0], down: [1, 0], left: [0, -1], right: [0, 1] }.freeze
-
-      def pushing?(state, buttons)
-        return false unless @objects && state.cell
-
-        dr, dc = DELTAS.fetch((buttons & DIRECTIONS).first)
-        ahead = [state.cell[0] + dr, state.cell[1] + dc]
-        Array(@objects.call).any? { |object| object[:kind].to_s == 'pushable' && object[:cell] == ahead }
-      end
-
       def threatened?(state)
-        return false unless @entities
-
         Navigation::Threat.within?(Navigation::Threat.of(Array(@entities.call)), state.x, state.y, margin: Navigation::Threat.shield_margin)
       end
     end
