@@ -65,25 +65,51 @@ module Koholint
       note_crossing(result)
     end
 
-    # A place change by walk or goto is an exit taken too: the side left and the side arrived by both count as left.
+    # Only walk and step cross in the direction they were given; the result's from is where the skill began, not where it crossed.
+    STRAIGHT = %w[walk step].freeze
+
     def note_crossing(result)
       from_at = Ledger.pick(result, :from)
       from = Ledger.place_of(from_at)
       to = Ledger.place_of(Ledger.pick(result, :to))
-      return unless from && to && from != to
+      return unless from && to && from != to && STRAIGHT.include?(Ledger.pick(result, :skill).to_s)
 
-      cell = [Ledger.pick(from_at, :row), Ledger.pick(from_at, :col)]
-      direction = border_sides(cell, Ledger.pick(Ledger.pick(result, :params) || {}, :direction)) or return
-      @exits[[from, cell, direction]] = TRIED_AT
-      @edges[from][direction] = to
+      direction = Ledger.pick(Ledger.pick(result, :params) || {}, :direction)&.to_s&.to_sym
+      return unless OPPOSITE.key?(direction)
+
+      @edges[from][direction] ||= to
       @edges[to][OPPOSITE.fetch(direction)] ||= from
     end
 
-    def border_sides(cell, hint)
-      return nil unless cell.all?(Integer)
+    def absorb(result)
+      return unless result.is_a?(Hash)
 
-      sides = { up: cell[0].zero?, down: cell[0] == Geometry::ROWS - 1, left: cell[1].zero?, right: cell[1] == Geometry::COLS - 1 }.select { |_, on| on }.keys
-      sides.include?(hint&.to_sym) ? hint.to_sym : (sides.first if sides.size == 1)
+      place = Ledger.place_of(Ledger.pick(result, :from)) or return
+      know(place)
+      survey = Ledger.pick(result, :survey)
+      @surveys[place] = parse_survey(survey) if survey.is_a?(Hash)
+      Array(Ledger.pick(result, :exits)).each do |exit|
+        cell = [Ledger.pick(exit, :row), Ledger.pick(exit, :col)]
+        direction = Ledger.pick(exit, :direction)
+        next unless cell.all?(Integer) && direction.respond_to?(:to_sym)
+
+        key = [place, cell, direction.to_sym]
+        left = Ledger.pick(exit, :outcome).to_s == 'left'
+        @exits[key] = left ? TRIED_AT : @exits[key] + 1
+        to = Ledger.pick(exit, :to)
+        next unless left && to.is_a?(Array) && to.size == 2 && to.all?(Integer)
+
+        @edges[place][edge_key(exit, cell, direction.to_sym)] = to
+        @edges[to][OPPOSITE.fetch(direction.to_sym)] ||= place if Ledger.pick(exit, :kind).to_s != 'door' && OPPOSITE.key?(direction.to_sym)
+        know(to)
+      end
+      Array(Ledger.pick(result, :offered)).each { |object| offer(place, cell_of(object)) }
+      Array(Ledger.pick(result, :walls)).each { |wall| (@walls[place] << cell_of(wall)).uniq! }
+      Array(Ledger.pick(result, :crossed)).each do |row, col, direction|
+        delta = Navigation::Planner::DELTAS[direction.to_s.to_sym] or next
+        walk(place, [row, col])
+        walk(place, [row + delta[0], col + delta[1]])
+      end
     end
 
     def walked(place) = @walked.fetch(place, []).dup
