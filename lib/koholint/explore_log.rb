@@ -27,6 +27,8 @@ module Koholint
       @edges = Hash.new { |hash, key| hash[key] = {} }
       @surveys = {}
       @known = []
+      @arrivals = {}
+      @pockets = []
     end
 
     def absorb(result)
@@ -36,6 +38,7 @@ module Koholint
       know(place)
       survey = Ledger.pick(result, :survey)
       keep(place, parse_survey(survey).merge(provisional: provisional?(result))) if survey.is_a?(Hash)
+      note_pocket(place, result)
       Array(Ledger.pick(result, :exits)).each do |exit|
         cell = [Ledger.pick(exit, :row), Ledger.pick(exit, :col)]
         direction = Ledger.pick(exit, :direction)
@@ -48,6 +51,7 @@ module Koholint
         next unless left && to.is_a?(Array) && to.size == 2 && to.all?(Integer)
 
         @edges[place][edge_key(exit, cell, direction.to_sym)] = to
+        note_arrival(to, cell, direction.to_sym) if Ledger.pick(exit, :kind).to_s != 'door'
         @edges[to][OPPOSITE.fetch(direction.to_sym)] ||= place if Ledger.pick(exit, :kind).to_s != 'door' && OPPOSITE.key?(direction.to_sym)
         know(to)
       end
@@ -81,37 +85,6 @@ module Koholint
       @edges[to][OPPOSITE.fetch(direction)] ||= from
     end
 
-    def absorb(result)
-      return unless result.is_a?(Hash)
-
-      place = Ledger.place_of(Ledger.pick(result, :from)) or return
-      know(place)
-      survey = Ledger.pick(result, :survey)
-      keep(place, parse_survey(survey).merge(provisional: provisional?(result))) if survey.is_a?(Hash)
-      Array(Ledger.pick(result, :exits)).each do |exit|
-        cell = [Ledger.pick(exit, :row), Ledger.pick(exit, :col)]
-        direction = Ledger.pick(exit, :direction)
-        next unless cell.all?(Integer) && direction.respond_to?(:to_sym)
-
-        key = [place, cell, direction.to_sym]
-        left = Ledger.pick(exit, :outcome).to_s == 'left'
-        @exits[key] = left ? TRIED_AT : @exits[key] + 1
-        to = Ledger.pick(exit, :to)
-        next unless left && to.is_a?(Array) && to.size == 2 && to.all?(Integer)
-
-        @edges[place][edge_key(exit, cell, direction.to_sym)] = to
-        @edges[to][OPPOSITE.fetch(direction.to_sym)] ||= place if Ledger.pick(exit, :kind).to_s != 'door' && OPPOSITE.key?(direction.to_sym)
-        know(to)
-      end
-      Array(Ledger.pick(result, :offered)).each { |object| offer(place, cell_of(object)) }
-      Array(Ledger.pick(result, :walls)).each { |wall| (@walls[place] << cell_of(wall)).uniq! }
-      Array(Ledger.pick(result, :crossed)).each do |row, col, direction|
-        delta = Navigation::Planner::DELTAS[direction.to_s.to_sym] or next
-        walk(place, [row, col])
-        walk(place, [row + delta[0], col + delta[1]])
-      end
-    end
-
     def walked(place) = @walked.fetch(place, []).dup
 
     def known?(place) = @known.include?(place)
@@ -139,7 +112,7 @@ module Koholint
         return first_hop(seen, place, from) if place != from && (goal ? place == goal : untried?(place))
 
         @edges.fetch(place, {}).each do |key, to|
-          next if seen.key?(to)
+          next if seen.key?(to) || pocket?(to, key)
 
           seen[to] = [place, key]
           queue << to
@@ -147,6 +120,31 @@ module Koholint
       end
       nil
     end
+
+    # The cell an exit lands on in the next place; a call that finds nothing to do there while some place still has work
+    # shows the landing is a closed pocket, which routes must not enter.
+    def note_arrival(to, cell, direction)
+      return unless OPPOSITE.key?(direction)
+
+      @arrivals[[to, OPPOSITE.fetch(direction)]] = case direction
+                                                   when :up then [Geometry::ROWS - 1, cell[1]]
+                                                   when :down then [0, cell[1]]
+                                                   when :left then [cell[0], Geometry::COLS - 1]
+                                                   else [cell[0], 0]
+                                                   end
+    end
+
+    def note_pocket(place, result)
+      return unless Ledger.pick(result, :stopped_by).to_s == 'no_frontier' && Ledger.pick(result, :cells_walked).to_i.zero?
+
+      from = Ledger.pick(result, :from)
+      cell = [Ledger.pick(from, :row), Ledger.pick(from, :col)]
+      return unless route(place)
+
+      @arrivals.each { |(where, side), arrival| @pockets << [where, side] if where == place && arrival == cell && !@pockets.include?([where, side]) }
+    end
+
+    def pocket?(to, key) = key.is_a?(Symbol) && OPPOSITE.key?(key) && @pockets.include?([to, OPPOSITE.fetch(key)])
 
     def hops(from)
       found = { from => 0 }
