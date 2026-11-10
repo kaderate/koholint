@@ -1,0 +1,16 @@
+{
+  "flow_version": "flow-30",
+  "rom_sha256": "211a1d1559dc2684d63d87f62a6b1e9109201a6383b4004e9dd5e18ee926ee83",
+  "seed": 0,
+  "budget": {
+    "active_seconds": 3600.0,
+    "dollars": 3.0
+  },
+  "status": "stopped",
+  "parent": null,
+  "tag": "flow30-loop",
+  "harness_sha": "0449e7ebcd4b2b90062f4fd62b5a22b8423bece1",
+  "prompts_sha": "94e72e4581e5d01e13da66f3ecc9bfe55215efd96964cea23793bb13bcc8a340",
+  "model": "sonnet",
+  "autopilot": true
+}
