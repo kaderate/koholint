@@ -265,6 +265,19 @@ class ExploreTest < Minitest::Test
     refute log.side_left?([2, 0], :left)
   end
 
+  def test_a_place_left_after_a_few_cells_stays_unexplored_until_a_longer_visit
+    log = Koholint::ExploreLog.new
+    thin = { from: { room: 240, map: 0 }, stopped_by: :known_place, cells_walked: 1, survey: { sides: { up: [{ row: 0, col: 1 }] }, doors: [], pending: false } }
+    log.absorb(thin)
+    assert log.untried?([240, 0])
+    refute log.surveyed?([240, 0])
+    log.absorb(thin.merge(stopped_by: :no_frontier, cells_walked: 9))
+    refute log.untried?([240, 0])
+    assert log.surveyed?([240, 0])
+    log.absorb(thin)
+    refute log.untried?([240, 0])
+  end
+
   def test_a_closed_known_place_is_no_frontier_after_one_idle_frame
     result, inputs = explore(CLOSED)
     assert_equal :no_frontier, result[:stopped_by]
