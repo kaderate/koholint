@@ -171,9 +171,9 @@ from that call does not hold it. When a chain stopped `new_place` or `known_plac
 untried exits and the caps allow it. Results of autopilot decisions are marked `(autopilot)` in the context's results and attempts. Autopilot explores are objective attempts like any other (loop and stall
 abandonment still apply) and leave the engine's consecutive failure and refusal counters untouched; `--autopilot off`
 (manifest `autopilot`) disables it),
-`policies/walk_and_talk.rb` and `start_game.rb` (deterministic baselines and the intro), `with_fallback.rb`
-(an invalid answer falls back deterministically, 5 consecutive fallbacks stop the run; an engine exception before the
-agent call is an `engine_error` fallback counted apart and stops as `engine_errors`). Phases come from the mode
+`policies/walk_and_talk.rb` and `start_game.rb` (deterministic baselines and the intro). In `delegated.rb` an invalid
+answer falls back deterministically, 5 consecutive fallbacks stop the run; an engine exception before the
+agent call is an `engine_error` fallback counted apart and stops as `engine_errors`. Phases come from the mode
 catalogue (see Game modes): the boot script owns `boot` and `loading`; once the run has played (a `perception` in play
 mode, rebuilt from the trace on resume) the screens go to the agent with their own skills only (`menu`: `menu_move`,
 `menu_assign`, `close_menu`; `map`: `close_map`; `save`: `choose_option`; `unknown`: `press` and `wait`;

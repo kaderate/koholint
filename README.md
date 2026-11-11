@@ -15,7 +15,7 @@ Needs Ruby 4.0.1, an emu-gb checkout and the ROM. Copy `.env.example` to `.env` 
 `KOHOLINT_ROM`; real environment variables take precedence.
 
 Tests: `rake test` (one process per file, ROM-heavy files one process per test, about 2 min; the first run builds an emulator state cache in `tmp/`); `rake test:fast` skips the ROM-heavy files (about 25 s);
-`rake test:e2e` also plays the full boot from frame 0.
+`rake test:e2e` also plays the full boot from frame 0. `bin/generate_start_fixture` regenerates `test/fixtures/start_game.expected.json` (read by `test/perception_test.rb`) after a boot script or perception change.
 
 ## Quick start
 
