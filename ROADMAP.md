@@ -20,7 +20,7 @@ Only what is left to do. When something lands, delete it here (git is the histor
 13. **Viewer and live control.** Fork from the UI, pause/stop of the live engine; optional `--live-clock` with pause-on-danger and a reflex layer; background music (comfort, low priority: YouTube IFrame player, track per place kind via `data/music.json`, replay only); creatures overlay and map-cell thumbnails on hover; item icons captured from VRAM.
 
 ## Cleanups
-- `resume` without `--agent` on an agent run silently continues with WalkAndTalk: make it an error. Delete or document `bin/measure_speed` and `bin/generate_start_fixture`. Archive the finished plans of `docs/superpowers/plans/`.
+- `resume` without `--agent` on an agent run silently continues with WalkAndTalk: make it an error. Archive the finished plans of `docs/superpowers/plans/`.
 
 ## Open questions and unmeasured limits (one line each, details in `docs/loose-ends.md`)
 - Does entering a house or cave heal? Not observed (hp stayed 4/24 in two houses for 2600 frames; caves untested): the `shelter` candidate was removed in flow-34 (no retreat at low hp).
