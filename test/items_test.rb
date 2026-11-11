@@ -15,7 +15,8 @@ class ItemsTest < Minitest::Test
 
   def test_catalogue_names_verified_items_plainly_and_marks_hypotheses
     assert_equal 'shield', Items.name(4)
-    assert_equal 'sword?', Items.name(1)
+    assert_equal 'sword', Items.name(1)
+    assert_equal 'bombs?', Items.name(2)
     assert_equal 'unknown item 99', Items.name(99)
     assert_equal 'empty', Items.label(0)
     assert_equal :sword, Items.milestone(1)
@@ -66,8 +67,8 @@ class ItemsTest < Minitest::Test
   end
 
   def test_context_lists_the_buttons_and_the_filled_slots
-    text = Koholint::Agents::Context.send(:items_line, state(item_b: 4, inventory: [0, 0, 1, 0, 0, 0, 0, 0, 0, 0]))
-    assert_equal 'Items (a ? marks a name not yet measured): A empty, B shield (id 4); inventory slots: 2 sword? (id 1)', text
+    text = Koholint::Agents::Context.send(:items_line, state(item_b: 4, inventory: [0, 0, 2, 0, 0, 0, 0, 0, 0, 0]))
+    assert_equal 'Items (a ? marks a name not yet measured): A empty, B shield (id 4); inventory slots: 2 bombs? (id 2)', text
     assert_includes Koholint::Agents::Context.send(:items_line, state), 'inventory slots: all empty'
   end
 end
