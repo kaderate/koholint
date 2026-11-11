@@ -494,26 +494,22 @@ class EngineTest < Minitest::Test
     emulator = MenuEmulator.new
     emulator.define_singleton_method(:read) do |addr|
       { hp: 24, max_hearts: 3, link_x: 80, link_y: 60, game_mode: 0x0B, game_submode: frame.between?(100, 110) ? 3 : 7,
-        room_id: frame.between?(100, 199) ? 161 : 162, dialog_state: frame.between?(150, 160) ? 1 : 0,
+        room_id: frame.between?(100, 199) ? 161 : 162,
         inventory_slot_b: frame >= 230 ? 4 : 0 }.fetch(Koholint::Perception::ADDRESSES.key(addr), 0)
     end
     emulator
   end
 
-  class PressA < Recorder
-    def decide(...) = super.merge(choice: { buttons: [:a], frames: 5 })
-  end
-
-  def test_a_keyframe_marks_each_new_place_dialogue_opened_by_itself_and_item_gained
+  def test_a_keyframe_marks_each_new_place_and_item_gained_and_a_resume_keeps_the_places_seen
     with_run do |_dir, run|
       Koholint::Engine.new(run:, policy: Recorder.new, emulator: eventful_emulator, budget: Koholint::Budget.new(frames: 260)).run
-      keyframes = events(run, :keyframe).map { |e| e.values_at('frame', 'reason') }
-      assert_equal [[1, 'new_place'], [111, 'new_place'], [150, 'scripted_dialogue'], [230, 'item_gained'], [260, nil]], keyframes
+      keyframes = events(run, :keyframe).map { |e| e.values_at('frame', 'reason', 'place') }
+      assert_equal [[1, 'new_place', [162, 0]], [111, 'new_place', [161, 0]], [230, 'item_gained', nil], [260, nil, nil]], keyframes
       assert(keyframes.all? { |frame, _| File.file?(File.join(run.dir, 'keyframes', format('kf-%09d.zlib', frame))) })
-    end
-    with_run do |_dir, run|
-      Koholint::Engine.new(run:, policy: PressA.new, emulator: eventful_emulator, budget: Koholint::Budget.new(frames: 260)).run
-      assert_equal %w[new_place new_place item_gained], events(run, :keyframe).filter_map { |e| e['reason'] }
+      File.write(run.trace_path, File.readlines(run.trace_path).reject { |line| line.include?('"perception"') }.join)
+      Koholint::Engine.new(run:, policy: Recorder.new, emulator: eventful_emulator.tap { |e| e.instance_variable_set(:@frame, 260) },
+                           budget: Koholint::Budget.new(frames: 20)).run
+      assert_equal [nil, nil], events(run, :keyframe).last(2).map { |e| e['reason'] }
     end
   end
 

@@ -71,6 +71,10 @@ class CliTest < Minitest::Test
       assert_equal 210, Koholint::InputLog.load(File.join(child, 'inputs.log')).frames
       assert_equal 150, JSON.parse(File.read(File.join(child, 'manifest.json'))).dig('parent', 'frame')
       assert_match(/^stopped: frames$/, out.string)
+      out = StringIO.new
+      assert_equal 0, Koholint::CLI.run(['branch', run_dir, '--at', '100', '--frames', '30'], out:, err: StringIO.new, viewer: ->(*) { Process.spawn('false') })
+      assert_match(/^the viewer did not start \(exit 1\); watch the branch with: koholint watch /, out.string)
+      refute_match(/keeps serving/, out.string)
       code, _out, err = cli('branch', run_dir, '--at', 'sword-obtained')
       assert_equal 1, code
       assert_match(/checkpoint sword-obtained is in run 20261111-194737-9ba1/, err)

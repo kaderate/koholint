@@ -25,10 +25,10 @@ The engine owns the loop, the budgets, the files of a run and the trace; agents 
 **Emulator and replay** — `emulator.rb` wraps emu-gb (headless, paused between engine steps; the engine
 decides when frames advance). `input_log.rb` is the append-only input journal; `replay.rb` rebuilds any
 state by replaying the journal from boot; `keyframes.rb` and `canonical_save.rb` checkpoint it. The engine saves a
-keyframe every 1800 frames, at the stop, and on the frame of every `item_gained`, every first ready play frame in a place
-not seen in the run and every dialogue that opens while the current action does not press A (`keyframe` then carries
-`reason`: `item_gained`, `new_place` or `scripted_dialogue`); keyframes never feed perception or decisions, so they do
-not change the play flow. `checkpoints.rb` and `data/checkpoints.json` name points of runs (`run`, `frame`, `flow`,
+keyframe every 1800 frames, at the stop, and on the frame of every `item_gained` and every first ready play frame in a
+place not seen in the run (`keyframe` then carries `reason`, `item_gained` or `new_place`, and the new place in `place`;
+a resume rebuilds the places seen from perceptions and these keyframes); keyframes never feed perception or decisions,
+so they do not change the play flow. `checkpoints.rb` and `data/checkpoints.json` name points of runs (`run`, `frame`, `flow`,
 `source`) to branch from. The game is
 deterministic, so *ROM + journal* is the whole run. Time is the frame; wall clock appears only in budgets,
 pacing (`pacer.rb`) and observability.
@@ -223,7 +223,7 @@ observability only, no trace event, the set of captured places is rebuilt from t
 `world.json` (`{ goal, leads, places }`, rewritten from the trace at every stop), `summary.json` (written at every stop by
 `summary.rb` from the trace only, versioned by `Summary::VERSION`: totals, cost by skill, decisions by agent and
 feature usage, with `autopilot_decisions`, `chain_max`, `deaths`, `damage_events` and `stuck_events`, and `symptoms`: `left_with_unexhausted_people`, place changes
-away from a place whose last place card listed a verified person whose `TalkLog#last_status` was not `exhausted`; `archive` rewrites an outdated one), `star.json`, `notes.md` (owner notes from the viewer). Trace events (`dialogue` may carry `speaker`, `conversation` and `cached`; a `talk_to` result may carry `entity`; a `perception` may carry `not_ready_frames`; a `decision` may carry `autopilot`; a `keyframe` may carry `reason`; a `choose_objective` decision lists the offered candidates in `options` as `{id, label, leaves_unexhausted, picked}`): `perception`, `decision`, `action`, `objective`, `dialogue`, `lead`, `goal`,
+away from a place whose last place card listed a verified person whose `TalkLog#last_status` was not `exhausted`; `archive` rewrites an outdated one), `star.json`, `notes.md` (owner notes from the viewer). Trace events (`dialogue` may carry `speaker`, `conversation` and `cached`; a `talk_to` result may carry `entity`; a `perception` may carry `not_ready_frames`; a `decision` may carry `autopilot`; a `keyframe` may carry `reason` and `place`; a `choose_objective` decision lists the offered candidates in `options` as `{id, label, leaves_unexhausted, picked}`): `perception`, `decision`, `action`, `objective`, `dialogue`, `lead`, `goal`,
 `notable`, `place_card`, `place_name`, `item_gained`, `screen`, `screen_changed`, `affordance`, `grid_contradiction`, `keyframe`, `save`, `budget_stop`, `stop`. `budget.rb` enforces frames,
 minutes, dollars and objective steps. `archive.rb` keeps a light bundle per run in git (trace gzipped, `screens/` included);
 heavy artifacts stay local. A run resumes only with the same `flow_version` and ROM hash; a change to the
@@ -239,7 +239,7 @@ read-only replays with pacing and seek, comparison via `run_compare.rb`, star, t
 never writes game state; the only files it writes are `star.json`, `summary.json`'s `starred` and `notes.md`.
 
 **CLI** — `cli.rb`, `bin/koholint`: `run`, `resume`, `fork`, `branch` (fork at a frame or a checkpoint of
-`data/checkpoints.json`, spawn `watch` on the child, resume it, then wait for the viewer), `verify`, `summary`, `screens`, `watch`, `archive`, `star`,
+`data/checkpoints.json`, spawn `watch` on the child, resume it, then wait for the viewer or say it did not start), `verify`, `summary`, `screens`, `watch`, `archive`, `star`,
 `prune-heavy`, `census` (modes, `census entities`, `census objects` or `census ready`), `npcs` (`npc_catalogue.rb`: a markdown table of the people of all
 runs, their names and the distinct texts read with the milestone and the number of runs; writes nothing), `ab-plan` and
 `ab-report` (`ab.rb`: the fork and resume commands of an A/B between autopilot arms from one frame of a run, written to

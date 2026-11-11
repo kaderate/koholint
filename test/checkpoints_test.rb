@@ -34,6 +34,7 @@ class CheckpointsTest < Minitest::Test
     parent = Parent.new('20261111-194737-9ba1', { 'flow_version' => 'flow-37' })
     assert_equal 60_404, Koholint::Checkpoints.frame_for(parent, 'sword-obtained', points)
     assert_equal 1200, Koholint::Checkpoints.frame_for(parent, '1200', points)
+    assert_equal [8, 10], %w[08 010].map { |at| Koholint::Checkpoints.frame_for(parent, at, points) }
     assert_raises(Koholint::Error) { Koholint::Checkpoints.frame_for(parent, 'shield-obtained', points) }
     assert_raises(Koholint::Error) { Koholint::Checkpoints.frame_for(Parent.new('20261111-142812-34ca', parent.manifest), 'sword-obtained', points) }
     assert_raises(Koholint::Error) { Koholint::Checkpoints.frame_for(Parent.new(parent.id, { 'flow_version' => 'flow-36' }), 'sword-obtained', points) }

@@ -41,7 +41,7 @@ module Koholint
     end
 
     def frame_for(run, at, checkpoints = catalogue)
-      return Integer(at) if at.to_s.match?(/\A\d+\z/)
+      return Integer(at.to_s, 10) if at.to_s.match?(/\A\d+\z/)
 
       point = checkpoints[at.to_s] or raise Error, "no checkpoint #{at} in data/checkpoints.json"
       raise Error, "checkpoint #{at} is in run #{point['run']}, not #{run.id}" unless point['run'] == run.id

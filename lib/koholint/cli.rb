@@ -143,14 +143,18 @@ module Koholint
       out.puts "branch #{child.dir} from #{parent.id} at frame #{at_frame}"
       pid = viewer.call(child.dir, options.slice(:port, :host, :speed))
       code = resume(child.dir, options, budget, flow, out)
-      if pid
-        out.puts 'the viewer keeps serving the branch: Ctrl-C to quit'
-        previous = Signal.trap('INT') {}
-        Process.wait(pid)
+      return code unless pid
+
+      if (status = Process.wait2(pid, Process::WNOHANG))
+        out.puts "the viewer did not start (exit #{status.last.exitstatus}); watch the branch with: koholint watch #{child.dir} --port N"
+        return code
       end
+      out.puts 'the viewer keeps serving the branch: Ctrl-C to quit'
+      Process.wait(pid)
+      code
+    rescue Interrupt
       code
     ensure
-      Signal.trap('INT', previous) if previous
       begin
         Process.kill('TERM', pid) && Process.wait(pid) if pid
       rescue Errno::ESRCH, Errno::ECHILD
