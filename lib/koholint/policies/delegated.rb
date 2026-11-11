@@ -181,7 +181,7 @@ module Koholint
         remember_text(transcription[:transcription], state) unless @reading
         notes = notes_for(reply.output, transcription[:transcription], state)
         result = answer(choice, reply, reply.output).merge(plan ? { plan: } : {}).merge(transcription).merge(notes)
-        @images ? override_for_revisit(result, decision_point, state) : result
+        keep_moving(@images ? override_for_revisit(result, decision_point, state) : result, state)
       rescue NameError, TypeError
         raise
       rescue StandardError => e
@@ -190,6 +190,17 @@ module Koholint
         { choice: FALLBACK_CHOICE, justification: failure_text(e), confidence: 0.0, agent: engine ? 'engine' : 'claude', latency_ms: 0,
           cost_usd: cost_of(reply), fallback: true, decision_point: @skill_point, prompt: @prompt, image: @image, images: @images,
           **(e.is_a?(Refusal) ? { refused: true } : {}), **(engine ? { engine_error: true } : {}) }
+      end
+
+      STAND_SKILLS = %w[guard wait].freeze
+      STAND_MARGIN = 32
+
+      def keep_moving(result, state)
+        choice = result[:choice]
+        return result unless choice.is_a?(Hash) && STAND_SKILLS.include?(choice[:skill].to_s) && state.phase == :playing && !state.dialog_open?
+        return result unless Navigation::Threat.within?(Navigation::Threat.of(entities_now), state.x, state.y, margin: STAND_MARGIN)
+
+        result.merge(choice: EXPLORE, justification: "harness: no standing next to a hostile creature (replaces the model's #{choice[:skill]}): #{result[:justification]}", autopilot: false)
       end
 
       def failure_text(error)

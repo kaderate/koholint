@@ -77,7 +77,7 @@ place, so the grid went dark). The live view has a grid toggle that overlays the
 visited places from the trace; `fork` branches a run at a frame (the parent may be of an older flow; `--tag`, `--autopilot` and `--root` set the child's). Both work on an archived run, also on a fresh clone
 (see Run storage).
 
-## Agent skills (`flow-35`)
+## Agent skills (`flow-36`)
 
 - Between decisions the engine waits, with no input, until Link is ready (no screen scroll, door walk, jump or
   knockback, then 2 settled frames): the screen is never mapped and the model never called mid-scroll or mid-jump
@@ -118,7 +118,7 @@ visited places from the trace; `fork` branches a run at a frame (the parent may 
   uncatalogued screen gets `press` and `wait` and a `notable` `unknown_mode` in the trace; 600 frames on it stop the
   run as `unknown_mode_stuck`. Options that quit to the title are refused. The game-over screen is answered by the harness, free: it
   continues with the first option that does not quit (`notable` `death`); a health drop emits a `notable` `damage` and
-  the next prompt's health line shows the hearts lost since the last model call. There is no low-health rule (flow-35); six fruitless results in one
+  the next prompt's health line shows the hearts lost since the last model call. There is no low-health rule (flow-36); six fruitless results in one
   place without a new cell emit a `notable` `stuck` and a `STUCK` reset hint.
 - The context header lists the items on A and B and in the inventory slots (`data/items.json` names; a `?` marks a name
   not measured yet). `use_item item [button] [frames]` uses a held item (assigning it through the START menu to `button`,
