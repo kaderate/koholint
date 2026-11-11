@@ -10,8 +10,9 @@ module Koholint
         DELTAS.find { |_, (dr, dc)| [from[0] + dr, from[1] + dc] == to }&.first
       end
 
-      def initialize(grid:, ledger:, place:, triggers: nil, mode: :explore, danger: nil)
+      def initialize(grid:, ledger:, place:, triggers: nil, mode: :explore, danger: nil, pushable: nil)
         @danger = danger
+        @pushable = pushable
         @mode = mode
         @triggers = triggers
         @grid = grid
@@ -26,10 +27,12 @@ module Koholint
 
       def path(from:, to:, mode: @mode, doubt: true, forbid: true)
         zones = Array(@danger&.call)
-        (zones.any? && search(from:, to:, mode:, doubt:, forbid:, zones:)) || search(from:, to:, mode:, doubt:, forbid:, zones: [])
+        pushable = Array(@pushable&.call)
+        (zones.any? && search(from:, to:, mode:, doubt:, forbid:, zones:)) || search(from:, to:, mode:, doubt:, forbid:, zones: []) ||
+          (search(from:, to:, mode:, doubt:, forbid:, zones: [], push: pushable) if pushable.any?)
       end
 
-      def search(from:, to:, mode:, doubt:, forbid:, zones:)
+      def search(from:, to:, mode:, doubt:, forbid:, zones:, push: [])
         return nil unless inside?(from) && inside?(to)
         return [from] if from == to
 
@@ -44,7 +47,7 @@ module Koholint
 
           DELTAS.each_key do |direction|
             target = step(cell, direction)
-            next unless target && !zones.include?(target) && walkable?(cell, target, direction, allowed, doubt, forbid)
+            next unless target && !zones.include?(target) && walkable?(cell, target, direction, allowed, doubt, forbid, push)
 
             cost = [steps + 1, turns + (heading && heading != direction ? 1 : 0)]
             key = [target, direction]
@@ -92,10 +95,11 @@ module Koholint
         target if inside?(target)
       end
 
-      def walkable?(cell, target, direction, allowed, doubt, forbid)
-        return false if @grid.static_sprite(*target)
+      def walkable?(cell, target, direction, allowed, doubt, forbid, push = [])
         return false if @avoided.include?([cell, direction])
         return false if forbid && @triggers&.forbidden(@place, cell)&.include?(direction)
+        return true if push.include?(target)
+        return false if @grid.static_sprite(*target)
 
         belief = @grid.passable(*target, direction)
         return false if doubt && belief == :yes && @ledger&.doubtful?(@place, cell, direction)

@@ -55,6 +55,9 @@ module Koholint
 
       private
 
+      # Stationary enemies the raised shield pushes aside (sea urchins) sit on cells their sprites make look like objects.
+      def pushable_of(context) = context[:entities] && -> { Array(context[:entities].call).select { |e| e[:kind].to_s == 'enemy' && e[:moves] == false && e[:cell] }.map { |e| e[:cell] } }
+
       def danger_of(context) = context[:entities] && -> { Entities.danger_cells(Array(context[:entities].call)) }
 
       def trigger_input
