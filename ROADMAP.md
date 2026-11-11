@@ -26,7 +26,7 @@ Only what is left to do. When something lands, delete it here (git is the histor
 - Unmeasured thresholds: third of max hp, 3-cell danger range, 6-result stuck count, revisit caps (1800 / 2700 frames, 6 rounds, 3 stamps), autopilot chain caps (6 explores, 2400 frames), `untried_object` range.
 - `gap_entry` (-3..+4 px) is measured on one stairs cell; the escape from the 165/16 pocket is not replayed end to end.
 - Addresses at `verified_count: 1` (`name_length`, `max_hearts`, `dialog_state`, `shield_box`, `gap_entry`); `entity_state` (0xC290) and 0xDB47 are unexplained; item ids other than 4, counts and upgrades are unread.
-- Whether a run may inherit a map, a goal or leads from a previous run; ladder beyond shield and sword.
+- Whether a run may inherit a map, a goal or leads from a previous run; ladder beyond the sword (goal text only, no milestone yet).
 - People and dialogues: speaker attribution is a guess when two people overlap; stitching of scrolling pages and the exhaustion rule can miss a text given only on a third round; creature types 61, 220 and 47 are not settled; type 111 walks off its cell.
 - Doors, signs, readiness, game modes and place kinds are measured on the overworld and houses only (caves, dungeons, holes, swimming, stairs, scripted scenes are not).
 - Explore memory (walls, tried exits, sides) is per place and permanent; border exits are tried blindly; a harness-picked `new_place` objective skips the model's first look.
