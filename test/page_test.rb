@@ -61,6 +61,7 @@ class PageTest < Minitest::Test
     assert_equal ['$3.42 / 10', 34, '31'], view.values_at('cost', 'percent', 'places')
     assert_includes view['detail'], '41 min sur 180'
     assert_equal '-', evaluate('kpiView({}).places')
+    assert_includes evaluate('kpiView({spent: 1, inherited_cost_usd: 4}).detail'), '$4.00 hérités des runs parents'
   end
 
   def test_the_health_band_follows_the_hearts_and_a_bubble_flags_tips_and_repeats

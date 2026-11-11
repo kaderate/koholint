@@ -285,12 +285,13 @@ module Koholint
       def kpis(trace, manifest, frame, places)
         decisions = trace.select { |e| e['type'] == 'decision' }
         calls = decisions.count { |e| Summary.model_call?(e) }
-        spent = decisions.sum { |e| e['cost_usd'].to_f }
+        cost = Summary.cost(decisions, since: manifest.dig('parent', 'frame').to_i)
+        spent = cost[:cost_usd]
         budget = manifest['budget'].is_a?(Hash) ? manifest['budget'] : {}
         per = ->(value) { frame.positive? ? (value * 1000.0 / frame).round(4) : nil }
         { frame:, spent: spent.round(6), cap: budget['dollars'].is_a?(Numeric) ? budget['dollars'] : nil, calls:, free: decisions.size - calls,
           calls_per_1000f: per.call(calls), usd_per_1000f: per.call(spent), minutes: (frame / FPS / 60.0).round(1),
-          cap_minutes: budget['active_seconds'].is_a?(Numeric) ? (budget['active_seconds'] / 60.0).round(1) : nil, places: }
+          cap_minutes: budget['active_seconds'].is_a?(Numeric) ? (budget['active_seconds'] / 60.0).round(1) : nil, places:, **cost.slice(:inherited_cost_usd) }
       end
 
       def health(trace)

@@ -193,6 +193,9 @@ class InsightsTest < Minitest::Test
     ]
     view = Insights.cockpit(trace, manifest: { 'budget' => { 'dollars' => 10, 'active_seconds' => 600 } }, frame: 3600)
     assert_equal [0.5, 10, 1, 1, 1.0, 10.0], view[:kpis].values_at(:spent, :cap, :calls, :places, :minutes, :cap_minutes)
+    refute view[:kpis].key?(:inherited_cost_usd)
+    fork = Insights.cockpit(trace, manifest: { 'parent' => { 'id' => 'p', 'frame' => 10 } }, frame: 3600)
+    assert_equal [0.0, 0.5], fork[:kpis].values_at(:spent, :inherited_cost_usd)
     assert_equal [{ frame: 5, hp: 24, max_hp: 24 }], view[:health][:points]
     assert_equal [{ frame: 11, kind: 'damage' }], view[:health][:hits]
     assert_equal ['shield', true, false], [view[:hud][:item_b][:name], view[:hud][:ladder][0][:reached], view[:hud][:ladder][1][:reached]]

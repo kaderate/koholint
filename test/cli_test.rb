@@ -306,11 +306,18 @@ class CliTest < Minitest::Test
       Koholint::Config.env_path = File.join(dir, '.env')
       File.write(Koholint::Config.env_path, "CLAUDE_COMMAND=#{FAKE_CLAUDE}\n")
       assert_kind_of Proc, Koholint::CLI.policy_factory({ agent: true }, Koholint::Budget.new)
+      File.write(Koholint::Config.env_path, "CLAUDE_COMMAND=  \n")
+      File.symlink(FAKE_CLAUDE, File.join(dir, 'claude'))
+      old_env_path = ENV.fetch('PATH')
+      ENV['PATH'] = dir
+      assert_kind_of Proc, Koholint::CLI.policy_factory({ agent: true }, Koholint::Budget.new)
+      ENV['PATH'] = old_env_path
       File.write(Koholint::Config.env_path, "CLAUDE_COMMAND=/nope/claude\n")
       error = assert_raises(Koholint::Error) { Koholint::CLI.policy_factory({ agent: true }, Koholint::Budget.new) }
       assert_equal 'claude executable not found: /nope/claude (set CLAUDE_COMMAND in .env or pass --claude-command)', error.message
     ensure
       Koholint::Config.env_path = old_path
+      ENV['PATH'] = old_env_path if old_env_path
       ENV['CLAUDE_COMMAND'] = old_command if old_command
     end
   end

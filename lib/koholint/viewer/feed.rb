@@ -36,7 +36,7 @@ module Koholint
         manifest = read_manifest(run_dir)
         full = trace_events(run_dir)
         trace = upto ? full.select { |e| e['frame'].is_a?(Integer) && e['frame'] <= upto } : full
-        summary = Summary.from_events(trace)
+        summary = Summary.from_events(trace, since: manifest.dig('parent', 'frame').to_i)
         summary[:health] = 'unknown' if trace.none? { |e| Summary.progress?(e) } && %w[progressing stalled].include?(summary[:health])
         {
           status: summary.merge(run_id: File.basename(run_dir), flow_version: manifest['flow_version'],
@@ -49,7 +49,7 @@ module Koholint
           activity: activity(run_dir),
           server_now: Time.now.to_f,
           latency: latency(trace),
-          budget: budget(manifest, trace),
+          budget: budget(manifest, trace, summary),
           dialogues: dialogues(trace)
         }
       end
@@ -66,9 +66,9 @@ module Koholint
         { last_ms: samples.last, median_ms: Summary.percentile(samples, 0.5), p90_ms: Summary.percentile(samples, 0.9), count: samples.size }
       end
 
-      def budget(manifest, trace)
+      def budget(manifest, trace, summary)
         cap = manifest['budget'].is_a?(Hash) ? manifest['budget']['dollars'] : nil
-        { spent: trace.select { |e| e['type'] == 'decision' }.sum { |e| e['cost_usd'].to_f }, cap: cap.is_a?(Numeric) ? cap : nil, calls: calls(trace) }
+        { spent: summary[:cost_usd], cap: cap.is_a?(Numeric) ? cap : nil, calls: calls(trace), **summary.slice(:inherited_cost_usd) }
       end
 
       def calls(trace) = trace.count { |e| Summary.model_call?(e) }

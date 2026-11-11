@@ -239,7 +239,7 @@ read-only replays with pacing and seek, comparison via `run_compare.rb`, star, t
 never writes game state; the only files it writes are `star.json`, `summary.json`'s `starred` and `notes.md`.
 
 **CLI** — `cli.rb`, `bin/koholint`: `run`, `resume`, `fork`, `branch` (fork at a frame or a checkpoint of
-`data/checkpoints.json`, spawn `watch` on the child, resume it, then stop the viewer and exit, or with `--keep-viewer` wait for it; say when it did not start), `verify`, `summary` (a fork's `cost_usd` counts its own decisions only, `inherited_cost_usd` the parent's), `screens`, `watch`, `archive`, `star`,
+`data/checkpoints.json`, spawn `watch` on the child, resume it, then stop the viewer and exit, or with `--keep-viewer` wait for it; say when it did not start), `verify`, `summary` (a fork's `cost_usd` counts its own decisions only, `inherited_cost_usd` the parent's; the viewer's spent figure does the same), `screens`, `watch`, `archive`, `star`,
 `prune-heavy`, `census` (modes, `census entities`, `census objects` or `census ready`), `npcs` (`npc_catalogue.rb`: a markdown table of the people of all
 runs, their names and the distinct texts read with the milestone and the number of runs; writes nothing), `ab-plan` and
 `ab-report` (`ab.rb`: the fork and resume commands of an A/B between autopilot arms from one frame of a run, written to

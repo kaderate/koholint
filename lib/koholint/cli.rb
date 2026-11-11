@@ -270,7 +270,8 @@ module Koholint
     def policy_factory(options, budget, probe: false)
       return ->(_run) { Policies::StartGame.new(Policies::WalkAndTalk.new) } unless options[:agent]
 
-      command = options.fetch(:claude_command) { Config.get('CLAUDE_COMMAND') || 'claude' }
+      command = options.fetch(:claude_command) { Config.get('CLAUDE_COMMAND').to_s.strip }
+      command = 'claude' if command.empty?
       command = File.expand_path(command) if command.include?(File::SEPARATOR)
       raise Koholint::Error, "claude executable not found: #{command} (set CLAUDE_COMMAND in .env or pass --claude-command)" unless executable?(command)
 

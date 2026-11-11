@@ -417,6 +417,17 @@ class FeedTest < Minitest::Test
     end
   end
 
+  def test_a_fork_spends_its_own_decisions_and_labels_the_inherited_ones
+    manifest = { 'flow_version' => 'f', 'status' => 'running', 'budget' => { 'dollars' => 2.0 }, 'parent' => { 'id' => 'p', 'frame' => 3 } }
+    with_dir(manifest:) do |dir, trace|
+      (1..5).each { |frame| decision(trace, frame) }
+      doc = Koholint::Viewer::Feed.for(dir, FOLLOWER)
+      assert_in_delta 0.3, doc[:budget][:spent]
+      assert_in_delta 0.2, doc[:budget][:inherited_cost_usd]
+      assert_in_delta 0.3, doc[:status][:cost_usd]
+    end
+  end
+
   def test_latency_and_budget_come_from_model_decisions
     manifest = { 'flow_version' => 'f', 'status' => 'running', 'budget' => { 'dollars' => 2.0 } }
     with_dir(manifest:) do |dir, trace|

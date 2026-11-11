@@ -157,7 +157,6 @@ module Koholint
     def from_events(events, since: 0)
       frames = events.map { |e| e['frame'] }.max || 0
       state = events.reverse_each.find { |e| e['type'] == 'perception' }&.fetch('state')
-      inherited, own = events.select { |e| e['type'] == 'decision' }.partition { |e| e['frame'] < since }
       {
         health: health(events, state, frames),
         hearts: state && state['hp'] / HP_PER_HEART,
@@ -166,9 +165,13 @@ module Koholint
         last_notable: events.reverse_each.find { |e| e['type'] == 'notable' && progress?(e) }&.slice('kind', 'detail'),
         highest_milestone: highest_milestone(events),
         frames: frames,
-        cost_usd: own.sum { |e| e['cost_usd'] },
-        **(since.positive? ? { inherited_cost_usd: inherited.sum { |e| e['cost_usd'] } } : {})
+        **cost(events, since:)
       }
+    end
+
+    def cost(events, since: 0)
+      inherited, own = events.select { |e| e['type'] == 'decision' }.partition { |e| e['frame'] < since }
+      { cost_usd: own.sum { |e| e['cost_usd'].to_f }, **(since.positive? ? { inherited_cost_usd: inherited.sum { |e| e['cost_usd'].to_f } } : {}) }
     end
 
     def highest_milestone(events)
