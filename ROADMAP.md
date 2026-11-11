@@ -20,7 +20,9 @@ Only what is left to do. When something lands, delete it here (git is the histor
 13. **Viewer and live control.** Fork from the UI, pause/stop of the live engine; optional `--live-clock` with pause-on-danger and a reflex layer; background music (comfort, low priority: YouTube IFrame player, track per place kind via `data/music.json`, replay only); creatures overlay and map-cell thumbnails on hover; item icons captured from VRAM.
 
 ## Cleanups
-- `resume` without `--agent` on an agent run silently continues with WalkAndTalk: make it an error. Archive the finished plans of `docs/superpowers/plans/`.
+- `resume` without `--agent` on an agent run silently continues with WalkAndTalk: make it an error (WalkAndTalk stays: no-agent baseline, `StartGame` fallback, 13 test files).
+- Split `policies/delegated.rb` (851 lines) with no behaviour change before item 2 adds to it; `verify` on run 9ba1 must stay identical.
+- Archive the finished plans of `docs/superpowers/plans/`; `probes/readiness_census.rb` has no test (test it or drop it); keep the other census probes (provenance of `data/addresses.json`, and item 2 needs `EntityCensus.hit_profile`).
 
 ## Open questions and unmeasured limits (one line each, details in `docs/loose-ends.md`)
 - Does entering a house or cave heal? Not observed (hp stayed 4/24 in two houses for 2600 frames; caves untested): the `shelter` candidate was removed in flow-34 (no retreat at low hp).
