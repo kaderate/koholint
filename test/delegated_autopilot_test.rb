@@ -65,26 +65,13 @@ class DelegatedAutopilotTest < Minitest::Test
     result
   end
 
-  def test_at_one_heart_of_six_the_autopilot_never_relaunches_explore_and_the_context_says_low_health
+  def test_at_one_heart_of_six_the_autopilot_keeps_going_and_no_shelter_is_offered
     client = ScriptedClient.new(objective: new_place, default: explore)
     p = autopiloted(client)
     p.instance_variable_get(:@explore_log).absorb({ from: { room: 1, map: 0 }, exits: [{ row: 7, col: 5, direction: :up, outcome: :left, to: [166, 16] }] })
     results = (0..3).map { |i| lap(p, state(frame: 100 + (i * 300), room_id: 1, map_id: 0, hp: 4), :known_place, to: { room: 1, map: 0, row: 3, col: 4 }) }
-    refute(results.any? { |r| r[:autopilot] })
-    assert_includes client.calls.last[:prompt], 'LOW HEALTH: the harness no longer chains explores'
-    assert_includes client.calls.first[:prompt], '- shelter-166-16: LOW HEALTH: take shelter in place 166-16, 1 move away'
-  end
-
-  def test_after_damage_a_creature_within_three_cells_holds_the_autopilot
-    client = ScriptedClient.new(objective: new_place, default: explore)
-    p = autopiloted(client)
-    creature = [{ slot: 2, type: 45, cell: [3, 6], kind: :creature }]
-    far = [{ slot: 2, type: 45, cell: [7, 9], kind: :creature }]
-    lap(p, state(frame: 100), :budget)
-    lap(p, state(frame: 400, hp: 20), :new_place, to: { room: 163, map: 16, row: 3, col: 5 })
-    held = lap(p, state(frame: 450, hp: 20), :new_place, ctx: { grid:, entities: -> { creature } }, to: { room: 163, map: 16, row: 3, col: 6 })
-    refute held[:autopilot]
-    assert lap(p, state(frame: 500, hp: 20), :new_place, ctx: { grid:, entities: -> { far } })[:autopilot]
+    assert(results.any? { |r| r[:autopilot] })
+    refute_includes client.calls.map { |c| c[:prompt] }.join, 'LOW HEALTH'
   end
 
   def test_six_fruitless_results_in_one_place_emit_stuck_and_a_reset_hint

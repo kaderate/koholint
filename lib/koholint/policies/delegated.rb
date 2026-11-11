@@ -50,8 +50,6 @@ module Koholint
       WAIT_PHASES = %i[locked cutscene].freeze
       SPEAKER_LIMIT = Trace::SPEAKER_MAX
       REVISIT_BUDGET_SHARE = 0.05
-      HURT_FRAMES = 300
-      DANGER_CELLS = 3
       STUCK_STOPS = %w[no_frontier no_path blocked stalled].freeze
       STUCK_AT = 6
       FALL_MOTION = 6
@@ -331,32 +329,15 @@ module Koholint
       def alerts(state)
         place = [state.room_id, state.map_id]
         lines = []
-        if state.low_health?
-          shelter = Candidates.shelter(place, @explore_log.hops(place), ->(where) { @leads.name_of(where) })
-          where = if shelter then "nearest shelter: #{shelter[:title]} (candidate #{shelter[:id]})"
-                  elsif PlaceKinds.kind(place) == 'interior' then 'Link is inside, away from the creatures outside'
-                  else 'no interior is known yet'
-                  end
-          lines << "LOW HEALTH: the harness no longer chains explores; avoid creatures, guard with the shield when one is close; #{where}."
-        end
         if @deaths[place].positive?
           lines << "DIED HERE #{@deaths[place]} time(s): the planner already routes around the contact zones of the creatures on screen; " \
-                   'keep two cells away from them, do not cross holes, and leave this place when hp is low.'
+                   'keep clear of them or push them away with the shield, and do not cross holes.'
         end
         if @stuck&.dig(:hint) && @stuck[:place] == place
           lines << "STUCK: #{STUCK_AT} results in a row here found no frontier, no path or were blocked, without reaching a new cell. The grid may be wrong: " \
                    'try the cells marked doubtful, step onto stairs or narrow gaps from the cell centre, and read the grid against the screen image.'
         end
         lines
-      end
-
-      def danger?(state)
-        return false unless @hurt_at && state.frame - @hurt_at < HURT_FRAMES && state.cell
-
-        entities_now.any? do |entity|
-          cell = entity[:cell]
-          cell && (Entities.creature?(entity) || entity[:kind].to_s == 'enemy') && (cell[0] - state.cell[0]).abs + (cell[1] - state.cell[1]).abs <= DANGER_CELLS
-        end
       end
 
       def note_no_path(choice, outcome, frame)
@@ -445,7 +426,7 @@ module Koholint
                             signs: signs.select { |object| object[:kind].to_s == 'sign' }.map { |object| object.slice(:cell) } }
         end
         @candidates = Candidates.build(place:, grid: context[:grid], explore_log: @explore_log, talk_log: @talk_log, leads: @leads, cards: @cards,
-                                       entities: @entities, signs:, stamp: stamp(state), link: state.cell, low_health: state.low_health?)
+                                       entities: @entities, signs:, stamp: stamp(state), link: state.cell, low_health: false)
       end
 
       def satisfied?(predicate, state, place)
@@ -767,7 +748,7 @@ module Koholint
         return unless @autopilot && decision_point.name == :choose_skill && !@sequence && !@reading && !hemmed?(state)
 
         follow = follow_choice(state)
-        result = @autopilot.next_choice(state:, objective: @objectives.current, follow: follow&.dig(:choice), danger: danger?(state)) or return
+        result = @autopilot.next_choice(state:, objective: @objectives.current, follow: follow&.dig(:choice)) or return
         context[:aim] = follow[:aim] if follow&.dig(:aim)
         @autopilot_acting = true
         result
@@ -803,7 +784,7 @@ module Koholint
 
       def revisit_low? = @budget ? @budget.nearly_exhausted?(frames: Revisit::CYCLE_FRAMES, share: REVISIT_BUDGET_SHARE) : false
 
-      def revisit_danger?(state) = hemmed?(state) || (@hurt_at && state.frame - @hurt_at < HURT_FRAMES)
+      def revisit_danger?(state) = hemmed?(state)
 
       def revisit_candidate(state)
         return unless @entities_reader
