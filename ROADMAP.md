@@ -19,7 +19,7 @@ Only what is left to do. When something lands, delete it here (git is the histor
 - `resume` without `--agent` on an agent run silently continues with WalkAndTalk: make it an error. Delete or document `bin/measure_speed` and `bin/generate_start_fixture`. Archive the finished plans of `docs/superpowers/plans/`.
 
 ## Open questions and unmeasured limits (one line each, details in `docs/loose-ends.md`)
-- Does entering a house or cave heal? Not observed (hp stayed 4/24 in two houses for 2600 frames; caves untested): the `shelter` candidate only keeps Link away from creatures.
+- Does entering a house or cave heal? Not observed (hp stayed 4/24 in two houses for 2600 frames; caves untested): the `shelter` candidate was removed in flow-34 (no retreat at low hp).
 - Unmeasured thresholds: third of max hp, 3-cell danger range, 6-result stuck count, revisit caps (1800 / 2700 frames, 6 rounds, 3 stamps), autopilot chain caps (6 explores, 2400 frames), `untried_object` range.
 - `gap_entry` (-3..+4 px) is measured on one stairs cell; the escape from the 165/16 pocket is not replayed end to end.
 - Addresses at `verified_count: 1` (`name_length`, `max_hearts`, `dialog_state`, `shield_box`, `gap_entry`); `entity_state` (0xC290) and 0xDB47 are unexplained; item ids other than 4, counts and upgrades are unread.

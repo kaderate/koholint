@@ -162,8 +162,7 @@ also right after a sheet reading; and the explore autopilot, `autopilot.rb`: aft
 model), `budget` or `untried_object`, the policy issues the next `explore` with no direction itself (agent `delegated`, cost 0,
 `decision` event with `autopilot: true`), after the revisit, the hemmed wait and pending dialogue pages; the model is called again
 on any other stop or action, a new lead or goal from the last call, a phase other than `playing`, health lower than at the
-last call, low health (hp at most a third of max hp; only a `shelter` target is still followed), damage in the last 300 frames with a
-creature, unknown or enemy entity within 3 cells, an objective that changed or whose kind is not `new_place`, `leave_place` or `new_text` (unless it has a target), and after 6 autopilot
+last call, an objective that changed or whose kind is not `new_place`, `leave_place` or `new_text` (unless it has a target), and after 6 autopilot
 explores or 2400 frames since the last call. An objective with a `target` (picked from the candidate menu) is followed from the first
 skill decision after the model's call: `explore` with the exit's direction, or with an `aim` in the skill context (a door to enter first,
 a place to route to through `ExploreLog#route(goal:)`), or one `talk_to` of a person or sign of the current place (a `new_text` target left behind is not routed back to; a door Link stands on or just below is not a candidate); a new goal
@@ -182,9 +181,7 @@ all with `press` and `wait`), after a deterministic wait while the screen is sti
 animation included) waits like `locked`. The game-over screen is never sent to the model: the policy picks its first
 catalogue option not flagged `quits` with `choose_option` (agent `delegated`, no prompt) and emits one `notable` `death`
 per screen. A drop of `hp` between two observations emits a `notable` `damage` (`hp 16 -> 12`), and the next prompt's
-health line adds the hearts lost (and a death) since the last model call. At low health the header adds a `LOW HEALTH` line
-with the nearest known interior and `choose_objective` lists a `shelter-<room>-<map>` candidate first (target `shelter`, followed
-like a place). Six `no_frontier`, `no_path`, `blocked` or `stalled` results in one place without reaching a new cell emit a
+health line adds the hearts lost (and a death) since the last model call. There is no low-health rule since flow-34 (no retreat, no shelter candidate, no hold after damage). Six `no_frontier`, `no_path`, `blocked` or `stalled` results in one place without reaching a new cell emit a
 `notable` `stuck` and add a `STUCK` reset hint to the header until Link reaches a new cell or leaves. The play skill set has no screen-only skill. The engine stops the run with
 `stuck_boot` when the boot script decides for over 900 consecutive frames in a non-play mode past boot, or 3600 in any case. It stops
 with `unknown_mode_stuck` after 600 consecutive frames on an uncatalogued screen, and with `not_ready_stuck` after 600

@@ -149,12 +149,12 @@ class RevisitPolicyTest < Minitest::Test
     assert_equal 'claude', step(p, state(frame: 200))[:agent]
   end
 
-  def test_no_revisit_after_a_hit_or_while_hemmed_and_no_objective_bookkeeping
+  def test_a_hit_no_longer_holds_the_revisit_and_it_keeps_no_objective_bookkeeping
     p = setup_revisit(skill: [walk, walk, walk])
     step(p, state)
     p.observe(state(frame: 150), frame: 150)
     p.observe(state(frame: 160, hp: 20), frame: 160)
-    assert_equal 'claude', step(p, state(frame: 200, hp: 20))[:agent]
+    assert_equal 'delegated', step(p, state(frame: 200, hp: 20))[:agent]
     revisit = step(p, state(frame: 500, hp: 20))
     assert_equal 'delegated', revisit[:agent]
     attempts = @objectives.attempts_for_prompt.dup
