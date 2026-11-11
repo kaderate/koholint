@@ -1,0 +1,16 @@
+{
+  "flow_version": "flow-32",
+  "rom_sha256": "211a1d1559dc2684d63d87f62a6b1e9109201a6383b4004e9dd5e18ee926ee83",
+  "seed": 0,
+  "budget": {
+    "active_seconds": 5400.0,
+    "dollars": 4.0
+  },
+  "status": "stopped",
+  "parent": null,
+  "tag": "flow32-urchins",
+  "harness_sha": "57d9ef5faaefbcd7478d2e774e451acccd211934",
+  "prompts_sha": "606d9c187beea8361323fa8eca0bc993a3578291f52eeecad9b894d8e1bde9f6",
+  "model": "sonnet",
+  "autopilot": true
+}
