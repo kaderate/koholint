@@ -5,6 +5,7 @@ require 'koholint/ab'
 require 'koholint/archive'
 require 'koholint/autopilot'
 require 'koholint/budget'
+require 'koholint/checkpoints'
 require 'koholint/engine'
 require 'koholint/agents/claude_cli'
 require 'koholint/leads'
@@ -27,7 +28,7 @@ require 'koholint/viewer'
 
 module Koholint
   module CLI
-    USAGE = 'usage: koholint run|resume <run_dir>|fork <run_dir> --at-frame N|verify <run_dir>|summary <run_dir>|screens <run_dir>|watch <run_dir>|' \
+    USAGE = 'usage: koholint run|resume <run_dir>|fork <run_dir> --at-frame N|branch <run_dir> --at FRAME|CHECKPOINT|verify <run_dir>|summary <run_dir>|screens <run_dir>|watch <run_dir>|' \
             'archive|star <run_dir> WHY|prune-heavy|census boot|<run_dir> FRAME...|entities <run_dir> FRAME...|objects <run_dir> FRAME...|doors <run_dir> FRAME...|ready <run_dir>|npcs|' \
             'ab-plan <run_dir> --at-frame N|ab-report PREFIX ' \
             '[--frames N --minutes N --steps N --dollars X --root DIR --runs-root DIR --tag NAME --realtime --grid --port N --host H --from live|start|DIR ' \
@@ -38,7 +39,7 @@ module Koholint
 
     module_function
 
-    def run(argv, out: $stdout, err: $stderr)
+    def run(argv, out: $stdout, err: $stderr, viewer: method(:spawn_viewer))
       command, *rest = argv
       options = {}
       parser = OptionParser.new do |o|
@@ -51,6 +52,7 @@ module Koholint
         o.on('--runs-root DIR') { |v| options[:runs_root] = v }
         o.on('--tag NAME') { |v| options[:tag] = v }
         o.on('--at-frame N', Integer) { |v| options[:at_frame] = v }
+        o.on('--at POINT') { |v| options[:at] = v }
         o.on('--realtime') { options[:realtime] = true }
         o.on('--grid') { options[:grid] = true }
         o.on('--agent') { options[:agent] = true }
@@ -71,7 +73,7 @@ module Koholint
         o.on('--speed X', Float) { |v| options[:speed] = v.positive? ? v : raise(OptionParser::InvalidArgument, v.to_s) }
       end
       args = parser.parse(rest)
-      dispatch(command, args, options, out)
+      dispatch(command, args, options, out, viewer:)
     rescue OptionParser::ParseError
       err.puts USAGE
       2
@@ -80,7 +82,7 @@ module Koholint
       1
     end
 
-    def dispatch(command, args, options, out)
+    def dispatch(command, args, options, out, viewer: method(:spawn_viewer))
       flow = options.fetch(:flow_version, Koholint::FLOW_VERSION)
       return ab_plan(args, options, out) if command == 'ab-plan'
       options = options.merge(dollars: options.fetch(:dollars, DEFAULT_MAX_DOLLARS), grid: true) if options[:agent]
@@ -92,12 +94,8 @@ module Koholint
         run = Run.create(root: options.fetch(:root, 'runs'), flow_version: flow, budget: limits, tag: options[:tag],
                          model: options[:agent] ? options.fetch(:model, DEFAULT_MODEL) : nil, autopilot: (options.fetch(:autopilot, true) if options[:agent]))
         play(Engine.new(run:, policy: factory.call(run), budget:, **engine_options(options)), run, out)
-      when 'resume'
-        factory = policy_factory(options, budget)
-        run = Run.open(run_dir(args), flow_version: flow)
-        settle_autopilot(run, options)
-        engine = Engine.resume(run.dir, policy_factory: factory, budget:, flow_version: flow, **engine_options(options))
-        play(engine, run, out)
+      when 'resume' then resume(run_dir(args), options, budget, flow, out)
+      when 'branch' then branch(run_dir(args), options, budget, flow, out, viewer)
       when 'fork'
         at_frame = options.fetch(:at_frame) { raise OptionParser::MissingArgument, '--at-frame' }
         child = parent_run(run_dir(args)).fork(at_frame:, flow_version: flow, **options.slice(:tag, :autopilot, :root))
@@ -129,6 +127,44 @@ module Koholint
       else
         raise OptionParser::InvalidOption, command.to_s
       end
+    end
+
+    def resume(dir, options, budget, flow, out)
+      run = Run.open(dir, flow_version: flow)
+      settle_autopilot(run, options)
+      engine = Engine.resume(run.dir, policy_factory: policy_factory(options, budget), budget:, flow_version: flow, **engine_options(options))
+      play(engine, run, out)
+    end
+
+    def branch(dir, options, budget, flow, out, viewer)
+      parent = parent_run(dir)
+      at_frame = Checkpoints.frame_for(parent, options.fetch(:at) { raise OptionParser::MissingArgument, '--at' })
+      child = parent.fork(at_frame:, flow_version: flow, **options.slice(:tag, :autopilot, :root))
+      out.puts "branch #{child.dir} from #{parent.id} at frame #{at_frame}"
+      pid = viewer.call(child.dir, options.slice(:port, :host, :speed))
+      code = resume(child.dir, options, budget, flow, out)
+      return code unless pid
+
+      if (status = Process.wait2(pid, Process::WNOHANG))
+        out.puts "the viewer did not start (exit #{status.last.exitstatus}); watch the branch with: koholint watch #{child.dir} --port N"
+        return code
+      end
+      out.puts 'the viewer keeps serving the branch: Ctrl-C to quit'
+      Process.wait(pid)
+      code
+    rescue Interrupt
+      code
+    ensure
+      begin
+        Process.kill('TERM', pid) && Process.wait(pid) if pid
+      rescue Errno::ESRCH, Errno::ECHILD
+        nil
+      end
+    end
+
+    def spawn_viewer(dir, options)
+      flags = options.flat_map { |key, value| ["--#{key}", value.to_s] }
+      Process.spawn(RbConfig.ruby, '--yjit', File.expand_path('../../bin/koholint', __dir__), 'watch', dir, *flags)
     end
 
     def settle_autopilot(run, options)

@@ -68,6 +68,7 @@ module Koholint
       @played = GameState.played?(events)
       @card_place = carded_place(events)
       @items = ItemWatch.from_events(events)
+      @places = (Summary.visited_places(events) + events.filter_map { |event| event['place'] if event['type'] == 'keyframe' }).to_set
       @unknown_modes = events.filter_map { |event| event['detail'] if event['type'] == 'notable' && event['kind'] == 'unknown_mode' }.to_set
     end
 
@@ -277,11 +278,15 @@ module Koholint
       @emulator.step(buttons)
       @run.inputs.append(buttons)
       @budget.tick(frames: 1)
-      after_frame
-      Perception.read(@emulator).tap do |state|
-        @readiness.observe(state)
-        @items.observe(state).each { |gain| @run.trace.emit(:item_gained, frame: state.frame, **gain) }
-      end
+      state = Perception.read(@emulator)
+      @readiness.observe(state)
+      gains = @items.observe(state)
+      gains.each { |gain| @run.trace.emit(:item_gained, frame: state.frame, **gain) }
+      place = [state.room_id, state.map_id]
+      new_place = state.phase(booted: true) == :playing && Readiness.signals_ready?(state) && @places.add?(place)
+      moment = { reason: gains.any? ? 'item_gained' : 'new_place', **(new_place ? { place: } : {}) } if gains.any? || new_place
+      after_frame(moment)
+      state
     end
 
     # Between decisions only: a skill runs to its end, and the next observation waits here, stepping no input.
@@ -319,19 +324,19 @@ module Koholint
       done
     end
 
-    def after_frame
+    def after_frame(moment)
       frame = @emulator.frame
-      checkpoint_keyframe if (frame % @keyframe_every).zero?
+      checkpoint_keyframe(moment) if moment || (frame % @keyframe_every).zero?
       detect_game_save if (frame % SAVE_CHECK_EVERY).zero?
     end
 
-    def checkpoint_keyframe
+    def checkpoint_keyframe(moment = nil)
       @run.inputs.flush
       return if @last_keyframe == @emulator.frame
 
       @last_keyframe = @emulator.frame
       path = @keyframes.save(@emulator)
-      @run.trace.emit(:keyframe, frame: @emulator.frame, path: File.basename(path))
+      @run.trace.emit(:keyframe, frame: @emulator.frame, path: File.basename(path), **moment.to_h)
     end
 
     def detect_game_save
