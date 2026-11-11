@@ -37,6 +37,7 @@ module Koholint
                  dialogue: { speaker: ->(v) { v.is_a?(String) && v.length.between?(1, SPEAKER_MAX) && !v.match?(/[[:cntrl:]]/) },
                              conversation: ->(v) { v.is_a?(String) && v.match?(/\A\h{16}\z/) }, cached: ->(v) { [true, false].include?(v) } },
                  lead: { where: LABEL.(40) },
+                 keyframe: { reason: ->(v) { %w[item_gained new_place scripted_dialogue].include?(v) } },
                  place_name: { name: LABEL.(40), place: ->(v) { v.is_a?(Array) && v.size == 2 && v.all?(Integer) } },
                  objective: { because: ->(v) { v.is_a?(String) && v.match?(/\Alead-\d+\z/) }, autopilot: ->(v) { v == true },
                               candidate: LABEL.(40), target: ->(v) { v.is_a?(Hash) && %w[exit door person sign place lead].include?((v[:kind] || v['kind']).to_s) },

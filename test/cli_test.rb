@@ -57,6 +57,27 @@ class CliTest < Minitest::Test
     end
   end
 
+  def test_branch_forks_resumes_and_hands_the_child_to_the_viewer
+    skip_without_rom!
+    Dir.mktmpdir do |dir|
+      run_dir = cli('run', '--frames', '300', '--root', dir, '--tag', 'parent')[1][/^run (.+)$/, 1]
+      watched = []
+      out = StringIO.new
+      code = Koholint::CLI.run(['branch', run_dir, '--at', '150', '--frames', '60', '--port', '8123'], out:, err: StringIO.new,
+                                                                                                       viewer: ->(child, options) { watched << [child, options] && nil })
+      assert_equal 0, code
+      child = out.string[/^branch (\S+) from #{File.basename(run_dir)} at frame 150$/, 1]
+      assert_equal [[child, { port: 8123 }]], watched
+      assert_equal 210, Koholint::InputLog.load(File.join(child, 'inputs.log')).frames
+      assert_equal 150, JSON.parse(File.read(File.join(child, 'manifest.json'))).dig('parent', 'frame')
+      assert_match(/^stopped: frames$/, out.string)
+      code, _out, err = cli('branch', run_dir, '--at', 'sword-obtained')
+      assert_equal 1, code
+      assert_match(/checkpoint sword-obtained is in run 20261111-194737-9ba1/, err)
+      assert_equal 2, cli('branch', run_dir)[0]
+    end
+  end
+
   def test_the_autopilot_flag_reaches_the_manifest_and_the_policy_and_resume_keeps_it
     skip_without_rom!
     with_fake_claude do |dir|

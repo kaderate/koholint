@@ -30,7 +30,7 @@ bin/koholint watch /tmp/koholint-live/<id> --port 8123 --from live
 bin/koholint archive --from /tmp/koholint-live --commit
 ```
 
-Commands: `run`, `resume <run_dir>`, `fork <run_dir> --at-frame N`, `verify <run_dir>`, `summary <run_dir>`,
+Commands: `run`, `resume <run_dir>`, `fork <run_dir> --at-frame N`, `branch <run_dir> --at FRAME|CHECKPOINT`, `verify <run_dir>`, `summary <run_dir>`,
 `screens <run_dir>`, `watch <run_dir>`, `archive`, `star <run_dir> WHY`, `prune-heavy`, `census boot|<run_dir> FRAME...|entities <run_dir> FRAME...|ready <run_dir>`,
 `npcs [--root DIR]`, `ab-plan <run_dir> --at-frame N`, `ab-report PREFIX`.
 
@@ -75,7 +75,10 @@ place, so the grid went dark). The live view has a grid toggle that overlays the
 
 **Resume and fork.** `resume` continues a run with the same `flow_version` and ROM hash and rebuilds the ledger and
 visited places from the trace; `fork` branches a run at a frame (the parent may be of an older flow; `--tag`, `--autopilot` and `--root` set the child's). Both work on an archived run, also on a fresh clone
-(see Run storage).
+(see Run storage). `branch <run_dir> --at FRAME|CHECKPOINT` forks, starts `watch` on the child (`--port`, `--host`,
+`--speed`) and resumes it with the `resume` options (`--agent`, budgets) in one command; the viewer keeps serving after
+the stop until Ctrl-C. A checkpoint is a name from `data/checkpoints.json` (`name`, `run`, `frame`, `flow`, `source`),
+checked against the run id and its flow, e.g. `bin/koholint branch runs/20261111-194737-9ba1 --at sword-obtained --frames 3000`.
 
 ## Agent skills (`flow-37`)
 

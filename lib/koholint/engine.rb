@@ -17,6 +17,7 @@ require 'koholint/readiness'
 require 'koholint/replay'
 require 'koholint/run'
 require 'koholint/summary'
+require 'koholint/triggers'
 require 'koholint/vision/dialogue_shot'
 require 'koholint/vision/grid_builder'
 
@@ -68,6 +69,9 @@ module Koholint
       @played = GameState.played?(events)
       @card_place = carded_place(events)
       @items = ItemWatch.from_events(events)
+      @places = Summary.visited_places(events).to_set
+      @dialog_open = Perception.read(@emulator).dialog_open?
+      @pressing_a = false
       @unknown_modes = events.filter_map { |event| event['detail'] if event['type'] == 'notable' && event['kind'] == 'unknown_mode' }.to_set
     end
 
@@ -131,11 +135,13 @@ module Koholint
                                  **seen, **(result[:plan] ? { plan: result[:plan] } : {}), **(result[:autopilot] ? { autopilot: true } : {}),
                                  **(result[:engine_error] ? { engine_error: true } : {}))
       if choice.key?(:skill)
+        @pressing_a = Triggers.pressing_a?(choice[:skill], choice[:params])
         activity(:acting, "acting: #{choice[:skill]}", skill: choice[:skill], params: choice[:params])
         outcome = execute(choice, state, chosen.registry, context)
         @run.trace.emit(:action, frame: @emulator.frame, skill: choice[:skill], params: choice[:params], result: outcome)
         @policy.after_action(choice:, outcome:, state: Perception.read(@emulator), frame: @emulator.frame) if @policy.respond_to?(:after_action)
       elsif chosen.name != :choose_objective
+        @pressing_a = choice[:buttons].include?(:a)
         activity(:acting, 'acting: press', skill: 'press', params: choice)
         frames = press(choice)
         @run.trace.emit(:action, frame: @emulator.frame, skill: 'press', params: choice, result: { frames: frames })
@@ -277,11 +283,22 @@ module Koholint
       @emulator.step(buttons)
       @run.inputs.append(buttons)
       @budget.tick(frames: 1)
-      after_frame
-      Perception.read(@emulator).tap do |state|
-        @readiness.observe(state)
-        @items.observe(state).each { |gain| @run.trace.emit(:item_gained, frame: state.frame, **gain) }
-      end
+      state = Perception.read(@emulator)
+      @readiness.observe(state)
+      gains = @items.observe(state)
+      gains.each { |gain| @run.trace.emit(:item_gained, frame: state.frame, **gain) }
+      after_frame(keyframe_reason(state, gained: gains.any?))
+      state
+    end
+
+    def keyframe_reason(state, gained:)
+      opened = state.dialog_open? && !@dialog_open
+      @dialog_open = state.dialog_open?
+      new_place = state.phase(booted: true) == :playing && Readiness.signals_ready?(state) && @places.add?([state.room_id, state.map_id])
+      return 'item_gained' if gained
+      return 'new_place' if new_place
+
+      'scripted_dialogue' if opened && !@pressing_a
     end
 
     # Between decisions only: a skill runs to its end, and the next observation waits here, stepping no input.
@@ -319,19 +336,19 @@ module Koholint
       done
     end
 
-    def after_frame
+    def after_frame(reason)
       frame = @emulator.frame
-      checkpoint_keyframe if (frame % @keyframe_every).zero?
+      checkpoint_keyframe(reason) if reason || (frame % @keyframe_every).zero?
       detect_game_save if (frame % SAVE_CHECK_EVERY).zero?
     end
 
-    def checkpoint_keyframe
+    def checkpoint_keyframe(reason = nil)
       @run.inputs.flush
       return if @last_keyframe == @emulator.frame
 
       @last_keyframe = @emulator.frame
       path = @keyframes.save(@emulator)
-      @run.trace.emit(:keyframe, frame: @emulator.frame, path: File.basename(path))
+      @run.trace.emit(:keyframe, frame: @emulator.frame, path: File.basename(path), **(reason ? { reason: } : {}))
     end
 
     def detect_game_save
