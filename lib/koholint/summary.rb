@@ -26,7 +26,7 @@ module Koholint
       end
     end
 
-    def for(run) = from_events(Trace.read(File.join(run.dir, 'trace.jsonl')))
+    def for(run) = from_events(Trace.read(File.join(run.dir, 'trace.jsonl')), since: run.manifest.dig('parent', 'frame') || 0)
 
     def model_call?(event)
       event['type'] == 'decision' && !DETERMINISTIC_AGENTS.include?(event['agent']) &&
@@ -154,9 +154,10 @@ module Koholint
       {}
     end
 
-    def from_events(events)
+    def from_events(events, since: 0)
       frames = events.map { |e| e['frame'] }.max || 0
       state = events.reverse_each.find { |e| e['type'] == 'perception' }&.fetch('state')
+      inherited, own = events.select { |e| e['type'] == 'decision' }.partition { |e| e['frame'] < since }
       {
         health: health(events, state, frames),
         hearts: state && state['hp'] / HP_PER_HEART,
@@ -165,7 +166,8 @@ module Koholint
         last_notable: events.reverse_each.find { |e| e['type'] == 'notable' && progress?(e) }&.slice('kind', 'detail'),
         highest_milestone: highest_milestone(events),
         frames: frames,
-        cost_usd: events.select { |e| e['type'] == 'decision' }.sum { |e| e['cost_usd'] }
+        cost_usd: own.sum { |e| e['cost_usd'] },
+        **(since.positive? ? { inherited_cost_usd: inherited.sum { |e| e['cost_usd'] } } : {})
       }
     end
 

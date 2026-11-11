@@ -32,6 +32,18 @@ class SummaryTest < Minitest::Test
     end
   end
 
+  def test_a_fork_reports_its_own_cost_and_the_inherited_cost_apart
+    Dir.mktmpdir do |dir|
+      rom = File.join(dir, 'game.gbc')
+      File.binwrite(rom, 'rom')
+      run = Koholint::Run.create(root: dir, flow_version: 'f', budget: {}, rom_path: rom, parent: { 'id' => 'p', 'frame' => 30 })
+      decide(run.trace, 10, 'claude', 5, 4.0)
+      decide(run.trace, 30, 'claude', 5, 1.5)
+      decide(run.trace, 40, 'claude', 5, 0.5)
+      assert_equal [2.0, 4.0], Koholint::Summary.for(run).values_at(:cost_usd, :inherited_cost_usd)
+    end
+  end
+
   def test_highest_milestone_keeps_the_best_perceived
     with_run do |run|
       run.trace.emit(:perception, frame: 0, state: STATE, state_hash: 'h')
