@@ -242,6 +242,7 @@ module Koholint
         feed_talk_log(choice, outcome, state)
         @explore_log.note(outcome)
         @explore_log.absorb(outcome) if choice[:skill] == 'explore'
+        @skipped = { place: Ledger.place_of(outcome[:from]), vias: Array(outcome[:unreachable]) } if choice[:skill] == 'explore'
         note_no_path(choice, outcome, frame) unless revisiting
         note_stuck(outcome, state)
         unless @waiting || revisiting
@@ -360,11 +361,14 @@ module Koholint
         here = [state.room_id, state.map_id]
         return if goal.nil? || goal == here
 
-        hops = @explore_log.path(here, goal:)
-        return "Known route to #{goal.join('-')}: none over the exits taken so far." unless hops
+        exit = ->(via) { via.is_a?(Array) ? "door above (#{via[0] + 1},#{via[1]})" : via.to_s }
+        avoid = @skipped && @skipped[:place] == here ? @skipped[:vias] : []
+        skipped = avoid.empty? ? '' : " (the last explore found no way from Link to the #{avoid.map(&exit).join(', ')} exit here)"
+        hops = @explore_log.path(here, goal:, avoid:)
+        return "Known route to #{goal.join('-')}: none over the exits taken so far#{skipped}." unless hops
 
-        steps = hops.map { |hop| "#{hop[:via].is_a?(Array) ? "door above (#{hop[:via][0] + 1},#{hop[:via][1]})" : hop[:via]} to #{hop[:to].join('-')}" }
-        "Known route to #{goal.join('-')} over exits taken before (#{hops.size} screens; explore with no direction follows it): #{steps.join(', ')}"
+        steps = hops.map { |hop| "#{exit.(hop[:via])} to #{hop[:to].join('-')}" }
+        "Known route to #{goal.join('-')} over exits taken before (#{hops.size} screens; explore with no direction follows it)#{skipped}: #{steps.join(', ')}"
       end
 
       def aim_explore(choice, state, context)

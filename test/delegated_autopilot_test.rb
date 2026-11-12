@@ -99,6 +99,11 @@ class DelegatedAutopilotTest < Minitest::Test
     p.decide(p.decision_point_for(state), state, context)
     assert_includes client.calls.last[:prompt], 'Known route to 146-16 over exits taken before (2 screens; explore with no direction follows it): up to 147-16, left to 146-16'
     assert_equal({ place: [146, 16] }, context[:aim])
+    skipped = { skill: 'explore', params: {}, stopped_by: :no_frontier, moved_cells: 0, cells_walked: 0, from: { room: 163, map: 16, row: 3, col: 4 },
+                to: { room: 163, map: 16, row: 3, col: 4 }, unreachable: [:up], blocked_edges: [], exits: [], offered: [] }
+    p.after_action(choice: { skill: 'explore', params: {} }, outcome: skipped, state:, frame: 200)
+    p.decide(p.decision_point_for(state), state, { grid: })
+    assert_includes client.calls.last[:prompt], 'Known route to 146-16: none over the exits taken so far (the last explore found no way from Link to the up exit here).'
   end
 
   def test_coming_back_to_the_same_known_places_emits_a_loop_stuck_and_a_hint_until_a_new_place

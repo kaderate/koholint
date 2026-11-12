@@ -242,16 +242,31 @@ class ExploreTest < Minitest::Test
     assert_equal({ kind: :exit, row: 7, col: 5, direction: :down }, result[:target])
   end
 
+  def test_when_no_hop_of_the_route_has_a_reachable_exit_explore_stops_at_once_and_lists_the_skipped_exits
+    rows = with(CLOSED, [0, 5], '.', [1, 5], '#', [7, 5], '.', [6, 5], '#')
+    log = Koholint::ExploreLog.new
+    log.absorb({ from: { room: 1, map: 0 }, exits: [{ row: 0, col: 5, direction: :up, outcome: :left, to: [3, 0] }, { row: 7, col: 5, direction: :down, outcome: :left, to: [2, 0] }] })
+    log.absorb({ from: { room: 3, map: 0 }, exits: [{ row: 3, col: 9, direction: :right, outcome: :left, to: [4, 0] }] })
+    log.absorb({ from: { room: 2, map: 0 }, exits: [{ row: 3, col: 9, direction: :right, outcome: :left, to: [4, 0] }] })
+    result, inputs = explore(rows, explore_log: log, aim: { place: [4, 0] }, limit: 1000)
+    assert_equal [:no_frontier, %i[up down]], result.values_at(:stopped_by, :unreachable)
+    assert_operator inputs.size, :<, 20
+  end
+
   def test_a_pocket_found_by_an_aimed_route_is_left_the_way_link_came_and_routed_around
     log = Koholint::ExploreLog.new
-    log.absorb({ from: { room: 2, map: 0 }, exits: [{ row: 0, col: 9, direction: :up, outcome: :left, to: [1, 0] }, { row: 3, col: 9, direction: :right, outcome: :left, to: [3, 0] }] })
-    log.absorb({ from: { room: 3, map: 0 }, exits: [{ row: 0, col: 4, direction: :up, outcome: :left, to: [4, 0] }] })
-    log.absorb({ from: { room: 4, map: 0 }, exits: [{ row: 3, col: 9, direction: :right, outcome: :left, to: [1, 0] }] })
-    log.absorb({ from: { room: 7, map: 0 }, exits: [{ row: 7, col: 0, direction: :left, outcome: :left, to: [1, 0] }] })
-    log.absorb({ from: { room: 5, map: 0 }, exits: [{ row: 7, col: 5, direction: :down, outcome: :left, to: [1, 0] }] })
+    log.absorb({ from: { room: 2, map: 0 }, exits: [{ row: 0, col: 9, direction: :up, outcome: :left, to: [1, 0] }, { row: 3, col: 9, direction: :right, outcome: :left, to: [3, 0] }], survey: { sides: {}, doors: [] } })
+    log.absorb({ from: { room: 3, map: 0 }, exits: [{ row: 0, col: 4, direction: :up, outcome: :left, to: [4, 0] }], survey: { sides: {}, doors: [] } })
+    log.absorb({ from: { room: 4, map: 0 }, exits: [{ row: 3, col: 9, direction: :right, outcome: :left, to: [1, 0] }], survey: { sides: {}, doors: [] } })
+    log.absorb({ from: { room: 7, map: 0 }, exits: [{ row: 7, col: 0, direction: :left, outcome: :left, to: [1, 0] }], survey: { sides: {}, doors: [] } })
+    log.absorb({ from: { room: 5, map: 0 }, exits: [{ row: 7, col: 5, direction: :down, outcome: :left, to: [1, 0] }], survey: { sides: {}, doors: [] } })
     assert_equal [1, 0], log.route([2, 0], goal: [5, 0])[:next]
-    log.absorb({ skill: 'explore', from: { room: 1, map: 0, row: 7, col: 9 }, stopped_by: 'no_frontier', cells_walked: 0, route: { goal: [5, 0], next: [5, 0] } })
+    stuck = { skill: 'explore', from: { room: 1, map: 0, row: 7, col: 9 }, stopped_by: 'no_frontier', cells_walked: 0, route: { goal: [5, 0], next: [5, 0] }, dead_end: true }
+    2.times { log.absorb(stuck) }
     assert_includes %i[down right], log.pocket_side([1, 0], [7, 9])
+    assert_equal [1, 0], log.route([2, 0], goal: [5, 0])[:next], 'one visit blocked (an urchin, an enemy) is not a pocket yet'
+    log.note({ skill: 'walk', params: { direction: :up }, from: { room: 2, map: 0, row: 0, col: 9 }, to: { room: 1, map: 0, row: 7, col: 9 } })
+    log.absorb(stuck.merge(stopped_by: 'known_place', cells_walked: 1))
     assert_equal [[3, 0], [4, 0], [1, 0], [5, 0]], log.path([2, 0], goal: [5, 0]).map { |hop| hop[:to] }
     assert_nil log.route([7, 0], goal: [5, 0])
     pocket = with(CLOSED, [7, 9], '.', [6, 9], '#', [7, 8], '#')
@@ -266,8 +281,12 @@ class ExploreTest < Minitest::Test
     assert_equal [1, 0], log.route([6, 0], goal: [5, 0])[:next]
     rows = with(CLOSED, [0, 5], '.', [1, 5], '#')
     result, = explore(rows, explore_log: log, aim: { place: [5, 0] }, limit: 50)
-    assert_equal [:no_frontier, [:up]], result.values_at(:stopped_by, :unreachable)
-    log.absorb(result.merge(skill: 'explore', from: { room: 1, map: 0, row: 4, col: 5 }))
+    assert_equal [:no_frontier, [:up], true], result.values_at(:stopped_by, :unreachable, :dead_end)
+    failed = result.merge(skill: 'explore', from: { room: 1, map: 0, row: 4, col: 5 })
+    2.times { log.absorb(failed) }
+    assert_equal [1, 0], log.route([6, 0], goal: [5, 0])[:next], 'one visit cannot tell a ledge from a passing block'
+    log.note({ skill: 'walk', params: { direction: :right }, from: { room: 6, map: 0, row: 3, col: 9 }, to: { room: 1, map: 0, row: 3, col: 0 } })
+    log.absorb(failed)
     assert_nil log.route([6, 0], goal: [5, 0])
     log.absorb({ from: { room: 6, map: 0 }, unreachable: ['right'] })
     assert_equal [1, 0], log.route([6, 0], goal: [1, 0])[:next]

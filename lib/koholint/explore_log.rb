@@ -28,8 +28,11 @@ module Koholint
       @surveys = {}
       @known = []
       @arrivals = {}
-      @pockets = []
+      @pockets = {}
+      @suspects = {}
       @assumed = []
+      @doubted = {}
+      @visits = Hash.new(0)
     end
 
     def absorb(result)
@@ -56,10 +59,7 @@ module Koholint
         assume_edge(to, OPPOSITE.fetch(direction.to_sym), place) if Ledger.pick(exit, :kind).to_s != 'door' && OPPOSITE.key?(direction.to_sym)
         know(to)
       end
-      Array(Ledger.pick(result, :unreachable)).each do |via|
-        key = via.is_a?(Array) ? via : via.to_s.to_sym
-        @edges[place].delete(key) if @assumed.delete([place, key])
-      end
+      drop_unreachable(place, result) if Ledger.pick(result, :dead_end)
       Array(Ledger.pick(result, :offered)).each { |object| offer(place, cell_of(object)) }
       Array(Ledger.pick(result, :walls)).each { |wall| (@walls[place] << cell_of(wall)).uniq! }
       Array(Ledger.pick(result, :crossed)).each do |row, col, direction|
@@ -71,6 +71,9 @@ module Koholint
 
     def note(result)
       %i[from to].each { |end_| (place = Ledger.place_of(Ledger.pick(result, end_))) && know(place) }
+      from = Ledger.place_of(Ledger.pick(result, :from))
+      to = Ledger.place_of(Ledger.pick(result, :to))
+      @visits[to] += 1 if from && to && from != to
       note_crossing(result)
     end
 
@@ -90,7 +93,7 @@ module Koholint
       assume_edge(to, OPPOSITE.fetch(direction), from)
     end
 
-    # The way back across an edge Link crossed once is assumed until he crosses it; an explore that finds no exit for it drops it (a ledge jumped down).
+    # The way back across an edge Link crossed once is assumed until he crosses it; explores that find no exit for it on two visits drop it (a ledge jumped down).
     def observe_edge(place, key, to)
       @edges[place][key] = to
       @assumed.delete([place, key])
@@ -145,7 +148,8 @@ module Koholint
     end
 
     # The cell an exit lands on in the next place; a call that finds nothing to do there while some place still has work, or
-    # while its aimed route has no exit, shows the landing is a closed pocket: routes must not enter it, Link leaves it the way he came.
+    # whose route has no reachable exit on two visits (an enemy may block it once), shows the landing is a closed pocket: routes must not
+    # enter it, and Link leaves a landing suspected or known as one the way he came.
     def note_arrival(to, cell, direction)
       return unless OPPOSITE.key?(direction)
 
@@ -158,18 +162,37 @@ module Koholint
     end
 
     def note_pocket(place, result)
-      return unless Ledger.pick(result, :stopped_by).to_s == 'no_frontier' && Ledger.pick(result, :cells_walked).to_i.zero?
-
       from = Ledger.pick(result, :from)
       cell = [Ledger.pick(from, :row), Ledger.pick(from, :col)]
-      return unless route(place) || Ledger.pick(result, :route)
+      side = landing_side(place, cell) or return
+      idle = Ledger.pick(result, :stopped_by).to_s == 'no_frontier' && Ledger.pick(result, :cells_walked).to_i.zero?
+      return @pockets[[place, cell]] ||= side if idle && route(place)
 
-      @pockets << [place, cell] if @arrivals.any? { |(where, _), arrival| where == place && arrival == cell } && !@pockets.include?([place, cell])
+      @pockets[[place, cell]] ||= side if Ledger.pick(result, :dead_end) && again?(@suspects, [place, cell], place)
     end
 
-    def pocket_side(place, cell) = (@arrivals.find { |(where, _), arrival| where == place && arrival == cell }&.dig(0, 1) if @pockets.include?([place, cell]))
+    def pocket_side(place, cell) = @pockets[[place, cell]] || (landing_side(place, cell) if @suspects.key?([place, cell]))
 
-    def pocket?(to, key) = key.is_a?(Symbol) && OPPOSITE.key?(key) && @pockets.include?([to, @arrivals[[to, OPPOSITE.fetch(key)]]])
+    def pocket?(to, key) = key.is_a?(Symbol) && OPPOSITE.key?(key) && @pockets.key?([to, @arrivals[[to, OPPOSITE.fetch(key)]]])
+
+    def landing_side(place, cell) = @arrivals.find { |(where, _), arrival| where == place && arrival == cell }&.dig(0, 1)
+
+    def drop_unreachable(place, result)
+      Array(Ledger.pick(result, :unreachable)).each do |via|
+        key = via.is_a?(Array) ? via : via.to_s.to_sym
+        next unless @assumed.include?([place, key]) && again?(@doubted, [place, key], place)
+
+        @assumed.delete([place, key])
+        @edges[place].delete(key)
+      end
+    end
+
+    def again?(seen, key, place)
+      return true if seen.key?(key) && seen[key] != @visits[place]
+
+      seen[key] ||= @visits[place]
+      false
+    end
 
     def hops(from)
       found = { from => 0 }

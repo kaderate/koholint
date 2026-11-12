@@ -63,7 +63,7 @@ module Koholint
           @objects = grid ? TalkLog.objects(grid) : []
           @doors = Array(context[:objects]&.call).select { |object| object[:kind].to_s == 'door' && object[:cell][0] < Geometry::ROWS - 1 }.map { |object| object[:cell] }
           @survey = @known && survey
-          @route = @unreachable = nil
+          @route = @unreachable = @dead_end = nil
           @entering = 0
           @cell = @start.cell
           @offered = near_objects(@cell)
@@ -89,7 +89,8 @@ module Koholint
                                offered: @offered.map { |row, col| { row:, col: } })
           merged[:survey] = @survey.merge(pending: pending?) if @survey
           merged[:route] = @route if @route
-          merged[:unreachable] = @unreachable if @unreachable && @stopped_by == :no_frontier
+          merged[:unreachable] = @unreachable if @unreachable
+          merged[:dead_end] = true if @dead_end
           merged[:cause] = @fail_cause if @stopped_by == :blocked && @fail_cause
           merged[:untried_objects] = @untried.map { |row, col| { row:, col: } } if @stopped_by == :untried_object
           merged[:tried_exits] = @log ? @log.tried_exits(@place) : [] if @stopped_by == :no_frontier
@@ -335,6 +336,7 @@ module Koholint
             @unreachable = (@unreachable || []) | [via]
           end
           @route = { goal: first[:goal], next: first[:next] } if first
+          @dead_end = true if first
           side = @log&.pocket_side(@place, from) or return []
 
           gather(from, path_to) { |cell, direction| :exit if direction == side && neighbour(cell, direction).nil? }
