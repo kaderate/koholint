@@ -80,7 +80,7 @@ visited places from the trace; `fork` branches a run at a frame (the parent may 
 `--keep-viewer` keeps it serving after the stop until Ctrl-C (if it could not start, for example on a busy port, `branch` says so and still plays). A checkpoint is a name from `data/checkpoints.json` (`name`, `run`, `frame`, `flow`, `source`),
 checked against the run id and its flow, e.g. `bin/koholint branch runs/20261111-194737-9ba1 --at sword-obtained --frames 3000`.
 
-## Agent skills (`flow-39`)
+## Agent skills (`flow-40`)
 
 - Between decisions the engine waits, with no input, until Link is ready (no screen scroll, door walk, jump or
   knockback, then 2 settled frames): the screen is never mapped and the model never called mid-scroll or mid-jump
@@ -95,7 +95,11 @@ checked against the run id and its flow, e.g. `bin/koholint branch runs/20261111
 - `goto row col` walks to a cell of the known grid by a shortest path with the fewest turns (stops `done`, `blocked`,
   `no_path`, ...; a result carries `blocked_at` when a move hit a wall); `step direction pixels` moves a few pixels;
   `talk_to row col` walks next to a person, faces them and presses A, trying other sides on no response; the person is
-  the entity at or next to the cell, followed when it walks away, and may cover several cells.
+  the entity at or next to the cell, followed when it walks away, and may cover several cells; silent at talk reach, it
+  tries once more pressed against the person.
+- A scripted scene (Link held by `link_frozen`, e.g. a character arriving to speak, or something Link touches) stops any
+  skill with `scene`; the harness waits through it, advances its dialogues (past the 40-page cap once) and waits 30 more
+  frames after a long lock before asking the model. Unidentified things on screen are offered as `examine-ROW-COL`.
 - `attack row col` walks next to the enemy at or next to the cell, lines up within the measured sword reach, faces it
   and strikes with the sword's button until it dies (up to 6 strikes, walking up again after a knockback); it stops
   `done` (`killed`), `damage`, `refused` (no sword on A or B), `no_target`, `target_gone`, `no_kill`, `out_of_reach` or

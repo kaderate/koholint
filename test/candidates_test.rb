@@ -12,6 +12,21 @@ class CandidatesTest < Minitest::Test
 
   HERE = [1, 0].freeze
 
+  class SpriteGrid < OpenGrid
+    def static_sprite(row, col) = [[2, 2], [6, 8]].include?([row, col]) || nil
+  end
+
+  def test_unidentified_things_are_offered_nearest_first_until_tried
+    talk_log = Koholint::TalkLog.new
+    entities = [{ type: 47, kind: 'unknown', cell: [6, 6] }, { type: 9, kind: 'enemy', cell: [6, 8] }]
+    found = build(grid: SpriteGrid.new, entities:, talk_log:, link: [6, 5]).select { |c| c[:id].start_with?('examine') }
+    assert_equal %w[examine-6-6 examine-2-2], found.map { |c| c[:id] }
+    assert_equal({ kind: 'examine', place: HERE, cell: [2, 2] }, found[1][:target])
+    talk_log.record(place: HERE, row: 2, col: 2, talked: false)
+    talk_log.record(place: HERE, row: 6, col: 6, talked: false, entity: 47)
+    assert_empty(build(grid: SpriteGrid.new, entities:, talk_log:, link: [6, 5]).select { |c| c[:id].start_with?('examine') })
+  end
+
   def log
     log = Koholint::ExploreLog.new
     log.absorb({ from: { room: 1, map: 0 }, exits: [{ row: 0, col: 5, direction: :up, outcome: :left, to: [3, 0] }] })
@@ -29,16 +44,17 @@ class CandidatesTest < Minitest::Test
     signs = [{ kind: 'door', cell: [3, 5], object: 226 }, { kind: 'sign', cell: [5, 1], object: 212 }]
     found = build(entities:, signs:)
     ids = found.map { |candidate| candidate[:id] }
-    assert_equal %w[person-t62 sign-5-1 exit-down exit-left exit-right door-3-5 place-4-0], ids
-    exit = found[2]
+    assert_equal %w[person-t62 sign-5-1 examine-6-6 exit-down exit-left exit-right door-3-5 place-4-0], ids
+    assert_equal({ kind: 'person', type: 47, place: HERE, cell: [6, 6] }, found[2][:target])
+    exit = found[3]
     assert_equal({ kind: 'leave_place', place: HERE }, exit[:predicate])
     assert_equal({ kind: 'exit', place: HERE, direction: 'down' }, exit[:target])
     assert_equal({ kind: 'new_text' }, found[0][:predicate])
     assert_equal({ kind: 'reach_place', place: [4, 0] }, found.last[:predicate])
     assert_match(/2 moves away/, found.last[:label])
-    assert_equal '- door-3-5: enter the door at (3,5), never entered (leaves unexhausted people here: person (type 62))', Koholint::Candidates.lines(found)[5]
+    assert_equal '- door-3-5: enter the door at (3,5), never entered (leaves unexhausted people here: person (type 62))', Koholint::Candidates.lines(found)[6]
     assert_equal found[0], Koholint::Candidates.find(found, ' person-t62 ')
-    assert(found.drop(2).all? { |candidate| candidate[:label].end_with?('(leaves unexhausted people here: person (type 62))') })
+    assert(found.drop(3).all? { |candidate| candidate[:label].end_with?('(leaves unexhausted people here: person (type 62))') })
     [[3, 5], [4, 5]].each { |link| refute_includes build(signs:, link:).map { |c| c[:id] }, 'door-3-5' }
     assert_includes build(signs:, link: [5, 5]).map { |c| c[:id] }, 'door-3-5'
   end
