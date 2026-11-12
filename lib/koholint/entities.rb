@@ -29,7 +29,7 @@ module Koholint
         type = at.(:entity_type)
         known = kinds[type]
         { slot:, type:, x:, y:, status:, state: at.(:entity_state), health: at.(:entity_health), cell: Geometry.cell_for(x, y), kind: known ? known[:kind] : :unknown,
-          verified: known ? known[:verified] : false, moves: known&.dig(:moves), **(known || {}).slice(:contact, :sword_hits) }
+          verified: known ? known[:verified] : false, moves: known&.dig(:moves), **(known || {}).slice(:contact, :sword_hits, :sword_verified) }
       end
     end
 
@@ -59,7 +59,8 @@ module Koholint
     def load(path = DEFAULT_PATH)
       JSON.parse(File.read(path)).reject { |entry| entry.key?('object') }.to_h do |entry|
         validate!(entry)
-        [Integer(entry.fetch('type')), { kind: entry.fetch('kind').to_sym, verified: entry['confidence'] == 'verified', moves: entry['moves'], contact: entry['contact_px'], sword_hits: entry['sword_hits'] }.compact]
+        [Integer(entry.fetch('type')), { kind: entry.fetch('kind').to_sym, verified: entry['confidence'] == 'verified', moves: entry['moves'], contact: entry['contact_px'],
+                                         sword_hits: entry.dig('sword_hits', 'value'), sword_verified: (entry['sword_hits']['confidence'] == 'verified' if entry.key?('sword_hits')) }.compact]
       end
     end
 
@@ -71,9 +72,15 @@ module Koholint
       raise Invalid, "entity #{entry[id]}: unknown kind #{entry['kind']}" unless (id == 'object' ? OBJECT_KINDS : KINDS).include?(entry['kind'])
       raise Invalid, "entity #{entry[id]}: unknown faces #{entry['faces']}" unless (Array(entry['faces']) - FACES).empty?
       raise Invalid, "entity #{entry[id]}: unknown confidence #{entry['confidence']}" unless Addresses::CONFIDENCES.include?(entry['confidence'])
-      return unless entry['confidence'] == 'verified' && entry['verified_count'] < 2
+      raise Invalid, "entity #{entry['type']}: verified needs verified_count >= 2" if entry['confidence'] == 'verified' && entry['verified_count'] < 2
 
-      raise Invalid, "entity #{entry['type']}: verified needs verified_count >= 2"
+      validate_fact!(entry['sword_hits'], "entity #{entry['type']} sword_hits") if entry.key?('sword_hits')
+    end
+
+    def validate_fact!(fact, label)
+      %w[value confidence verified_count source].each { |key| raise Invalid, "#{label}: missing #{key}" unless fact.is_a?(Hash) && fact.key?(key) }
+      raise Invalid, "#{label}: unknown confidence #{fact['confidence']}" unless Addresses::CONFIDENCES.include?(fact['confidence'])
+      raise Invalid, "#{label}: verified needs verified_count >= 2" if fact['confidence'] == 'verified' && fact['verified_count'] < 2
     end
 
     # Link's centre may sit anywhere in a cell (half a cell) and a walker drifts a few pixels before the next plan.

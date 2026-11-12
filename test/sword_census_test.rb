@@ -1,5 +1,6 @@
 require_relative 'test_helper'
 require 'koholint/probes/sword_census'
+require 'koholint/talk_log'
 
 class SwordCensusTest < Minitest::Test
   SC = Koholint::Probes::SwordCensus
@@ -21,9 +22,22 @@ class SwordCensusTest < Minitest::Test
     assert_equal SC::LATERAL_GAP, SC.gap_for({ up: [] })
   end
 
-  def test_measured_sword_hits_reach_the_entity_catalogue
-    assert_equal 2, Koholint::Entities.catalogue.dig(198, :sword_hits)
-    assert_equal 1, Koholint::Entities.catalogue.dig(9, :sword_hits)
-    assert_nil Koholint::Entities.catalogue.dig(14, :sword_hits)
+  def test_measured_sword_hits_reach_the_entity_catalogue_with_their_own_confidence
+    catalogue = Koholint::Entities.catalogue
+    assert_equal [1, true], catalogue[9].values_at(:sword_hits, :sword_verified)
+    assert_equal [2, false], catalogue[198].values_at(:sword_hits, :sword_verified)
+    assert_equal [2, false], catalogue[14].values_at(:sword_hits, :sword_verified)
+  end
+
+  def test_a_verified_sword_fact_needs_two_checks
+    fact = { 'value' => 2, 'confidence' => 'verified', 'verified_count' => 1, 'source' => 'one room' }
+    assert_raises(Koholint::Entities::Invalid) { Koholint::Entities.validate_fact!(fact, 'sword_hits') }
+    Koholint::Entities.validate_fact!(fact.merge('confidence' => 'hypothesis'), 'sword_hits')
+  end
+
+  def test_the_listing_marks_an_unverified_hit_count
+    log = Koholint::TalkLog.new
+    assert_includes log.send(:entity_label, [1, 0], { type: 198, kind: :enemy, sword_hits: 2, sword_verified: false }), 'sword hits to kill 2 (unverified)'
+    assert_includes log.send(:entity_label, [1, 0], { type: 9, kind: :enemy, sword_hits: 1, sword_verified: true }), 'sword hits to kill 1)'
   end
 end

@@ -22,14 +22,17 @@ class AttackTest < Minitest::Test
   end
 
   # Link moves 1 px per direction frame; an A press lands a hit when he faces the enemy within 24 px along and 8 px across.
-  def fight(target, enemies, from: [4, 2], sword: 1, immune: false, limit: 900)
+  def fight(target, enemies, from: [4, 2], sword: 1, immune: false, knockback: 0, hurt_at: nil, cap: nil, limit: 1000)
     x, y = Koholint::Geometry.center_of(*from)
+    hp = 24
     reader = -> { enemies.map { |e| e.merge(cell: Koholint::Geometry.cell_for(e[:x], e[:y])) } }
     execution = registry.start('attack', state(x:, y:, sword:), { row: target[0], col: target[1] }, { grid: FakeGrid.new, entities: reader })
+    execution.__getobj__.define_singleton_method(:hard_cap) { cap } if cap
     facing = nil
     inputs = []
     limit.times do
-      buttons = execution.next_input(state(x:, y:, sword:)) or break
+      hp = 20 if hurt_at && inputs.size >= hurt_at
+      buttons = execution.next_input(state(x:, y:, sword:, hp:)) or break
       inputs << buttons
       direction = (buttons & VECTORS.keys).first
       if direction
@@ -48,9 +51,11 @@ class AttackTest < Minitest::Test
         e[:hit] = inputs.size
         e[:health] -= 1
         e[:status] = 1 if e[:health].zero?
+        e[:x] += VECTORS[facing][0] * knockback if e[:status] == 5
+        e[:y] += VECTORS[facing][1] * knockback if e[:status] == 5
       end
     end
-    [execution.result(state(x:, y:, sword:)), inputs]
+    [execution.result(state(x:, y:, sword:, hp:)), inputs]
   end
 
   def test_attack_is_a_registry_skill_that_the_shield_wraps
@@ -74,6 +79,22 @@ class AttackTest < Minitest::Test
   def test_gives_up_after_the_strike_cap_when_no_hit_lands
     result, = fight([4, 6], [enemy(4, 6)], immune: true)
     assert_equal [:no_kill, false, Koholint::Skills::Attack::MAX_STRIKES, 0], result.values_at(:stopped_by, :killed, :strikes, :hits)
+  end
+
+  def test_walks_up_again_when_a_strike_knocks_the_enemy_more_than_two_cells_away
+    result, = fight([4, 6], [enemy(4, 6, health: 2, type: 198)], knockback: 40)
+    assert_equal [:done, true, 2, 1], result.values_at(:stopped_by, :killed, :hits, :approaches)
+  end
+
+  def test_stops_when_link_is_hurt
+    result, = fight([4, 6], [enemy(4, 6)], hurt_at: 10, immune: true)
+    assert_equal [:damage, false], result.values_at(:stopped_by, :killed)
+  end
+
+  def test_stops_at_its_frame_cap
+    result, inputs = fight([4, 6], [enemy(4, 6)], immune: true, cap: 50)
+    assert_equal :frame_cap, result[:stopped_by]
+    assert_equal 50, inputs.size
   end
 
   def test_refuses_without_the_sword_on_a_button

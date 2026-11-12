@@ -25,7 +25,12 @@
   },
   "sword_reach": {
     "value": { "along": 22, "cross": 8 },
-    "verified_count": 6,
-    "provenance": "sword census 2026-11-12 (bin/koholint census sword, restored copies of sword-holding states: run 20261111-194737-9ba1 frames 60404 (242/0), 61350 (226/0), 62000 and 62400 (243/0); attack demo runs 20261111-235344-d069 frame 60584 (241/0) and 20261111-235114-d8f2 frame 60688 (243/0), both forked from checkpoint sword-obtained): Link placed at 8 to 40 px from each enemy along each facing (2 frames of the direction, then A for 3 frames, a hit is entity_health lower or the slot status leaving 5 within 20 frames) and sideways at 16 px; every slot of types 9, 197 and 198 (12 slots) was hit at 14 to 22 px in every facing measured and with a sideways offset of -8..+8 px (the farthest hits were 24 to 36 px, the sideways band -10..+16 px); a hit lands 3 frames after A up to 26 px and 6 frames after A beyond; the struck enemy flashes for 24 frames (0xC420, hypothesis). Spin: holding A for 56 frames or more (54 did not) then releasing hit an enemy 16 px behind Link in 13 of the 14 slots (types 9, 14, 197, 198), a 3-frame tap from behind never did; the attack skill does not use it. along and cross are the strike window of skills/attack.rb; the closest distance is the type contact_px plus 2."
+    "verified_count": 3,
+    "provenance": "sword census 2026-11-12 (bin/koholint census sword): Link placed at 8 to 40 px from each enemy along each facing (2 frames of the direction, then A for 3 frames; a hit is entity_health lower or the slot status leaving 5 within 20 frames) and sideways at 16 px; independent checks are the three enemy types with their own rooms and instances, all one run lineage: type 197 in 242/0 and 226/0 (run 20261111-194737-9ba1 frames 60404, 61350), type 9 in 226/0 and 241/0 (same run frame 61350, run 20261111-235344-d069 frame 60584), type 198 in 243/0 (run 9ba1 frames 62000, 62400, run 20261111-235114-d8f2 frame 60688); every slot of these types (12) was hit at 14 to 22 px in every facing measured and with a sideways offset of -8..+8 px (the farthest hits were 24 to 36 px, the sideways band -10..+16 px); a hit lands 3 frames after A up to 26 px and 6 frames after A beyond. along and cross are the strike window of skills/attack.rb; the closest distance is the type contact_px plus 2."
+  },
+  "sword_spin": {
+    "value": { "charge_frames": 56, "behind_px": 16 },
+    "verified_count": 1,
+    "provenance": "hypothesis, sword census 2026-11-12 (same 6 states as sword_reach, one run lineage): holding A for 56 frames or more (54 did not) then releasing hit an enemy 16 px behind Link in 13 of 14 slots (types 9, 14, 197, 198); a 3-frame tap from behind never did; not used by any skill"
   }
 }

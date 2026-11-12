@@ -80,7 +80,7 @@ visited places from the trace; `fork` branches a run at a frame (the parent may 
 `--keep-viewer` keeps it serving after the stop until Ctrl-C (if it could not start, for example on a busy port, `branch` says so and still plays). A checkpoint is a name from `data/checkpoints.json` (`name`, `run`, `frame`, `flow`, `source`),
 checked against the run id and its flow, e.g. `bin/koholint branch runs/20261111-194737-9ba1 --at sword-obtained --frames 3000`.
 
-## Agent skills (`flow-37`)
+## Agent skills (`flow-38`)
 
 - Between decisions the engine waits, with no input, until Link is ready (no screen scroll, door walk, jump or
   knockback, then 2 settled frames): the screen is never mapped and the model never called mid-scroll or mid-jump
@@ -96,6 +96,10 @@ checked against the run id and its flow, e.g. `bin/koholint branch runs/20261111
   `no_path`, ...; a result carries `blocked_at` when a move hit a wall); `step direction pixels` moves a few pixels;
   `talk_to row col` walks next to a person, faces them and presses A, trying other sides on no response; the person is
   the entity at or next to the cell, followed when it walks away, and may cover several cells.
+- `attack row col` walks next to the enemy at or next to the cell, lines up within the measured sword reach, faces it
+  and strikes with the sword's button until it dies (up to 6 strikes, walking up again after a knockback); it stops
+  `done` (`killed`), `damage`, `refused` (no sword on A or B), `no_target`, `target_gone`, `no_kill`, `out_of_reach` or
+  `frame_cap`, and reports `strikes` and `hits`.
 - A ledger counts blocked edges per place; an edge blocked twice is marked doubtful in the context, and an objective
   that keeps failing is abandoned as `unreachable`.
 - Dialogue pages are advanced automatically (one `decision` with agent `delegated` and cost 0 per page) and read once

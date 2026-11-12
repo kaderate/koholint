@@ -12,6 +12,7 @@ module Koholint
       MAX_STRIKES = 6
       LINEUP_FRAMES = 60
       APPROACHES = 3
+      HARD_CAP = 900
       FAR = 2 * Geometry::CELL
       CONTACT_SLACK = 2
       OPPOSITE = { up: :down, down: :up, left: :right, right: :left }.freeze
@@ -47,6 +48,8 @@ module Koholint
         private
 
         def centres? = @phase == :walk
+
+        def hard_cap = HARD_CAP
 
         def enemy_near(cell)
           enemies = Array(@entities&.call).select { |entity| entity[:kind].to_s == 'enemy' && entity[:cell] }
@@ -93,7 +96,8 @@ module Koholint
         def strike(state)
           now = Array(@entities.call).find { |entity| entity.values_at(:slot, :type) == @enemy.values_at(:slot, :type) }
           @hits += 1 if now && now[:health].to_i < @enemy[:health].to_i
-          return killed unless now && now[:status] == @enemy[:status]
+          return finish(:target_gone) unless now
+          return killed unless now[:status] == @enemy[:status]
 
           @enemy = @enemy.merge(now.slice(:x, :y, :cell, :health))
           return finish(:damage) if state.hp.to_i < @start.hp.to_i
@@ -133,13 +137,11 @@ module Koholint
         # A struck enemy is knocked back and may walk off: walk next to it again rather than chase it pixel by pixel.
         def reapproach(state)
           @approaches += 1
-          @path = approach(state.cell)
-          return finish(:no_path) unless @path
+          path = approach(state.cell) or return finish(:no_path)
 
+          restart(state, path)
           @phase = :walk
-          @index = @settle = @still = @lineup = 0
-          @arrived_by = @heading = @centring = @idle_reason = nil
-          @position = [state.x, state.y]
+          @lineup = 0
           input_for(state)
         end
 
