@@ -31,7 +31,7 @@ bin/koholint archive --from /tmp/koholint-live --commit
 ```
 
 Commands: `run`, `resume <run_dir>`, `fork <run_dir> --at-frame N`, `branch <run_dir> --at FRAME|CHECKPOINT`, `verify <run_dir>`, `summary <run_dir>`,
-`screens <run_dir>`, `watch <run_dir>`, `archive`, `star <run_dir> WHY`, `prune-heavy`, `census boot|<run_dir> FRAME...|entities <run_dir> FRAME...|ready <run_dir>`,
+`screens <run_dir>`, `watch <run_dir>`, `archive`, `star <run_dir> WHY`, `prune-heavy`, `census boot|<run_dir> FRAME...|entities <run_dir> FRAME...|sword <run_dir> FRAME...|ready <run_dir>`,
 `npcs [--root DIR]`, `ab-plan <run_dir> --at-frame N`, `ab-report PREFIX`.
 
 ## Running

@@ -13,7 +13,7 @@ module Koholint
     OBJECT_KINDS = %w[sign object door].freeze
     FACES = %w[up down left right].freeze
     DEFAULT_PATH = File.expand_path('../../data/entities.json', __dir__)
-    ADDRESSES = Addresses.load.slice(:entity_x, :entity_y, :entity_status, :entity_state, :entity_type, :room_objects).freeze
+    ADDRESSES = Addresses.load.slice(:entity_x, :entity_y, :entity_status, :entity_state, :entity_type, :entity_health, :room_objects).freeze
     ROOM_ROW_STRIDE = 16
 
     module_function
@@ -28,8 +28,8 @@ module Koholint
         y = at.(:entity_y)
         type = at.(:entity_type)
         known = kinds[type]
-        { slot:, type:, x:, y:, status:, state: at.(:entity_state), cell: Geometry.cell_for(x, y), kind: known ? known[:kind] : :unknown,
-          verified: known ? known[:verified] : false, moves: known&.dig(:moves), **(known&.dig(:contact) ? { contact: known[:contact] } : {}) }
+        { slot:, type:, x:, y:, status:, state: at.(:entity_state), health: at.(:entity_health), cell: Geometry.cell_for(x, y), kind: known ? known[:kind] : :unknown,
+          verified: known ? known[:verified] : false, moves: known&.dig(:moves), **(known || {}).slice(:contact, :sword_hits) }
       end
     end
 
@@ -59,7 +59,7 @@ module Koholint
     def load(path = DEFAULT_PATH)
       JSON.parse(File.read(path)).reject { |entry| entry.key?('object') }.to_h do |entry|
         validate!(entry)
-        [Integer(entry.fetch('type')), { kind: entry.fetch('kind').to_sym, verified: entry['confidence'] == 'verified', moves: entry['moves'], contact: entry['contact_px'] }.compact]
+        [Integer(entry.fetch('type')), { kind: entry.fetch('kind').to_sym, verified: entry['confidence'] == 'verified', moves: entry['moves'], contact: entry['contact_px'], sword_hits: entry['sword_hits'] }.compact]
       end
     end
 

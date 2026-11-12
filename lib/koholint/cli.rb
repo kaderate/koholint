@@ -29,7 +29,7 @@ require 'koholint/viewer'
 module Koholint
   module CLI
     USAGE = 'usage: koholint run|resume <run_dir>|fork <run_dir> --at-frame N|branch <run_dir> --at FRAME|CHECKPOINT|verify <run_dir>|summary <run_dir>|screens <run_dir>|watch <run_dir>|' \
-            'archive|star <run_dir> WHY|prune-heavy|census boot|<run_dir> FRAME...|entities <run_dir> FRAME...|objects <run_dir> FRAME...|doors <run_dir> FRAME...|ready <run_dir>|npcs|' \
+            'archive|star <run_dir> WHY|prune-heavy|census boot|<run_dir> FRAME...|entities <run_dir> FRAME...|objects <run_dir> FRAME...|doors <run_dir> FRAME...|sword <run_dir> FRAME...|ready <run_dir>|npcs|' \
             'ab-plan <run_dir> --at-frame N|ab-report PREFIX ' \
             '[--frames N --minutes N --steps N --dollars X --root DIR --runs-root DIR --tag NAME --realtime --grid --port N --host H --from live|start|DIR ' \
             '--speed X --agent --autopilot on|off --model M --max-dollars X --claude-command PATH --commit --full --keep N --yes --arms A,B --forks N --crawl N]'.freeze
@@ -203,6 +203,7 @@ module Koholint
       return census_ready(args.drop(1), out) if args.first == 'ready'
       return census_objects(args.drop(1), out, crawl:) if args.first == 'objects'
       return census_doors(args.drop(1), out) if args.first == 'doors'
+      return census_sword(args.drop(1), out) if args.first == 'sword'
 
       require 'koholint/probes/mode_census'
       raise OptionParser::MissingArgument, 'boot or <run_dir> FRAME...' unless args.first == 'boot' || args.size > 1
@@ -240,6 +241,16 @@ module Koholint
       raise OptionParser::MissingArgument, 'doors <run_dir> FRAME...' unless args.size > 1
 
       Probes::DoorCensus.census(run_dir(args), args.drop(1).map { |frame| Integer(frame) }).each { |path| out.puts "census #{path}" }
+      0
+    rescue ArgumentError => e
+      raise OptionParser::InvalidArgument, e.message
+    end
+
+    def census_sword(args, out)
+      require 'koholint/probes/sword_census'
+      raise OptionParser::MissingArgument, 'sword <run_dir> FRAME...' unless args.size > 1
+
+      Probes::SwordCensus.census(run_dir(args), args.drop(1).map { |frame| Integer(frame) }).each { |path| out.puts "census #{path}" }
       0
     rescue ArgumentError => e
       raise OptionParser::InvalidArgument, e.message

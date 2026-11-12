@@ -11,6 +11,7 @@ module Koholint
     REQUIRED = %w[id name source confidence verified_count].freeze
     SLOTS = 10
     SHIELD = 4
+    SWORD = 1
 
     module_function
 

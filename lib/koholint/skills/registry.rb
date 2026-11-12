@@ -1,5 +1,6 @@
 require 'koholint'
 require 'koholint/skills/advance_dialogue'
+require 'koholint/skills/attack'
 require 'koholint/skills/explore'
 require 'koholint/skills/goto'
 require 'koholint/skills/press'
@@ -27,7 +28,7 @@ module Koholint
       def self.default
         new([Walk.new, Press.new, AdvanceDialogue.new, Wait.new, Goto.new, Step.new, TalkTo.new, Explore.new, Screens.open_menu, Screens.close_menu,
              Screens.open_map, Screens.close_map, Screens::MenuMove.new, Screens::MenuAssign.new, Screens::ChooseOption.new,
-             UseItem.new, Guard.new])
+             UseItem.new, Guard.new, Attack.new])
       end
 
       def initialize(skills)
