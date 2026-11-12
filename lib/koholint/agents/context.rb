@@ -25,13 +25,13 @@ module Koholint
       QUOTE_LIMIT = 80
 
       def self.build(state:, grid:, objective:, history:, attempts:, manual:, last_results:, max_chars: 9000, ledger: nil, refusals: [], plan: nil, triggers: nil, talk_log: nil, locked: nil, locked_frames: nil, goal: nil, leads: [], stamp: nil, entities: [], signs: [],
-                     place_name: nil, candidates: nil, resolve: nil, hp_lost: 0, died: false, alerts: [], route: nil)
+                     place_name: nil, candidates: nil, resolve: nil, hp_lost: 0, died: false, alerts: [], route: nil, learned: nil)
         link = state.cell
         place = [state.room_id, state.map_id]
         results = last_results.last(RESULT_LIMIT).map { |r| r.transform_keys(&:to_sym) }
         fixed = [header(state, link, triggers, place, locked, locked_frames, place_name, hp_lost, died, alerts), grid_block(grid, link, ledger, place), neighbours(grid, link, results, ledger, place),
                  *things_block(grid, talk_log, place, stamp, entities, signs), objective_block(objective, attempts, plan, goal, route), *leads_block(leads, place, resolve),
-                 *candidates_block(candidates)]
+                 *candidates_block(candidates), *learned_block(learned)]
         finished = history.map { |h| "- #{h[:id]} #{h[:outcome]}#{h[:reason] ? " (#{h[:reason]})" : ''}: #{h[:title]}#{' (picked by the harness)' if h[:autopilot]}" }
         refused = refusals.last(KEEP_REFUSALS).map { |r| "- #{r[:title]} #{r[:predicate].to_json}: #{r[:reason]}" }
         lines = results.map { |r| "- #{result_line(r)}" }
@@ -243,6 +243,13 @@ module Koholint
         ["Candidate objectives (give one id in candidate; the harness then follows it by itself):\n#{candidates.join("\n")}"]
       end
       private_class_method :candidates_block
+
+      def self.learned_block(learned)
+        return [] if learned.nil? || learned.empty?
+
+        ["Learned skills (compositions of the skills above, validated by experiment; listed only while their object is on screen):\n#{learned.join("\n")}"]
+      end
+      private_class_method :learned_block
 
       def self.leads_block(leads, place, resolve = nil)
         newest = leads.reverse

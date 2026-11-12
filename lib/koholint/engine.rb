@@ -35,6 +35,7 @@ module Koholint
 
     def self.resume(run_path, budget:, policy: nil, policy_factory: nil, flow_version: Koholint::FLOW_VERSION, **options)
       run = Run.open(run_path, flow_version: flow_version)
+      run.check_capabilities!
       run.lock!
       run.truncate_trace!(run.inputs.frames)
       run.truncate_prompts!(run.inputs.frames)

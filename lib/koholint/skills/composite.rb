@@ -24,18 +24,23 @@ module Koholint
           @target = target
           @done = []
           @sub = nil
+          @objects = context[:room_objects]
+          @before = object_at_target
         end
 
         def result(state = @last)
           last = @done.last
           entered = @stopped_by == :done && last && [last.dig(:to, :row), last.dig(:to, :col)] == @target
           super.merge(capability: @capability, steps: @done.map { |step| step.slice(:skill, :stopped_by, :frames) },
-                      target: { row: @target[0], col: @target[1] }, effect: entered ? true : false)
+                      target: { row: @target[0], col: @target[1] }, effect: entered ? true : false,
+                      **(@objects ? { object_before: @before, object_after: object_at_target } : {}))
         end
 
         private
 
         def hard_cap = @cap
+
+        def object_at_target = @objects&.call&.dig(*@target)
 
         def input_for(state)
           return finish(:done) if @sub.nil? && @done.size == @steps.size

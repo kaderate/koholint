@@ -1,6 +1,7 @@
 require 'koholint/agents/context'
 require 'koholint/agents/prompts'
 require 'koholint/autopilot'
+require 'koholint/capabilities'
 require 'koholint/candidates'
 require 'koholint/decision'
 require 'koholint/dialogues'
@@ -88,6 +89,8 @@ module Koholint
         @agent_driven = false
         @locked_since = nil
         @skill_point = DecisionPoint.choose_skill(subset(registry, registry.names - SCREEN_ONLY))
+        @composites = registry.names.map { |name| registry.fetch(name) }.grep(Skills::Composite)
+        @learned = []
         @notes = []
         @hp_lost = 0
         @deaths = Hash.new(0)
@@ -97,6 +100,7 @@ module Koholint
       def prepare(context)
         @entities_reader = context[:entities] if context[:entities]
         @objects_reader = context[:objects] if context[:objects]
+        offer_learned(context[:room_objects]) if @composites.any? && context[:room_objects]
       end
 
       def decision_point_for(state)
@@ -253,6 +257,16 @@ module Koholint
       end
 
       def offered_candidates = Candidates.offered(@candidates, @candidate)
+
+      # A learned capability is offered only while its object is on screen.
+      def offer_learned(room_objects)
+        grid = room_objects.call
+        cells = @composites.to_h { |skill| [skill, grid.each_with_index.flat_map { |row, r| row.each_index.select { |c| row[c] == Capabilities.object_of(skill.entry) }.map { |c| [r, c] } }] }
+        present = cells.select { |_, at| at.any? }
+        @learned = present.map { |skill, at| "- #{skill.name} (row, col, direction): #{Capabilities.describe(skill.entry)}. Object #{Capabilities.object_of(skill.entry)} here at #{at.map { |r, c| "(#{r},#{c})" }.join(', ')}; give the free cell next to it where Link stands and the direction facing it." }
+        names = @registry.names - SCREEN_ONLY - (@composites - present.keys).map(&:name)
+        @skill_point = DecisionPoint.choose_skill(subset(@registry, names)) unless @skill_point.registry.names == (names & @registry.names)
+      end
 
       private
 
@@ -665,6 +679,7 @@ module Koholint
                                        triggers: @triggers, talk_log: @talk_log, signs: objects_now, locked: (@hemmed[:attempts] if @hemmed && hemmed?(state)),
                                        locked_frames: (locked_frames(state) if WAIT_PHASES.include?(state.phase)), goal: goal_line, leads: @leads.all, stamp: stamp(state),
                                        place_name: @leads.name_of([state.room_id, state.map_id]), candidates: (Candidates.lines(@candidates) if decision_point.name == :choose_objective),
+                                       learned: (@learned if decision_point.name == :choose_skill),
                                        resolve: @leads.method(:place_for), hp_lost: @hp_lost, died: @died, alerts: alerts(state), route: route_line(state))
         @hp_lost = 0
         @died = false

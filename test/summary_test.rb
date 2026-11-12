@@ -126,6 +126,13 @@ class SummaryTest < Minitest::Test
     end
   end
 
+  def test_capability_uses_count_uses_effects_and_cleared_objects_after_the_fork_frame
+    use = ->(frame, effect, after) { { 'type' => 'action', 'frame' => frame, 'skill' => 'sword_on_object_92', 'params' => {}, 'result' => { 'capability' => { 'id' => 'sword-on-object-92', 'version' => 3 }, 'effect' => effect, 'object_before' => 92, 'object_after' => after, 'frames' => 70 } } }
+    events = [use.(5, true, 4), use.(20, true, 4), use.(30, false, 92), { 'type' => 'action', 'frame' => 40, 'skill' => 'walk', 'params' => {}, 'result' => {} }]
+    assert_equal({ 'sword-on-object-92@3' => { uses: 3, effects: 2, cleared: 2, frames: 210 } }, Koholint::Summary.capability_uses(events))
+    assert_equal({ 'sword-on-object-92@3' => { uses: 2, effects: 1, cleared: 1, frames: 140 } }, Koholint::Summary.capability_uses(events, since: 10))
+  end
+
   def test_record_derives_the_run_summary_from_manifest_and_trace
     with_run do |run|
       run.manifest.merge!('tag' => 'exp', 'model' => 'sonnet', 'harness_sha' => 'abc')
@@ -142,13 +149,13 @@ class SummaryTest < Minitest::Test
       t.emit(:perception, frame: 1000, state: PLAYING.merge('room_id' => 1, 'milestone' => 'shield'), state_hash: 'h')
       t.emit(:stop, frame: 2000, reason: 'dollars')
       assert_equal({ v: Koholint::Summary::VERSION, run_id: run.id, flow_version: 'f', tag: 'exp', harness_sha: 'abc', prompts_sha: run.manifest['prompts_sha'], model: 'sonnet',
-                     autopilot: nil, frames: 2000, dollars: 1.0, calls: 4, calls_per_1000f: 2.0, usd_per_1000f: 0.5,
+                     autopilot: nil, capabilities: run.manifest['capabilities'], frames: 2000, dollars: 1.0, calls: 4, calls_per_1000f: 2.0, usd_per_1000f: 0.5,
                      latency_ms: { median: 3000, p90: 5000 }, highest_milestone: 'shield', places_seen: 2,
                      objectives: { count: 2, achieved: 1 }, stop_reason: 'dollars', symptoms: [], starred: false,
                      cost_by_skill: { 'choose_skill' => { calls: 4, usd: 1.0 } }, decisions_by_agent: { 'claude' => 4, 'start_game' => 1 },
                      usage: { goal_changes: 0, leads: { high: 0, normal: 0, low: 0, tip: 0 }, lead_rejected: 0, objectives_by_kind: { 'unknown' => 2 },
                               because_used: 0, talks: 0, talks_to_known: 0, dialogues: 0, not_ready_frames: 0, not_ready_waits: 0, deaths: 0, damage_events: 0, stuck_events: 0,
-                              autopilot_decisions: 0, chain_max: 0, left_with_unexhausted_people: 0 } },
+                              autopilot_decisions: 0, chain_max: 0, left_with_unexhausted_people: 0 }, capability_uses: {} },
                    Koholint::Summary.record(run.dir))
     end
   end

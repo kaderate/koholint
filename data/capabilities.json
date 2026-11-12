@@ -2,8 +2,8 @@
   {
     "id": "sword-on-object-92",
     "name": "sword_on_object_92",
-    "version": 2,
-    "status": "validated",
+    "version": 3,
+    "status": "operational",
     "trigger": {
       "run": "20261112-103604-0c64",
       "frame": 60404,
@@ -364,6 +364,11 @@
         "version": 2,
         "status": "validated",
         "reason": "validated by koholint learn: 3 success, 8 unreached; successes in 224-0, 193-0"
+      },
+      {
+        "version": 3,
+        "status": "operational",
+        "reason": "validated by koholint learn on run 20261112-103604-0c64 in 224-0 and 193-0 and reviewed in PR 16"
       }
     ]
   }

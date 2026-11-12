@@ -14,7 +14,7 @@ module Koholint
     FILE = 'summary.json'.freeze
     VERSION = 7
     LEAD_TIERS = %w[high normal low tip].freeze
-    MANIFEST_KEYS = %w[flow_version tag harness_sha prompts_sha model autopilot].freeze
+    MANIFEST_KEYS = %w[flow_version tag harness_sha prompts_sha model autopilot capabilities].freeze
 
     module_function
 
@@ -61,8 +61,22 @@ module Koholint
         stop_reason: events.reverse_each.find { |e| e['type'] == 'stop' }&.fetch('reason'),
         symptoms: symptoms(unexhausted), starred: File.exist?(File.join(dir, 'star.json')),
         cost_by_skill: cost_by_skill(calls), decisions_by_agent: events.select { |e| e['type'] == 'decision' }.map { |e| e['agent'] }.tally,
-        usage: usage(events).merge(left_with_unexhausted_people: unexhausted.size)
+        usage: usage(events).merge(left_with_unexhausted_people: unexhausted.size),
+        capability_uses: capability_uses(events, since: manifest.dig('parent', 'frame').to_i)
       }
+    end
+
+    # Uses of learned capabilities per id@version: effect is the last walk entering the cell, cleared the object id leaving it.
+    def capability_uses(events, since: 0)
+      events.each_with_object({}) do |event, uses|
+        capability = event['type'] == 'action' && event['frame'] >= since && event.dig('result', 'capability') or next
+        result = event['result']
+        row = uses["#{capability['id']}@#{capability['version']}"] ||= { uses: 0, effects: 0, cleared: 0, frames: 0 }
+        row[:uses] += 1
+        row[:effects] += 1 if result['effect']
+        row[:cleared] += 1 if result.key?('object_before') && result['object_before'] != result['object_after']
+        row[:frames] += result['frames'].to_i
+      end
     end
 
     def symptoms(unexhausted)
