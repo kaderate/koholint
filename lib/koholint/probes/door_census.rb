@@ -8,7 +8,6 @@ module Koholint
       WALK_FRAMES = 60
       SAMPLES_PER_OBJECT = 2
       SETTLE_FRAMES = 120
-      WALK_IN = 3
       PLAY_SUBMODE = 7
 
       module_function
@@ -43,7 +42,7 @@ module Koholint
         auto = false
         (WALK_FRAMES + SETTLE_FRAMES).times do |i|
           state = Perception.read(copy)
-          if !auto && (state.link_motion_state == WALK_IN || state.game_submode != PLAY_SUBMODE)
+          if !auto && (state.door_walk_in? || state.game_submode != PLAY_SUBMODE)
             return nil unless state.cell == cell
 
             auto = true

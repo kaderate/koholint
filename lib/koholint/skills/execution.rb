@@ -24,6 +24,8 @@ module Koholint
         @triggers = nil
         @last_input = nil
         @trigger_input = nil
+        @exit = nil
+        @walked_in = false
       end
 
       def next_input(state)
@@ -31,11 +33,14 @@ module Koholint
         @trigger_input = @last_input if state.dialog_open? && !@start.dialog_open? && @trigger_input.nil?
         return nil if @stopped_by
 
+        @walked_in ||= state.door_walk_in?
         buttons = if @frames >= hard_cap then finish(:frame_cap)
                   elsif state.scene? && !@start.scene? then finish(:scene)
+                  elsif waits_through_doors? && door_walk?(state) then []
                   elsif @centring then centre(state)
                   else input_for(state)
                   end
+        note_exit(state, buttons)
         @frames += 1 if buttons
         @last_input = buttons if buttons
         buttons
@@ -51,10 +56,21 @@ module Koholint
         { skill: @skill, params: @params, frames: @frames, from: place(@start), to: place(state),
           moved_cells: moved_cells(state), room_changed: room(@start) != room(state), hp_delta: state.hp.to_i - @start.hp.to_i,
           dialog_before: @start.dialog_open?, dialog_after: state.dialog_open?, stopped_by: @stopped_by,
-          aligned:, offset:, blocked_at: @blocked_at, trigger_input: trigger_input }
+          aligned:, offset:, blocked_at: @blocked_at, trigger_input: trigger_input }.tap { |r| r[:exit] = @walked_in ? @exit.merge(walk_in: true) : @exit if r[:room_changed] && @exit }
       end
 
       private
+
+      # Link stands still while a door walks him in and the next place loads; a moving skill waits through it instead of reading it as blocked.
+      def door_walk?(state) = state.loading? || state.door_walk_in?
+
+      def waits_through_doors? = false
+
+      def note_exit(state, buttons)
+        direction = (Array(buttons) & DIRECTIONS).first
+        row, col = state.cell
+        @exit = { row:, col:, direction: } if direction && row && room(state) == room(@start)
+      end
 
       # Stationary enemies the raised shield pushes aside (sea urchins) sit on cells their sprites make look like objects.
       def pushable_of(context) = context[:entities] && -> { Array(context[:entities].call).select { |e| e[:kind].to_s == 'enemy' && e[:moves] == false && e[:cell] }.map { |e| e[:cell] } }

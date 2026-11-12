@@ -34,6 +34,8 @@ module Koholint
 
         def centres? = true
 
+        def waits_through_doors? = true
+
         def blocked_direction = @heading
 
         def planner_for(context)

@@ -319,6 +319,25 @@ class ExploreTest < Minitest::Test
     assert_equal [[208, 0]], log.hops([224, 0]).keys - [[224, 0]]
   end
 
+  def test_a_walk_or_goto_into_a_door_records_the_door_and_no_side
+    log = Koholint::ExploreLog.new
+    log.absorb({ from: { room: 161, map: 0 }, stopped_by: :no_frontier, cells_walked: 5, survey: { sides: { up: [{ row: 0, col: 5 }] }, doors: [{ row: 3, col: 5 }], pending: nil } })
+    log.note({ skill: 'goto', params: { row: 0, col: 5 }, from: { room: 161, map: 0, row: 4, col: 5 }, to: { room: 178, map: 18, row: 7, col: 5 }, exit: { row: 4, col: 5, direction: :up } })
+    assert log.door_tried?([161, 0], [3, 5])
+    refute log.side_left?([161, 0], :up)
+    refute log.side_left?([178, 18], :down)
+    assert_equal [[178, 18]], log.hops([161, 0]).keys - [[161, 0]]
+  end
+
+  def test_a_house_left_by_its_bottom_door_assumes_no_side_of_the_place_outside
+    log = Koholint::ExploreLog.new
+    log.note({ skill: 'walk', params: { direction: 'down', cells: 1 }, from: { room: 178, map: 18, row: 7, col: 4 }, to: { room: 161, map: 0, row: 3, col: 5 }, exit: { row: 7, col: 4, direction: :down, walk_in: true } })
+    log.absorb({ from: { room: 167, map: 16 }, exits: [{ row: 7, col: 5, direction: :down, outcome: :left, to: [161, 0], walk_in: true }] })
+    assert log.side_left?([178, 18], :down)
+    assert log.side_left?([167, 16], :down)
+    refute log.side_left?([161, 0], :up)
+  end
+
   def test_a_goto_or_a_walk_that_started_on_a_border_cell_records_no_wrong_side
     log = Koholint::ExploreLog.new
     log.note({ skill: 'goto', params: {}, from: { room: 1, map: 0, row: 4, col: 9 }, to: { room: 2, map: 0, row: 4, col: 4 } })

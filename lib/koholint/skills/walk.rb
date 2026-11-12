@@ -21,6 +21,8 @@ module Koholint
 
         def centres? = true
 
+        def waits_through_doors? = true
+
         def blocked_direction = @direction
 
         def input_for(state)
