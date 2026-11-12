@@ -32,7 +32,8 @@ module Koholint
                     inventory_cursor: read_byte.(:inventory_cursor), menu_option: read_byte.(:menu_option),
                     item_a: buttons[0], item_b: buttons[1], inventory:, shield_raised: read_byte.(:shield_raised),
                     room_transition: read_byte.(:room_transition), link_airborne: read_byte.(:link_airborne),
-                    link_z: read_byte.(:link_z), link_knockback: read_byte.(:link_knockback))
+                    link_z: read_byte.(:link_z), link_knockback: read_byte.(:link_knockback),
+                    link_frozen: read_byte.(:link_frozen))
     end
   end
 end

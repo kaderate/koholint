@@ -32,6 +32,7 @@ module Koholint
         return nil if @stopped_by
 
         buttons = if @frames >= hard_cap then finish(:frame_cap)
+                  elsif state.scene? && !@start.scene? then finish(:scene)
                   elsif @centring then centre(state)
                   else input_for(state)
                   end

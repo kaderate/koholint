@@ -57,6 +57,16 @@ class GameStateTest < Minitest::Test
     refute state(frame: 0).locked?
   end
 
+  def test_a_scripted_scene_is_link_frozen_above_one
+    settled = { game_mode: 0x0B, game_submode: 7, dialog_state: 0 }
+    assert state(**settled, link_frozen: 104).scene?
+    assert_equal :locked, state(**settled, link_frozen: 5).phase
+    assert_equal 'frozen', state(**settled, link_frozen: 5, motion_blocked: 2).mode.name
+    refute state(**settled, link_frozen: 1).scene?
+    assert_equal :playing, state(**settled, link_frozen: 1).phase
+    assert_equal :dialogue, state(**settled, link_frozen: 5, dialog_state: 3).phase
+  end
+
   def test_dialogue_and_loading_win_over_locked
     assert_equal :dialogue, state(game_mode: 0x0B, game_submode: 7, dialog_state: 1, motion_blocked: 2).phase
     assert_equal :loading, state(game_mode: 0x0B, game_submode: 3, motion_blocked: 2).phase

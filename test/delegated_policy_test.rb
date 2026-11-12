@@ -201,7 +201,7 @@ class DelegatedPolicyTest < Minitest::Test
     result = decide(p).last
     assert result[:fallback]
     assert_match(/needs an open dialogue/, result[:justification])
-    refute decide(policy(ScriptedClient.new(objective: closed)), state(dialog_state: 3)).last[:fallback]
+    assert_equal :choose_skill, policy(ScriptedClient.new(objective: closed)).decision_point_for(state(dialog_state: 3)).name
   end
 
   def test_hemmed_in_releases_when_the_position_the_dialogue_or_the_place_changes
@@ -507,8 +507,9 @@ class DelegatedPolicyTest < Minitest::Test
     assert_equal (1..4).to_a, result[:transcription].map { |t| t[:page] }
   end
 
-  def test_the_page_cap_asks_once_then_the_agent_drives_until_the_dialogue_closes
-    client = ScriptedClient.new(objective: objective, skill: [ok('skill' => 'advance_dialogue', 'params' => {}, 'transcription' => 'Early'),
+  def test_the_page_cap_is_read_and_advanced_once_then_the_agent_drives_until_the_dialogue_closes
+    client = ScriptedClient.new(objective: objective, skill: [ok('skill' => 'explore', 'params' => {}, 'transcription' => 'Early'),
+                                                              ok('skill' => 'advance_dialogue', 'params' => {}, 'transcription' => 'Late'),
                                                               ok('skill' => 'advance_dialogue', 'params' => {}, 'transcription' => 'Driven'),
                                                               ok('skill' => 'wait', 'params' => { 'frames' => 3 })])
     p = policy(client)
@@ -520,14 +521,23 @@ class DelegatedPolicyTest < Minitest::Test
     assert_includes client.calls.last[:prompt], '40 pages'
     assert_includes client.calls.last[:system], 'stacked vertically in sheets'
     assert_equal 'Early', capped[:transcription].first[:text]
+    assert_equal({ skill: 'advance_dialogue', params: {} }, capped[:choice])
+    assert_match(/keep advancing/, capped[:justification])
     advance(p, capped, state(frame: 1300, **OPEN), 1300)
-    driven = decide_with_shot(p, state(frame: 1330, **OPEN))
+    resumed = decide_with_shot(p, state(frame: 1330, **OPEN))
+    assert_equal 'automatic dialogue advance', resumed[:justification]
+    assert_equal 2, client.calls.size
+    pages(p, 39, from: 1360)
+    second = decide_with_shot(p, state(frame: 2600, **OPEN))
+    assert_equal 'Late', second[:transcription].first[:text]
+    advance(p, second, state(frame: 2601, **OPEN), 2601)
+    driven = decide_with_shot(p, state(frame: 2630, **OPEN))
     assert_equal SHOT, client.calls.last[:image]
     assert_equal 'claude', driven[:agent]
     refute_includes client.calls.last[:system], 'stacked vertically in sheets'
-    advance(p, driven, state(frame: 1360), 1360)
-    decide_with_shot(p, state(frame: 1361))
-    again = decide_with_shot(p, state(frame: 1400, **OPEN))
+    advance(p, driven, state(frame: 2660), 2660)
+    decide_with_shot(p, state(frame: 2661))
+    again = decide_with_shot(p, state(frame: 2700, **OPEN))
     assert_equal 'automatic dialogue advance', again[:justification]
   end
 
@@ -598,7 +608,7 @@ class DelegatedPolicyTest < Minitest::Test
     decide_with_shot(p, state)
     decide_with_shot(p, state(frame: 100, **OPEN))
     result = decide_with_shot(p, state(frame: 1900, **OPEN))
-    assert_equal 'wait', result[:choice][:skill]
+    assert_equal 'advance_dialogue', result[:choice][:skill]
     assert_equal 2, client.calls.size
   end
 
@@ -655,7 +665,7 @@ class DelegatedPolicyTest < Minitest::Test
     2.times { |i| wrapper.observe(state, frame: i) }
     assert_equal %w[press wait], wrapper.decision_point_for(state(game_mode: 1)).registry.names
     assert_equal :choose_objective, wrapper.decision_point_for(state).name
-    assert_equal :choose_objective, wrapper.decision_point_for(state(dialog_state: 3)).name
+    assert_equal :choose_skill, wrapper.decision_point_for(state(dialog_state: 3)).name
     wrapper.after_action(choice: { buttons: [:a], frames: 1 }, outcome: {}, state:, frame: 1)
   end
 
@@ -680,6 +690,57 @@ class DelegatedPolicyTest < Minitest::Test
                    r.values_at(:choice, :justification, :agent, :cost_usd, :fallback, :prompt, :image)
     end
     assert_equal 0, @objectives.attempts_for_prompt.to_s.scan('wait').size
+  end
+
+  def test_a_long_lock_is_followed_by_a_short_wait_before_the_model_is_asked
+    client = ScriptedClient.new(objective: objective, skill: walk)
+    p = policy(client)
+    decide(p)
+    calls = client.calls.size
+    [100, 130].each { |frame| locked_step(p, frame) }
+    free = state(frame: 160)
+    p.observe(free, frame: 160)
+    settle = decide_with_shot(p, free)
+    assert_equal [{ skill: 'wait', params: { frames: 30 } }, 'delegated'], settle.values_at(:choice, :agent)
+    assert_equal calls, client.calls.size
+    advance(p, settle, state(frame: 190), 190)
+    decide_with_shot(p, state(frame: 190))
+    assert_equal calls + 1, client.calls.size
+  end
+
+  def test_a_lock_past_the_wait_cap_is_noted_once_and_handed_to_the_model
+    client = ScriptedClient.new(objective: objective, skill: [walk, walk])
+    p = policy(client)
+    decide(p)
+    calls = client.calls.size
+    locked_step(p, 100, link_frozen: 5)
+    capped = locked_step(p, 100 + Koholint::Policies::Delegated::LOCKED_WAIT_LIMIT_FRAMES, link_frozen: 5)
+    assert_equal calls + 1, client.calls.size
+    assert_equal ['lock_cap'], Array(capped[:notables]).map { |note| note[:kind] }
+    again = locked_step(p, 130 + Koholint::Policies::Delegated::LOCKED_WAIT_LIMIT_FRAMES, link_frozen: 5)
+    assert_equal calls + 2, client.calls.size
+    assert_empty Array(again[:notables]).select { |note| note[:kind] == 'lock_cap' }
+  end
+
+  def test_a_scripted_scene_holding_link_is_a_lock
+    client = ScriptedClient.new(objective: objective, skill: walk)
+    p = policy(client)
+    decide(p)
+    calls = client.calls.size
+    held = state(frame: 100, link_frozen: 5)
+    assert_equal :locked, held.phase
+    assert_equal 'locked: waiting for Link to be free', decide_with_shot(p, held)[:justification]
+    assert_equal :playing, state(frame: 100, link_frozen: 1).phase
+    assert_equal calls, client.calls.size
+  end
+
+  def test_a_dialogue_with_no_objective_is_advanced_before_an_objective_is_asked
+    client = ScriptedClient.new
+    p = policy(client)
+    open = state(frame: 100, **OPEN)
+    assert_equal :choose_skill, p.decision_point_for(open).name
+    assert_equal 'automatic dialogue advance', decide_with_shot(p, open)[:justification]
+    assert_empty client.calls
   end
 
   def test_a_locked_link_with_no_objective_still_waits_with_a_skill
