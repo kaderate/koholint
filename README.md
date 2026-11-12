@@ -42,7 +42,7 @@ in-flight agent call. A run that hits the Claude subscription session limit stop
 consecutive fallbacks stop a run the same way. An exception in the engine's own code before the agent is called is a free
 fallback marked `engine_error` (class, message and origin in the justification); five in a row stop the run as `engine_errors`.
 
-**Agent.** `--agent` uses `claude -p` (`--model`, default `sonnet`; `--claude-command PATH`). The engine writes what the
+**Agent.** `--agent` uses `claude -p` (`--model`, default `sonnet`; `--claude-command PATH`, else `CLAUDE_COMMAND` from the environment or `.env`, else `claude` on `PATH`). The engine writes what the
 agent saw to `runs/<id>/prompts/<frame>-<decision_point>.txt` (and `.png` when an image was sent; gitignored, not part
 of replay); the `decision` trace event carries its `prompt_sha`. `--tag NAME` labels a run.
 
@@ -76,8 +76,8 @@ place, so the grid went dark). The live view has a grid toggle that overlays the
 **Resume and fork.** `resume` continues a run with the same `flow_version` and ROM hash and rebuilds the ledger and
 visited places from the trace; `fork` branches a run at a frame (the parent may be of an older flow; `--tag`, `--autopilot` and `--root` set the child's). Both work on an archived run, also on a fresh clone
 (see Run storage). `branch <run_dir> --at FRAME|CHECKPOINT` forks, starts `watch` on the child (`--port`, `--host`,
-`--speed`) and resumes it with the `resume` options (`--agent`, budgets) in one command; the viewer keeps serving after
-the stop until Ctrl-C (if it could not start, for example on a busy port, `branch` says so and still plays). A checkpoint is a name from `data/checkpoints.json` (`name`, `run`, `frame`, `flow`, `source`),
+`--speed`) and resumes it with the `resume` options (`--agent`, budgets) in one command, then stops the viewer and exits;
+`--keep-viewer` keeps it serving after the stop until Ctrl-C (if it could not start, for example on a busy port, `branch` says so and still plays). A checkpoint is a name from `data/checkpoints.json` (`name`, `run`, `frame`, `flow`, `source`),
 checked against the run id and its flow, e.g. `bin/koholint branch runs/20261111-194737-9ba1 --at sword-obtained --frames 3000`.
 
 ## Agent skills (`flow-37`)

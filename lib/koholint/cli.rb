@@ -32,7 +32,7 @@ module Koholint
             'archive|star <run_dir> WHY|prune-heavy|census boot|<run_dir> FRAME...|entities <run_dir> FRAME...|objects <run_dir> FRAME...|doors <run_dir> FRAME...|ready <run_dir>|npcs|' \
             'ab-plan <run_dir> --at-frame N|ab-report PREFIX ' \
             '[--frames N --minutes N --steps N --dollars X --root DIR --runs-root DIR --tag NAME --realtime --grid --port N --host H --from live|start|DIR ' \
-            '--speed X --agent --autopilot on|off --model M --max-dollars X --claude-command PATH --commit --full --keep N --yes --arms A,B --forks N --crawl N]'.freeze
+            '--speed X --agent --autopilot on|off --model M --max-dollars X --claude-command PATH --keep-viewer --commit --full --keep N --yes --arms A,B --forks N --crawl N]'.freeze
 
     DEFAULT_MODEL = 'sonnet'.freeze
     DEFAULT_MAX_DOLLARS = 1.5
@@ -63,6 +63,7 @@ module Koholint
         o.on('--model M') { |v| options[:model] = v }
         o.on('--max-dollars X', Float) { |v| options[:dollars] = v }
         o.on('--claude-command PATH') { |v| options[:claude_command] = v }
+        o.on('--keep-viewer') { options[:keep_viewer] = true }
         o.on('--port N', Integer) { |v| options[:port] = v }
         o.on('--host H') { |v| options[:host] = v }
         o.on('--from MODE') { |v| options[:from] = v }
@@ -149,6 +150,8 @@ module Koholint
         out.puts "the viewer did not start (exit #{status.last.exitstatus}); watch the branch with: koholint watch #{child.dir} --port N"
         return code
       end
+      return code unless options[:keep_viewer]
+
       out.puts 'the viewer keeps serving the branch: Ctrl-C to quit'
       Process.wait(pid)
       code
@@ -267,9 +270,10 @@ module Koholint
     def policy_factory(options, budget, probe: false)
       return ->(_run) { Policies::StartGame.new(Policies::WalkAndTalk.new) } unless options[:agent]
 
-      command = options.fetch(:claude_command, 'claude')
+      command = options.fetch(:claude_command) { Config.get('CLAUDE_COMMAND').to_s.strip }
+      command = 'claude' if command.empty?
       command = File.expand_path(command) if command.include?(File::SEPARATOR)
-      raise Koholint::Error, "claude executable not found: #{command}" unless executable?(command)
+      raise Koholint::Error, "claude executable not found: #{command} (set CLAUDE_COMMAND in .env or pass --claude-command)" unless executable?(command)
 
       client = Agents::ClaudeCli.new(model: options.fetch(:model, DEFAULT_MODEL), command:, lenient: %w[plan])
       manual = manual_text
