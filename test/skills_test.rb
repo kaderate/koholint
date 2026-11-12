@@ -121,6 +121,29 @@ class SkillsTest < Minitest::Test
     end
   end
 
+  def test_walk_into_a_door_waits_through_the_walk_in_and_stops_in_the_next_place
+    door = ->(**rest) { Koholint::GameState.new(frame: 0, map_id: 0, x: 89, y: 63, hp: 24, dialog_state: 0, game_mode: 0x0B, milestone: :none, room_id: 1, game_submode: 7, link_motion_state: 3, **rest) }
+    states = [state(x: 89, y: 66), state(x: 89, y: 64)] + Array.new(18) { door.call } +
+             Array.new(20) { door.call(room_id: 2, game_submode: 1) } + [door.call(room_id: 2, x: 80, y: 124, link_motion_state: 4)]
+    execution = registry.start('walk', state(x: 89, y: 68), { direction: :up, cells: 1 })
+    inputs = drive(execution, states)
+    result = execution.result(states.last)
+    assert_equal :room_change, result[:stopped_by]
+    assert_nil result[:blocked_at]
+    assert_equal [7, 5], result[:to].values_at(:row, :col)
+    assert_equal({ row: 3, col: 5, direction: :up, walk_in: true }, result[:exit])
+    assert_equal [[:up]] * 2 + [[]] * 38, inputs
+  end
+
+  def test_walk_across_a_border_scroll_is_not_a_door_walk
+    scroll = Koholint::GameState.new(frame: 0, room_id: 2, map_id: 0, x: 89, y: 140, hp: 24, dialog_state: 0, game_mode: 0x0B, game_submode: 7, milestone: :none, room_transition: 1)
+    execution = registry.start('walk', state(x: 89, y: 20), { direction: :up, cells: 2 })
+    drive(execution, [state(x: 89, y: 18), state(x: 89, y: 16), scroll])
+    result = execution.result(scroll)
+    assert_equal :room_change, result[:stopped_by]
+    assert_equal({ row: 0, col: 5, direction: :up }, result[:exit])
+  end
+
   def test_advance_dialogue_runs_one_cycle_while_open
     open = state(dialog_state: 129)
     execution = registry.start('advance_dialogue', open, {})

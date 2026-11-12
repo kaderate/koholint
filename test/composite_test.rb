@@ -34,7 +34,7 @@ class CompositeTest < Minitest::Test
     end
   end
 
-  def state = Koholint::GameState.new(frame: 0, room_id: 224, map_id: 0, x: 88, y: 82, hp: 16, item_a: 1, item_b: 4, dialog_state: 0, game_mode: 0x0B)
+  def state = Koholint::GameState.new(frame: 0, room_id: 224, map_id: 0, x: 88, y: 82, hp: 16, item_a: 1, item_b: 4, dialog_state: 0, game_mode: 0x0B, game_submode: 7)
 
   def composite = Koholint::Skills::Composite.new(Koholint::Learn.hypothesis(gain: { item: 1, frame: 1 }, object: 92, run: '20261112-103604-0c64'))
 

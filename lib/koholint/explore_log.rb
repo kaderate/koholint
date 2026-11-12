@@ -43,22 +43,7 @@ module Koholint
       survey = Ledger.pick(result, :survey)
       keep(place, parse_survey(survey).merge(provisional: provisional?(result))) if survey.is_a?(Hash)
       note_pocket(place, result)
-      Array(Ledger.pick(result, :exits)).each do |exit|
-        cell = [Ledger.pick(exit, :row), Ledger.pick(exit, :col)]
-        direction = Ledger.pick(exit, :direction)
-        next unless cell.all?(Integer) && direction.respond_to?(:to_sym)
-
-        key = [place, cell, direction.to_sym]
-        left = Ledger.pick(exit, :outcome).to_s == 'left'
-        @exits[key] = left ? TRIED_AT : @exits[key] + 1
-        to = Ledger.pick(exit, :to)
-        next unless left && to.is_a?(Array) && to.size == 2 && to.all?(Integer)
-
-        observe_edge(place, edge_key(exit, cell, direction.to_sym), to)
-        note_arrival(to, cell, direction.to_sym) if Ledger.pick(exit, :kind).to_s != 'door'
-        assume_edge(to, OPPOSITE.fetch(direction.to_sym), place) if Ledger.pick(exit, :kind).to_s != 'door' && OPPOSITE.key?(direction.to_sym)
-        know(to)
-      end
+      Array(Ledger.pick(result, :exits)).each { |exit| take_exit(place, exit) }
       drop_unreachable(place, result) if Ledger.pick(result, :dead_end)
       Array(Ledger.pick(result, :offered)).each { |object| offer(place, cell_of(object)) }
       Array(Ledger.pick(result, :walls)).each { |wall| (@walls[place] << cell_of(wall)).uniq! }
@@ -69,6 +54,31 @@ module Koholint
       end
     end
 
+    # A door is tried from the cell below it, walking up; Link stands on it or just below it when the place changes.
+    def self.door_exit(cell, ahead, doors, to)
+      door = [cell, ahead].find { |c| doors.include?(c) } || cell
+      { row: door[0] + 1, col: door[1], direction: :up, outcome: :left, to:, kind: :door }
+    end
+
+    def take_exit(place, exit)
+      cell = [Ledger.pick(exit, :row), Ledger.pick(exit, :col)]
+      direction = Ledger.pick(exit, :direction)
+      return unless cell.all?(Integer) && direction.respond_to?(:to_sym)
+
+      key = [place, cell, direction.to_sym]
+      left = Ledger.pick(exit, :outcome).to_s == 'left'
+      @exits[key] = left ? TRIED_AT : @exits[key] + 1
+      to = Ledger.pick(exit, :to)
+      return unless left && to.is_a?(Array) && to.size == 2 && to.all?(Integer)
+
+      observe_edge(place, edge_key(exit, cell, direction.to_sym), to)
+      know(to)
+      return if Ledger.pick(exit, :kind).to_s == 'door' || Ledger.pick(exit, :walk_in)
+
+      note_arrival(to, cell, direction.to_sym)
+      assume_edge(to, OPPOSITE.fetch(direction.to_sym), place) if OPPOSITE.key?(direction.to_sym)
+    end
+
     def note(result)
       %i[from to].each { |end_| (place = Ledger.place_of(Ledger.pick(result, end_))) && know(place) }
       from = Ledger.place_of(Ledger.pick(result, :from))
@@ -77,20 +87,27 @@ module Koholint
       note_crossing(result)
     end
 
-    # Only walk and step cross in the direction they were given; the result's from is where the skill began, not where it crossed.
+    # Without an exit cell, only walk and step cross in the direction they were given; the result's from is where the skill began, not where it crossed.
     STRAIGHT = %w[walk step].freeze
 
     def note_crossing(result)
-      from_at = Ledger.pick(result, :from)
-      from = Ledger.place_of(from_at)
+      from = Ledger.place_of(Ledger.pick(result, :from))
       to = Ledger.place_of(Ledger.pick(result, :to))
-      return unless from && to && from != to && STRAIGHT.include?(Ledger.pick(result, :skill).to_s)
+      skill = Ledger.pick(result, :skill).to_s
+      return unless from && to && from != to && skill != 'explore'
 
-      direction = Ledger.pick(Ledger.pick(result, :params) || {}, :direction)&.to_s&.to_sym
+      exit = Ledger.pick(result, :exit)
+      direction = (exit ? Ledger.pick(exit, :direction) : (Ledger.pick(Ledger.pick(result, :params) || {}, :direction) if STRAIGHT.include?(skill)))&.to_s&.to_sym
       return unless OPPOSITE.key?(direction)
 
+      cell = cell_of(exit) if exit
+      dr, dc = Navigation::Planner::DELTAS[direction]
+      ahead = [cell[0] + dr, cell[1] + dc] if cell&.all?(Integer)
+      return take_exit(from, ExploreLog.door_exit(cell, ahead, @surveys.dig(from, :doors) || [], to)) if ahead && ahead[0].between?(0, Geometry::ROWS - 1) && ahead[1].between?(0, Geometry::COLS - 1)
+
       observe_edge(from, direction, @edges[from].fetch(direction, to))
-      assume_edge(to, OPPOSITE.fetch(direction), from)
+      # A door walk (a house left by its bottom edge) loads the next place instead of scrolling: it says nothing of the side Link arrives by.
+      assume_edge(to, OPPOSITE.fetch(direction), from) unless exit && Ledger.pick(exit, :walk_in)
     end
 
     # The way back across an edge Link crossed once is assumed until he crosses it; explores that find no exit for it on two visits drop it (a ledge jumped down).

@@ -2,7 +2,7 @@
 
 Only what is left to do. When something lands, delete it here (git is the history). Amend freely. Details of measured limits: `docs/loose-ends.md`.
 
-**Goal:** an agent plays Link's Awakening DX through the engine. Shield and sword are obtained (sword: fork `20261111-194737-9ba1` of `34ca`, flow-37, item 1 at frame 60404, room 242/0, after pushing the type 197 sea urchins with the raised shield and an owl dialogue of about 1900 frames). The sword strikes through the `attack` skill (flow-38). Scripted scenes hold the harness (flow-40). Next: lead statuses and the first dungeon.
+**Goal:** an agent plays Link's Awakening DX through the engine. Shield and sword are obtained (sword: fork `20261111-194737-9ba1` of `34ca`, flow-37, item 1 at frame 60404, room 242/0, after pushing the type 197 sea urchins with the raised shield and an owl dialogue of about 1900 frames). The sword strikes through the `attack` skill (flow-38). Scripted scenes hold the harness (flow-40). Skills wait through door walk-ins and doors are recorded as crossings (flow-41). Next: lead statuses and the first dungeon.
 
 ## Next, in order
 1. **Lead statuses and the next goal.** Leads are only open claims: add open / tested / refuted with evidence. The goal now reads "go to the Enchanted Forest north of the village to meet the owl, then find the first dungeon"; open leads: a cave (Cave Flagello), "further east", "come see me in the forest", "wake the Wind Fish".
