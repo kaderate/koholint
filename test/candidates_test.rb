@@ -22,6 +22,8 @@ class CandidatesTest < Minitest::Test
     found = build(grid: SpriteGrid.new, entities:, talk_log:, link: [6, 5]).select { |c| c[:id].start_with?('examine') }
     assert_equal %w[examine-6-6 examine-2-2], found.map { |c| c[:id] }
     assert_equal({ kind: 'examine', place: HERE, cell: [2, 2] }, found[1][:target])
+    assert_match(/not known whether it is a person or hostile/, found[0][:label])
+    refute_match(/talk to|person \(type/, found[0][:label])
     talk_log.record(place: HERE, row: 2, col: 2, talked: false)
     talk_log.record(place: HERE, row: 6, col: 6, talked: false, entity: 47)
     assert_empty(build(grid: SpriteGrid.new, entities:, talk_log:, link: [6, 5]).select { |c| c[:id].start_with?('examine') })

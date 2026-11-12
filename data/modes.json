@@ -37,7 +37,7 @@
    "match": {"game_mode": 11, "game_submode": 7, "dialog_state": 0, "link_motion_state": {"not": 7}, "link_frozen": {"not": [0, 1]}},
    "enter": {"buttons": [], "text": "a scripted scene holds Link: a character arriving to speak (the owl of 242/0) or Link touching something (the sword of 242/0 at 14 px, no A)"}, "exit": {"buttons": [], "text": "ends by itself, usually with a dialogue; motion_lock and dialogues follow inside the same scene"},
    "inputs": {},
-   "source": "scene probe 2026-11-12 on run 20261111-194737-9ba1 (see link_frozen in data/addresses.json): the owl arrival 57600-57728 and the start of the sword scene 59621-59724, the only spans above 1 in the 62,457 frames of the run; a copy at frame 59343 reached 104 five frames after Link walked into contact with the sword", "confidence": "verified", "verified_count": 2,
+   "source": "scene probe 2026-11-12 on run 20261111-194737-9ba1 (see link_frozen in data/addresses.json): the owl arrival 57600-57728 and the start of the sword scene 59621-59724, the only spans above 1 in the 62,457 frames of the run; a copy at frame 59343 reached 104 five frames after Link walked into contact with the sword; one run and one room, so one check", "confidence": "hypothesis", "verified_count": 1,
    "note": "value 1 alone was seen for 1 to 3 frames in room 167 with nothing happening, so it is not a scene"},
   {"name": "dying", "kind": "cutscene", "phase": "cutscene",
    "match": {"game_mode": 11, "game_submode": 7, "link_motion_state": 7, "game_over_stage": {"not": 4}},

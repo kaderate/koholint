@@ -187,7 +187,8 @@ mode, rebuilt from the trace on resume) the screens go to the agent with their o
 `menu_assign`, `close_menu`; `map`: `close_map`; `save`: `choose_option`; `unknown`: `press` and `wait`;
 all with `press` and `wait`), after a deterministic wait while the screen is still opening; `cutscene` (the dying
 animation included) waits like `locked`; a lock of 30 frames or more is followed by a 30-frame wait before the model is asked
-(flow-40: the sword scene released Link for 3 frames between two locks). A dialogue sequence that reaches its page or frame cap is
+(flow-40: the sword scene released Link for 3 frames between two locks); a lock that outlasts the 900-frame wait cap emits one
+`notable` `lock_cap` and the model decides from then on. A dialogue sequence that reaches its page or frame cap is
 sent as sheets once and the advance goes on (the model's choice is replaced while the box is open); only a second cap of the same
 dialogue hands the pages to the model (the owl and sword texts together run over 40 pages); a dialogue that opens with no current
 objective is advanced before a new objective is asked for. The game-over screen is never sent to the model: the policy picks its first

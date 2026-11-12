@@ -85,7 +85,7 @@ module Koholint
     def unidentified(place, grid, entities, talk_log, link)
       things = entities.select { |entity| entity[:kind].to_s == 'unknown' && entity[:cell] }.uniq { |entity| entity[:type] }
                        .reject { |entity| talk_log.attempts(place, [[:entity, entity[:type]]]).positive? }
-                       .map { |entity| [entity[:cell], "the unidentified creature (type #{entity[:type]})", { kind: 'person', type: entity[:type] }] }
+                       .map { |entity| [entity[:cell], "the unidentified thing (type #{entity[:type]}, not known whether it is a person or hostile)", { kind: 'person', type: entity[:type] }] }
       sprites = grid ? TalkLog.objects(grid) : []
       things += sprites.reject { |cells| entities.any? { |entity| entity[:cell] && cells.include?(entity[:cell]) } || talk_log.tried?(sprites, place, cells) }
                        .map { |cells| [cells.first, 'the unidentified object', { kind: 'examine' }] }
