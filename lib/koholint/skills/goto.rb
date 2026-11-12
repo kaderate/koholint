@@ -45,6 +45,16 @@ module Koholint
 
         def initial_plan = plan(@start.cell)
 
+        def restart(state, path)
+          @path = path
+          @index = 0
+          @arrived_by = @idle_reason = @centring = nil
+          @settle = 0
+          @still = 0
+          @heading = nil
+          @position = [state.x, state.y]
+        end
+
         def plan(cell)
           path = cell && @planner&.path(from: cell, to: @target)
           @cause = path ? nil : why_not(cell)

@@ -163,14 +163,8 @@ module Koholint
         end
 
         def restart(state, path)
-          @path = path
+          super
           @phase = :walk
-          @index = 0
-          @arrived_by = @idle_reason = @centring = nil
-          @settle = 0
-          @still = 0
-          @heading = nil
-          @position = [state.x, state.y]
           @face_frames = @face_still = @press_frames = @response_frames = 0
           @face_origin = @face_last = @align_last = nil
           @align_frames = 0

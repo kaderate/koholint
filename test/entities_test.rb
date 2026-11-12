@@ -28,8 +28,8 @@ class EntitiesTest < Minitest::Test
     put(reader, 1, x: 120, y: 80, type: 63, status: 0)
     put(reader, 4, x: 250, y: 20, type: 200)
     found = Koholint::Entities.read(reader, kinds: { 62 => { kind: :npc, verified: true, moves: false } })
-    assert_equal [{ slot: 0, type: 62, x: 80, y: 56, status: 5, state: 3, cell: [3, 5], kind: :npc, verified: true, moves: false },
-                  { slot: 4, type: 200, x: 250, y: 20, status: 5, state: 0, cell: nil, kind: :unknown, verified: false, moves: nil }], found
+    assert_equal [{ slot: 0, type: 62, x: 80, y: 56, status: 5, state: 3, health: 0, cell: [3, 5], kind: :npc, verified: true, moves: false },
+                  { slot: 4, type: 200, x: 250, y: 20, status: 5, state: 0, health: 0, cell: nil, kind: :unknown, verified: false, moves: nil }], found
   end
 
   def test_the_catalogue_validates_kinds_and_provenance

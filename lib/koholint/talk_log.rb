@@ -247,6 +247,7 @@ module Koholint
       name = name_of(place, entity[:type])
       kind = entity[:kind].to_s
       kind += ', unverified' if entity[:verified] == false
+      kind += ", sword hits to kill #{entity[:sword_hits]}#{' (unverified)' unless entity[:sword_verified]}" if entity[:sword_hits]
       "entity type #{entity[:type]} (#{kind}#{name ? ", name #{name}" : ''})"
     end
 
