@@ -8,7 +8,6 @@ module Koholint
       CENTRING_FRAMES = 16
       CENTRING_STILL = 3
       DIRECTIONS = %i[up right down left].freeze
-      WALK_IN = 3
 
       attr_reader :frames, :stopped_by
       attr_writer :triggers
@@ -34,11 +33,10 @@ module Koholint
         @trigger_input = @last_input if state.dialog_open? && !@start.dialog_open? && @trigger_input.nil?
         return nil if @stopped_by
 
+        @walked_in ||= state.door_walk_in?
         buttons = if @frames >= hard_cap then finish(:frame_cap)
                   elsif state.scene? && !@start.scene? then finish(:scene)
-                  elsif waits_through_doors? && door_walk?(state)
-                    @walked_in = true
-                    []
+                  elsif waits_through_doors? && door_walk?(state) then []
                   elsif @centring then centre(state)
                   else input_for(state)
                   end
@@ -64,7 +62,7 @@ module Koholint
       private
 
       # Link stands still while a door walks him in and the next place loads; a moving skill waits through it instead of reading it as blocked.
-      def door_walk?(state) = state.loading? || state.link_motion_state.to_i == WALK_IN
+      def door_walk?(state) = state.loading? || state.door_walk_in?
 
       def waits_through_doors? = false
 

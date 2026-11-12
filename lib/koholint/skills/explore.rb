@@ -1,4 +1,5 @@
 require 'koholint/skills/goto'
+require 'koholint/explore_log'
 require 'koholint/talk_log'
 
 module Koholint
@@ -150,10 +151,9 @@ module Koholint
           if @target && @target[:kind] == :door && (@outward || @entering.positive?)
             @exits << { row: @target[:cell][0], col: @target[:cell][1], direction: :up, outcome: :left, to:, kind: :door }
           elsif @cell && @heading && neighbour(@cell, @heading)
-            door = [@cell, neighbour(@cell, @heading)].find { |cell| @doors.include?(cell) } || @cell
-            @exits << { row: door[0] + 1, col: door[1], direction: :up, outcome: :left, to:, kind: :door }
+            @exits << ExploreLog.door_exit(@cell, neighbour(@cell, @heading), @doors, to)
           elsif @cell && @heading
-            @exits << { row: @cell[0], col: @cell[1], direction: @heading, outcome: :left, to:, **(@entering.positive? ? { walk_in: true } : {}) }
+            @exits << { row: @cell[0], col: @cell[1], direction: @heading, outcome: :left, to:, **(@walked_in ? { walk_in: true } : {}) }
           end
           finish(@log&.known?(to) ? :known_place : :new_place)
         end

@@ -43,24 +43,7 @@ module Koholint
       survey = Ledger.pick(result, :survey)
       keep(place, parse_survey(survey).merge(provisional: provisional?(result))) if survey.is_a?(Hash)
       note_pocket(place, result)
-      Array(Ledger.pick(result, :exits)).each do |exit|
-        cell = [Ledger.pick(exit, :row), Ledger.pick(exit, :col)]
-        direction = Ledger.pick(exit, :direction)
-        next unless cell.all?(Integer) && direction.respond_to?(:to_sym)
-
-        key = [place, cell, direction.to_sym]
-        left = Ledger.pick(exit, :outcome).to_s == 'left'
-        @exits[key] = left ? TRIED_AT : @exits[key] + 1
-        to = Ledger.pick(exit, :to)
-        next unless left && to.is_a?(Array) && to.size == 2 && to.all?(Integer)
-
-        observe_edge(place, edge_key(exit, cell, direction.to_sym), to)
-        know(to)
-        next if Ledger.pick(exit, :kind).to_s == 'door' || Ledger.pick(exit, :walk_in)
-
-        note_arrival(to, cell, direction.to_sym)
-        assume_edge(to, OPPOSITE.fetch(direction.to_sym), place) if OPPOSITE.key?(direction.to_sym)
-      end
+      Array(Ledger.pick(result, :exits)).each { |exit| take_exit(place, exit) }
       drop_unreachable(place, result) if Ledger.pick(result, :dead_end)
       Array(Ledger.pick(result, :offered)).each { |object| offer(place, cell_of(object)) }
       Array(Ledger.pick(result, :walls)).each { |wall| (@walls[place] << cell_of(wall)).uniq! }
@@ -69,6 +52,31 @@ module Koholint
         walk(place, [row, col])
         walk(place, [row + delta[0], col + delta[1]])
       end
+    end
+
+    # A door is tried from the cell below it, walking up; Link stands on it or just below it when the place changes.
+    def self.door_exit(cell, ahead, doors, to)
+      door = [cell, ahead].find { |c| doors.include?(c) } || cell
+      { row: door[0] + 1, col: door[1], direction: :up, outcome: :left, to:, kind: :door }
+    end
+
+    def take_exit(place, exit)
+      cell = [Ledger.pick(exit, :row), Ledger.pick(exit, :col)]
+      direction = Ledger.pick(exit, :direction)
+      return unless cell.all?(Integer) && direction.respond_to?(:to_sym)
+
+      key = [place, cell, direction.to_sym]
+      left = Ledger.pick(exit, :outcome).to_s == 'left'
+      @exits[key] = left ? TRIED_AT : @exits[key] + 1
+      to = Ledger.pick(exit, :to)
+      return unless left && to.is_a?(Array) && to.size == 2 && to.all?(Integer)
+
+      observe_edge(place, edge_key(exit, cell, direction.to_sym), to)
+      know(to)
+      return if Ledger.pick(exit, :kind).to_s == 'door' || Ledger.pick(exit, :walk_in)
+
+      note_arrival(to, cell, direction.to_sym)
+      assume_edge(to, OPPOSITE.fetch(direction.to_sym), place) if OPPOSITE.key?(direction.to_sym)
     end
 
     def note(result)
@@ -95,18 +103,11 @@ module Koholint
       cell = cell_of(exit) if exit
       dr, dc = Navigation::Planner::DELTAS[direction]
       ahead = [cell[0] + dr, cell[1] + dc] if cell&.all?(Integer)
-      return note_door(from, cell, ahead, to) if ahead && ahead[0].between?(0, Geometry::ROWS - 1) && ahead[1].between?(0, Geometry::COLS - 1)
+      return take_exit(from, ExploreLog.door_exit(cell, ahead, @surveys.dig(from, :doors) || [], to)) if ahead && ahead[0].between?(0, Geometry::ROWS - 1) && ahead[1].between?(0, Geometry::COLS - 1)
 
       observe_edge(from, direction, @edges[from].fetch(direction, to))
       # A door walk (a house left by its bottom edge) loads the next place instead of scrolling: it says nothing of the side Link arrives by.
       assume_edge(to, OPPOSITE.fetch(direction), from) unless exit && Ledger.pick(exit, :walk_in)
-    end
-
-    # A place change that does not cross the border went through a door, keyed like explore's: the door cell, tried from the cell below.
-    def note_door(from, cell, ahead, to)
-      door = [cell, ahead].find { |c| @surveys.dig(from, :doors)&.include?(c) } || cell
-      @exits[[from, [door[0] + 1, door[1]], :up]] = TRIED_AT
-      observe_edge(from, door, to)
     end
 
     # The way back across an edge Link crossed once is assumed until he crosses it; explores that find no exit for it on two visits drop it (a ledge jumped down).

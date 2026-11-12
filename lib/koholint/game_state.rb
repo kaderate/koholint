@@ -8,6 +8,8 @@ module Koholint
   # Values and meaning: notes of game_mode and game_submode in data/addresses.json and the catalogue data/modes.json.
   PLAY_MODE = 0x0B
   PLAY_SETTLED_SUBMODE = 7
+  # link_motion_state while a door walks Link in: he holds still about 18 frames, then the next place loads (run 20261112-103604-0c64, frames 71971-71990).
+  DOOR_WALK_IN = 3
 
   GameState = Struct.new(:frame, :room_id, :map_id, :x, :y, :direction, :hp, :max_hp, :milestone,
                          :game_mode, :game_submode, :name_length, :dialog_state, :motion_blocked, :scene_state,
@@ -26,6 +28,8 @@ module Koholint
     def dialog_open? = dialog_state.to_i.positive?
 
     def loading? = game_mode == PLAY_MODE && game_submode != PLAY_SETTLED_SUBMODE
+
+    def door_walk_in? = link_motion_state.to_i == DOOR_WALK_IN
 
     def locked? = motion_blocked.to_i.positive?
 

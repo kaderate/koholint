@@ -135,6 +135,15 @@ class SkillsTest < Minitest::Test
     assert_equal [[:up]] * 2 + [[]] * 38, inputs
   end
 
+  def test_walk_across_a_border_scroll_is_not_a_door_walk
+    scroll = Koholint::GameState.new(frame: 0, room_id: 2, map_id: 0, x: 89, y: 140, hp: 24, dialog_state: 0, game_mode: 0x0B, game_submode: 7, milestone: :none, room_transition: 1)
+    execution = registry.start('walk', state(x: 89, y: 20), { direction: :up, cells: 2 })
+    drive(execution, [state(x: 89, y: 18), state(x: 89, y: 16), scroll])
+    result = execution.result(scroll)
+    assert_equal :room_change, result[:stopped_by]
+    assert_equal({ row: 0, col: 5, direction: :up }, result[:exit])
+  end
+
   def test_advance_dialogue_runs_one_cycle_while_open
     open = state(dialog_state: 129)
     execution = registry.start('advance_dialogue', open, {})
