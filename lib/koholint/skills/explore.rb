@@ -35,14 +35,17 @@ module Koholint
       end
 
       class Leg < Goto::Run
-        def initialize(planner:, context: {}, **rest)
+        def initialize(planner:, clearing: nil, **rest)
           @shared = planner
-          super(context:, **rest)
+          @shared_clearing = clearing
+          super(context: {}, **rest)
         end
 
         private
 
         def planner_for(_context) = @shared
+
+        def clearing_for(_context) = @shared_clearing
       end
 
       class Run < Execution
@@ -60,10 +63,7 @@ module Koholint
           @known = grid && Known.new(grid, @walked)
           @planner = @known && Navigation::Planner.new(grid: @known, ledger: @ledger, place: @place, triggers: context[:triggers], mode: :free_only, danger: danger_of(context), pushable: pushable_of(context))
           @pushable = Array(pushable_of(context)&.call)
-          @context = context
           @clearing = Clearing.of(context)
-          @clearable = @clearing ? @clearing.cells.keys : []
-          @leg_clears = []
           @objects = grid ? TalkLog.objects(grid) : []
           @doors = Array(context[:objects]&.call).select { |object| object[:kind].to_s == 'door' && object[:cell][0] < Geometry::ROWS - 1 }.map { |object| object[:cell] }
           @survey = @known && survey
@@ -76,7 +76,8 @@ module Koholint
           @blocked = []
           @crossed = []
           @excluded = []
-          @walls = @log ? @log.walls(@place) : []
+          # Runs without the capability logged clearable objects as walls.
+          @walls = (@log ? @log.walls(@place) : []) - Array(@clearing&.cells&.keys)
           @new_walls = []
           @cells_walked = 0
           @stuck = 0
@@ -91,8 +92,7 @@ module Koholint
           merged = super.merge(place_changed: room(state) != @place, cells_walked: @cells_walked, legs: @legs, target: target_summary,
                                crossed: @crossed.map(&:dup), walls: @new_walls.map { |row, col| { row:, col: } }, blocked_edges: @blocked.map(&:dup), exits: @exits.map(&:dup),
                                offered: @offered.map { |row, col| { row:, col: } })
-          clears = @leg_clears + Array(@clearing&.uses)
-          merged[:clears] = clears if clears.any?
+          merged[:clears] = @clearing.uses if @clearing&.uses&.any?
           merged[:survey] = @survey.merge(pending: pending?) if @survey
           merged[:route] = @route if @route
           merged[:unreachable] = @unreachable if @unreachable
@@ -112,7 +112,7 @@ module Koholint
 
         def input_for(state)
           return finish(@idle) if @idle
-          return @clearing.step(state) if @clearing&.active?
+          return @clearing.step(state) if @clearing&.active? && !@leg
           return depart(state) if room(state) != @place
           return harmed if state.hp.to_i < @start.hp.to_i
           return stop_now(:dialogue) if state.dialog_open?
@@ -220,7 +220,7 @@ module Koholint
             outward_from(state)
           else
             row, col = @target[:cell]
-            @leg = Leg.new(skill: 'goto', params: { row:, col: }, state:, target: @target[:cell], planner: @planner, context: @context)
+            @leg = Leg.new(skill: 'goto', params: { row:, col: }, state:, target: @target[:cell], planner: @planner, clearing: @clearing)
             @leg.triggers = @triggers
           end
           nil
@@ -232,7 +232,6 @@ module Koholint
 
           outcome = @leg.result(state)
           @crossed.concat(outcome[:crossed])
-          @leg_clears.concat(Array(outcome[:clears]))
           @leg = nil
           return outward_from(state) if outcome[:stopped_by] == :done
 
@@ -394,8 +393,6 @@ module Koholint
         def frontier_kind(cell, direction)
           ahead = neighbour(cell, direction) or return nil
           return nil if @doors.include?(ahead) || (direction == :up && @doors.include?(cell))
-
-          return :frontier if @clearable.include?(ahead) && !@walked.include?(ahead)
 
           :frontier if !@walls.include?(ahead) && (@pushable.include?(ahead) || (!@known.static_sprite(*ahead) && UNKNOWN.include?(@known.passable(*ahead, direction))))
         end

@@ -196,10 +196,9 @@ as last-resort route cells. Explore keeps them as frontiers until walked. `goto`
 step run the composite once per cell when they are blocked facing one, and record each run in the result's `clears`.
 The object is read again from `room_objects` on every call, because a cleared object may return when the room is re-entered.
 
-**Scripted proof ($0).** The proof plays explore only, with `advance_dialogue` in dialogues, for 3000 frames from the new checkpoint
+**Scripted proof ($0, manual measurement).** The proof is not a committed command: an ad-hoc script forked the checkpoint twice, with and without `--capabilities`, and resumed each fork through `Engine.resume` with a policy that plays explore only, with `advance_dialogue` in dialogues, for 3000 frames from the new checkpoint
 `clearable-objects-160` (run `20261112-103604-0c64` at frame 68444, room 160/0). Room 160/0 has `0x5C` at (2,4), (2,5), (2,6)
-and (3,8). With the capability, explore cleared (3,8), (2,6) and (2,5) at frame 69011 (object 92 to 4 each) and entered 164/17
-at frame 69252. None of the 37 archived runs has been to 164/17. Without the capability, Link never left 160/0.
+and (3,8). With the capability, explore cleared (3,8), (2,6) and (2,5) (object 92 to 4 each) and entered 164/17. A rerun after the review fixes did the same, clearing (3,8) at frame 68810 and the other two at 69035. None of the 37 archived runs has been to 164/17. Without the capability, Link never left 160/0.
 
 **A/B (tag `cap43`, 5.87 USD).** The A/B ran 3 forks per arm from the same checkpoint, 6000 frames and `--max-dollars 1` each.
 New places are now counted against the whole lineage: every ancestor's trace, including frames after the fork point.

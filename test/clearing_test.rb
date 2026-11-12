@@ -51,6 +51,17 @@ class ClearingTest < Minitest::Test
     assert_nil clearing.start(state, :down)
   end
 
+  def test_a_composite_never_clears_from_its_own_steps
+    registry = StubRegistry.new([composite])
+    context = { registry:, room_objects: objects([1, 1]) }
+    run = composite.start(state, { row: 1, col: 0, direction: 'right' }, context)
+    steps = run.instance_variable_get(:@context)
+    assert_equal composite.name, steps[:composite]
+    assert_nil Koholint::Skills::Clearing.of(steps)
+    assert_equal [], Array(Koholint::Skills::Execution.new(skill: 'goto', params: {}, state:).send(:pushable_of, steps)&.call)
+    refute_nil Koholint::Skills::Clearing.of(context)
+  end
+
   def test_object_cells_join_the_pushable_cells
     context = { registry: StubRegistry.new([composite]), room_objects: objects([3, 8]), entities: -> { [{ kind: 'enemy', moves: false, cell: [1, 1] }] } }
     host = Koholint::Skills::Execution.new(skill: 'goto', params: {}, state:)

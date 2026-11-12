@@ -22,7 +22,7 @@ module Koholint
           @still = 0
           @idle_reason = nil
           @crossed = []
-          @clearing = Clearing.of(context)
+          @clearing = clearing_for(context)
         end
 
         def result(state = @last)
@@ -85,6 +85,8 @@ module Koholint
 
           advance(state)
         end
+
+        def clearing_for(context) = Clearing.of(context)
 
         def clearing(state)
           @still = 0

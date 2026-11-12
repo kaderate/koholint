@@ -10,7 +10,7 @@ module Koholint
 
       def self.of(context)
         registry = context[:registry]
-        new(context) if context[:room_objects] && registry.respond_to?(:composites) && registry.composites.any?
+        new(context) if !context[:composite] && context[:room_objects] && registry.respond_to?(:composites) && registry.composites.any?
       end
 
       def initialize(context)
