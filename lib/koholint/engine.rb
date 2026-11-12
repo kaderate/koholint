@@ -178,7 +178,8 @@ module Koholint
     def context_for(grid)
       context = @builder ? { grid: } : {}
       context.merge(dialogue_shot: -> { Vision::DialogueShot.crop(@emulator) }, dialogue_rgb: -> { Vision::DialogueShot.rgb(@emulator) },
-                    entities: -> { Entities.read(@emulator) }, objects: -> { Entities.objects(@emulator) })
+                    entities: -> { Entities.read(@emulator) }, objects: -> { Entities.objects(@emulator) },
+                    room_objects: -> { Entities.room_objects(@emulator) })
     end
 
     def record_prompt(result, frame, name)

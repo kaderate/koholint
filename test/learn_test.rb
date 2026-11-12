@@ -1,0 +1,102 @@
+require_relative 'test_helper'
+require 'koholint/learn'
+
+class LearnTest < Minitest::Test
+  L = Koholint::Learn
+
+  def grid(fill: 4, at: {})
+    rows = Array.new(8) { Array.new(10, fill) }
+    at.each { |(row, col), id| rows[row][col] = id }
+    rows
+  end
+
+  def perception(frame, room, x, y) = { 'type' => 'perception', 'frame' => frame, 'state' => { 'game_mode' => 0x0B, 'room_id' => room, 'map_id' => 0, 'x' => x, 'y' => y } }
+
+  def gain = { item: 1, name: 'sword', frame: 100 }
+
+  def sightings
+    { [224, 0] => { frame: 120, arrival: [4, 4], grid: grid(at: { [6, 5] => 92, [6, 7] => 92, [0, 0] => 37 }) },
+      [209, 0] => { frame: 300, arrival: [2, 2], grid: grid(at: { [5, 6] => 92, [7, 9] => 212 }) },
+      [193, 0] => { frame: 400, arrival: [3, 3], grid: grid(at: { [2, 2] => 37, [3, 3] => 50, [1, 1] => 92 }) } }
+  end
+
+  def stood = { [224, 0] => Set[[4, 4]], [193, 0] => Set[[3, 3]] }
+
+  def trial(outcome, place) = { 'outcome' => outcome, 'place' => place }
+
+  def test_triggers_and_first_frames_after_the_gain
+    held = ->(event, a) { event.tap { |e| e['state'].merge!('item_a' => a, 'item_b' => 4, 'inventory' => [0] * 10) } }
+    events = [held.(perception(50, 224, 72, 66), 0), held.(perception(120, 224, 72, 66), 1), perception(130, 224, 88, 66), perception(300, 209, 40, 40)]
+    assert_equal [{ item: 1, name: 'sword', frame: 120 }], L.triggers(events, since: 100)
+    assert_equal [4, 1], L.triggers(events).map { |t| t[:item] }
+    firsts = L.first_frames(events, 120)
+    assert_equal({ frame: 120, arrival: Koholint::GameState.cell_at(72, 66) }, firsts[[224, 0]])
+    assert_equal 300, firsts[[209, 0]][:frame]
+  end
+
+  def test_candidates_are_uncatalogued_never_stood_on_and_widest_first
+    found = L.candidates(gain:, sightings:, stood:, known: [])
+    assert_equal [92, 37], found.map { |c| c[:object] }
+    assert_equal [[224, 0], [209, 0], [193, 0]], found.first[:places].map { |p| p[:place] }
+    assert_equal [[6, 5], [6, 7]], found.first[:places].first[:cells]
+    place = found.first[:places].first
+    stand, direction = L.stands([6, 5], place).first
+    dr, dc = Koholint::Skills::Composite::DELTAS[direction]
+    assert_equal 92, place[:grid].dig(stand[0] + dr, stand[1] + dc)
+    assert_equal [37], L.candidates(gain:, sightings:, stood:, known: [], object: 37).map { |c| c[:object] }
+    assert_equal [92], L.candidates(gain:, sightings:, stood:, known: [], limit: 1).map { |c| c[:object] }
+  end
+
+  def test_a_pair_already_in_the_file_is_never_retried
+    rejected = Koholint::Capabilities.transition(L.hypothesis(gain:, object: 92, run: '20261112-103604-0c64'), 'rejected', 'test')
+    assert_equal [37], L.candidates(gain:, sightings:, stood:, known: [rejected]).map { |c| c[:object] }
+    assert_equal [92, 37], L.candidates(gain: gain.merge(item: 2), sightings:, stood:, known: [rejected]).map { |c| c[:object] }
+  end
+
+  def test_standing_sides_skip_the_border_and_the_same_object_nearest_first
+    sighting = sightings[[224, 0]]
+    sides = L.stands([6, 5], sighting)
+    assert_includes [[[5, 5], :down], [[6, 4], :right]], sides.first
+    assert_equal 4, sides.size
+    sighting = sighting.merge(grid: grid(at: { [6, 5] => 92, [6, 6] => 92 }))
+    refute_includes L.stands([6, 5], sighting).map(&:first), [6, 6]
+    assert_equal [[6, 0], [7, 1]].sort, L.stands([7, 0], sightings[[224, 0]].merge(grid: grid(at: { [7, 0] => 92 }))).map(&:first).sort
+  end
+
+  def test_judge
+    assert_equal 'validated', L.judge([trial('success', [224, 0]), trial('failure', [224, 0]), trial('success', [209, 0])])
+    assert_equal 'inconclusive', L.judge([trial('success', [224, 0]), trial('success', [224, 0])])
+    assert_equal 'rejected', L.judge([trial('failure', [224, 0]), trial('not_solid', [224, 0]), trial('failure', [209, 0]), trial('failure', [209, 0])])
+    assert_equal 'inconclusive', L.judge([trial('failure', [224, 0])] * 4)
+    assert_equal 'inconclusive', L.judge([trial('unreached', [224, 0]), trial('unreached', [209, 0])] * 3)
+  end
+
+  Policy = Struct.new(:outcome, :before, :after)
+
+  def test_outcome_needs_blocked_before_effect_and_an_id_change
+    entry = L.hypothesis(gain:, object: 92, run: '20261112-103604-0c64')
+    steps = ->(*stops) { stops.map { |stop| { stopped_by: stop } } }
+    good = { steps: steps.(:done, :blocked, :done, :done, :done), effect: true, frames: 150 }
+    assert_equal 'success', L.outcome(Policy.new(good, 92, 4), entry)['outcome']
+    assert_equal 'failure', L.outcome(Policy.new(good, 92, 92), entry)['outcome']
+    assert_equal 'failure', L.outcome(Policy.new(good.merge(effect: false), 92, 4), entry)['outcome']
+    assert_equal 'not_solid', L.outcome(Policy.new({ steps: steps.(:done, :done), effect: false }, 92, 92), entry)['outcome']
+    assert_equal 'unreached', L.outcome(Policy.new({ steps: steps.(:no_path), effect: false }, 92, 92), entry)['outcome']
+    assert_equal 'unreached', L.outcome(Policy.new(nil, nil, nil), entry)['outcome']
+  end
+
+  def test_the_trial_policy_reads_the_cell_around_one_action_and_stops
+    cells = grid(at: { [6, 5] => 92 })
+    budget = Koholint::Budget.new
+    registry = Koholint::Skills::Registry.default
+    policy = L::Trial.new(registry:, choice: { skill: 'wait', params: { frames: 1 } }, target: [6, 5], budget:)
+    assert_equal :choose_skill, policy.decision_point_for(nil).name
+    answer = policy.decide(nil, nil, { room_objects: -> { cells } })
+    assert_equal({ skill: 'wait', params: { frames: 1 } }, answer[:choice])
+    assert_equal 'learner', answer[:agent]
+    cells[6][5] = 4
+    policy.after_action(choice: answer[:choice], outcome: { stopped_by: :done }, state: nil, frame: 1)
+    assert_equal [92, 4], [policy.before, policy.after]
+    assert_equal :trial_done, budget.exhausted
+  end
+end
