@@ -18,7 +18,7 @@ module Koholint
           super(**rest)
           @cap = cap
           @steps = steps
-          @context = context
+          @context = context.merge(composite: @skill)
           @registry = context.fetch(:registry)
           @capability = capability
           @target = target

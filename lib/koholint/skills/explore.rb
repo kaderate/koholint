@@ -35,14 +35,17 @@ module Koholint
       end
 
       class Leg < Goto::Run
-        def initialize(planner:, **rest)
+        def initialize(planner:, clearing: nil, **rest)
           @shared = planner
+          @shared_clearing = clearing
           super(context: {}, **rest)
         end
 
         private
 
         def planner_for(_context) = @shared
+
+        def clearing_for(_context) = @shared_clearing
       end
 
       class Run < Execution
@@ -60,6 +63,7 @@ module Koholint
           @known = grid && Known.new(grid, @walked)
           @planner = @known && Navigation::Planner.new(grid: @known, ledger: @ledger, place: @place, triggers: context[:triggers], mode: :free_only, danger: danger_of(context), pushable: pushable_of(context))
           @pushable = Array(pushable_of(context)&.call)
+          @clearing = Clearing.of(context)
           @objects = grid ? TalkLog.objects(grid) : []
           @doors = Array(context[:objects]&.call).select { |object| object[:kind].to_s == 'door' && object[:cell][0] < Geometry::ROWS - 1 }.map { |object| object[:cell] }
           @survey = @known && survey
@@ -72,7 +76,8 @@ module Koholint
           @blocked = []
           @crossed = []
           @excluded = []
-          @walls = @log ? @log.walls(@place) : []
+          # Runs without the capability logged clearable objects as walls.
+          @walls = (@log ? @log.walls(@place) : []) - Array(@clearing&.cells&.keys)
           @new_walls = []
           @cells_walked = 0
           @stuck = 0
@@ -87,6 +92,7 @@ module Koholint
           merged = super.merge(place_changed: room(state) != @place, cells_walked: @cells_walked, legs: @legs, target: target_summary,
                                crossed: @crossed.map(&:dup), walls: @new_walls.map { |row, col| { row:, col: } }, blocked_edges: @blocked.map(&:dup), exits: @exits.map(&:dup),
                                offered: @offered.map { |row, col| { row:, col: } })
+          merged[:clears] = @clearing.uses if @clearing&.uses&.any?
           merged[:survey] = @survey.merge(pending: pending?) if @survey
           merged[:route] = @route if @route
           merged[:unreachable] = @unreachable if @unreachable
@@ -106,6 +112,7 @@ module Koholint
 
         def input_for(state)
           return finish(@idle) if @idle
+          return @clearing.step(state) if @clearing&.active? && !@leg
           return depart(state) if room(state) != @place
           return harmed if state.hp.to_i < @start.hp.to_i
           return stop_now(:dialogue) if state.dialog_open?
@@ -213,7 +220,7 @@ module Koholint
             outward_from(state)
           else
             row, col = @target[:cell]
-            @leg = Leg.new(skill: 'goto', params: { row:, col: }, state:, target: @target[:cell], planner: @planner)
+            @leg = Leg.new(skill: 'goto', params: { row:, col: }, state:, target: @target[:cell], planner: @planner, clearing: @clearing)
             @leg.triggers = @triggers
           end
           nil
@@ -250,7 +257,9 @@ module Koholint
           position = [state.x, state.y]
           @outward[:still] = @outward[:frames].positive? && position == @outward[:position] ? @outward[:still] + 1 : 0
           @outward[:position] = position
-          return outward_blocked(state, cell, direction) if @outward[:still] >= STILL_FRAMES || @outward[:frames] >= OUTWARD_FRAMES
+          if @outward[:still] >= STILL_FRAMES || @outward[:frames] >= OUTWARD_FRAMES
+            return @clearing&.start(state, direction) || outward_blocked(state, cell, direction)
+          end
 
           @outward[:frames] += 1
           [direction]

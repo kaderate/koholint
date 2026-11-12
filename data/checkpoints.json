@@ -1,3 +1,4 @@
 [
-  {"name": "sword-obtained", "run": "20261111-194737-9ba1", "frame": 60404, "flow": "flow-37", "source": "item_gained event of run 20261111-194737-9ba1 (fork of 20261111-142812-34ca at frame 52200): item 1 (sword) at frame 60404 in room 242/0, held [1, 4]"}
+  {"name": "sword-obtained", "run": "20261111-194737-9ba1", "frame": 60404, "flow": "flow-37", "source": "item_gained event of run 20261111-194737-9ba1 (fork of 20261111-142812-34ca at frame 52200): item 1 (sword) at frame 60404 in room 242/0, held [1, 4]"},
+  {"name": "clearable-objects-160", "run": "20261112-103604-0c64", "frame": 68444, "flow": "flow-38", "source": "first ready frame of room 160/0 in run 20261112-103604-0c64 (fork of 20261111-194737-9ba1 at frame 60404, sword held): room objects 0x5C at (2,4), (2,5), (2,6), (3,8); a scripted explore from here with sword-on-object-92 cleared three of them and reached 164/17, a place no archived run had seen"}
 ]

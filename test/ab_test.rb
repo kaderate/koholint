@@ -64,6 +64,21 @@ class ABTest < Minitest::Test
     end
   end
 
+  def test_report_counts_only_places_new_to_the_whole_lineage
+    Dir.mktmpdir do |root|
+      fixture(root, 'ab-off-1', cost: 0.01, places: 3, autopilot: false)
+      write = lambda do |id, parent, rooms|
+        FileUtils.mkdir_p(File.join(root, id))
+        File.write(File.join(root, id, 'manifest.json'), JSON.generate({ 'tag' => 'lineage', 'parent' => parent }.compact))
+        File.write(File.join(root, id, 'trace.jsonl'), rooms.map { |room| "#{JSON.generate('type' => 'perception', 'frame' => 5000, 'state' => PLAYING.merge('room_id' => room))}\n" }.join)
+      end
+      write.('p', { 'id' => 'g', 'frame' => 500 }, [2])
+      write.('g', nil, [3])
+      run = Koholint::AB.report(prefix: 'ab', root:)[:arms]['off'][:detail].first
+      assert_equal [1, 1], [run[:places], run[:progress]]
+    end
+  end
+
   def cli(*argv)
     out = StringIO.new
     err = StringIO.new
