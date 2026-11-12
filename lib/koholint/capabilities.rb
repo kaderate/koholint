@@ -13,6 +13,7 @@ module Koholint
     ID = /\A[a-z0-9]+(-[a-z0-9]+)*\z/
     NAME = /\A[a-z][a-z0-9_]*\z/
     PLACES_TO_VALIDATE = 2
+    RUN = /\A\d{8}-\d{6}-\h{4}\z/
 
     module_function
 
@@ -57,10 +58,10 @@ module Koholint
       raise Invalid, "#{id}: steps must be a non-empty list" unless steps.is_a?(Array) && !steps.empty?
 
       require 'koholint/skills/registry'
-      known = Skills::Registry.default.names
+      known = Skills::Composite::CAPS.keys & Skills::Registry.default.names
       steps.each do |step|
         raise Invalid, "#{id}: a step needs skill, params and accept" unless step.is_a?(Hash) && step.keys.sort == %w[accept params skill]
-        raise Invalid, "#{id}: unknown skill #{step['skill']}" unless known.include?(step['skill'])
+        raise Invalid, "#{id}: skill #{step['skill']} cannot be composed" unless known.include?(step['skill'])
         raise Invalid, "#{id}: accept must list stop reasons" unless step['accept'].is_a?(Array) && !step['accept'].empty? && step['accept'].all?(String)
 
         templates = step['params'].values.grep(/\A\$/)
@@ -72,7 +73,17 @@ module Koholint
       history = entry['history']
       raise Invalid, "#{id}: history must hold one record per version" unless entry['version'].is_a?(Integer) && history.is_a?(Array) && history.size == entry['version']
       raise Invalid, "#{id}: the last history record must carry the current status" unless history.last['status'] == entry['status']
-      raise Invalid, "#{id}: evidence must be a list" unless entry['evidence'].is_a?(Array)
+      raise Invalid, "#{id}: evidence must be a list of trials" unless entry['evidence'].is_a?(Array) && entry['evidence'].all?(Hash)
+
+      entry['evidence'].select { |trial| trial['outcome'] == 'success' }.each do |trial|
+        raise Invalid, "#{id}: a success needs place, run, parent and frame" unless traced?(trial)
+      end
+    end
+
+    def traced?(trial)
+      place = trial['place']
+      place.is_a?(Array) && place.size == 2 && place.all?(Integer) && trial['frame'].is_a?(Integer) &&
+        [trial['run'], trial['parent']].all? { |run| run.is_a?(String) && run.match?(RUN) }
     end
 
     def success_places(entry) = entry['evidence'].select { |trial| trial['outcome'] == 'success' }.map { |trial| trial['place'] }.uniq

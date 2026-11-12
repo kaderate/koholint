@@ -353,7 +353,7 @@
         "direction": "up"
       }
     ],
-    "source": "koholint learn: item 1 gained at frame 60404 of run 20261112-103604-0c64; object 92 seen after it and never stood on",
+    "source": "koholint learn: item 1 gained at frame 60404 of run 20261112-103604-0c64; object 92 seen after it and never stood on; the object id was selected by --object (manual override of the ranking)",
     "history": [
       {
         "version": 1,

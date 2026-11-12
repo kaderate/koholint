@@ -1,4 +1,6 @@
+require 'koholint/skills/attack'
 require 'koholint/skills/execution'
+require 'koholint/skills/use_item'
 
 module Koholint
   module Skills
@@ -6,11 +8,15 @@ module Koholint
     class Composite
       DIRECTIONS = %i[up right down left].freeze
       DELTAS = { up: [-1, 0], right: [0, 1], down: [1, 0], left: [0, -1] }.freeze
-      STEP_FRAMES = 900
+      # Skills a capability may compose, with their frame caps; explore (unbounded) and the screen skills are left out.
+      CAPS = { 'goto' => Execution::HARD_CAP, 'walk' => Execution::HARD_CAP, 'step' => Execution::HARD_CAP, 'wait' => Execution::HARD_CAP,
+               'press' => Execution::HARD_CAP, 'advance_dialogue' => Execution::HARD_CAP, 'talk_to' => Execution::HARD_CAP,
+               'use_item' => ItemRun::HARD_CAP, 'guard' => ItemRun::HARD_CAP, 'attack' => Attack::HARD_CAP }.freeze
 
       class Run < Execution
-        def initialize(steps:, context:, capability:, target:, **rest)
+        def initialize(steps:, context:, capability:, target:, cap:, **rest)
           super(**rest)
+          @cap = cap
           @steps = steps
           @context = context
           @registry = context.fetch(:registry)
@@ -29,7 +35,7 @@ module Koholint
 
         private
 
-        def hard_cap = Float::INFINITY
+        def hard_cap = @cap
 
         def input_for(state)
           return finish(:done) if @sub.nil? && @done.size == @steps.size
@@ -55,7 +61,7 @@ module Koholint
 
       def name = @entry['name']
 
-      def max_frames = @entry['steps'].size * STEP_FRAMES
+      def max_frames = @entry['steps'].sum { |step| CAPS.fetch(step['skill']) }
 
       def params_schema
         { type: 'object', title: name,
@@ -83,7 +89,7 @@ module Koholint
           { skill: step['skill'], params: step['params'].transform_values { |value| values.fetch(value, value) }, accept: step['accept'] }
         end
         target = [params[:row], params[:col]].zip(DELTAS.fetch(params[:direction])).map(&:sum)
-        Run.new(skill: name, params:, state:, steps:, context:, target:, capability: { id: @entry['id'], version: @entry['version'] })
+        Run.new(skill: name, params:, state:, steps:, context:, target:, cap: max_frames, capability: { id: @entry['id'], version: @entry['version'] })
       end
     end
   end

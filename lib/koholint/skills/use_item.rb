@@ -6,6 +6,7 @@ module Koholint
   module Skills
     # Puts an item on a button through the START menu when it is not on one, then holds that button.
     class ItemRun < Execution
+      HARD_CAP = 900
       SETTLE_FRAMES = 60
       # Measured: A and B do nothing for 16 frames after close_menu returns (runs 20261020-085011-8330, 20261101-141755-eca1).
       AFTER_MENU_FRAMES = 16
@@ -29,7 +30,7 @@ module Koholint
 
       private
 
-      def hard_cap = 900
+      def hard_cap = HARD_CAP
 
       def input_for(state)
         return begin_with(state) if @steps.nil?

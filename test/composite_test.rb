@@ -83,6 +83,13 @@ class CompositeTest < Minitest::Test
     assert_equal false, result[:effect]
   end
 
+  def test_the_composite_stops_at_the_sum_of_its_step_caps
+    endless = Array.new(5) { Scripted.new(frames: 10_000, stop: :done) }
+    result = drive(composite.start(state, { row: 5, col: 5, direction: 'down' }, { registry: StubRegistry.new(endless) }), limit: 5000)
+    assert_equal :frame_cap, result[:stopped_by]
+    assert_equal composite.max_frames, result[:frames]
+  end
+
   def test_parameters_are_checked
     assert_raises(ArgumentError) { composite.normalize({ row: 8, col: 0, direction: 'up' }) }
     assert_raises(ArgumentError) { composite.normalize({ row: 0, col: 0, direction: 'north' }) }
@@ -98,6 +105,6 @@ class CompositeTest < Minitest::Test
     result = drive(execution)
     assert_equal 'goto', result[:steps].first[:skill]
     assert_equal :step_failed, result[:stopped_by]
-    assert_equal 4500, composite.max_frames
+    assert_equal 400 + 400 + 900 + 400 + 400, composite.max_frames
   end
 end

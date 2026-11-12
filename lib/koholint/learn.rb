@@ -68,7 +68,7 @@ module Koholint
       triggers(events, since: run.manifest.dig('parent', 'frame').to_i).each do |gain|
         sightings = sightings(run, first_frames(events, gain[:frame]))
         candidates(gain:, sightings:, stood: stood(events), known: entries, limit:, object:).each do |candidate|
-          entry = hypothesis(gain:, object: candidate[:object], run: run.id)
+          entry = hypothesis(gain:, object: candidate[:object], run: run.id, selected: !object.nil?)
           out.puts "#{entry['id']}: #{candidate[:places].size} places"
           evidence = try(run, entry, candidate[:places], root:, out:)
           status = judge(evidence)
@@ -131,13 +131,13 @@ module Koholint
       ids.sort_by { |id| [-places[id].size, id] }.first(limit).map { |id| { object: id, places: places[id] } }
     end
 
-    def hypothesis(gain:, object:, run:)
+    def hypothesis(gain:, object:, run:, selected: false)
       item = Items.name(gain[:item]).to_s.delete('?').strip
       slug = item.downcase.gsub(/[^a-z0-9]+/, '_').gsub(/\A_|_\z/, '')
       { 'id' => "#{slug.tr('_', '-')}-on-object-#{object}", 'name' => "#{slug}_on_object_#{object}", 'version' => 1, 'status' => 'hypothesis',
         'trigger' => { 'run' => run, 'frame' => gain[:frame], 'item' => gain[:item] }, 'target' => { 'object' => object },
         'steps' => steps(item), 'effect' => EFFECT, 'evidence' => [],
-        'source' => "koholint learn: item #{gain[:item]} gained at frame #{gain[:frame]} of run #{run}; object #{object} seen after it and never stood on",
+        'source' => "koholint learn: item #{gain[:item]} gained at frame #{gain[:frame]} of run #{run}; object #{object} seen after it and never stood on#{'; the object id was selected by --object (manual override of the ranking)' if selected}",
         'history' => [{ 'version' => 1, 'status' => 'hypothesis', 'reason' => "item #{gain[:item]} gained in run #{run}" }] }
     end
 
