@@ -80,7 +80,7 @@ visited places from the trace; `fork` branches a run at a frame (the parent may 
 `--keep-viewer` keeps it serving after the stop until Ctrl-C (if it could not start, for example on a busy port, `branch` says so and still plays). A checkpoint is a name from `data/checkpoints.json` (`name`, `run`, `frame`, `flow`, `source`),
 checked against the run id and its flow, e.g. `bin/koholint branch runs/20261111-194737-9ba1 --at sword-obtained --frames 3000`.
 
-## Agent skills (`flow-38`)
+## Agent skills (`flow-39`)
 
 - Between decisions the engine waits, with no input, until Link is ready (no screen scroll, door walk, jump or
   knockback, then 2 settled frames): the screen is never mapped and the model never called mid-scroll or mid-jump
@@ -126,7 +126,8 @@ checked against the run id and its flow, e.g. `bin/koholint branch runs/20261111
   run as `unknown_mode_stuck`. Options that quit to the title are refused. The game-over screen is answered by the harness, free: it
   continues with the first option that does not quit (`notable` `death`); a health drop emits a `notable` `damage` and
   the next prompt's health line shows the hearts lost since the last model call. There is no low-health rule (flow-37); six fruitless results in one
-  place without a new cell emit a `notable` `stuck` and a `STUCK` reset hint.
+  place without a new cell emit a `notable` `stuck` and a `STUCK` reset hint; a known place entered 4 times within 3600 frames
+  with no new place emits a `notable` `stuck` (`loop: ...`) and a `LOOP` hint until a new place.
 - The context header lists the items on A and B and in the inventory slots (`data/items.json` names; a `?` marks a name
   not measured yet). `use_item item [button] [frames]` uses a held item (assigning it through the START menu to `button`,
   default B, when it is on no button); `guard frames [direction]` raises the shield (Link walks at full speed and turns

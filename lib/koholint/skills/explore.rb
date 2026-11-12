@@ -63,7 +63,7 @@ module Koholint
           @objects = grid ? TalkLog.objects(grid) : []
           @doors = Array(context[:objects]&.call).select { |object| object[:kind].to_s == 'door' && object[:cell][0] < Geometry::ROWS - 1 }.map { |object| object[:cell] }
           @survey = @known && survey
-          @route = nil
+          @route = @unreachable = @dead_end = nil
           @entering = 0
           @cell = @start.cell
           @offered = near_objects(@cell)
@@ -89,6 +89,8 @@ module Koholint
                                offered: @offered.map { |row, col| { row:, col: } })
           merged[:survey] = @survey.merge(pending: pending?) if @survey
           merged[:route] = @route if @route
+          merged[:unreachable] = @unreachable if @unreachable
+          merged[:dead_end] = true if @dead_end
           merged[:cause] = @fail_cause if @stopped_by == :blocked && @fail_cause
           merged[:untried_objects] = @untried.map { |row, col| { row:, col: } } if @stopped_by == :untried_object
           merged[:tried_exits] = @log ? @log.tried_exits(@place) : [] if @stopped_by == :no_frontier
@@ -318,13 +320,26 @@ module Koholint
         end
 
         def routed(from, path_to)
-          hop = @log&.route(@place, goal: (@aim[:place] if @aim[:place] != @place)) or return []
+          avoid = []
+          first = nil
+          while (hop = @log&.route(@place, goal: (@aim[:place] if @aim[:place] != @place), avoid:))
+            first ||= hop
+            via = hop[:via]
+            found = if via.is_a?(Array) then doors(path_to) { |door| door == via }
+                    else gather(from, path_to) { |cell, direction| :exit if direction == via && neighbour(cell, direction).nil? }
+                    end
+            if found.any?
+              @route = { goal: hop[:goal], next: hop[:next] }
+              return found
+            end
+            avoid << via
+            @unreachable = (@unreachable || []) | [via]
+          end
+          @route = { goal: first[:goal], next: first[:next] } if first
+          @dead_end = true if first
+          side = @log&.pocket_side(@place, from) or return []
 
-          @route = { goal: hop[:goal], next: hop[:next] }
-          via = hop[:via]
-          return doors(path_to) { |door| door == via } if via.is_a?(Array)
-
-          gather(from, path_to) { |cell, direction| :exit if direction == via && neighbour(cell, direction).nil? }
+          gather(from, path_to) { |cell, direction| :exit if direction == side && neighbour(cell, direction).nil? }
         end
 
         def gather(from, path_to)

@@ -28,7 +28,11 @@ module Koholint
       @surveys = {}
       @known = []
       @arrivals = {}
-      @pockets = []
+      @pockets = {}
+      @suspects = {}
+      @assumed = []
+      @doubted = {}
+      @visits = Hash.new(0)
     end
 
     def absorb(result)
@@ -50,11 +54,12 @@ module Koholint
         to = Ledger.pick(exit, :to)
         next unless left && to.is_a?(Array) && to.size == 2 && to.all?(Integer)
 
-        @edges[place][edge_key(exit, cell, direction.to_sym)] = to
+        observe_edge(place, edge_key(exit, cell, direction.to_sym), to)
         note_arrival(to, cell, direction.to_sym) if Ledger.pick(exit, :kind).to_s != 'door'
-        @edges[to][OPPOSITE.fetch(direction.to_sym)] ||= place if Ledger.pick(exit, :kind).to_s != 'door' && OPPOSITE.key?(direction.to_sym)
+        assume_edge(to, OPPOSITE.fetch(direction.to_sym), place) if Ledger.pick(exit, :kind).to_s != 'door' && OPPOSITE.key?(direction.to_sym)
         know(to)
       end
+      drop_unreachable(place, result) if Ledger.pick(result, :dead_end)
       Array(Ledger.pick(result, :offered)).each { |object| offer(place, cell_of(object)) }
       Array(Ledger.pick(result, :walls)).each { |wall| (@walls[place] << cell_of(wall)).uniq! }
       Array(Ledger.pick(result, :crossed)).each do |row, col, direction|
@@ -66,6 +71,9 @@ module Koholint
 
     def note(result)
       %i[from to].each { |end_| (place = Ledger.place_of(Ledger.pick(result, end_))) && know(place) }
+      from = Ledger.place_of(Ledger.pick(result, :from))
+      to = Ledger.place_of(Ledger.pick(result, :to))
+      @visits[to] += 1 if from && to && from != to
       note_crossing(result)
     end
 
@@ -81,8 +89,21 @@ module Koholint
       direction = Ledger.pick(Ledger.pick(result, :params) || {}, :direction)&.to_s&.to_sym
       return unless OPPOSITE.key?(direction)
 
-      @edges[from][direction] ||= to
-      @edges[to][OPPOSITE.fetch(direction)] ||= from
+      observe_edge(from, direction, @edges[from].fetch(direction, to))
+      assume_edge(to, OPPOSITE.fetch(direction), from)
+    end
+
+    # The way back across an edge Link crossed once is assumed until he crosses it; explores that find no exit for it on two visits drop it (a ledge jumped down).
+    def observe_edge(place, key, to)
+      @edges[place][key] = to
+      @assumed.delete([place, key])
+    end
+
+    def assume_edge(place, key, to)
+      return if @edges[place].key?(key)
+
+      @edges[place][key] = to
+      @assumed << [place, key]
     end
 
     def walked(place) = @walked.fetch(place, []).dup
@@ -104,15 +125,20 @@ module Koholint
         survey[:doors].any? { |cell| !door_tried?(place, cell) }
     end
 
-    def route(from, goal: nil)
+    def route(from, goal: nil, avoid: [])
+      hops = path(from, goal:, avoid:) or return nil
+      { goal: hops.last[:to], next: hops.first[:to], via: hops.first[:via] }
+    end
+
+    def path(from, goal: nil, avoid: [])
       seen = { from => nil }
       queue = [from]
       until queue.empty?
         place = queue.shift
-        return first_hop(seen, place, from) if place != from && (goal ? place == goal : untried?(place))
+        return hops_to(seen, place) if place != from && (goal ? place == goal : untried?(place))
 
         @edges.fetch(place, {}).each do |key, to|
-          next if seen.key?(to) || pocket?(to, key)
+          next if seen.key?(to) || pocket?(to, key) || (place == from && avoid.include?(key))
 
           seen[to] = [place, key]
           queue << to
@@ -121,8 +147,9 @@ module Koholint
       nil
     end
 
-    # The cell an exit lands on in the next place; a call that finds nothing to do there while some place still has work
-    # shows the landing is a closed pocket, which routes must not enter.
+    # The cell an exit lands on in the next place; a call that finds nothing to do there while some place still has work, or
+    # whose route has no reachable exit on two visits (an enemy may block it once), shows the landing is a closed pocket: routes must not
+    # enter it, and Link leaves a landing suspected or known as one the way he came.
     def note_arrival(to, cell, direction)
       return unless OPPOSITE.key?(direction)
 
@@ -135,16 +162,37 @@ module Koholint
     end
 
     def note_pocket(place, result)
-      return unless Ledger.pick(result, :stopped_by).to_s == 'no_frontier' && Ledger.pick(result, :cells_walked).to_i.zero?
-
       from = Ledger.pick(result, :from)
       cell = [Ledger.pick(from, :row), Ledger.pick(from, :col)]
-      return unless route(place)
+      side = landing_side(place, cell) or return
+      idle = Ledger.pick(result, :stopped_by).to_s == 'no_frontier' && Ledger.pick(result, :cells_walked).to_i.zero?
+      return @pockets[[place, cell]] ||= side if idle && route(place)
 
-      @arrivals.each { |(where, side), arrival| @pockets << [where, side] if where == place && arrival == cell && !@pockets.include?([where, side]) }
+      @pockets[[place, cell]] ||= side if Ledger.pick(result, :dead_end) && again?(@suspects, [place, cell], place)
     end
 
-    def pocket?(to, key) = key.is_a?(Symbol) && OPPOSITE.key?(key) && @pockets.include?([to, OPPOSITE.fetch(key)])
+    def pocket_side(place, cell) = @pockets[[place, cell]] || (landing_side(place, cell) if @suspects.key?([place, cell]))
+
+    def pocket?(to, key) = key.is_a?(Symbol) && OPPOSITE.key?(key) && @pockets.key?([to, @arrivals[[to, OPPOSITE.fetch(key)]]])
+
+    def landing_side(place, cell) = @arrivals.find { |(where, _), arrival| where == place && arrival == cell }&.dig(0, 1)
+
+    def drop_unreachable(place, result)
+      Array(Ledger.pick(result, :unreachable)).each do |via|
+        key = via.is_a?(Array) ? via : via.to_s.to_sym
+        next unless @assumed.include?([place, key]) && again?(@doubted, [place, key], place)
+
+        @assumed.delete([place, key])
+        @edges[place].delete(key)
+      end
+    end
+
+    def again?(seen, key, place)
+      return true if seen.key?(key) && seen[key] != @visits[place]
+
+      seen[key] ||= @visits[place]
+      false
+    end
 
     def hops(from)
       found = { from => 0 }
@@ -184,10 +232,14 @@ module Koholint
 
     def edge_key(exit, cell, direction) = Ledger.pick(exit, :kind).to_s == 'door' ? [cell[0] - 1, cell[1]] : direction
 
-    def first_hop(seen, goal, from)
+    def hops_to(seen, goal)
+      hops = []
       place = goal
-      place = seen[place][0] while seen[place][0] != from
-      { goal:, next: place, via: seen[place][1] }
+      while seen[place]
+        hops.unshift({ via: seen[place][1], to: place })
+        place = seen[place][0]
+      end
+      hops
     end
 
     # A call that left the place after a few cells saw only the strip it arrived by: its survey stands until a longer one replaces it.

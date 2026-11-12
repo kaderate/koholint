@@ -292,7 +292,7 @@ module Koholint
         events = events_for(run)
         autopilot = Autopilot.new unless run.manifest['autopilot'] == false
         delegated = Policies::Delegated.new(client:, autopilot:, registry: Skills::Registry.default, objectives: objectives_for(run, events), ledger: ledger_for(run, events),
-                                            triggers: Triggers.from_events(events), talk_log: TalkLog.from_events(events), explore_log: ExploreLog.from_events(events), leads: Leads.from_events(events), manual:, on_step: budget.method(:step_done), budget:, cards: PlaceCard.latest(events),
+                                            triggers: Triggers.from_events(events), talk_log: TalkLog.from_events(events), explore_log: ExploreLog.from_events(events), leads: Leads.from_events(events), manual:, on_step: budget.method(:step_done), budget:, cards: PlaceCard.latest(events), loop_watch: LoopWatch.from_events(events),
                                             on_activity: run.method(:write_activity))
         Policies::StartGame.new(delegated, ready: ->(state) { %i[playing dialogue].include?(state.phase) }, probe:, played: GameState.played?(events))
       end
