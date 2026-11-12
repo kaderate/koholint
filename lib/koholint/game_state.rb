@@ -12,7 +12,8 @@ module Koholint
   GameState = Struct.new(:frame, :room_id, :map_id, :x, :y, :direction, :hp, :max_hp, :milestone,
                          :game_mode, :game_submode, :name_length, :dialog_state, :motion_blocked, :scene_state,
                          :link_motion_state, :game_over_stage, :inventory_cursor, :menu_option, :item_a, :item_b,
-                         :room_transition, :link_airborne, :link_z, :link_knockback, :inventory, :shield_raised, keyword_init: true) do
+                         :room_transition, :link_airborne, :link_z, :link_knockback, :inventory, :shield_raised, :link_frozen,
+                         keyword_init: true) do
     # Link's sprites cover x - 8...x + 8 and y - 16...y; nil when his center is outside the 8x10 grid.
     def self.cell_at(x, y) = Geometry.cell_for(x, y)
 
@@ -27,6 +28,9 @@ module Koholint
     def loading? = game_mode == PLAY_MODE && game_submode != PLAY_SETTLED_SUBMODE
 
     def locked? = motion_blocked.to_i.positive?
+
+    # link_frozen 1 alone was seen for a few frames outside any scene (data/addresses.json).
+    def scene? = link_frozen.to_i > 1
 
     def self.played?(events) = events.any? { |event| event['type'] == 'perception' && event.dig('state', 'game_mode') == PLAY_MODE }
 

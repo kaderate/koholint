@@ -37,6 +37,7 @@ module Koholint
           @face_still = 0
           @press_frames = 0
           @response_frames = 0
+          @closing = nil
           @replans = 0
           @failed = []
           @entities = context[:entities]
@@ -66,9 +67,10 @@ module Koholint
         end
 
         def result(state = @last)
-          merged = super.merge(talked: @talked, standing_cell: (@standing && { row: @standing[0], col: @standing[1] }), facing: @facing, replans: @replans, standing_cells_tried: @tried.map(&:dup))
+          merged = super.merge(talked: @talked || scene_response?, standing_cell: (@standing && { row: @standing[0], col: @standing[1] }), facing: @facing, replans: @replans, standing_cells_tried: @tried.map(&:dup))
           merged[:cause] = FREE_CAUSE if @stopped_by == :target_free
-          merged[:entity] = @entity if @entity
+          entity = @entity || (faced_entity if scene_response?)
+          merged[:entity] = entity if entity
           merged[:person_cells] = @cells.map { |row, col| { row:, col: } } if @who
           merged[:tracked] = @tracks if @tracks.positive?
           merged
@@ -166,6 +168,7 @@ module Koholint
           super
           @phase = :walk
           @face_frames = @face_still = @press_frames = @response_frames = 0
+          @closing = nil
           @face_origin = @face_last = @align_last = nil
           @align_frames = 0
           @facing = facing_from(@standing)
@@ -260,6 +263,8 @@ module Koholint
             return finish(:dialogue) if state.dialog_open? && !@start.dialog_open?
 
             face(state)
+          elsif @phase == :close
+            close_in(state)
           else
             talk(state)
           end
@@ -276,7 +281,8 @@ module Koholint
           @face_origin ||= position
           @face_still = position == @face_last ? @face_still + 1 : 0
           return out_of_reach(state) if @face_still >= CONTACT_FRAMES && @who && !within_reach?(position, slack: Geometry::ALIGN_TOLERANCE)
-          return begin_talk(state) if @face_still >= CONTACT_FRAMES || (@face_frames.positive? && within_reach?(position))
+          return begin_talk(state, contact: true) if @face_still >= CONTACT_FRAMES
+          return begin_talk(state) if @face_frames.positive? && within_reach?(position)
 
           return finish(:target_free) if @who ? passed?(position) : drifted?(position)
 
@@ -347,10 +353,26 @@ module Koholint
           found&.slice(:type, :slot, :kind)&.transform_values { |v| v.is_a?(Symbol) ? v.to_s : v }
         end
 
-        def begin_talk(state)
+        def begin_talk(state, contact: false)
           @phase = :talk
+          @closing = { done: true } if contact
           talk(state)
         end
+
+        # Some targets answer only once Link is pressed against them (the sword of 242/0 at 14 px, not at 19 px within talk reach).
+        def close_in(state)
+          position = [state.x, state.y]
+          @closing[:still] = position == @closing[:last] ? @closing[:still] + 1 : 0
+          @closing[:last] = position
+          @closing[:frames] += 1
+          return [@facing] if @closing[:still] < CONTACT_FRAMES && @closing[:frames] < FACE_FRAMES
+
+          @phase = :talk
+          @response_frames = 0
+          talk(state)
+        end
+
+        def scene_response? = @stopped_by == :scene && !@standing.nil? && @phase != :walk
 
         def talk(state)
           if state.dialog_open? && !@start.dialog_open?
@@ -361,6 +383,11 @@ module Koholint
           end
           refresh_who
           return out_of_reach(state) if @who && !within_reach?([state.x, state.y], slack: Geometry::ALIGN_TOLERANCE)
+          if @response_frames >= RESPONSE_FRAMES && @who && !@closing
+            @phase = :close
+            @closing = { still: 0, last: nil, frames: 0 }
+            return close_in(state)
+          end
           if @response_frames >= RESPONSE_FRAMES
             note_tried(:no_response)
             @failed << @standing

@@ -42,6 +42,7 @@ module Koholint
       PATH_SKILLS = %w[goto talk_to explore attack].freeze
       LOCKED_WAIT = { skill: 'wait', params: { frames: 30 } }.freeze
       LOCKED_WAIT_LIMIT_FRAMES = 900
+      SETTLE_FRAMES = 30
       HEMMED_WAIT_LIMIT = 1800 / HEMMED_WAIT[:params][:frames]
       SCREEN_SKILLS = { menu: %w[menu_move menu_assign close_menu press wait], map: %w[close_map press wait], save: %w[choose_option press wait],
                         game_over: %w[choose_option press wait], unknown: %w[press wait] }.freeze
@@ -101,8 +102,8 @@ module Koholint
 
       def decision_point_for(state)
         return @screen_points.fetch(screen(state)) if screen(state)
-        return @skill_point if locked_waiting?(state)
-        return @skill_point if revisit_candidate(state)
+        return @skill_point if locked_waiting?(state) || settling?(state)
+        return @skill_point if revisit_candidate(state) || (state.phase == :dialogue && !@agent_driven)
 
         @objectives.current ? @skill_point : DecisionPoint.choose_objective
       end
@@ -137,6 +138,7 @@ module Koholint
         @prompt = @image = @images = @reading = nil
         @revisit_acting = false
         @autopilot_acting = false
+        @flushing = false
         prepare(context)
         context[:ledger] = @ledger
         context[:triggers] = @triggers
@@ -156,6 +158,7 @@ module Koholint
 
           @reading = cached_reading(decision_point, state)
           return locked_wait.merge(@reading || {}) if locked_waiting?(state)
+          return settle_wait(state).merge(@reading || {}) if settling?(state)
 
           revisit = revisit_choice(decision_point, state)
           return revisit.merge(@reading || {}) if revisit
@@ -185,7 +188,7 @@ module Koholint
         remember_text(transcription[:transcription], state) unless @reading
         notes = notes_for(reply.output, transcription[:transcription], state)
         result = answer(choice, reply, reply.output).merge(plan ? { plan: } : {}).merge(transcription).merge(notes)
-        keep_moving(@images ? override_for_revisit(result, decision_point, state) : result, state)
+        continue_dialogue(keep_moving(@images ? override_for_revisit(result, decision_point, state) : result, state), state)
       rescue NameError, TypeError
         raise
       rescue StandardError => e
@@ -207,6 +210,13 @@ module Koholint
         result.merge(choice: EXPLORE, justification: "harness: no standing next to a hostile creature (replaces the model's #{choice[:skill]}): #{result[:justification]}", autopilot: false)
       end
 
+      def continue_dialogue(result, state)
+        return result unless @flushing && state.dialog_open?
+
+        @auto = true
+        result.merge(choice: ADVANCE, justification: "harness: the dialogue goes on after #{@pages_read} pages read, keep advancing (replaces the model's choice): #{result[:justification]}")
+      end
+
       def failure_text(error)
         return error.message if error.is_a?(Failure)
 
@@ -224,6 +234,7 @@ module Koholint
           @page = 0
           @agent_driven = false
         end
+        @flushes = 0 if state.phase == :playing
         if @auto || @locked_wait
           @auto = @locked_wait = false
           return track { @objectives.update(state, frame:) }
@@ -601,7 +612,9 @@ module Koholint
         return unless decision_point.name == :choose_skill && state.phase == :dialogue && !@agent_driven
 
         if @sequence && sequence_full?(state)
-          @agent_driven = true
+          @flushes = @flushes.to_i + 1
+          @flushing = @flushes == 1
+          @agent_driven = true unless @flushing
           @objectives.touch(frame: state.frame)
           return
         end
@@ -631,6 +644,7 @@ module Koholint
             @objectives.touch(frame: state.frame)
           end
         elsif @locked_since && !state.loading?
+          @settle_until = state.frame + SETTLE_FRAMES if state.phase == :playing && locked_frames(state) >= SETTLE_FRAMES
           @locked_since = nil
           @objectives.touch(frame: state.frame)
         end
@@ -640,13 +654,30 @@ module Koholint
 
       def locked_waiting?(state)
         track_locked(state)
-        WAIT_PHASES.include?(state.phase) && locked_frames(state) < LOCKED_WAIT_LIMIT_FRAMES
+        return false unless WAIT_PHASES.include?(state.phase)
+        return true if locked_frames(state) < LOCKED_WAIT_LIMIT_FRAMES
+
+        unless @lock_capped == @locked_since
+          @lock_capped = @locked_since
+          @notes << { kind: 'lock_cap', detail: "#{state.mode&.name || state.phase} held Link for #{locked_frames(state)} frames: the model decides from now on" }
+        end
+        false
       end
 
       def locked_wait
         @locked_wait = true
         { choice: LOCKED_WAIT, justification: 'locked: waiting for Link to be free', confidence: 1.0, agent: 'delegated', latency_ms: 0, cost_usd: 0.0,
           fallback: false, prompt: nil, image: nil }
+      end
+
+      # The sword scene of 242/0 released Link for 3 frames between two locks, so a long lock is trusted over only after a short wait.
+      def settling?(state) = !!@settle_until && state.phase == :playing && state.frame < @settle_until
+
+      def settle_wait(state)
+        @locked_wait = true
+        frames = @settle_until - state.frame
+        { choice: { skill: 'wait', params: { frames: } }, justification: "locked: Link was just released, waiting #{frames} frames in case the scene goes on",
+          confidence: 1.0, agent: 'delegated', latency_ms: 0, cost_usd: 0.0, fallback: false, prompt: nil, image: nil }
       end
 
       def hemmed_wait
@@ -818,7 +849,7 @@ module Koholint
         case target[:kind]
         when 'exit' then { choice: { skill: 'explore', params: { direction: target[:direction] } } } if here
         when 'door' then { choice: EXPLORE, aim: { door: target[:cell] } } if here
-        when 'person', 'sign'
+        when 'person', 'sign', 'examine'
           return (@objectives.current.dig(:predicate, :kind).to_s == 'reach_place' ? { choice: EXPLORE, aim: { place: target[:place] } } : nil) unless here
 
           cell = target[:kind] == 'person' ? entities_now.find { |entity| entity[:type] == target[:type] && entity[:cell] }&.dig(:cell) : target[:cell]

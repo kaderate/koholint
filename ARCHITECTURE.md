@@ -34,14 +34,14 @@ deterministic, so *ROM + journal* is the whole run. Time is the frame; wall cloc
 pacing (`pacer.rb`) and observability.
 
 **Perception** — `perception.rb`, `addresses.rb`, `game_state.rb`, `data/addresses.json`: a typed `GameState`
-(position, room/map, HP, phase such as dialogue or locked, milestone, inventory cursor, menu option, A/B items, the 10 inventory slots, `shield_raised`) read from RAM. Every address carries
+(position, room/map, HP, phase such as dialogue or locked, `link_frozen` (a scripted scene holds Link), milestone, inventory cursor, menu option, A/B items, the 10 inventory slots, `shield_raised`) read from RAM. Every address carries
 provenance and a `verified_count`; `verified` needs two independent checks. No RAM writes to gameplay state.
 `items.rb` and `data/items.json` name item ids (with provenance; unmeasured names are shown with a `?`); the milestone is the best of `shield_level` and the `milestone` of the items held (`none`, `shield`, `sword`). The engine runs an `ItemWatch` on every frame and emits `item_gained` (`item`, `name`, `place`, `held`) the first time an item id appears among the held items after the first play frame (once per id per run, rebuilt from the trace on resume).
 `GameState` also carries the readiness signals (`room_transition`, `link_airborne`, `link_z`, `link_knockback`,
 measured by `probes/readiness_census.rb`, `bin/koholint census ready <run_dir>`). `entities.rb` reads the game's entity table (16 slots: status, type, x, y, state, health) into `{ slot, type, x, y, status, state, health,
 cell, kind }` for the active slots; the kind per type id (`npc`, `enemy`, `object`, `creature`, `unknown`) comes from
 `data/entities.json`, measured by `probes/entity_census.rb` (`bin/koholint census entities`): A pressed next to the
-entity opens a dialogue that does not open with its slot cleared in a control copy (`npc`); contact damage against the
+entity opens a dialogue (or a scripted scene, flow-40, whose dialogue is then awaited up to 600 frames) that does not open with its slot cleared in a control copy (`npc`); contact damage against the
 same control (`enemy`: types 9, 10 and 197 of the beach zone, measured with `EntityCensus.trajectory`, `motion_summary` and `hit_profile`: speed, contact gap, damage and whether the raised shield blocks it); neither, measured (`creature`: not a person, never a talk target, no danger);
 an uncatalogued type is `unknown`. The engine passes `Entities.read` to the policy and
 skills as the `entities` context entry. `Entities.objects` reads the room object table (`room_objects`, one id per cell)
@@ -56,14 +56,14 @@ arrives in another place (226 at 5 house doors of map 0, 225 at one); `--crawl N
 the same map.
 
 **Game modes** — `modes.rb`, `data/modes.json`: the catalogue of the game's screens (intro, file select, name entry,
-loading, play, dialogue, locks, dying, game over, inventory, map, save screen). Each entry has a kind, the engine phase it
+loading, play, dialogue, locks, scripted scenes, dying, game over, inventory, map, save screen). Each entry has a kind, the engine phase it
 routes to, a `match` on the mode tuple (`game_mode`, `game_submode`, `dialog_state`, `motion_blocked`, `scene_state`,
-`link_motion_state`, `game_over_stage`; values are an integer, a list, `nonzero` or `{"not": ...}`), an optional
+`link_motion_state`, `game_over_stage`, `link_frozen`; values are an integer, a list, `nonzero` or `{"not": ...}`), an optional
 `ready` (the settled submode), how to enter and leave it, its inputs, its cursor and options, and provenance
 (`source`, `confidence`, `verified_count`). The validator refuses missing keys, `verified` below two checks and two
 entries that match the same tuple unless one strictly refines the other (the most specific wins). `Modes.for(state)`
 resolves the entry; `GameState#phase` is `boot` for anything outside play mode before the run first played, else the
-entry's phase (`loading`, `playing`, `locked`, `dialogue`, `cutscene`, `menu`, `map`, `save`, `game_over`, `boot` for
+entry's phase (`loading`, `playing`, `locked` (also the `frozen` entry, flow-40: `link_frozen` 0xC1A8 above 1, Link held by a scripted scene such as the owl arriving or the sword of 242/0 touched), `dialogue`, `cutscene`, `menu`, `map`, `save`, `game_over`, `boot` for
 the title screens) or `unknown`; the `ready` of `play` lists the readiness signals at rest (no screen scroll, not in the
 air, no knockback, no door walk: `link_motion_state` not 2, 3 or 4); the engine emits a `notable` `unknown_mode` once per unknown tuple (rebuilt from the
 trace on resume). `probes/mode_census.rb` (`bin/koholint census`; the probes are the only code allowed to write RAM, in throwaway copies, and are used by the CLI only) is the probe that measures them: from a replayed
@@ -129,6 +129,9 @@ person who stays put wins over a walker on the same cells, and A is pressed agai
 dialogue closes: `dialogue_cooldown`); without an entity it falls back on the grid. A catalogued room object (sign,
 furniture, door) on the target cell is the target even with a sprite on or next to it (only an `npc` covering the cell
 replaces it): Link presses toward it until he stops moving, since a sign answers only once he is pressed against it.
+Flow-40: a person that gives nothing after the 48 frames at talk reach gets one more try pressed against it (the sword of 242/0
+answers at 14 px, not at 19); a scripted scene that starts during any skill (`GameState#scene?`) stops it with `scene`, and for
+`talk_to` that counts as the target's answer once Link faces it (`talked`, with the faced `entity`; a scene met on the way is not attributed).
 Its walk never goes up into or out of a door cell (that enters the building). `talk_log.rb` remembers which sides of a person gave no response and, per person (the entity type that `talk_to` faced when the
 dialogue opened, reported in its result, else the last `talk_to` target cell), the key (letters
 and digits only, as for `new_text`) of each stitched text read, its conversation signature and speaker name, and a world stamp (milestone, item ids held, count of `high` and `normal` leads; places visited do not count): the context says whether the last talk gave
@@ -185,7 +188,12 @@ catalogue (see Game modes): the boot script owns `boot` and `loading`; once the 
 mode, rebuilt from the trace on resume) the screens go to the agent with their own skills only (`menu`: `menu_move`,
 `menu_assign`, `close_menu`; `map`: `close_map`; `save`: `choose_option`; `unknown`: `press` and `wait`;
 all with `press` and `wait`), after a deterministic wait while the screen is still opening; `cutscene` (the dying
-animation included) waits like `locked`. The game-over screen is never sent to the model: the policy picks its first
+animation included) waits like `locked`; a lock of 30 frames or more is followed by a 30-frame wait before the model is asked
+(flow-40: the sword scene released Link for 3 frames between two locks); a lock that outlasts the 900-frame wait cap emits one
+`notable` `lock_cap` and the model decides from then on. A dialogue sequence that reaches its page or frame cap is
+sent as sheets once and the advance goes on (the model's choice is replaced while the box is open); only a second cap of the same
+dialogue hands the pages to the model (the owl and sword texts together run over 40 pages); a dialogue that opens with no current
+objective is advanced before a new objective is asked for. The game-over screen is never sent to the model: the policy picks its first
 catalogue option not flagged `quits` with `choose_option` (agent `delegated`, no prompt) and emits one `notable` `death`
 per screen. A drop of `hp` between two observations emits a `notable` `damage` (`hp 16 -> 12`), and the next prompt's
 health line adds the hearts lost (and a death) since the last model call. There is no low-health rule since flow-34 (no retreat, no shelter candidate, no hold after damage). Six `no_frontier`, `no_path`, `blocked` or `stalled` results in one place without reaching a new cell emit a
@@ -196,7 +204,8 @@ frames waited for readiness. `choose_option` refuses (`refused`) the
 catalogue options flagged `quits` (save and quit to the title), and the context lists only the other options.
 
 **Candidates** — `candidates.rb` builds the `choose_objective` menu: people here first (`npc`, status never/new/changed/repeat),
-unread signs here, untried exits by side and untried doors of the place (every candidate that leaves the place is labelled
+unread signs here, unidentified things here (flow-40: `unknown` entities and sprites holding no entity never talked to, nearest 4,
+`examine-ROW-COL`, followed by one `talk_to`), untried exits by side and untried doors of the place (every candidate that leaves the place is labelled
 `leaves unexhausted people here` while such a person is listed), known places with untried exits, people (never/new) and unread signs of
 other places from their last place card (`PlaceCard.latest`, kept current by the policy), and places a lead's `where` resolves to (a
 place id or a place name); remote ones are nearest first by `ExploreLog#hops`, 4 per kind. Each candidate carries an id, a label, a

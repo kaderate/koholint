@@ -1,5 +1,6 @@
 require 'koholint/place_card'
 require 'koholint/place_kinds'
+require 'koholint/talk_log'
 
 module Koholint
   module Candidates
@@ -15,7 +16,8 @@ module Koholint
       people = people_here(place, entities, talk_log, stamp)
       leaving = exits(place, grid, explore_log) + doors(place, signs, explore_log, link) + places(place, hops, explore_log, named) +
                 people_away(place, hops, cards, talk_log, named) + signs_away(place, hops, cards, talk_log, named) + lead_places(place, hops, leads, named)
-      [(shelter(place, hops, named) if low_health)].compact + people + signs_here(place, signs, talk_log) + warn(leaving, people)
+      [(shelter(place, hops, named) if low_health)].compact + people + signs_here(place, signs, talk_log) + unidentified(place, grid, entities, talk_log, link) +
+        warn(leaving, people)
     end
 
     def warn(leaving, people)
@@ -76,6 +78,21 @@ module Koholint
         row, col = sign[:cell]
         { id: "sign-#{row}-#{col}", label: "read the sign at (#{row},#{col}), not read yet", title: "Read the sign at (#{row},#{col})",
           predicate: { kind: 'new_text' }, target: { kind: 'sign', place:, cell: [row, col] } }
+      end
+    end
+
+    # Uncatalogued entities and sprites holding no entity may answer A like a person (the sword of 242/0 before its census).
+    def unidentified(place, grid, entities, talk_log, link)
+      things = entities.select { |entity| entity[:kind].to_s == 'unknown' && entity[:cell] }.uniq { |entity| entity[:type] }
+                       .reject { |entity| talk_log.attempts(place, [[:entity, entity[:type]]]).positive? }
+                       .map { |entity| [entity[:cell], "the unidentified thing (type #{entity[:type]}, not known whether it is a person or hostile)", { kind: 'person', type: entity[:type] }] }
+      sprites = grid ? TalkLog.objects(grid) : []
+      things += sprites.reject { |cells| entities.any? { |entity| entity[:cell] && cells.include?(entity[:cell]) } || talk_log.tried?(sprites, place, cells) }
+                       .map { |cells| [cells.first, 'the unidentified object', { kind: 'examine' }] }
+      near = ->((cell, _, _)) { link ? (cell[0] - link[0]).abs + (cell[1] - link[1]).abs : 0 }
+      things.sort_by { |thing| [near.(thing), thing[0]] }.first(PER_KIND).map do |(row, col), what, target|
+        { id: "examine-#{row}-#{col}", label: "examine #{what} at (#{row},#{col}): stand next to it, face it and press A, never tried",
+          title: "Examine #{what} at (#{row},#{col})"[0, 80], predicate: { kind: 'new_text' }, target: { **target, place:, cell: [row, col] } }
       end
     end
 

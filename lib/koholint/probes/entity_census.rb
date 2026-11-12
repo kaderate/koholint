@@ -16,6 +16,7 @@ module Koholint
       FACE_FRAMES = 6
       PRESS_FRAMES = 4
       RESPONSE_FRAMES = 40
+      SCENE_FRAMES = 600
       CONTACT_FRAMES = 90
       IDLE_FRAMES = 120
       SPRITE_DX = 8
@@ -100,11 +101,14 @@ module Koholint
         PRESS_FRAMES.times { copy.step([:a]) }
         RESPONSE_FRAMES.times.any? do
           copy.step([])
-          dialog?(copy)
-        end || dialog?(copy)
+          answered?(copy)
+        end || answered?(copy)
       end
 
       def dialog?(emulator) = emulator.read(ADDR.fetch(:dialog_state)).positive?
+
+      # A scripted scene (the sword of 242/0) holds Link at once and opens its dialogue well after the response window.
+      def answered?(emulator) = dialog?(emulator) || Perception.read(emulator).scene?
 
       def contact_damage(emulator, entity)
         copy = ModeCensus.copy(emulator)
@@ -183,7 +187,7 @@ module Koholint
 
           emulator.step([:a])
         end
-        RESPONSE_FRAMES.times { dialog?(emulator) ? break : emulator.step([]) }
+        wait_for_dialogue(emulator)
         rows = []
         while dialog?(emulator) && rows.size < PAGE_LIMIT
           rows << Vision::DialogueShot.text_rows(Vision::DialogueShot.rgb(emulator))
@@ -193,6 +197,14 @@ module Koholint
         page_hashes = rows.map { |page| Digest::SHA256.hexdigest(page.join("\n"))[0, Vision::DialogueShot::HASH_CHARS] }
         { pages: rows.size, page_sequence: Digest::SHA256.hexdigest(page_hashes.join(','))[0, Vision::DialogueShot::HASH_CHARS],
           signature: Vision::DialogueShot.signature(rows) }
+      end
+
+      def wait_for_dialogue(emulator)
+        frames = 0
+        until dialog?(emulator) || frames >= SCENE_FRAMES || (frames >= RESPONSE_FRAMES && !Perception.read(emulator).scene?)
+          emulator.step([])
+          frames += 1
+        end
       end
 
       def advance(emulator)

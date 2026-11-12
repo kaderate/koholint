@@ -182,6 +182,57 @@ class TalkToTest < Minitest::Test
     assert_includes 1..Koholint::Skills::TalkTo::REACH.fetch(:right), person[:x] - x
   end
 
+  def drive(execution, x:, y:, contact:, frames: 200, frozen_after_a: nil)
+    inputs = []
+    dialog = 0
+    frozen = 0
+    frames.times do
+      buttons = execution.next_input(state(x:, y:, dialog_state: dialog).tap { |s| s.link_frozen = frozen }) or break
+      inputs << buttons
+      if buttons == [:a]
+        frozen = 104 if frozen_after_a
+        dialog = 3 if !frozen_after_a && x >= contact
+      elsif buttons == [:right] && x < contact
+        x += 1
+      end
+    end
+    [execution.result(state(x:, y:, dialog_state: dialog).tap { |s| s.link_frozen = frozen }), inputs, x]
+  end
+
+  def test_a_person_silent_at_reach_answers_once_pressed_against
+    x, y = centre(4, 5)
+    person = person_at(*centre(4, 6))
+    execution = registry.start('talk_to', state(x:, y:), { row: 4, col: 6 }, { grid: FakeGrid.new, entities: -> { [person] } })
+    result, inputs, x = drive(execution, x:, y:, contact: person[:x] - 14, frames: 300)
+    assert_equal :done, result[:stopped_by], result.inspect
+    assert result[:talked]
+    assert_equal 14, person[:x] - x
+    first_a = inputs.index([:a])
+    assert_includes inputs[first_a..], [:right]
+  end
+
+  def test_a_scene_that_starts_after_a_is_the_answer_of_the_person
+    x, y = centre(4, 5)
+    person = person_at(*centre(4, 6), type: 49)
+    execution = registry.start('talk_to', state(x:, y:), { row: 4, col: 6 }, { grid: FakeGrid.new, entities: -> { [person] } })
+    result, = drive(execution, x:, y:, contact: person[:x] - 14, frozen_after_a: true)
+    assert_equal :scene, result[:stopped_by]
+    assert result[:talked]
+    assert_equal 49, result[:entity][:type]
+  end
+
+  def test_a_scene_met_on_the_way_is_not_attributed
+    x, y = centre(4, 2)
+    person = person_at(*centre(4, 6))
+    execution = registry.start('talk_to', state(x:, y:), { row: 4, col: 6 }, { grid: FakeGrid.new, entities: -> { [person] } })
+    execution.next_input(state(x:, y:))
+    execution.next_input(state(x: x + 1, y:).tap { |s| s.link_frozen = 5 })
+    result = execution.result(state(x: x + 1, y:))
+    assert_equal :scene, result[:stopped_by]
+    refute result[:talked]
+    refute result.key?(:entity)
+  end
+
   def test_a_person_who_leaves_the_screen_is_target_free
     frames = 0
     result, inputs = talk(4, 8, grid: FakeGrid.new, entities: -> { (frames += 1) < 30 ? [person_at(136, 80)] : [] })
