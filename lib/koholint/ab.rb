@@ -69,19 +69,30 @@ module Koholint
       start = manifest.dig('parent', 'frame').to_i
       events = Trace.read(File.join(dir, 'trace.jsonl'))
       before, after = events.partition { |event| event['frame'] < start }
+      known = Summary.visited_places(before) | ancestor_places(File.dirname(dir), manifest)
       frames = [(after.map { |event| event['frame'] }.max || start) - start, 0].max
       decisions = after.select { |event| event['type'] == 'decision' }
       { run: File.basename(dir), frames:, usd: decisions.sum { |event| event['cost_usd'].to_f }, calls: after.count { |event| Summary.model_call?(event) },
         autopilot: decisions.count { |event| event['autopilot'] },
-        places: (Summary.visited_places(after) - Summary.visited_places(before)).size, cells: (cells(after) - cells(before)).size,
-        stalls: after.count { |event| stall?(event) }, progress: progress(before, after), **capability(after) }
+        places: (Summary.visited_places(after) - known).size, cells: (cells(after) - cells(before)).size,
+        stalls: after.count { |event| stall?(event) }, progress: progress(before, after, known), **capability(after) }
     end
 
-    # Game progress after the fork frame: new places, items gained and milestone steps over the first state of the fork.
-    def progress(before, after)
+    # Places any ancestor run reached, after the fork frame too, so a fork's new place is new to the whole lineage.
+    def ancestor_places(root, manifest)
+      places = []
+      while (id = manifest.dig('parent', 'id')) && File.file?(path = File.join(root, id, 'manifest.json'))
+        places |= Summary.visited_places(Trace.read(File.join(root, id, 'trace.jsonl')))
+        manifest = Summary.read_json(path)
+      end
+      places
+    end
+
+    # Game progress after the fork frame: places new to the lineage, items gained and milestone steps over the first state of the fork.
+    def progress(before, after, known = Summary.visited_places(before))
       milestone = ->(events) { Perception::MILESTONES.index(Summary.highest_milestone(events).to_s.to_sym).to_i }
       first = after.find { |event| event['type'] == 'perception' }
-      places = (Summary.visited_places(after) - Summary.visited_places(before)).size
+      places = (Summary.visited_places(after) - known).size
       places + after.count { |event| event['type'] == 'item_gained' } + (first ? [milestone.(after) - milestone.([first]), 0].max : 0)
     end
 

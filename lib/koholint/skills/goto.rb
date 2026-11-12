@@ -22,10 +22,12 @@ module Koholint
           @still = 0
           @idle_reason = nil
           @crossed = []
+          @clearing = Clearing.of(context)
         end
 
         def result(state = @last)
           merged = super.merge(path_length: @initial_length.to_i, steps_done: @index, crossed: @crossed.map(&:dup))
+          merged[:clears] = @clearing.uses if @clearing&.uses&.any?
           merged[:cause] = @cause if @cause && !@path
           merged
         end
@@ -72,15 +74,21 @@ module Koholint
 
         def input_for(state)
           track(state) if @frames.positive?
+          return clearing(state) if @clearing&.active?
           return finish(@idle_reason) if @idle_reason
           return idle(:no_path) unless @path
           return idle(:done) if @path.size < 2 && @frames.zero?
           return finish(:room_change) if room(state) != room(@start)
           return finish(:damage) if state.hp.to_i < @start.hp.to_i
           return finish(:dialogue) if state.dialog_open? && !@start.dialog_open?
-          return finish(:blocked) if @still >= STILL_FRAMES
+          return @clearing&.start(state, @heading) || finish(:blocked) if @still >= STILL_FRAMES
 
           advance(state)
+        end
+
+        def clearing(state)
+          @still = 0
+          @clearing.step(state)
         end
 
         def idle(reason)

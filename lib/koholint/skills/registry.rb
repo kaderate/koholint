@@ -38,6 +38,8 @@ module Koholint
 
       def names = @skills.keys
 
+      def composites = @skills.values.grep(Composite)
+
       def fetch(name)
         @skills.fetch(name.to_s) { raise ArgumentError, "unknown skill #{name.inspect}; known: #{names.join(', ')}" }
       end

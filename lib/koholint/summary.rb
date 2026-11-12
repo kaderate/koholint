@@ -66,14 +66,17 @@ module Koholint
       }
     end
 
-    # Uses of learned capabilities per id@version, and how many changed the target cell's object id.
+    # Uses of learned capabilities per id@version, chosen or run by a moving skill (its clears), and how many changed the target cell's object id.
     def capability_uses(events, since: 0)
       events.each_with_object({}) do |event, uses|
-        capability = event['type'] == 'action' && event['frame'] >= since && event.dig('result', 'capability') or next
-        result = event['result']
-        row = uses["#{capability['id']}@#{capability['version']}"] ||= { uses: 0, cleared: 0 }
-        row[:uses] += 1
-        row[:cleared] += 1 if result.key?('object_before') && result['object_before'] != result['object_after']
+        next unless event['type'] == 'action' && event['frame'] >= since && event['result'].is_a?(Hash)
+
+        [event['result'], *Array(event['result']['clears'])].each do |result|
+          capability = result['capability'] or next
+          row = uses["#{capability['id']}@#{capability['version']}"] ||= { uses: 0, cleared: 0 }
+          row[:uses] += 1
+          row[:cleared] += 1 if result.key?('object_before') && result['object_before'] != result['object_after']
+        end
       end
     end
 

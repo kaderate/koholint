@@ -189,8 +189,23 @@ What this says: offering a validated skill in the context is not enough. Nothing
 `0x5C` cell opens a route, and explore never sends Link there. The next step below (clearable objects as frontiers and route
 cells) is where the use has to come from, and the A/B should be rerun after it.
 
-## Next step after the slice
+## PR 3: clearable objects in explore and the planner (flow-43)
 
-A validated "clears object O" effect is navigation data: the planner and explore could treat O like the pushable urchins of
-flow-35 (a last-resort route cell and a frontier, cleared by the composite on the way). That is where most of the game-progress
-gain should be, and it is a separate PR once the A/B has shown whether the agent uses the skill by itself.
+A published "clears object O" capability is now navigation data (`skills/clearing.rb`). Cells of O join the shield-pushed urchins
+as last-resort route cells. Explore keeps them as frontiers until walked. `goto` (alone or as an explore leg) and explore's outward
+step run the composite once per cell when they are blocked facing one, and record each run in the result's `clears`.
+The object is read again from `room_objects` on every call, because a cleared object may return when the room is re-entered.
+
+**Scripted proof ($0).** The proof plays explore only, with `advance_dialogue` in dialogues, for 3000 frames from the new checkpoint
+`clearable-objects-160` (run `20261112-103604-0c64` at frame 68444, room 160/0). Room 160/0 has `0x5C` at (2,4), (2,5), (2,6)
+and (3,8). With the capability, explore cleared (3,8), (2,6) and (2,5) at frame 69011 (object 92 to 4 each) and entered 164/17
+at frame 69252. None of the 37 archived runs has been to 164/17. Without the capability, Link never left 160/0.
+
+**A/B (tag `cap43`, 5.87 USD).** The A/B ran 3 forks per arm from the same checkpoint, 6000 frames and `--max-dollars 1` each.
+New places are now counted against the whole lineage: every ancestor's trace, including frames after the fork point.
+It **failed** the use criterion. Both arms had 0 capability uses, 0 new places and 0 progress. The capabilities arm cost 0.179 USD
+per 1000 frames and the other arm 0.178. In every fork, the agent's first decision set the objective of talking to a person in
+161/0. Explore followed that objective's exit (`known_place`) instead of a frontier, so no fork crossed a `0x5C` cell.
+The forks then went back and forth between 177/0 and 169/16 (or 161/0 and 178/18), mostly ending in `no_frontier` and
+"revisit npc" rounds, until the dollar cap. The harness clears the object only when explore picks a frontier behind it, and the
+objective-driven autopilot never let it pick one.
