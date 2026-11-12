@@ -30,9 +30,9 @@ module Koholint
   module CLI
     USAGE = 'usage: koholint run|resume <run_dir>|fork <run_dir> --at-frame N|branch <run_dir> --at FRAME|CHECKPOINT|verify <run_dir>|summary <run_dir>|screens <run_dir>|watch <run_dir>|' \
             'archive|star <run_dir> WHY|prune-heavy|census boot|<run_dir> FRAME...|entities <run_dir> FRAME...|objects <run_dir> FRAME...|doors <run_dir> FRAME...|sword <run_dir> FRAME...|ready <run_dir>|npcs|' \
-            'ab-plan <run_dir> --at-frame N|ab-report PREFIX|learn <run_dir> [--limit N --object ID] ' \
+            'ab-plan <run_dir> --at-frame N|ab-report PREFIX|learn <run_dir> [--limit N --object ID]|capability list|publish ID WHY|retire ID WHY ' \
             '[--frames N --minutes N --steps N --dollars X --root DIR --runs-root DIR --tag NAME --realtime --grid --port N --host H --from live|start|DIR ' \
-            '--speed X --agent --autopilot on|off --model M --max-dollars X --claude-command PATH --keep-viewer --commit --full --keep N --yes --arms A,B --forks N --crawl N]'.freeze
+            '--speed X --agent --autopilot on|off --capabilities on|off --model M --max-dollars X --claude-command PATH --keep-viewer --commit --full --keep N --yes --arms A,B --forks N --crawl N]'.freeze
 
     DEFAULT_MODEL = 'sonnet'.freeze
     DEFAULT_MAX_DOLLARS = 1.5
@@ -57,6 +57,7 @@ module Koholint
         o.on('--grid') { options[:grid] = true }
         o.on('--agent') { options[:agent] = true }
         o.on('--autopilot MODE', %w[on off]) { |v| options[:autopilot] = v == 'on' }
+        o.on('--capabilities MODE', %w[on off]) { |v| options[:capabilities] = v == 'on' }
         o.on('--arms LIST', Array) { |v| options[:arms] = v }
         o.on('--forks N', Integer) { |v| options[:forks] = v.positive? ? v : raise(OptionParser::InvalidArgument, v.to_s) }
         o.on('--crawl N', Integer) { |v| options[:crawl] = v.positive? ? v : raise(OptionParser::InvalidArgument, v.to_s) }
@@ -101,7 +102,7 @@ module Koholint
       when 'branch' then branch(run_dir(args), options, budget, flow, out, viewer)
       when 'fork'
         at_frame = options.fetch(:at_frame) { raise OptionParser::MissingArgument, '--at-frame' }
-        child = parent_run(run_dir(args)).fork(at_frame:, flow_version: flow, **options.slice(:tag, :autopilot, :root))
+        child = parent_run(run_dir(args)).fork(at_frame:, flow_version: flow, **options.slice(:tag, :autopilot, :capabilities, :root))
         out.puts "run #{child.dir}"
         0
       when 'watch'
@@ -119,6 +120,7 @@ module Koholint
       when 'learn'
         require 'koholint/learn'
         Learn.learn(parent_run(run_dir(args)), limit: options.fetch(:limit, Learn::LIMIT), object: options[:object], root: options.fetch(:root, Learn::ROOT), out:)
+      when 'capability' then capability(args, out)
       when 'npcs'
         require 'koholint/npc_catalogue'
         out.print NpcCatalogue.markdown(options.fetch(:root, 'runs'))
@@ -145,7 +147,7 @@ module Koholint
     def branch(dir, options, budget, flow, out, viewer)
       parent = parent_run(dir)
       at_frame = Checkpoints.frame_for(parent, options.fetch(:at) { raise OptionParser::MissingArgument, '--at' })
-      child = parent.fork(at_frame:, flow_version: flow, **options.slice(:tag, :autopilot, :root))
+      child = parent.fork(at_frame:, flow_version: flow, **options.slice(:tag, :autopilot, :capabilities, :root))
       out.puts "branch #{child.dir} from #{parent.id} at frame #{at_frame}"
       pid = viewer.call(child.dir, options.slice(:port, :host, :speed))
       code = resume(child.dir, options, budget, flow, out)
@@ -168,6 +170,24 @@ module Koholint
       rescue Errno::ESRCH, Errno::ECHILD
         nil
       end
+    end
+
+    def capability(args, out)
+      action, id, *why = args
+      entries = Capabilities.load
+      case action
+      when 'list'
+        entries.each { |entry| out.puts "#{entry['id']} v#{entry['version']} #{entry['status']}: #{Capabilities.describe(entry)}" }
+        out.puts "digest #{Capabilities.digest(Capabilities.operational(entries))}"
+        return 0
+      when 'publish', 'retire'
+        raise OptionParser::MissingArgument, "capability #{action} ID WHY" if id.nil? || why.empty?
+      else raise OptionParser::InvalidArgument, "capability #{action}"
+      end
+      changed = Capabilities.public_send(action, entries, id, why.join(' '))
+      Capabilities.write(changed)
+      out.puts "#{id}: #{changed.find { |entry| entry['id'] == id }['status']}; digest #{Capabilities.digest(Capabilities.operational(changed))} (runs recorded with another digest resume only through fork)"
+      0
     end
 
     def spawn_viewer(dir, options)
@@ -198,7 +218,7 @@ module Koholint
       parent = parent_run(run_dir(args))
       raise Koholint::Error, "cannot fork at frame #{at_frame}: run has #{parent.inputs.frames} frames" unless (0..parent.inputs.frames).cover?(at_frame)
 
-      plan = { parent: parent.dir, at_frame:, arms: options.fetch(:arms, AB::ARMS.keys), forks: options.fetch(:forks, 3), dollars: options.fetch(:dollars, 0.8),
+      plan = { parent: parent.dir, at_frame:, arms: options.fetch(:arms, AB::DEFAULT_ARMS), forks: options.fetch(:forks, 3), dollars: options.fetch(:dollars, 0.8),
                frames: options.fetch(:frames, 3000), tag: options.fetch(:tag, 'ab'), root: options.fetch(:root, 'tmp/ab/runs') }
       _record, script = AB.plan(**plan, **options.slice(:model))
       out.print File.read(script)
@@ -296,7 +316,8 @@ module Koholint
       lambda do |run|
         events = events_for(run)
         autopilot = Autopilot.new unless run.manifest['autopilot'] == false
-        delegated = Policies::Delegated.new(client:, autopilot:, registry: Skills::Registry.default, objectives: objectives_for(run, events), ledger: ledger_for(run, events),
+        learned = run.manifest['capabilities'] == false ? [] : Capabilities.operational.map { |entry| Skills::Composite.new(entry) }
+        delegated = Policies::Delegated.new(client:, autopilot:, registry: Skills::Registry.default(extra: learned), objectives: objectives_for(run, events), ledger: ledger_for(run, events),
                                             triggers: Triggers.from_events(events), talk_log: TalkLog.from_events(events), explore_log: ExploreLog.from_events(events), leads: Leads.from_events(events), manual:, on_step: budget.method(:step_done), budget:, cards: PlaceCard.latest(events), loop_watch: LoopWatch.from_events(events),
                                             on_activity: run.method(:write_activity))
         Policies::StartGame.new(delegated, ready: ->(state) { %i[playing dialogue].include?(state.phase) }, probe:, played: GameState.played?(events))

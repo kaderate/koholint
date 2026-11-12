@@ -1,3 +1,4 @@
+require 'digest'
 require 'json'
 require 'koholint'
 
@@ -89,6 +90,27 @@ module Koholint
     def success_places(entry) = entry['evidence'].select { |trial| trial['outcome'] == 'success' }.map { |trial| trial['place'] }.uniq
 
     def operational(entries = load) = entries.select { |entry| entry['status'] == 'operational' }
+
+    def digest(entries = operational) = Digest::SHA256.hexdigest(JSON.generate(entries.sort_by { |entry| entry['id'] }))
+
+    def empty_digest = digest([])
+
+    def publish(entries, id, why) = change(entries, id, 'operational', why, from: %w[validated deprecated])
+
+    def retire(entries, id, why) = change(entries, id, 'deprecated', why, from: %w[operational])
+
+    def change(entries, id, status, why, from:)
+      entry = entries.find { |e| e['id'] == id } or raise Invalid, "no capability #{id}"
+      raise Invalid, "#{id} is #{entry['status']}, not #{from.join(' or ')}" unless from.include?(entry['status'])
+
+      entries.map { |e| e['id'] == id ? transition(e, status, why) : e }
+    end
+
+    def describe(entry)
+      places = success_places(entry).map { |place| place.join('-') }.join(' and ')
+      item = entry['steps'].find { |step| step['skill'] == 'use_item' }&.dig('params', 'item') || 'item'
+      "uses the #{item} facing object #{entry['target']['object']} and steps into its cell; validated by experiment in #{places}: the object was cleared and Link walked into its cell"
+    end
 
     def transition(entry, status, reason, evidence: entry['evidence'])
       version = entry['version'] + 1

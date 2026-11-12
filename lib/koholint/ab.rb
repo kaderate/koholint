@@ -2,29 +2,33 @@ require 'fileutils'
 require 'json'
 require 'shellwords'
 require 'koholint/game_state'
+require 'koholint/perception'
 require 'koholint/summary'
 require 'koholint/trace'
 
 module Koholint
   module AB
-    ARMS = { 'autopilot' => 'on', 'off' => 'off' }.freeze
+    ARMS = { 'autopilot' => %w[--autopilot on], 'off' => %w[--autopilot off], 'capabilities' => %w[--autopilot on --capabilities on],
+             'no-capabilities' => %w[--autopilot on --capabilities off] }.freeze
+    CHOSEN_FORKS = 2
+    DEFAULT_ARMS = %w[autopilot off].freeze
     BIN = File.expand_path('../../bin/koholint', __dir__)
     COST_SHARE = 0.5
     PLACES_SHARE = 0.9
 
     module_function
 
-    def plan(parent:, at_frame:, arms: ARMS.keys, forks: 3, dollars: 0.8, frames: 3000, tag: 'ab', root: 'tmp/ab/runs', model: nil, out_dir: 'tmp/ab')
+    def plan(parent:, at_frame:, arms: DEFAULT_ARMS, forks: 3, dollars: 0.8, frames: 3000, tag: 'ab', root: 'tmp/ab/runs', model: nil, out_dir: 'tmp/ab')
       unknown = arms - ARMS.keys
       raise Error, "unknown arms #{unknown.join(', ')} (known: #{ARMS.keys.join(', ')})" unless unknown.empty?
 
       runs = (1..forks).flat_map do |k|
         arms.map do |arm|
           name = "#{tag}-#{arm}-#{k}"
-          mode = ARMS.fetch(arm)
+          flags = ARMS.fetch(arm)
           { arm:, k:, tag: name,
-            fork: ['fork', parent, '--at-frame', at_frame.to_s, '--root', root, '--tag', name, '--autopilot', mode],
-            resume: ['resume', '$child', '--agent', '--autopilot', mode, '--max-dollars', dollars.to_s, '--frames', frames.to_s,
+            fork: ['fork', parent, '--at-frame', at_frame.to_s, '--root', root, '--tag', name, *flags],
+            resume: ['resume', '$child', '--agent', *flags.first(2), '--max-dollars', dollars.to_s, '--frames', frames.to_s,
                      *(model ? ['--model', model] : [])] }
         end
       end
@@ -70,7 +74,20 @@ module Koholint
       { run: File.basename(dir), frames:, usd: decisions.sum { |event| event['cost_usd'].to_f }, calls: after.count { |event| Summary.model_call?(event) },
         autopilot: decisions.count { |event| event['autopilot'] },
         places: (Summary.visited_places(after) - Summary.visited_places(before)).size, cells: (cells(after) - cells(before)).size,
-        stalls: after.count { |event| stall?(event) } }
+        stalls: after.count { |event| stall?(event) }, progress: progress(before, after), **capability(after) }
+    end
+
+    # Game progress after the fork frame: new places, items gained and milestone steps over the first state of the fork.
+    def progress(before, after)
+      milestone = ->(events) { Perception::MILESTONES.index(Summary.highest_milestone(events).to_s.to_sym).to_i }
+      first = after.find { |event| event['type'] == 'perception' }
+      places = (Summary.visited_places(after) - Summary.visited_places(before)).size
+      places + after.count { |event| event['type'] == 'item_gained' } + (first ? [milestone.(after) - milestone.([first]), 0].max : 0)
+    end
+
+    def capability(events)
+      uses = Summary.capability_uses(events).values
+      { capability_uses: uses.sum { |row| row[:uses] }, capability_cleared: uses.sum { |row| row[:cleared] } }
     end
 
     def cells(events)
@@ -94,10 +111,15 @@ module Koholint
       rate = ->(key) { Summary.per_1000(runs.sum { |run| run[key] }, frames) }
       { runs: runs.size, frames:, usd: runs.sum { |run| run[:usd] }.round(6), usd_per_1000f: rate.(:usd), calls_per_1000f: rate.(:calls),
         places_per_1000f: rate.(:places), cells_per_1000f: rate.(:cells), stalls: runs.sum { |run| run[:stalls] },
-        autopilot_decisions: runs.sum { |run| run[:autopilot] }, detail: runs }
+        autopilot_decisions: runs.sum { |run| run[:autopilot] }, progress: runs.sum { |run| run[:progress] }, progress_per_1000f: rate.(:progress),
+        progress_per_usd: runs.sum { |run| run[:usd] }.positive? ? (runs.sum { |run| run[:progress] } / runs.sum { |run| run[:usd] }).round(3) : nil,
+        chosen_forks: runs.count { |run| run[:capability_uses].positive? }, capability_uses: runs.sum { |run| run[:capability_uses] },
+        capability_cleared: runs.sum { |run| run[:capability_cleared] }, detail: runs }
     end
 
     def criterion(arms)
+      return usage_criterion(arms['capabilities']) if arms.key?('capabilities')
+
       on = arms['autopilot']
       off = arms['off']
       return { verdict: 'incomplete', rule: rule } unless on && off && on[:usd_per_1000f] && off[:usd_per_1000f]
@@ -108,16 +130,28 @@ module Koholint
       { verdict: pass ? 'pass' : 'fail', rule:, cost_ratio: cost&.round(3), places_ratio: places&.round(3) }
     end
 
+    def usage_criterion(on)
+      rule = "the capability is chosen in at least #{CHOSEN_FORKS} forks of the capabilities arm and at least one use clears its object (progress per fork is a guard)"
+      return { verdict: 'incomplete', rule: } unless on
+
+      { verdict: on[:chosen_forks] >= CHOSEN_FORKS && on[:capability_cleared].positive? ? 'pass' : 'fail', rule:, chosen_forks: on[:chosen_forks], cleared: on[:capability_cleared] }
+    end
+
     def rule = "autopilot cost per 1000 frames <= #{(COST_SHARE * 100).round} % of off and places per 1000 frames >= #{(PLACES_SHARE * 100).round} % of off"
 
-    COLUMNS = %i[runs frames usd usd_per_1000f calls_per_1000f places_per_1000f cells_per_1000f stalls autopilot_decisions].freeze
+    COLUMNS = %i[runs frames usd usd_per_1000f calls_per_1000f places_per_1000f cells_per_1000f stalls autopilot_decisions progress progress_per_1000f
+                 progress_per_usd chosen_forks capability_uses capability_cleared].freeze
 
     def markdown(result)
       lines = ["A/B #{result[:prefix]} (#{result[:root]})", '', "| arm | #{COLUMNS.join(' | ')} |", "|---|#{COLUMNS.map { '---' }.join('|')}|"]
       result[:arms].each { |arm, row| lines << "| #{arm} | #{COLUMNS.map { |key| row[key].nil? ? '-' : row[key] }.join(' | ')} |" }
       verdict = result[:criterion]
-      ratios = verdict.slice(:cost_ratio, :places_ratio).map { |key, value| "#{key} #{value.nil? ? '-' : value}" }.join(', ')
+      ratios = verdict.slice(:cost_ratio, :places_ratio, :chosen_forks, :cleared).map { |key, value| "#{key} #{value.nil? ? '-' : value}" }.join(', ')
       lines << '' << "Criterion (#{verdict[:rule]}): #{verdict[:verdict]}#{ratios.empty? ? '' : " (#{ratios})"}"
+      lines << '' << '| arm | run | frames | usd | places | progress | capability uses | cleared |' << '|---|---|---|---|---|---|---|---|'
+      result[:arms].each do |arm, row|
+        row[:detail].each { |run| lines << "| #{arm} | #{run.values_at(:run, :frames, :usd, :places, :progress, :capability_uses, :capability_cleared).join(' | ')} |" }
+      end
       "#{lines.join("\n")}\n"
     end
   end

@@ -5,6 +5,7 @@ require 'open3'
 require 'securerandom'
 require 'koholint'
 require 'koholint/agents/prompts'
+require 'koholint/capabilities'
 require 'koholint/trace'
 require 'koholint/input_log'
 
@@ -12,10 +13,11 @@ module Koholint
   class Run
     class VersionMismatch < Error; end
     class RomMismatch < Error; end
+    class CapabilitiesMismatch < Error; end
 
     attr_reader :dir, :manifest
 
-    def self.create(root: 'runs', flow_version:, budget:, parent: nil, seed: 0, rom_path: Koholint.rom_path, tag: nil, model: nil, autopilot: nil)
+    def self.create(root: 'runs', flow_version:, budget:, parent: nil, seed: 0, rom_path: Koholint.rom_path, tag: nil, model: nil, autopilot: nil, capabilities: Capabilities.digest)
       dir = unique_dir(root)
       FileUtils.mkdir_p(File.join(dir, 'save'))
       FileUtils.mkdir_p(File.join(dir, 'keyframes'))
@@ -26,7 +28,7 @@ module Koholint
       manifest = { 'flow_version' => flow_version, 'rom_sha256' => rom_hash(rom_path), 'seed' => seed,
                    'budget' => JSON.parse(JSON.generate(budget)), 'status' => 'created', 'parent' => parent,
                    'tag' => tag, 'harness_sha' => harness_sha, 'prompts_sha' => Agents::Prompts.digest, 'model' => model,
-                   'autopilot' => autopilot }
+                   'autopilot' => autopilot, 'capabilities' => capabilities }
       new(dir, manifest).tap(&:write_manifest)
     end
 
@@ -85,6 +87,8 @@ module Koholint
       raise Error, "cannot fork at frame #{at_frame}: run has #{inputs.frames} frames" unless (0..inputs.frames).cover?(at_frame)
 
       inherited = { tag: manifest['tag'], model: manifest['model'], autopilot: manifest['autopilot'] }.merge(overrides.slice(:tag, :model, :autopilot))
+      loads = overrides.fetch(:capabilities) { manifest['capabilities'] != false }
+      inherited[:capabilities] = loads ? Capabilities.digest : false
       child = self.class.create(root:, flow_version:, budget: manifest['budget'], parent: { 'id' => id, 'frame' => at_frame }, seed: manifest['seed'],
                                 rom_path:, **inherited)
       journal = InputLog.new(File.join(child.dir, 'inputs.log'))
@@ -99,6 +103,15 @@ module Koholint
         FileUtils.cp(path, File.join(child.dir, 'keyframes')) if File.basename(path)[/\d+/].to_i <= at_frame
       end
       self.class.open(child.dir, flow_version: flow_version, rom_path: rom_path)
+    end
+
+    # A run resumes with the capability set it was recorded with; false (an A/B off arm) loads none, a missing key is the empty set.
+    def check_capabilities!(current = Capabilities.digest)
+      recorded = manifest.fetch('capabilities', Capabilities.empty_digest)
+      return if recorded == false || recorded == current
+
+      raise CapabilitiesMismatch, "run #{id} was recorded with capabilities #{recorded}, current is #{current}; " \
+                                  "fork it (koholint fork #{dir} --at-frame #{inputs.frames}) to continue with the current set"
     end
 
     def lock!

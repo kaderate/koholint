@@ -70,7 +70,7 @@ first dungeon is not known and is not looked up (walkthrough knowledge stays out
 | 2 | `lib/koholint/skills/composite.rb` (new) | An `Execution` that runs its steps one after the other, the pattern of `ItemRun#menu` in `skills/use_item.rb`. Each step is started through `context[:registry].start` with the composite's context, so `Shielded` wraps the moving sub-steps (`goto`, `walk`) and `triggers` still apply; the composite itself is never in `Shielded::MOVING` (no double wrap). Params `row`, `col` (Link's standing cell) and `direction` (facing the target), substituted for `$row`, `$col`, `$direction` in step params. Each step has an `accept` list of stop reasons (the facing `step` before the item: `blocked`); any other stop ends the composite with `step_failed`. Result: `Execution#result` plus `capability: {id, version}`, `steps` (skill and `stopped_by` each) and `effect` (the last step entered the target cell). Hard cap: the sum of the steps' caps (`Composite::CAPS`: 400 for `goto`, `step`, `walk`, `wait` and the other bounded skills, 900 for `use_item`, `guard` and `attack`; `explore`, which is unbounded, and the screen skills cannot be composed). |
 | 3 | `skills/registry.rb` `Registry.default`, `Registry#start` | `default(capabilities: Capabilities.operational)` appends one `Composite` per entry. `Registry#start` passes itself to the skill as `context[:registry]`: `Registry.default` builds the skills before the registry exists, so a composite cannot hold it at construction. The schema enum, `DecisionPoint.choose_skill` and the delegated policy's `@skill_point` (`registry.names - SCREEN_ONLY`) pick the names up with no other change. Composites never join `Delegated::PATH_SKILLS` (their params carry a `direction` and their results no `crossed`, which the path bookkeeping expects). |
 | 4 | `cli.rb` `policy_factory` and `dispatch` | Pass the operational set (or none when the manifest says `capabilities: false`) to `Registry.default`; new commands `learn <run_dir>`, `capability publish|retire <id> <why>`, `capability list`. |
-| 5 | `run.rb` `Run.create`, `Run.open`, `Run#fork` | Manifest key `capabilities`: the digest, or `false` for an A/B off arm (inherited and overridable on fork like `autopilot`). `open` refuses a run whose digest differs from the current one, as it refuses another `flow_version`, so a run stays one flow while capability data changes without a code bump. Obligations in "Build PRs" below. |
+| 5 | `run.rb` `Run.create`, `Run.open`, `Run#fork` | Manifest key `capabilities`: the digest, or `false` for an A/B off arm (inherited and overridable on fork like `autopilot`). `Engine.resume` refuses a run whose digest differs from the current one (`Run#check_capabilities!`; `Run.open` does not check it, so `verify`, `summary` and `fork` still open any run), so a run stays one flow while capability data changes without a code bump. Obligations in "Build PRs" below. |
 | 6 | `engine.rb` `context_for` + `entities.rb` | One more context entry `room_objects: -> { Entities.room_objects(@emulator) }` (the raw 8x10 ids, read-only; `Entities.objects` keeps catalogued ids only). The trial policy reads it for the oracle, the agent context for the learned block. Nothing else in the engine: triggers are read offline. |
 | 7 | `agents/context.rb` `build` (called from `Delegated#ask`) | A "Learned skills" block, only for operational entries whose target object is on screen: name, one generated line ("clears object 92: stand next to it, face it; validated in 224-0 and 209-0"), the object's cells here, and real-use counts (uses, effects). The system prompt (`agents/prompts.rb` `SKILL`) is not touched, so `prompts_sha` stays a code fact. |
 | 8 | `summary.rb` `from_events`, `MANIFEST_KEYS` | `capabilities`: per `id@version`, uses, effects, frames, read from `action` results carrying `capability`; add `capabilities` to the manifest keys. |
@@ -169,6 +169,25 @@ blocked walk recentres Link with 1 or 2 frames in the opposite direction, so he 
 step is now `step 16 px`, which stops `blocked` without recentring. One limit is that the widest-first ranking of uncatalogued
 ids puts `0x5C` 13th on `0c64`, behind multi-cell scenery ids. Without `--object`, the default limit of 3 would test scenery
 first. Each rejected scenery id costs a few minutes and $0 and is never retried, but a better ranking is still open.
+
+## PR 2 outcome and A/B (2026-11-12)
+
+PR 2 adds publish and retire, the digest in each run's manifest (`Run#check_capabilities!`, called by `Engine.resume` only), the registry and
+context wiring, `capability_uses` in `summary.json` and the capability arms of `ab-plan` and `ab-report`.
+`sword-on-object-92` is published at version 3. The offline horizon check passed: both earlier sword runs reach a place with
+`0x5C` within 6000 frames of `sword-obtained`. `0c64` reaches 224 after 3730 frames (209 and 193 by 5660), and `4ec5`
+reaches 225 after 4719.
+
+The A/B used tag `cap5c` in `~/Code/koholint/runs`: 3 forks per arm from run `20261111-194737-9ba1` at frame 60404, 6000
+frames and `--max-dollars 1` each. It ran on flow-39 code (main at e20c86b plus this PR, before flow-40 merged; the PR now ships as flow-42) and spent 5.04 USD
+in total. It **failed** the use criterion. The capability was offered in 45 of the 117 skill prompts of the capabilities arm (in
+224/0, 209/0 and 225/0) and chosen 0 times. The agent explored exits, attacked enemies and walked away at low health; no
+justification mentions the object. Both arms only revisited places: every fork stayed within the parent's 42 places (no new place and no item), and the milestone ladder cannot move from `sword-obtained` (sword is its top rung), so the progress guard reads 0 in all 6 forks.
+Cost per 1000 frames was 0.135 USD with the capability and 0.145 without.
+
+What this says: offering a validated skill in the context is not enough. Nothing in the prompt tells the agent that a cleared
+`0x5C` cell opens a route, and explore never sends Link there. The next step below (clearable objects as frontiers and route
+cells) is where the use has to come from, and the A/B should be rerun after it.
 
 ## Next step after the slice
 
