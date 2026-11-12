@@ -170,6 +170,25 @@ step is now `step 16 px`, which stops `blocked` without recentring. One limit is
 ids puts `0x5C` 13th on `0c64`, behind multi-cell scenery ids. Without `--object`, the default limit of 3 would test scenery
 first. Each rejected scenery id costs a few minutes and $0 and is never retried, but a better ranking is still open.
 
+## PR 2 outcome and A/B (2026-11-12)
+
+PR 2 adds publish and retire, the digest in each run's manifest (`Run#check_capabilities!` on resume), the registry and
+context wiring, `capability_uses` in `summary.json` and the capability arms of `ab-plan` and `ab-report`.
+`sword-on-object-92` is published at version 3. The offline horizon check passed: both earlier sword runs reach a place with
+`0x5C` within 6000 frames of `sword-obtained`. `0c64` reaches 224 after 3730 frames (209 and 193 by 5660), and `4ec5`
+reaches 225 after 4719.
+
+The A/B used tag `cap5c` in `~/Code/koholint/runs`: 3 forks per arm from run `20261111-194737-9ba1` at frame 60404, 6000
+frames and `--max-dollars 1` each. It ran on flow-39 code (main at e20c86b plus this PR, before flow-40 merged) and spent 5.04 USD
+in total. It **failed** the use criterion. The capability was offered in 45 of the 117 skill prompts of the capabilities arm (in
+224/0, 209/0 and 225/0) and chosen 0 times. The agent explored exits, attacked enemies and walked away at low health; no
+justification mentions the object. Neither arm made progress: no new place, item or milestone, and 0 progress in all 6 forks.
+Cost per 1000 frames was 0.135 USD with the capability and 0.145 without.
+
+What this says: offering a validated skill in the context is not enough. Nothing in the prompt tells the agent that a cleared
+`0x5C` cell opens a route, and explore never sends Link there. The next step below (clearable objects as frontiers and route
+cells) is where the use has to come from, and the A/B should be rerun after it.
+
 ## Next step after the slice
 
 A validated "clears object O" effect is navigation data: the planner and explore could treat O like the pushable urchins of
