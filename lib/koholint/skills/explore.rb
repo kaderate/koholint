@@ -13,7 +13,6 @@ module Koholint
       FRUITLESS_ATTEMPTS = 3
       OBJECT_RANGE = 3
       ENTER_FRAMES = 120
-      WALK_IN = 3
       UNKNOWN = %i[unknown stale].freeze
       SIDES = { up: ->(row, _col) { row.zero? }, down: ->(row, _col) { row == Geometry::ROWS - 1 },
                 left: ->(_row, col) { col.zero? }, right: ->(_row, col) { col == Geometry::COLS - 1 } }.freeze
@@ -154,12 +153,12 @@ module Koholint
             door = [@cell, neighbour(@cell, @heading)].find { |cell| @doors.include?(cell) } || @cell
             @exits << { row: door[0] + 1, col: door[1], direction: :up, outcome: :left, to:, kind: :door }
           elsif @cell && @heading
-            @exits << { row: @cell[0], col: @cell[1], direction: @heading, outcome: :left, to: }
+            @exits << { row: @cell[0], col: @cell[1], direction: @heading, outcome: :left, to:, **(@entering.positive? ? { walk_in: true } : {}) }
           end
           finish(@log&.known?(to) ? :known_place : :new_place)
         end
 
-        def walking_in?(state) = @entering.positive? || state.loading? || state.link_motion_state.to_i == WALK_IN
+        def walking_in?(state) = @entering.positive? || door_walk?(state)
 
         def entering
           @entering += 1

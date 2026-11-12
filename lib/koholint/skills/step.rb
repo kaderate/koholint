@@ -21,6 +21,8 @@ module Koholint
 
         private
 
+        def waits_through_doors? = true
+
         def input_for(state)
           track(state) if @frames.positive?
           return finish(:room_change) if room(state) != room(@start)
