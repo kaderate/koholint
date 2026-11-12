@@ -12,7 +12,7 @@ module Koholint
     TERMINAL = %w[achieved abandoned failed].freeze
     DETERMINISTIC_AGENTS = %w[start_game walk_and_talk engine learner].freeze
     FILE = 'summary.json'.freeze
-    VERSION = 7
+    VERSION = 8
     LEAD_TIERS = %w[high normal low tip].freeze
     MANIFEST_KEYS = %w[flow_version tag harness_sha prompts_sha model autopilot capabilities].freeze
 
@@ -66,16 +66,14 @@ module Koholint
       }
     end
 
-    # Uses of learned capabilities per id@version: effect is the last walk entering the cell, cleared the object id leaving it.
+    # Uses of learned capabilities per id@version, and how many changed the target cell's object id.
     def capability_uses(events, since: 0)
       events.each_with_object({}) do |event, uses|
         capability = event['type'] == 'action' && event['frame'] >= since && event.dig('result', 'capability') or next
         result = event['result']
-        row = uses["#{capability['id']}@#{capability['version']}"] ||= { uses: 0, effects: 0, cleared: 0, frames: 0 }
+        row = uses["#{capability['id']}@#{capability['version']}"] ||= { uses: 0, cleared: 0 }
         row[:uses] += 1
-        row[:effects] += 1 if result['effect']
         row[:cleared] += 1 if result.key?('object_before') && result['object_before'] != result['object_after']
-        row[:frames] += result['frames'].to_i
       end
     end
 

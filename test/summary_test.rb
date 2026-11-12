@@ -126,11 +126,11 @@ class SummaryTest < Minitest::Test
     end
   end
 
-  def test_capability_uses_count_uses_effects_and_cleared_objects_after_the_fork_frame
+  def test_capability_uses_count_uses_and_cleared_objects_after_the_fork_frame
     use = ->(frame, effect, after) { { 'type' => 'action', 'frame' => frame, 'skill' => 'sword_on_object_92', 'params' => {}, 'result' => { 'capability' => { 'id' => 'sword-on-object-92', 'version' => 3 }, 'effect' => effect, 'object_before' => 92, 'object_after' => after, 'frames' => 70 } } }
     events = [use.(5, true, 4), use.(20, true, 4), use.(30, false, 92), { 'type' => 'action', 'frame' => 40, 'skill' => 'walk', 'params' => {}, 'result' => {} }]
-    assert_equal({ 'sword-on-object-92@3' => { uses: 3, effects: 2, cleared: 2, frames: 210 } }, Koholint::Summary.capability_uses(events))
-    assert_equal({ 'sword-on-object-92@3' => { uses: 2, effects: 1, cleared: 1, frames: 140 } }, Koholint::Summary.capability_uses(events, since: 10))
+    assert_equal({ 'sword-on-object-92@3' => { uses: 3, cleared: 2 } }, Koholint::Summary.capability_uses(events))
+    assert_equal({ 'sword-on-object-92@3' => { uses: 2, cleared: 1 } }, Koholint::Summary.capability_uses(events, since: 10))
   end
 
   def test_record_derives_the_run_summary_from_manifest_and_trace

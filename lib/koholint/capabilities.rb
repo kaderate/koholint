@@ -106,13 +106,10 @@ module Koholint
       entries.map { |e| e['id'] == id ? transition(e, status, why) : e }
     end
 
-    def object_of(entry) = entry['target']['object']
-
-    def item_of(entry) = entry['steps'].find { |step| step['skill'] == 'use_item' }&.dig('params', 'item')
-
     def describe(entry)
       places = success_places(entry).map { |place| place.join('-') }.join(' and ')
-      "uses the #{item_of(entry) || 'item'} facing object #{object_of(entry)} and steps into its cell; validated by experiment in #{places}: the object was cleared and Link walked into its cell"
+      item = entry['steps'].find { |step| step['skill'] == 'use_item' }&.dig('params', 'item') || 'item'
+      "uses the #{item} facing object #{entry['target']['object']} and steps into its cell; validated by experiment in #{places}: the object was cleared and Link walked into its cell"
     end
 
     def transition(entry, status, reason, evidence: entry['evidence'])

@@ -272,9 +272,9 @@ module Koholint
       # A learned capability is offered only while its object is on screen.
       def offer_learned(room_objects)
         grid = room_objects.call
-        cells = @composites.to_h { |skill| [skill, grid.each_with_index.flat_map { |row, r| row.each_index.select { |c| row[c] == Capabilities.object_of(skill.entry) }.map { |c| [r, c] } }] }
+        cells = @composites.to_h { |skill| [skill, grid.each_with_index.flat_map { |row, r| row.each_index.select { |c| row[c] == skill.entry['target']['object'] }.map { |c| [r, c] } }] }
         present = cells.select { |_, at| at.any? }
-        @learned = present.map { |skill, at| "- #{skill.name} (row, col, direction): #{Capabilities.describe(skill.entry)}. Object #{Capabilities.object_of(skill.entry)} here at #{at.map { |r, c| "(#{r},#{c})" }.join(', ')}; give the free cell next to it where Link stands and the direction facing it." }
+        @learned = present.map { |skill, at| "- #{skill.name} (row, col, direction): #{Capabilities.describe(skill.entry)}. Object #{skill.entry['target']['object']} here at #{at.map { |r, c| "(#{r},#{c})" }.join(', ')}; give the free cell next to it where Link stands and the direction facing it." }
         names = @registry.names - SCREEN_ONLY - (@composites - present.keys).map(&:name)
         @skill_point = DecisionPoint.choose_skill(subset(@registry, names)) unless @skill_point.registry.names == (names & @registry.names)
       end
