@@ -8,6 +8,7 @@ require 'koholint/entities'
 require 'koholint/explore_log'
 require 'koholint/leads'
 require 'koholint/ledger'
+require 'koholint/loop_watch'
 require 'koholint/navigation/planner'
 require 'koholint/revisit'
 require 'koholint/talk_log'
@@ -57,8 +58,9 @@ module Koholint
       AUTO_OBJECTIVE = { title: 'Explore the nearest untried exits (picked by the harness)', predicate: { kind: 'new_place' } }.freeze
 
       def initialize(client:, registry:, objectives:, manual: '', on_step: nil, on_activity: nil, ledger: nil, triggers: nil, talk_log: nil, leads: nil, explore_log: nil, revisit: nil,
-                     budget: nil, autopilot: nil, cards: {})
+                     budget: nil, autopilot: nil, cards: {}, loop_watch: nil)
         @cards = cards.dup
+        @loop_watch = loop_watch || LoopWatch.new
         @candidates = []
         @budget = budget
         @autopilot = autopilot
@@ -115,6 +117,7 @@ module Koholint
         track_locked(state)
         @over = false unless screen(state) == :game_over
         note_damage(state)
+        note_loop(state, frame)
         @revisit.observe(state)
         track { @objectives.update(state, frame:) }
       end
@@ -175,6 +178,7 @@ module Koholint
 
         output = decision_point.name == :choose_objective ? resolve_candidate(reply.output) : reply.output
         choice = decision_point.validate(output).slice(*decision_point.output_schema)
+        aim_explore(choice, state, context) if decision_point.name == :choose_skill
         start_objective(choice, state, context, reply.output['because']) if decision_point.name == :choose_objective
         plan = remember_plan(reply.output)
         transcription = @reading || transcription_for(reply.output, state, decision_point)
@@ -337,9 +341,48 @@ module Koholint
         end
       end
 
+      def note_loop(state, frame)
+        return unless state.game_mode == PLAY_MODE
+
+        @loop_watch.observe(place: [state.room_id, state.map_id], frame:)
+        @notes.concat(@loop_watch.notes)
+        @loop_watch.notes.clear
+      end
+
+      def objective_place
+        objective = @objectives.current or return
+        predicate = objective[:predicate]
+        predicate[:kind].to_s == 'reach_place' ? predicate[:place] : objective.dig(:target, :place)
+      end
+
+      def route_line(state)
+        goal = objective_place
+        here = [state.room_id, state.map_id]
+        return if goal.nil? || goal == here
+
+        hops = @explore_log.path(here, goal:)
+        return "Known route to #{goal.join('-')}: none over the exits taken so far." unless hops
+
+        steps = hops.map { |hop| "#{hop[:via].is_a?(Array) ? "door above (#{hop[:via][0] + 1},#{hop[:via][1]})" : hop[:via]} to #{hop[:to].join('-')}" }
+        "Known route to #{goal.join('-')} over exits taken before (#{hops.size} screens; explore with no direction follows it): #{steps.join(', ')}"
+      end
+
+      def aim_explore(choice, state, context)
+        return unless choice[:skill].to_s == 'explore' && choice[:params].to_h.empty?
+
+        place = objective_place
+        aim = follow_choice(state)&.dig(:aim) || ({ place: } if place && place != [state.room_id, state.map_id])
+        context[:aim] = aim if aim
+      end
+
       def alerts(state)
         place = [state.room_id, state.map_id]
         lines = []
+        if (loop = @loop_watch.hint)
+          lines << "LOOP: #{loop[:place].join('-')} was entered #{LoopWatch::ENTRIES} times in #{loop[:span]} frames without reaching a new place " \
+                   "(#{loop[:places].join(', ')}). Going back and forth between known screens is not progress: " \
+                   "#{objective_place ? 'follow the known route to the objective place, or choose another objective' : 'choose an objective that leads to an untried exit or a new place'}."
+        end
         if @deaths[place].positive?
           lines << "DIED HERE #{@deaths[place]} time(s): the planner already routes around the contact zones of the creatures on screen; " \
                    'keep clear of them or push them away with the shield, and do not cross holes.'
@@ -618,7 +661,7 @@ module Koholint
                                        triggers: @triggers, talk_log: @talk_log, signs: objects_now, locked: (@hemmed[:attempts] if @hemmed && hemmed?(state)),
                                        locked_frames: (locked_frames(state) if WAIT_PHASES.include?(state.phase)), goal: goal_line, leads: @leads.all, stamp: stamp(state),
                                        place_name: @leads.name_of([state.room_id, state.map_id]), candidates: (Candidates.lines(@candidates) if decision_point.name == :choose_objective),
-                                       resolve: @leads.method(:place_for), hp_lost: @hp_lost, died: @died, alerts: alerts(state))
+                                       resolve: @leads.method(:place_for), hp_lost: @hp_lost, died: @died, alerts: alerts(state), route: route_line(state))
         @hp_lost = 0
         @died = false
         if @reading

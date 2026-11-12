@@ -87,6 +87,39 @@ class DelegatedAutopilotTest < Minitest::Test
     refute_includes client.calls.last[:prompt], 'STUCK'
   end
 
+  def test_a_place_objective_shows_its_known_route_and_aims_a_model_explore_with_no_direction
+    log = Koholint::ExploreLog.new
+    log.absorb({ from: { room: 163, map: 16 }, exits: [{ row: 0, col: 5, direction: :up, outcome: :left, to: [147, 16] }] })
+    log.absorb({ from: { room: 147, map: 16 }, exits: [{ row: 3, col: 0, direction: :left, outcome: :left, to: [146, 16] }] })
+    client = ScriptedClient.new(objective: objective(kind: 'reach_place', place: [146, 16]), default: ok('skill' => 'explore', 'params' => {}))
+    @objectives = Koholint::Objectives.new(trace: trace)
+    p = Koholint::Policies::Delegated.new(client:, registry: Koholint::Skills::Registry.default, objectives: @objectives, manual: '', explore_log: log)
+    decide(p)
+    context = { grid: }
+    p.decide(p.decision_point_for(state), state, context)
+    assert_includes client.calls.last[:prompt], 'Known route to 146-16 over exits taken before (2 screens; explore with no direction follows it): up to 147-16, left to 146-16'
+    assert_equal({ place: [146, 16] }, context[:aim])
+  end
+
+  def test_coming_back_to_the_same_known_places_emits_a_loop_stuck_and_a_hint_until_a_new_place
+    client = ScriptedClient.new(objective: new_place, default: explore)
+    p = policy(client)
+    notes = [163, 164, 163, 164, 163, 164, 163, 164, 163].each_with_index.flat_map do |room, i|
+      now = state(frame: 100 + (i * 300), room_id: room)
+      p.observe(now, frame: now.frame)
+      Array(p.decide(p.decision_point_for(now), now, { grid: })[:notables])
+    end
+    assert_equal ['loop: 163-16 entered 4 times in 1800 frames without a new place (163-16, 164-16), 1 times this run'],
+                 notes.select { |note| note[:kind] == 'stuck' }.map { |note| note[:detail] }
+    now = state(frame: 2800, room_id: 163)
+    p.decide(p.decision_point_for(now), now, { grid: })
+    assert_includes client.calls.last[:prompt], 'LOOP: 163-16 was entered 4 times in 1800 frames without reaching a new place'
+    now = state(frame: 3100, room_id: 165)
+    p.observe(now, frame: now.frame)
+    p.decide(p.decision_point_for(now), now, { grid: })
+    refute_includes client.calls.last[:prompt], 'LOOP'
+  end
+
   def test_untried_objects_continue_and_other_stops_go_to_the_model
     client = ScriptedClient.new(objective: new_place, default: explore)
     results = tours(autopiloted(client), 4, stop: :untried_object)

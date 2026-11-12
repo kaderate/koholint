@@ -229,6 +229,50 @@ class ExploreTest < Minitest::Test
     assert_equal({ kind: :exit, row: 0, col: 5, direction: :up }, result[:target])
   end
 
+  def test_a_route_whose_first_exit_cannot_be_reached_from_link_takes_the_next_route
+    rows = with(CLOSED, [7, 5], '.', [0, 5], '.', [1, 5], '#')
+    log = Koholint::ExploreLog.new
+    log.absorb({ from: { room: 1, map: 0 }, exits: [{ row: 0, col: 5, direction: :up, outcome: :left, to: [3, 0] }, { row: 7, col: 5, direction: :down, outcome: :left, to: [2, 0] }] })
+    log.absorb({ from: { room: 3, map: 0 }, exits: [{ row: 3, col: 9, direction: :right, outcome: :left, to: [4, 0] }] })
+    log.absorb({ from: { room: 2, map: 0 }, exits: [{ row: 3, col: 9, direction: :right, outcome: :left, to: [4, 0] }] })
+    assert_equal [{ via: :up, to: [3, 0] }, { via: :right, to: [4, 0] }], log.path([1, 0], goal: [4, 0])
+    assert_equal({ goal: [4, 0], next: [2, 0], via: :down }, log.route([1, 0], goal: [4, 0], avoid: [:up]))
+    result, = explore(rows, exits: [[[7, 5], :down]], explore_log: log, aim: { place: [4, 0] })
+    assert_equal({ goal: [4, 0], next: [2, 0] }, result[:route])
+    assert_equal({ kind: :exit, row: 7, col: 5, direction: :down }, result[:target])
+  end
+
+  def test_a_pocket_found_by_an_aimed_route_is_left_the_way_link_came_and_routed_around
+    log = Koholint::ExploreLog.new
+    log.absorb({ from: { room: 2, map: 0 }, exits: [{ row: 0, col: 9, direction: :up, outcome: :left, to: [1, 0] }, { row: 3, col: 9, direction: :right, outcome: :left, to: [3, 0] }] })
+    log.absorb({ from: { room: 3, map: 0 }, exits: [{ row: 0, col: 4, direction: :up, outcome: :left, to: [4, 0] }] })
+    log.absorb({ from: { room: 4, map: 0 }, exits: [{ row: 3, col: 9, direction: :right, outcome: :left, to: [1, 0] }] })
+    log.absorb({ from: { room: 7, map: 0 }, exits: [{ row: 7, col: 0, direction: :left, outcome: :left, to: [1, 0] }] })
+    log.absorb({ from: { room: 5, map: 0 }, exits: [{ row: 7, col: 5, direction: :down, outcome: :left, to: [1, 0] }] })
+    assert_equal [1, 0], log.route([2, 0], goal: [5, 0])[:next]
+    log.absorb({ skill: 'explore', from: { room: 1, map: 0, row: 7, col: 9 }, stopped_by: 'no_frontier', cells_walked: 0, route: { goal: [5, 0], next: [5, 0] } })
+    assert_includes %i[down right], log.pocket_side([1, 0], [7, 9])
+    assert_equal [[3, 0], [4, 0], [1, 0], [5, 0]], log.path([2, 0], goal: [5, 0]).map { |hop| hop[:to] }
+    assert_nil log.route([7, 0], goal: [5, 0])
+    pocket = with(CLOSED, [7, 9], '.', [6, 9], '#', [7, 8], '#')
+    result, = explore(pocket, start: [148, 124], exits: [[[7, 9], :down], [[7, 9], :right]], explore_log: log, aim: { place: [5, 0] })
+    assert_equal [:exit, 7, 9], result[:target].values_at(:kind, :row, :col)
+  end
+
+  def test_a_way_back_never_crossed_is_dropped_when_an_explore_finds_no_exit_for_it
+    log = Koholint::ExploreLog.new
+    log.absorb({ from: { room: 5, map: 0 }, exits: [{ row: 7, col: 5, direction: :down, outcome: :left, to: [1, 0] }] })
+    log.absorb({ from: { room: 6, map: 0 }, exits: [{ row: 3, col: 9, direction: :right, outcome: :left, to: [1, 0] }] })
+    assert_equal [1, 0], log.route([6, 0], goal: [5, 0])[:next]
+    rows = with(CLOSED, [0, 5], '.', [1, 5], '#')
+    result, = explore(rows, explore_log: log, aim: { place: [5, 0] }, limit: 50)
+    assert_equal [:no_frontier, [:up]], result.values_at(:stopped_by, :unreachable)
+    log.absorb(result.merge(skill: 'explore', from: { room: 1, map: 0, row: 4, col: 5 }))
+    assert_nil log.route([6, 0], goal: [5, 0])
+    log.absorb({ from: { room: 6, map: 0 }, unreachable: ['right'] })
+    assert_equal [1, 0], log.route([6, 0], goal: [1, 0])[:next]
+  end
+
   def test_the_side_a_place_was_entered_by_counts_as_left
     log = Koholint::ExploreLog.new
     log.absorb({ from: { room: 1, map: 0 }, exits: [{ row: 7, col: 5, direction: :down, outcome: :left, to: [2, 0] }] })
