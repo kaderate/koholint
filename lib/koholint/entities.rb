@@ -33,6 +33,10 @@ module Koholint
       end
     end
 
+    def room_objects(reader)
+      Array.new(Geometry::ROWS) { |row| Array.new(Geometry::COLS) { |col| reader.read(ADDRESSES.fetch(:room_objects) + (row * ROOM_ROW_STRIDE) + col) } }
+    end
+
     def objects(reader, kinds: object_catalogue)
       Geometry::ROWS.times.flat_map do |row|
         Geometry::COLS.times.filter_map do |col|
