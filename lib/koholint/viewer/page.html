@@ -784,6 +784,7 @@
     k = k || {};
     var percent = meterPercent(k.spent, k.cap);
     var detail = [formatDollars(k.spent) + (typeof k.cap === 'number' ? ' sur ' + formatDollars(k.cap) + (percent === null ? '' : ' (' + percent + ' %)') : '')];
+    if (typeof k.inherited_cost_usd === 'number') detail.push(formatDollars(k.inherited_cost_usd) + ' hérités des runs parents');
     detail.push((k.calls || 0) + ' appels payants, ' + (k.free || 0) + ' décisions moteur');
     if (typeof k.calls_per_1000f === 'number') detail.push(k.calls_per_1000f + ' appels / 1000 frames');
     if (typeof k.usd_per_1000f === 'number') detail.push(formatDollars(k.usd_per_1000f).replace(/0+$/, '') + ' / 1000 frames');

@@ -75,6 +75,11 @@ class CliTest < Minitest::Test
       assert_equal 0, Koholint::CLI.run(['branch', run_dir, '--at', '100', '--frames', '30'], out:, err: StringIO.new, viewer: ->(*) { Process.spawn('false') })
       assert_match(/^the viewer did not start \(exit 1\); watch the branch with: koholint watch /, out.string)
       refute_match(/keeps serving/, out.string)
+      viewer_pid = nil
+      out = StringIO.new
+      assert_equal 0, Koholint::CLI.run(['branch', run_dir, '--at', '100', '--frames', '30'], out:, err: StringIO.new, viewer: ->(*) { viewer_pid = Process.spawn('sleep', '60') })
+      refute_match(/keeps serving/, out.string)
+      assert_raises(Errno::ECHILD) { Process.wait(viewer_pid) }
       code, _out, err = cli('branch', run_dir, '--at', 'sword-obtained')
       assert_equal 1, code
       assert_match(/checkpoint sword-obtained is in run 20261111-194737-9ba1/, err)
@@ -292,6 +297,29 @@ class CliTest < Minitest::Test
     assert_equal 1, code
     assert_equal 1, err.lines.size
     assert_match(/claude/, err)
+  end
+
+  def test_claude_command_comes_from_the_env_file
+    Dir.mktmpdir do |dir|
+      old_path = Koholint::Config.env_path
+      old_command = ENV.delete('CLAUDE_COMMAND')
+      Koholint::Config.env_path = File.join(dir, '.env')
+      File.write(Koholint::Config.env_path, "CLAUDE_COMMAND=#{FAKE_CLAUDE}\n")
+      assert_kind_of Proc, Koholint::CLI.policy_factory({ agent: true }, Koholint::Budget.new)
+      File.write(Koholint::Config.env_path, "CLAUDE_COMMAND=  \n")
+      File.symlink(FAKE_CLAUDE, File.join(dir, 'claude'))
+      old_env_path = ENV.fetch('PATH')
+      ENV['PATH'] = dir
+      assert_kind_of Proc, Koholint::CLI.policy_factory({ agent: true }, Koholint::Budget.new)
+      ENV['PATH'] = old_env_path
+      File.write(Koholint::Config.env_path, "CLAUDE_COMMAND=/nope/claude\n")
+      error = assert_raises(Koholint::Error) { Koholint::CLI.policy_factory({ agent: true }, Koholint::Budget.new) }
+      assert_equal 'claude executable not found: /nope/claude (set CLAUDE_COMMAND in .env or pass --claude-command)', error.message
+    ensure
+      Koholint::Config.env_path = old_path
+      ENV['PATH'] = old_env_path if old_env_path
+      ENV['CLAUDE_COMMAND'] = old_command if old_command
+    end
   end
 
   def http(port, path)
