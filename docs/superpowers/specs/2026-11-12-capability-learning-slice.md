@@ -10,7 +10,7 @@ censuses.
 
 After a run, `koholint learn <run_dir>` reads the trace for a trigger (an `item_gained` event), replays to the first ready frame
 of each place seen after it and reads the room object table there, and proposes candidates of one generic shape: *use the new
-item facing an uncatalogued solid object*. Each candidate is a composition of existing skills (`goto`, `walk`, `use_item`) and
+item facing an uncatalogued solid object*. Each candidate is a composition of existing skills (`goto`, `step`, `use_item`, `wait`, `walk`) and
 is written to `data/capabilities.json` as `hypothesis` with its provenance. The learner tests it on throwaway forks of the run
 (`Run#fork` into `tmp/learn/runs`, an `Engine` driven by a scripted policy, a frame budget, no model call, no RAM write) and
 judges it from the action results (walking into the object's cell is blocked before the item is used and enters it after) and
@@ -24,7 +24,7 @@ flowchart LR
   T[trace: item_gained] --> L[koholint learn]
   K[replay: room_objects per place] --> L
   L -->|hypothesis + provenance| C[data/capabilities.json]
-  C --> X[trial forks in tmp/learn/runs<br/>goto, walk, use_item, walk]
+  C --> X[trial forks in tmp/learn/runs<br/>goto, step, use_item, wait, walk]
   X -->|2 places succeed| V[validated]
   X -->|0 of 4+| R[rejected]
   V -->|capability publish| O[operational]
@@ -67,7 +67,7 @@ first dungeon is not known and is not looked up (walkthrough knowledge stays out
 | # | where (today) | what the slice needs there |
 |---|---|---|
 | 1 | `data/capabilities.json` (new) + `lib/koholint/capabilities.rb` (new) | List of entries `{id, name, version, status, trigger, target, steps, effect, evidence, source, history}`; loader and `validate!` in the style of `checkpoints.rb` / `items.rb` (unknown key, bad status, a step skill not in `Registry.default`, a `$param` not declared, duplicate id or name); `operational`, `digest` (sha of the operational entries) and `record!(id, status:, evidence:, reason:)`, which bumps `version` and appends to `history` so every earlier state stays readable. Statuses: `hypothesis`, `validated`, `operational`, `rejected`, `inconclusive`, `deprecated`. Name clash to keep in mind: `Vision::Capabilities` is the held-item context of beliefs (always empty today, `engine.rb` builds `GridBuilder` without it). |
-| 2 | `lib/koholint/skills/composite.rb` (new) | An `Execution` that runs its steps one after the other, the pattern of `ItemRun#menu` in `skills/use_item.rb`. Each step is started through `context[:registry].start` with the composite's context, so `Shielded` wraps the moving sub-steps (`goto`, `walk`) and `triggers` still apply; the composite itself is never in `Shielded::MOVING` (no double wrap). Params `row`, `col` (Link's standing cell) and `direction` (facing the target), substituted for `$row`, `$col`, `$direction` in step params. Each step has an `accept` list of stop reasons (`walk` before the item: `blocked`); any other stop ends the composite with `step_failed`. Result: `Execution#result` plus `capability: {id, version}`, `steps` (skill and `stopped_by` each) and `effect` (the last step entered the target cell). Hard cap: the sum of the steps' caps (`goto` 400, `walk` 90, `use_item` 900, `walk` 90). |
+| 2 | `lib/koholint/skills/composite.rb` (new) | An `Execution` that runs its steps one after the other, the pattern of `ItemRun#menu` in `skills/use_item.rb`. Each step is started through `context[:registry].start` with the composite's context, so `Shielded` wraps the moving sub-steps (`goto`, `walk`) and `triggers` still apply; the composite itself is never in `Shielded::MOVING` (no double wrap). Params `row`, `col` (Link's standing cell) and `direction` (facing the target), substituted for `$row`, `$col`, `$direction` in step params. Each step has an `accept` list of stop reasons (the facing `step` before the item: `blocked`); any other stop ends the composite with `step_failed`. Result: `Execution#result` plus `capability: {id, version}`, `steps` (skill and `stopped_by` each) and `effect` (the last step entered the target cell). Hard cap: the sum of the steps' caps (`goto` 400, `walk` 90, `use_item` 900, `walk` 90). |
 | 3 | `skills/registry.rb` `Registry.default`, `Registry#start` | `default(capabilities: Capabilities.operational)` appends one `Composite` per entry. `Registry#start` passes itself to the skill as `context[:registry]`: `Registry.default` builds the skills before the registry exists, so a composite cannot hold it at construction. The schema enum, `DecisionPoint.choose_skill` and the delegated policy's `@skill_point` (`registry.names - SCREEN_ONLY`) pick the names up with no other change. Composites never join `Delegated::PATH_SKILLS` (their params carry a `direction` and their results no `crossed`, which the path bookkeeping expects). |
 | 4 | `cli.rb` `policy_factory` and `dispatch` | Pass the operational set (or none when the manifest says `capabilities: false`) to `Registry.default`; new commands `learn <run_dir>`, `capability publish|retire <id> <why>`, `capability list`. |
 | 5 | `run.rb` `Run.create`, `Run.open`, `Run#fork` | Manifest key `capabilities`: the digest, or `false` for an A/B off arm (inherited and overridable on fork like `autopilot`). `open` refuses a run whose digest differs from the current one, as it refuses another `flow_version`, so a run stays one flow while capability data changes without a code bump. Obligations in "Build PRs" below. |
@@ -154,6 +154,21 @@ All in `rake test`, no ROM, no model; the suite must stay under its 2-minute tar
 - `summary_test` and `ab_test`: capability usage block; the new arms and the progress columns.
 - Not in `rake test` (needs a sword state, 60,000 frames from boot): `koholint learn` on run `0c64` end to end, run once by hand
   and reported in the PR (expected: `sword-on-object-92` validated from 224 and 209, a few thousand frames, $0).
+
+## PR 1 outcome (2026-11-12)
+
+`koholint learn ~/Code/koholint/runs/20261112-103604-0c64 --object 0x5c` validated `sword-on-object-92` from skills alone, at $0
+in 4 min 35 s: 3 successes out of 3 reached trials. The successes were (6,5) from the right and (6,7) from the left in 224/0,
+and (4,2) from below in 193/0. In every success the facing step was blocked, the last walk entered the cell and its object
+id went from 92 to 4. The 8 other trials were `unreached`: `goto` was blocked on the way to the standing cell. In 209/0, Link
+arrives in the top-left corner and was blocked walking down at row 1 with the shield raised, and that was not investigated
+further. The evidence and trial run ids are in `data/capabilities.json`; the trial runs stay local under `tmp/learn/runs`.
+
+The first live attempt facing with `walk 1` was inconclusive (1 success, 3 failures). The input log showed the cause: a
+blocked walk recentres Link with 1 or 2 frames in the opposite direction, so he faces away when the sword swings. The facing
+step is now `step 16 px`, which stops `blocked` without recentring. One limit is that the widest-first ranking of uncatalogued
+ids puts `0x5C` 13th on `0c64`, behind multi-cell scenery ids. Without `--object`, the default limit of 3 would test scenery
+first. Each rejected scenery id costs a few minutes and $0 and is never retried, but a better ranking is still open.
 
 ## Next step after the slice
 

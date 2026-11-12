@@ -1,6 +1,7 @@
 require 'koholint'
 require 'koholint/skills/advance_dialogue'
 require 'koholint/skills/attack'
+require 'koholint/skills/composite'
 require 'koholint/skills/explore'
 require 'koholint/skills/goto'
 require 'koholint/skills/press'
@@ -25,10 +26,10 @@ module Koholint
     end
 
     class Registry
-      def self.default
+      def self.default(extra: [])
         new([Walk.new, Press.new, AdvanceDialogue.new, Wait.new, Goto.new, Step.new, TalkTo.new, Explore.new, Screens.open_menu, Screens.close_menu,
              Screens.open_map, Screens.close_map, Screens::MenuMove.new, Screens::MenuAssign.new, Screens::ChooseOption.new,
-             UseItem.new, Guard.new, Attack.new])
+             UseItem.new, Guard.new, Attack.new, *extra])
       end
 
       def initialize(skills)
@@ -44,7 +45,7 @@ module Koholint
       def validate(name, params) = fetch(name).normalize(params)
 
       def start(name, state, params, context = {})
-        execution = fetch(name).start(state, params, context)
+        execution = fetch(name).start(state, params, context.merge(registry: self))
         execution.triggers = context[:triggers] if execution.respond_to?(:triggers=)
         execution = Shielded.new(execution, entities: context[:entities]) if Shielded::MOVING.include?(name.to_s) && context[:entities]
         execution
