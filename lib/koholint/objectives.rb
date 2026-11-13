@@ -72,7 +72,7 @@ module Koholint
 
       @counter += 1
       id = "obj-#{@counter}"
-      extra = { candidate:, target:, autopilot: (true if autopilot) }.compact
+      extra = { because:, candidate:, target:, autopilot: (true if autopilot) }.compact
       @current = { id:, title:, predicate: self.class.normalize(predicate), started_frame: frame, attempts: [], **extra }
       @signature = nil
       @last_change_frame = frame
@@ -86,7 +86,7 @@ module Koholint
       @blocked_total = 0
       @no_path = 0
       @blocked_pairs = Hash.new(0)
-      @trace.emit(:objective, frame:, id:, status: 'started', title:, predicate: @current[:predicate], **(because ? { because: } : {}), **extra)
+      @trace.emit(:objective, frame:, id:, status: 'started', title:, predicate: @current[:predicate], **extra)
       id
     end
 
@@ -213,7 +213,7 @@ module Koholint
       fields[:reason] = reason if reason
       @trace.emit(:objective, frame:, **fields)
       @history << { id: done[:id], title: done[:title], predicate: done[:predicate], outcome:, reason:,
-                    started_frame: done[:started_frame], ended_frame: frame, **done.slice(:target, :autopilot) }
+                    started_frame: done[:started_frame], ended_frame: frame, **done.slice(:target, :autopilot, :because) }
       outcome
     end
   end

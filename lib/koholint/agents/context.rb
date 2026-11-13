@@ -3,6 +3,7 @@ require 'koholint/game_state'
 require 'koholint/entities'
 require 'koholint/geometry'
 require 'koholint/items'
+require 'koholint/leads'
 require 'koholint/perception'
 require 'koholint/vision/grid'
 
@@ -22,6 +23,7 @@ module Koholint
       HIGH_LEADS = 8
       NORMAL_LEADS = 5
       TIP_LEADS = 4
+      EVIDENCE_SHOWN = 3
       QUOTE_LIMIT = 80
 
       def self.build(state:, grid:, objective:, history:, attempts:, manual:, last_results:, max_chars: 9000, ledger: nil, refusals: [], plan: nil, triggers: nil, talk_log: nil, locked: nil, locked_frames: nil, goal: nil, leads: [], stamp: nil, entities: [], signs: [],
@@ -252,16 +254,24 @@ module Koholint
       private_class_method :learned_block
 
       def self.leads_block(leads, place, resolve = nil)
-        newest = leads.reverse
+        newest = leads.reverse.each_with_index.sort_by { |lead, i| [%w[tested refuted].include?(lead[:status].to_s) ? 1 : 0, i] }.map(&:first)
         high = newest.select { |lead| lead[:importance] == 'high' }.first(HIGH_LEADS)
         normal = newest.select { |lead| lead[:importance] == 'normal' && lead[:place] == place }.first(NORMAL_LEADS)
         tips = newest.select { |lead| lead[:importance] == 'tip' }.first(TIP_LEADS)
         lines = (high + normal + tips).map do |lead|
           quote = lead[:quote].size > QUOTE_LIMIT ? "#{lead[:quote][0, QUOTE_LIMIT - 3]}..." : lead[:quote]
           where = lead[:where] ? " (where: #{lead[:where]}#{(found = resolve&.call(lead)) ? ", place #{found.join('-')}" : ''})" : ''
-          "- [#{lead[:id]} #{lead[:importance]}] #{lead[:claim]}#{where} — \"#{quote}\""
+          tries = Array(lead[:evidence]).last(EVIDENCE_SHOWN).map do |try|
+            "#{try[:objective]} \"#{try[:title]}\" #{try[:outcome]}#{" in #{try[:place].join('-')}" if try[:place]} at frame #{try[:frame]}"
+          end
+          status = tries.empty? ? '' : " #{lead[:status]}: #{tries.join('; ')}"
+          "- [#{lead[:id]} #{lead[:importance]}#{status}] #{lead[:claim]}#{where} — \"#{quote}\""
         end
-        lines.empty? ? [] : ["Leads from texts you read (all high ones, normal ones of this place, the newest how-to-play tips):\n#{lines.join("\n")}"]
+        return [] if lines.empty?
+
+        ["Leads from texts you read (all high ones, normal ones of this place, the newest how-to-play tips). A lead is open until an objective follows it (give its id in because): " \
+         "tested once one was achieved, refuted after #{Leads::REFUTE_AT} that failed (not for a loop, a stall or an unreachable target), with the last of those objectives as evidence. Prefer open leads; do not chase a tested or refuted one again " \
+         "without a new reason.\n#{lines.join("\n")}"]
       end
       private_class_method :leads_block
 

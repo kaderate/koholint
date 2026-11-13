@@ -379,6 +379,22 @@ class AgentsContextTest < Minitest::Test
     assert_equal %w[lead-6 lead-5 lead-4 lead-3], section.lines.drop(1).map { |line| line[/lead-\d+/] }
   end
 
+  def test_a_followed_lead_shows_its_status_and_evidence_and_open_leads_come_first
+    tested = lead(1, 'high').merge(status: 'tested', evidence: [{ objective: 'obj-70', title: 'Leave by the up side', outcome: 'achieved', place: [81, 0], frame: 75199 }])
+    refuted = lead(2, 'high').merge(status: 'refuted', evidence: [{ objective: 'obj-3', title: 'Go', outcome: 'abandoned', place: nil, frame: 9 }, { objective: 'obj-5', title: 'Go', outcome: 'failed', place: [5, 0], frame: 20 }])
+    section = build(leads: [tested, refuted, lead(3, 'high').merge(status: 'open', evidence: [])])[/Leads from texts.*?(?=\n\n|\z)/m]
+    assert_includes section.lines.first, 'Prefer open leads'
+    assert_equal ['- [lead-3 high] claim 3 — "some words"',
+                  '- [lead-2 high refuted: obj-3 "Go" abandoned at frame 9; obj-5 "Go" failed in 5-0 at frame 20] claim 2 — "some words"',
+                  '- [lead-1 high tested: obj-70 "Leave by the up side" achieved in 81-0 at frame 75199] claim 1 — "some words"'], section.lines.drop(1).map(&:chomp)
+  end
+
+  def test_a_lead_shows_its_last_three_objectives_as_evidence
+    tries = (1..5).map { |i| { objective: "obj-#{i}", title: 'Go', outcome: 'failed', place: nil, frame: i } }
+    line = build(leads: [lead(1, 'high').merge(status: 'refuted', evidence: tries)])[/- \[lead-1.*$/]
+    assert_equal %w[obj-3 obj-4 obj-5], line.scan(/obj-\d/)
+  end
+
   def test_leads_are_capped_newest_first
     leads = (1..10).map { |i| lead(i, 'high') } + (11..17).map { |i| lead(i, 'normal') }
     shown = build(leads:).scan(/\[(lead-\d+)/).flatten

@@ -100,6 +100,13 @@ class CandidatesTest < Minitest::Test
     assert_equal({ kind: 'lead', place: [3, 0], lead: 'lead-1' }, by_id['lead-1'][:target])
     assert_match(/no known route/, by_id['lead-2'][:label])
     refute by_id.key?('place-3-0')
+    leads.note_objective({ id: 'obj-1', title: 'Leave by the up side', outcome: :achieved, ended_frame: 40, predicate: { kind: 'leave_place', place: HERE }, because: 'lead-1' })
+    assert_equal 'tested', leads.status(leads.all[0])[:status]
+    assert build(leads:, cards:).any? { |candidate| candidate[:id] == 'lead-1' }, 'a lead tested somewhere else stays a candidate'
+    leads.note_objective({ id: 'obj-2', title: 'Go to Beach', outcome: :achieved, ended_frame: 50, target: { kind: 'lead', place: [3, 0], lead: 'lead-1' } })
+    refute build(leads:, cards:).any? { |candidate| candidate[:id] == 'lead-1' }, 'a lead whose place was reached is no longer a candidate'
+    2.times { |n| leads.note_objective({ id: "obj-#{3 + n}", title: 'Go to the tower', outcome: :failed, ended_frame: 60 + n, because: 'lead-2' }) }
+    refute build(leads:, cards:).any? { |candidate| candidate[:id] == 'lead-2' }, 'a refuted lead is no longer a candidate'
   end
 
   def test_low_health_lists_the_nearest_known_interior_first

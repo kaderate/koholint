@@ -931,6 +931,20 @@ class DelegatedPolicyTest < Minitest::Test
     decide(p)
     started = Koholint::Trace.read(File.join(@dir, 'trace.jsonl')).select { |e| e['status'] == 'started' }
     assert_equal ['lead-1', nil], started.map { |e| e['because'] }
+    assert_includes client.calls.last[:prompt], '- [lead-1 high open: obj-1 "go" abandoned at frame 101] c — "q"'
+  end
+
+  def test_a_lead_followed_twice_without_success_is_shown_refuted
+    known = Koholint::Leads.from_events([{ 'type' => 'lead', 'id' => 'lead-1', 'place' => [1, 2], 'source' => nil, 'quote' => 'q', 'claim' => 'c', 'importance' => 'high' }])
+    client = ScriptedClient.new(objective: [ok('title' => 'go', 'predicate' => { 'kind' => 'new_place' }, 'because' => 'lead-1')] * 3)
+    @objectives = Koholint::Objectives.new(trace:)
+    p = Koholint::Policies::Delegated.new(client:, registry: Koholint::Skills::Registry.default, objectives: @objectives, leads: known)
+    2.times do |n|
+      decide(p, state(frame: 100 + n))
+      @objectives.abandon(frame: 150 + n, reason: 'test')
+    end
+    decide(p, state(frame: 200))
+    assert_includes client.calls.last[:prompt], '- [lead-1 high refuted: obj-1 "go" abandoned at frame 150; obj-2 "go" abandoned at frame 151] c — "q"'
   end
 
   def test_the_game_over_screen_continues_without_a_model_call_and_never_quits
