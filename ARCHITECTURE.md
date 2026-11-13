@@ -119,7 +119,9 @@ it reports how it stopped (`done`, `blocked`, `no_path`, `no_response`…). flow
 open avoids that edge and plans again from where Link stands, up to `Goto::REPLANS` (3) times, before it reports `blocked` (the result
 counts `replans` and lists the edges it went around in `avoided`, which `Ledger.edges_of` reads with `blocked_at`, so the delegated
 ledger and learn record them too); explore's legs and `talk_to` keep their own replanning (explore blocks the edge and picks its next target, `talk_to`
-its next standing cell). `ledger.rb`
+its next standing cell). flow-54: before that, a goto blocked off-centre backs off to the cell's centre along its move,
+centres exactly across it and tries the same edge once more with no tolerance, since stairs and one-cell gaps take Link only when
+exactly centred (208/0's stairs refuse him 3 px off). `ledger.rb`
 counts blocked edges per place (doubtful edges), `triggers.rb` forbids inputs that re-fire a scripted event,
 `talk_to` resolves the person to the entity at or next to the target cell
 (an `npc`, else any non-enemy entity in that cell; never an entity type the census found mute, i.e. catalogued with a kind

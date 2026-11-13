@@ -8,6 +8,7 @@ module Koholint
       SETTLE_FRAMES = 16
       SETTLE_STILL = 2
       REPLANS = 3
+      BACK = { up: :down, down: :up, left: :right, right: :left }.freeze
 
       class Run < Execution
         def initialize(target:, context:, **rest)
@@ -25,6 +26,9 @@ module Koholint
           @crossed = []
           @replans = 0
           @avoided = []
+          @centred = nil
+          @exact = false
+          @recentre = nil
           @clearing = clearing_for(context)
         end
 
@@ -86,12 +90,50 @@ module Koholint
           return finish(:room_change) if room(state) != room(@start)
           return finish(:damage) if state.hp.to_i < @start.hp.to_i
           return finish(:dialogue) if state.dialog_open? && !@start.dialog_open?
-          return @clearing&.start(state, @heading) || reroute(state) || finish(:blocked) if @still >= STILL_FRAMES
+          return recentre(state) if @recentre
+          return @clearing&.start(state, @heading) || centre_exactly(state) || reroute(state) || finish(:blocked) if @still >= STILL_FRAMES
 
           advance(state)
         end
 
         def clearing_for(context) = Clearing.of(context)
+
+        # Narrow passages (stairs, gaps) take Link only when exactly centred across the move; the tolerance that suffices elsewhere bumps him.
+        def centre_exactly(state)
+          cell = state.cell
+          return nil unless cell && @heading && @centred != [cell, @heading]
+
+          dx, dy = Geometry.offset(state.x, state.y, cell)
+          return nil if (%i[left right].include?(@heading) ? dy : dx).zero?
+
+          @centred = [cell, @heading]
+          @recentre = @heading
+          @still = 0
+          recentre(state)
+        end
+
+        # Back off to the cell's centre along the move, centre across it, then move on with no tolerance.
+        def recentre(state)
+          heading = @recentre
+          if @still >= STILL_FRAMES || state.cell != @centred.first
+            @recentre = nil
+            return reroute(state) || finish(:blocked)
+          end
+
+          horizontal = %i[left right].include?(heading)
+          dx, dy = Geometry.offset(state.x, state.y, state.cell)
+          along, across = horizontal ? [dx, dy] : [dy, dx]
+          ahead = Navigation::Planner::DELTAS.fetch(heading)[horizontal ? 1 : 0]
+          return [BACK.fetch(heading)] if (along * ahead).positive?
+          return [horizontal ? (across.positive? ? :up : :down) : (across.positive? ? :left : :right)] unless across.zero?
+
+          @recentre = nil
+          @exact = true
+          @arrived_by = nil
+          @settle = 0
+          @still = 0
+          press(heading)
+        end
 
         # A blocked edge the grid believed open: avoid it and plan again from here, like talk_to, up to REPLANS times.
         def reroute(state)
@@ -140,6 +182,7 @@ module Koholint
               @index = at
               @arrived_by = Navigation::Planner.direction_between(@path[at - 1], cell)
               @settle = 0
+              @exact = false
             end
           else
             @path = plan(cell)
@@ -156,7 +199,7 @@ module Koholint
           dx, dy = Geometry.offset(state.x, state.y, cell)
           horizontal = %i[left right].include?(direction)
           off = horizontal ? dy : dx
-          return nil if off.abs <= Geometry::ALIGN_TOLERANCE
+          return nil if off.abs <= (@exact ? 0 : Geometry::ALIGN_TOLERANCE)
 
           toward = horizontal ? (off.positive? ? :up : :down) : (off.positive? ? :left : :right)
           return nil if forbidden_at(state).include?(toward)

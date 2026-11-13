@@ -300,3 +300,10 @@ was recorded in `data/capabilities.json`. The 38 unreached trials left:
 - 21 were blocked: pockets and one-way areas, each hit until trials in 2 runs confirm the wall.
 - 6 were `no_path`, where the live grid disagrees with the sighting's.
 - 2 were `room_change`: one into the off-grid exit at the bottom of 208/0, one in 176/0.
+
+**Exact centring (flow-54).** In 208/0, every goto toward the upper part stopped at (5,8) up, 3 px left of the stairs' centre. A
+probe showed that Link climbs the stairs only when exactly centred: from x 133 he is blocked, from x 136 he passes. goto now backs off to
+the cell's centre, centres exactly across the move and tries the same edge once more before replanning. Re-measured as above: 63
+trials, 40 unreached (63%), 22 skipped, 3095 s (flow-51: 61, 38, 24, 2988 s), with the same verdicts. The 208/0 trials now reach the
+stairs but end on damage from an enemy there, like 240/0's crabs. Damage is the largest remaining cause (13), and goto stops on it
+by design.
