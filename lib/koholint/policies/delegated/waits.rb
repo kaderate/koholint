@@ -109,6 +109,21 @@ module Koholint
             confidence: 1.0, agent: 'delegated', latency_ms: 0, cost_usd: 0.0, fallback: false, prompt: nil, image: nil }
         end
 
+        # A skill started while health still drains from a hit stops on the next unit lost, so the harness waits the drain out instead of the model.
+        def draining? = @drain.to_i.positive? && @drain <= DRAIN_WAIT_LIMIT
+
+        def note_drain(choice, outcome)
+          drained = outcome[:stopped_by].to_s == 'damage' || (@drain_waiting && outcome[:hp_delta].to_i.negative?)
+          @drain = drained ? @drain.to_i + 1 : 0
+          @drain_waiting = false
+        end
+
+        def drain_wait
+          @locked_wait = @drain_waiting = true
+          { choice: DRAIN_WAIT, justification: 'damage: waiting for the health drain to end', confidence: 1.0, agent: 'delegated', latency_ms: 0,
+            cost_usd: 0.0, fallback: false, prompt: nil, image: nil }
+        end
+
         def hemmed_wait
           @waiting = true
           @hemmed[:waits] += 1

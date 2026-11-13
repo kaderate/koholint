@@ -65,6 +65,9 @@ module Koholint
       STUCK_STOPS = %w[no_frontier no_path blocked stalled].freeze
       STUCK_AT = 6
       ZERO_WAIT = { skill: 'wait', params: { frames: 120 } }.freeze
+      # Health drains one unit every 2 frames after a hit (per-frame replays of the post-56 forks), so 4 still frames mean the drain is over.
+      DRAIN_WAIT = { skill: 'wait', params: { frames: 4 } }.freeze
+      DRAIN_WAIT_LIMIT = 12
       FALL_MOTION = 6
       EXPLORE = { skill: 'explore', params: {} }.freeze
       AUTO_OBJECTIVE = { title: 'Explore the nearest untried exits (picked by the harness)', predicate: { kind: 'new_place' } }.freeze
@@ -174,6 +177,7 @@ module Koholint
           @reading = cached_reading(decision_point, state)
           return locked_wait.merge(@reading || {}) if locked_waiting?(state)
           return settle_wait(state).merge(@reading || {}) if settling?(state)
+          return drain_wait if decision_point.name == :choose_skill && !@sequence && state.phase == :playing && draining?
 
           revisit = revisit_choice(decision_point, state)
           return revisit.merge(@reading || {}) if revisit
@@ -233,6 +237,7 @@ module Koholint
         @autopilot&.acted(skill: choice[:skill], outcome:) unless @revisit_acting
         @zero_watch.note(place: Ledger.place_of(outcome[:from]) || [state.room_id, state.map_id], skill: choice[:skill], stop: outcome[:stopped_by], frames: outcome[:frames])
         @frame = frame
+        note_drain(choice, outcome)
         @page += 1 if choice[:skill] == 'advance_dialogue'
         unless state.phase == :dialogue
           @page = 0
