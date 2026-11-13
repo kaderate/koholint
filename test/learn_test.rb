@@ -155,6 +155,7 @@ class LearnTest < Minitest::Test
     assert_equal 'inconclusive', L.judge([trial('success', [224, 0]), trial('success', [224, 0])])
     assert_equal 'rejected', L.judge([trial('failure', [224, 0]), trial('not_solid', [224, 0]), trial('failure', [209, 0]), trial('failure', [209, 0])])
     assert_equal 'inconclusive', L.judge([trial('dialogue', [224, 0]), trial('dialogue', [224, 0]), trial('dialogue', [209, 0]), trial('dialogue', [209, 0])])
+    assert_equal 'inconclusive', L.judge([trial('dialogue', [224, 0]), trial('failure', [224, 0]), trial('failure', [209, 0]), trial('failure', [209, 0])])
     assert_equal 'inconclusive', L.judge([trial('failure', [224, 0])] * 4)
     assert_equal 'inconclusive', L.judge([trial('unreached', [224, 0]), trial('unreached', [209, 0])] * 3)
   end
