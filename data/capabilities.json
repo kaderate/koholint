@@ -618,7 +618,7 @@
   {
     "id": "sword-on-object-73",
     "name": "sword_on_object_73",
-    "version": 2,
+    "version": 3,
     "status": "inconclusive",
     "trigger": {
       "run": "20261112-103604-0c64",
@@ -1059,6 +1059,56 @@
           7
         ],
         "direction": "down"
+      },
+      {
+        "outcome": "unreached",
+        "steps": [
+          "no_path"
+        ],
+        "before": 73,
+        "after": 73,
+        "frames": 1,
+        "run": "20261113-160510-260e",
+        "parent": "20261112-103604-0c64",
+        "frame": 64134,
+        "place": [
+          224,
+          0
+        ],
+        "cell": [
+          7,
+          7
+        ],
+        "stand": [
+          6,
+          7
+        ],
+        "direction": "down"
+      },
+      {
+        "outcome": "unreached",
+        "steps": [
+          "blocked"
+        ],
+        "before": 73,
+        "after": 73,
+        "frames": 8,
+        "run": "20261113-160550-f512",
+        "parent": "20261112-103604-0c64",
+        "frame": 64134,
+        "place": [
+          224,
+          0
+        ],
+        "cell": [
+          7,
+          7
+        ],
+        "stand": [
+          7,
+          8
+        ],
+        "direction": "left"
       }
     ],
     "source": "koholint learn: item 1 gained at frame 60404 of run 20261112-103604-0c64; object 73 seen after it and never stood on",
@@ -1072,13 +1122,18 @@
         "version": 2,
         "status": "inconclusive",
         "reason": "inconclusive by koholint learn: 1 failure, 14 unreached"
+      },
+      {
+        "version": 3,
+        "status": "inconclusive",
+        "reason": "inconclusive by koholint learn: 1 failure, 16 unreached"
       }
     ]
   },
   {
     "id": "sword-on-object-96",
     "name": "sword_on_object_96",
-    "version": 2,
+    "version": 3,
     "status": "inconclusive",
     "trigger": {
       "run": "20261112-103604-0c64",
@@ -1269,6 +1324,56 @@
           8
         ],
         "direction": "left"
+      },
+      {
+        "outcome": "unreached",
+        "steps": [
+          "blocked"
+        ],
+        "before": 96,
+        "after": 96,
+        "frames": 25,
+        "run": "20261113-160630-16a1",
+        "parent": "20261112-103604-0c64",
+        "frame": 70193,
+        "place": [
+          177,
+          0
+        ],
+        "cell": [
+          2,
+          6
+        ],
+        "stand": [
+          2,
+          7
+        ],
+        "direction": "left"
+      },
+      {
+        "outcome": "unreached",
+        "steps": [
+          "blocked"
+        ],
+        "before": 96,
+        "after": 96,
+        "frames": 25,
+        "run": "20261113-160646-f30f",
+        "parent": "20261112-103604-0c64",
+        "frame": 70193,
+        "place": [
+          177,
+          0
+        ],
+        "cell": [
+          2,
+          6
+        ],
+        "stand": [
+          3,
+          6
+        ],
+        "direction": "up"
       }
     ],
     "source": "koholint learn: item 1 gained at frame 60404 of run 20261112-103604-0c64; object 96 seen after it and never stood on",
@@ -1282,6 +1387,2477 @@
         "version": 2,
         "status": "inconclusive",
         "reason": "inconclusive by koholint learn: 1 failure, 4 unreached"
+      },
+      {
+        "version": 3,
+        "status": "inconclusive",
+        "reason": "inconclusive by koholint learn: 1 failure, 6 unreached"
+      }
+    ]
+  },
+  {
+    "id": "sword-on-object-72",
+    "name": "sword_on_object_72",
+    "version": 2,
+    "status": "inconclusive",
+    "trigger": {
+      "run": "20261112-103604-0c64",
+      "frame": 60404,
+      "item": 1
+    },
+    "target": {
+      "object": 72
+    },
+    "steps": [
+      {
+        "skill": "goto",
+        "params": {
+          "row": "$row",
+          "col": "$col"
+        },
+        "accept": [
+          "done"
+        ]
+      },
+      {
+        "skill": "step",
+        "params": {
+          "direction": "$direction",
+          "pixels": 16
+        },
+        "accept": [
+          "blocked"
+        ]
+      },
+      {
+        "skill": "use_item",
+        "params": {
+          "item": "sword",
+          "frames": 3
+        },
+        "accept": [
+          "done"
+        ]
+      },
+      {
+        "skill": "wait",
+        "params": {
+          "frames": 20
+        },
+        "accept": [
+          "done"
+        ]
+      },
+      {
+        "skill": "walk",
+        "params": {
+          "direction": "$direction",
+          "cells": 1
+        },
+        "accept": [
+          "done"
+        ]
+      }
+    ],
+    "effect": "walking into the target cell is blocked before the item is used and enters it after, and the cell's object id changes",
+    "evidence": [
+      {
+        "outcome": "failure",
+        "steps": [
+          "done",
+          "blocked",
+          "done",
+          "done",
+          "blocked"
+        ],
+        "before": 72,
+        "after": 72,
+        "frames": 50,
+        "run": "20261113-155321-395f",
+        "parent": "20261112-103604-0c64",
+        "frame": 64134,
+        "place": [
+          224,
+          0
+        ],
+        "cell": [
+          7,
+          5
+        ],
+        "stand": [
+          7,
+          6
+        ],
+        "direction": "left"
+      },
+      {
+        "outcome": "unreached",
+        "steps": [
+          "blocked"
+        ],
+        "before": 72,
+        "after": 72,
+        "frames": 83,
+        "run": "20261113-155432-fadb",
+        "parent": "20261112-103604-0c64",
+        "frame": 64363,
+        "place": [
+          208,
+          0
+        ],
+        "cell": [
+          7,
+          5
+        ],
+        "stand": [
+          7,
+          4
+        ],
+        "direction": "right"
+      },
+      {
+        "outcome": "unreached",
+        "steps": [
+          "blocked"
+        ],
+        "before": 72,
+        "after": 72,
+        "frames": 83,
+        "run": "20261113-155534-5346",
+        "parent": "20261112-103604-0c64",
+        "frame": 64363,
+        "place": [
+          208,
+          0
+        ],
+        "cell": [
+          7,
+          5
+        ],
+        "stand": [
+          6,
+          5
+        ],
+        "direction": "down"
+      },
+      {
+        "outcome": "unreached",
+        "steps": [
+          "blocked"
+        ],
+        "before": 72,
+        "after": 72,
+        "frames": 83,
+        "run": "20261113-155623-069e",
+        "parent": "20261112-103604-0c64",
+        "frame": 64363,
+        "place": [
+          208,
+          0
+        ],
+        "cell": [
+          7,
+          5
+        ],
+        "stand": [
+          7,
+          6
+        ],
+        "direction": "left"
+      },
+      {
+        "outcome": "unreached",
+        "steps": [
+          "blocked"
+        ],
+        "before": 72,
+        "after": 72,
+        "frames": 154,
+        "run": "20261113-155712-54a3",
+        "parent": "20261112-103604-0c64",
+        "frame": 64363,
+        "place": [
+          208,
+          0
+        ],
+        "cell": [
+          3,
+          4
+        ],
+        "stand": [
+          4,
+          4
+        ],
+        "direction": "up"
+      },
+      {
+        "outcome": "unreached",
+        "steps": [
+          "blocked"
+        ],
+        "before": 72,
+        "after": 72,
+        "frames": 154,
+        "run": "20261113-155802-2bf4",
+        "parent": "20261112-103604-0c64",
+        "frame": 64363,
+        "place": [
+          208,
+          0
+        ],
+        "cell": [
+          3,
+          4
+        ],
+        "stand": [
+          3,
+          3
+        ],
+        "direction": "right"
+      },
+      {
+        "outcome": "unreached",
+        "steps": [
+          "blocked"
+        ],
+        "before": 72,
+        "after": 72,
+        "frames": 154,
+        "run": "20261113-155853-d90c",
+        "parent": "20261112-103604-0c64",
+        "frame": 64363,
+        "place": [
+          208,
+          0
+        ],
+        "cell": [
+          3,
+          4
+        ],
+        "stand": [
+          2,
+          4
+        ],
+        "direction": "down"
+      },
+      {
+        "outcome": "unreached",
+        "steps": [
+          "blocked"
+        ],
+        "before": 72,
+        "after": 72,
+        "frames": 154,
+        "run": "20261113-155944-9cb4",
+        "parent": "20261112-103604-0c64",
+        "frame": 64363,
+        "place": [
+          208,
+          0
+        ],
+        "cell": [
+          3,
+          4
+        ],
+        "stand": [
+          3,
+          5
+        ],
+        "direction": "left"
+      },
+      {
+        "outcome": "unreached",
+        "steps": [
+          "blocked"
+        ],
+        "before": 72,
+        "after": 72,
+        "frames": 10,
+        "run": "20261113-160037-91dc",
+        "parent": "20261112-103604-0c64",
+        "frame": 65912,
+        "place": [
+          192,
+          0
+        ],
+        "cell": [
+          7,
+          3
+        ],
+        "stand": [
+          7,
+          4
+        ],
+        "direction": "left"
+      },
+      {
+        "outcome": "unreached",
+        "steps": [
+          "blocked"
+        ],
+        "before": 72,
+        "after": 72,
+        "frames": 10,
+        "run": "20261113-160116-580a",
+        "parent": "20261112-103604-0c64",
+        "frame": 65912,
+        "place": [
+          192,
+          0
+        ],
+        "cell": [
+          7,
+          3
+        ],
+        "stand": [
+          7,
+          2
+        ],
+        "direction": "right"
+      },
+      {
+        "outcome": "unreached",
+        "steps": [
+          "blocked"
+        ],
+        "before": 72,
+        "after": 72,
+        "frames": 10,
+        "run": "20261113-160155-5c4d",
+        "parent": "20261112-103604-0c64",
+        "frame": 65912,
+        "place": [
+          192,
+          0
+        ],
+        "cell": [
+          7,
+          3
+        ],
+        "stand": [
+          6,
+          3
+        ],
+        "direction": "down"
+      },
+      {
+        "outcome": "unreached",
+        "steps": [
+          "blocked"
+        ],
+        "before": 72,
+        "after": 72,
+        "frames": 10,
+        "run": "20261113-160234-52ab",
+        "parent": "20261112-103604-0c64",
+        "frame": 65912,
+        "place": [
+          192,
+          0
+        ],
+        "cell": [
+          3,
+          5
+        ],
+        "stand": [
+          4,
+          5
+        ],
+        "direction": "up"
+      },
+      {
+        "outcome": "unreached",
+        "steps": [
+          "blocked"
+        ],
+        "before": 72,
+        "after": 72,
+        "frames": 10,
+        "run": "20261113-160313-3721",
+        "parent": "20261112-103604-0c64",
+        "frame": 65912,
+        "place": [
+          192,
+          0
+        ],
+        "cell": [
+          3,
+          5
+        ],
+        "stand": [
+          3,
+          6
+        ],
+        "direction": "left"
+      },
+      {
+        "outcome": "unreached",
+        "steps": [
+          "blocked"
+        ],
+        "before": 72,
+        "after": 72,
+        "frames": 10,
+        "run": "20261113-160352-ad9c",
+        "parent": "20261112-103604-0c64",
+        "frame": 65912,
+        "place": [
+          192,
+          0
+        ],
+        "cell": [
+          3,
+          5
+        ],
+        "stand": [
+          3,
+          4
+        ],
+        "direction": "right"
+      },
+      {
+        "outcome": "unreached",
+        "steps": [
+          "blocked"
+        ],
+        "before": 72,
+        "after": 72,
+        "frames": 10,
+        "run": "20261113-160431-0a9b",
+        "parent": "20261112-103604-0c64",
+        "frame": 65912,
+        "place": [
+          192,
+          0
+        ],
+        "cell": [
+          3,
+          5
+        ],
+        "stand": [
+          2,
+          5
+        ],
+        "direction": "down"
+      }
+    ],
+    "source": "koholint learn: item 1 gained at frame 60404 of run 20261112-103604-0c64; object 72 seen after it and never stood on",
+    "history": [
+      {
+        "version": 1,
+        "status": "hypothesis",
+        "reason": "item 1 gained in run 20261112-103604-0c64"
+      },
+      {
+        "version": 2,
+        "status": "inconclusive",
+        "reason": "inconclusive by koholint learn: 1 failure, 14 unreached"
+      }
+    ]
+  },
+  {
+    "id": "sword-on-object-37",
+    "name": "sword_on_object_37",
+    "version": 2,
+    "status": "inconclusive",
+    "trigger": {
+      "run": "20261112-103604-0c64",
+      "frame": 60404,
+      "item": 1
+    },
+    "target": {
+      "object": 37
+    },
+    "steps": [
+      {
+        "skill": "goto",
+        "params": {
+          "row": "$row",
+          "col": "$col"
+        },
+        "accept": [
+          "done"
+        ]
+      },
+      {
+        "skill": "step",
+        "params": {
+          "direction": "$direction",
+          "pixels": 16
+        },
+        "accept": [
+          "blocked"
+        ]
+      },
+      {
+        "skill": "use_item",
+        "params": {
+          "item": "sword",
+          "frames": 3
+        },
+        "accept": [
+          "done"
+        ]
+      },
+      {
+        "skill": "wait",
+        "params": {
+          "frames": 20
+        },
+        "accept": [
+          "done"
+        ]
+      },
+      {
+        "skill": "walk",
+        "params": {
+          "direction": "$direction",
+          "cells": 1
+        },
+        "accept": [
+          "done"
+        ]
+      }
+    ],
+    "effect": "walking into the target cell is blocked before the item is used and enters it after, and the cell's object id changes",
+    "evidence": [
+      {
+        "outcome": "unreached",
+        "steps": [
+          "blocked"
+        ],
+        "before": 37,
+        "after": 37,
+        "frames": 98,
+        "run": "20261113-160702-084a",
+        "parent": "20261112-103604-0c64",
+        "frame": 66018,
+        "place": [
+          209,
+          0
+        ],
+        "cell": [
+          1,
+          9
+        ],
+        "stand": [
+          1,
+          8
+        ],
+        "direction": "right"
+      },
+      {
+        "outcome": "unreached",
+        "steps": [
+          "no_path"
+        ],
+        "before": 37,
+        "after": 37,
+        "frames": 1,
+        "run": "20261113-160748-2b9c",
+        "parent": "20261112-103604-0c64",
+        "frame": 66018,
+        "place": [
+          209,
+          0
+        ],
+        "cell": [
+          1,
+          9
+        ],
+        "stand": [
+          0,
+          9
+        ],
+        "direction": "down"
+      },
+      {
+        "outcome": "unreached",
+        "steps": [
+          "no_path"
+        ],
+        "before": 37,
+        "after": 37,
+        "frames": 1,
+        "run": "20261113-160830-7cee",
+        "parent": "20261112-103604-0c64",
+        "frame": 66018,
+        "place": [
+          209,
+          0
+        ],
+        "cell": [
+          1,
+          9
+        ],
+        "stand": [
+          2,
+          9
+        ],
+        "direction": "up"
+      },
+      {
+        "outcome": "unreached",
+        "steps": [
+          "blocked"
+        ],
+        "before": 37,
+        "after": 37,
+        "frames": 98,
+        "run": "20261113-160912-7e46",
+        "parent": "20261112-103604-0c64",
+        "frame": 66018,
+        "place": [
+          209,
+          0
+        ],
+        "cell": [
+          3,
+          9
+        ],
+        "stand": [
+          3,
+          8
+        ],
+        "direction": "right"
+      },
+      {
+        "outcome": "unreached",
+        "steps": [
+          "no_path"
+        ],
+        "before": 37,
+        "after": 37,
+        "frames": 1,
+        "run": "20261113-160958-dd10",
+        "parent": "20261112-103604-0c64",
+        "frame": 66018,
+        "place": [
+          209,
+          0
+        ],
+        "cell": [
+          3,
+          9
+        ],
+        "stand": [
+          2,
+          9
+        ],
+        "direction": "down"
+      },
+      {
+        "outcome": "unreached",
+        "steps": [
+          "no_path"
+        ],
+        "before": 37,
+        "after": 37,
+        "frames": 1,
+        "run": "20261113-161040-e132",
+        "parent": "20261112-103604-0c64",
+        "frame": 66018,
+        "place": [
+          209,
+          0
+        ],
+        "cell": [
+          3,
+          9
+        ],
+        "stand": [
+          4,
+          9
+        ],
+        "direction": "up"
+      },
+      {
+        "outcome": "unreached",
+        "steps": [
+          "blocked"
+        ],
+        "before": 37,
+        "after": 37,
+        "frames": 15,
+        "run": "20261113-161122-8473",
+        "parent": "20261112-103604-0c64",
+        "frame": 66062,
+        "place": [
+          193,
+          0
+        ],
+        "cell": [
+          7,
+          9
+        ],
+        "stand": [
+          7,
+          8
+        ],
+        "direction": "right"
+      },
+      {
+        "outcome": "unreached",
+        "steps": [
+          "blocked"
+        ],
+        "before": 37,
+        "after": 37,
+        "frames": 15,
+        "run": "20261113-161207-69bb",
+        "parent": "20261112-103604-0c64",
+        "frame": 66062,
+        "place": [
+          193,
+          0
+        ],
+        "cell": [
+          7,
+          9
+        ],
+        "stand": [
+          6,
+          9
+        ],
+        "direction": "down"
+      },
+      {
+        "outcome": "unreached",
+        "steps": [
+          "blocked"
+        ],
+        "before": 37,
+        "after": 37,
+        "frames": 15,
+        "run": "20261113-161251-7cda",
+        "parent": "20261112-103604-0c64",
+        "frame": 66062,
+        "place": [
+          193,
+          0
+        ],
+        "cell": [
+          5,
+          9
+        ],
+        "stand": [
+          6,
+          9
+        ],
+        "direction": "up"
+      },
+      {
+        "outcome": "unreached",
+        "steps": [
+          "blocked"
+        ],
+        "before": 37,
+        "after": 37,
+        "frames": 15,
+        "run": "20261113-161335-6025",
+        "parent": "20261112-103604-0c64",
+        "frame": 66062,
+        "place": [
+          193,
+          0
+        ],
+        "cell": [
+          5,
+          9
+        ],
+        "stand": [
+          5,
+          8
+        ],
+        "direction": "right"
+      },
+      {
+        "outcome": "unreached",
+        "steps": [
+          "blocked"
+        ],
+        "before": 37,
+        "after": 37,
+        "frames": 15,
+        "run": "20261113-161419-1ebe",
+        "parent": "20261112-103604-0c64",
+        "frame": 66062,
+        "place": [
+          193,
+          0
+        ],
+        "cell": [
+          5,
+          9
+        ],
+        "stand": [
+          4,
+          9
+        ],
+        "direction": "down"
+      },
+      {
+        "outcome": "failure",
+        "steps": [
+          "done",
+          "blocked",
+          "done",
+          "done",
+          "blocked"
+        ],
+        "before": 37,
+        "after": 37,
+        "frames": 123,
+        "run": "20261113-161504-0832",
+        "parent": "20261112-103604-0c64",
+        "frame": 68303,
+        "place": [
+          176,
+          0
+        ],
+        "cell": [
+          7,
+          2
+        ],
+        "stand": [
+          6,
+          2
+        ],
+        "direction": "down"
+      },
+      {
+        "outcome": "unreached",
+        "steps": [
+          "no_path"
+        ],
+        "before": 37,
+        "after": 37,
+        "frames": 1,
+        "run": "20261113-161607-55fd",
+        "parent": "20261112-103604-0c64",
+        "frame": 68303,
+        "place": [
+          176,
+          0
+        ],
+        "cell": [
+          1,
+          9
+        ],
+        "stand": [
+          2,
+          9
+        ],
+        "direction": "up"
+      },
+      {
+        "outcome": "unreached",
+        "steps": [
+          "room_change"
+        ],
+        "before": 37,
+        "after": 36,
+        "frames": 60,
+        "run": "20261113-161705-0168",
+        "parent": "20261112-103604-0c64",
+        "frame": 68303,
+        "place": [
+          176,
+          0
+        ],
+        "cell": [
+          1,
+          9
+        ],
+        "stand": [
+          1,
+          8
+        ],
+        "direction": "right"
+      },
+      {
+        "outcome": "unreached",
+        "steps": [
+          "no_path"
+        ],
+        "before": 37,
+        "after": 37,
+        "frames": 1,
+        "run": "20261113-161806-4ca5",
+        "parent": "20261112-103604-0c64",
+        "frame": 68303,
+        "place": [
+          176,
+          0
+        ],
+        "cell": [
+          1,
+          9
+        ],
+        "stand": [
+          0,
+          9
+        ],
+        "direction": "down"
+      }
+    ],
+    "source": "koholint learn: item 1 gained at frame 60404 of run 20261112-103604-0c64; object 37 seen after it and never stood on",
+    "history": [
+      {
+        "version": 1,
+        "status": "hypothesis",
+        "reason": "item 1 gained in run 20261112-103604-0c64"
+      },
+      {
+        "version": 2,
+        "status": "inconclusive",
+        "reason": "inconclusive by koholint learn: 1 failure, 14 unreached"
+      }
+    ]
+  },
+  {
+    "id": "sword-on-object-57",
+    "name": "sword_on_object_57",
+    "version": 2,
+    "status": "inconclusive",
+    "trigger": {
+      "run": "20261112-103604-0c64",
+      "frame": 60404,
+      "item": 1
+    },
+    "target": {
+      "object": 57
+    },
+    "steps": [
+      {
+        "skill": "goto",
+        "params": {
+          "row": "$row",
+          "col": "$col"
+        },
+        "accept": [
+          "done"
+        ]
+      },
+      {
+        "skill": "step",
+        "params": {
+          "direction": "$direction",
+          "pixels": 16
+        },
+        "accept": [
+          "blocked"
+        ]
+      },
+      {
+        "skill": "use_item",
+        "params": {
+          "item": "sword",
+          "frames": 3
+        },
+        "accept": [
+          "done"
+        ]
+      },
+      {
+        "skill": "wait",
+        "params": {
+          "frames": 20
+        },
+        "accept": [
+          "done"
+        ]
+      },
+      {
+        "skill": "walk",
+        "params": {
+          "direction": "$direction",
+          "cells": 1
+        },
+        "accept": [
+          "done"
+        ]
+      }
+    ],
+    "effect": "walking into the target cell is blocked before the item is used and enters it after, and the cell's object id changes",
+    "evidence": [
+      {
+        "outcome": "failure",
+        "steps": [
+          "done",
+          "blocked",
+          "done",
+          "done",
+          "blocked"
+        ],
+        "before": 57,
+        "after": 57,
+        "frames": 115,
+        "run": "20261113-161905-2014",
+        "parent": "20261112-103604-0c64",
+        "frame": 60404,
+        "place": [
+          242,
+          0
+        ],
+        "cell": [
+          1,
+          7
+        ],
+        "stand": [
+          2,
+          7
+        ],
+        "direction": "up"
+      },
+      {
+        "outcome": "failure",
+        "steps": [
+          "done",
+          "blocked",
+          "done",
+          "done",
+          "blocked"
+        ],
+        "before": 57,
+        "after": 57,
+        "frames": 155,
+        "run": "20261113-161945-8bf9",
+        "parent": "20261112-103604-0c64",
+        "frame": 60404,
+        "place": [
+          242,
+          0
+        ],
+        "cell": [
+          2,
+          8
+        ],
+        "stand": [
+          3,
+          8
+        ],
+        "direction": "up"
+      },
+      {
+        "outcome": "failure",
+        "steps": [
+          "done",
+          "blocked",
+          "done",
+          "done",
+          "blocked"
+        ],
+        "before": 57,
+        "after": 57,
+        "frames": 110,
+        "run": "20261113-162027-5c52",
+        "parent": "20261112-103604-0c64",
+        "frame": 63531,
+        "place": [
+          241,
+          0
+        ],
+        "cell": [
+          2,
+          8
+        ],
+        "stand": [
+          3,
+          8
+        ],
+        "direction": "up"
+      },
+      {
+        "outcome": "unreached",
+        "steps": [
+          "blocked"
+        ],
+        "before": 57,
+        "after": 57,
+        "frames": 68,
+        "run": "20261113-162049-19f9",
+        "parent": "20261112-103604-0c64",
+        "frame": 63531,
+        "place": [
+          241,
+          0
+        ],
+        "cell": [
+          7,
+          9
+        ],
+        "stand": [
+          6,
+          9
+        ],
+        "direction": "down"
+      },
+      {
+        "outcome": "unreached",
+        "steps": [
+          "blocked"
+        ],
+        "before": 57,
+        "after": 57,
+        "frames": 56,
+        "run": "20261113-162110-d219",
+        "parent": "20261112-103604-0c64",
+        "frame": 63531,
+        "place": [
+          241,
+          0
+        ],
+        "cell": [
+          7,
+          9
+        ],
+        "stand": [
+          7,
+          8
+        ],
+        "direction": "right"
+      },
+      {
+        "outcome": "unreached",
+        "steps": [
+          "blocked"
+        ],
+        "before": 57,
+        "after": 57,
+        "frames": 62,
+        "run": "20261113-162131-4509",
+        "parent": "20261112-103604-0c64",
+        "frame": 64001,
+        "place": [
+          240,
+          0
+        ],
+        "cell": [
+          4,
+          0
+        ],
+        "stand": [
+          3,
+          0
+        ],
+        "direction": "down"
+      },
+      {
+        "outcome": "unreached",
+        "steps": [
+          "blocked"
+        ],
+        "before": 57,
+        "after": 57,
+        "frames": 62,
+        "run": "20261113-162209-8641",
+        "parent": "20261112-103604-0c64",
+        "frame": 64001,
+        "place": [
+          240,
+          0
+        ],
+        "cell": [
+          4,
+          0
+        ],
+        "stand": [
+          4,
+          1
+        ],
+        "direction": "left"
+      },
+      {
+        "outcome": "unreached",
+        "steps": [
+          "blocked"
+        ],
+        "before": 57,
+        "after": 57,
+        "frames": 62,
+        "run": "20261113-162246-9cce",
+        "parent": "20261112-103604-0c64",
+        "frame": 64001,
+        "place": [
+          240,
+          0
+        ],
+        "cell": [
+          4,
+          0
+        ],
+        "stand": [
+          5,
+          0
+        ],
+        "direction": "up"
+      },
+      {
+        "outcome": "unreached",
+        "steps": [
+          "blocked"
+        ],
+        "before": 57,
+        "after": 57,
+        "frames": 62,
+        "run": "20261113-162323-2826",
+        "parent": "20261112-103604-0c64",
+        "frame": 64001,
+        "place": [
+          240,
+          0
+        ],
+        "cell": [
+          6,
+          1
+        ],
+        "stand": [
+          5,
+          1
+        ],
+        "direction": "down"
+      },
+      {
+        "outcome": "unreached",
+        "steps": [
+          "blocked"
+        ],
+        "before": 57,
+        "after": 57,
+        "frames": 62,
+        "run": "20261113-162400-533b",
+        "parent": "20261112-103604-0c64",
+        "frame": 64001,
+        "place": [
+          240,
+          0
+        ],
+        "cell": [
+          6,
+          1
+        ],
+        "stand": [
+          6,
+          2
+        ],
+        "direction": "left"
+      },
+      {
+        "outcome": "unreached",
+        "steps": [
+          "blocked"
+        ],
+        "before": 57,
+        "after": 57,
+        "frames": 62,
+        "run": "20261113-162438-1781",
+        "parent": "20261112-103604-0c64",
+        "frame": 64001,
+        "place": [
+          240,
+          0
+        ],
+        "cell": [
+          6,
+          1
+        ],
+        "stand": [
+          7,
+          1
+        ],
+        "direction": "up"
+      },
+      {
+        "outcome": "unreached",
+        "steps": [
+          "blocked"
+        ],
+        "before": 57,
+        "after": 57,
+        "frames": 62,
+        "run": "20261113-162515-f12c",
+        "parent": "20261112-103604-0c64",
+        "frame": 64001,
+        "place": [
+          240,
+          0
+        ],
+        "cell": [
+          6,
+          1
+        ],
+        "stand": [
+          6,
+          0
+        ],
+        "direction": "right"
+      }
+    ],
+    "source": "koholint learn: item 1 gained at frame 60404 of run 20261112-103604-0c64; object 57 seen after it and never stood on",
+    "history": [
+      {
+        "version": 1,
+        "status": "hypothesis",
+        "reason": "item 1 gained in run 20261112-103604-0c64"
+      },
+      {
+        "version": 2,
+        "status": "inconclusive",
+        "reason": "inconclusive by koholint learn: 3 failure, 9 unreached"
+      }
+    ]
+  },
+  {
+    "id": "sword-on-object-61",
+    "name": "sword_on_object_61",
+    "version": 2,
+    "status": "inconclusive",
+    "trigger": {
+      "run": "20261112-103604-0c64",
+      "frame": 60404,
+      "item": 1
+    },
+    "target": {
+      "object": 61
+    },
+    "steps": [
+      {
+        "skill": "goto",
+        "params": {
+          "row": "$row",
+          "col": "$col"
+        },
+        "accept": [
+          "done"
+        ]
+      },
+      {
+        "skill": "step",
+        "params": {
+          "direction": "$direction",
+          "pixels": 16
+        },
+        "accept": [
+          "blocked"
+        ]
+      },
+      {
+        "skill": "use_item",
+        "params": {
+          "item": "sword",
+          "frames": 3
+        },
+        "accept": [
+          "done"
+        ]
+      },
+      {
+        "skill": "wait",
+        "params": {
+          "frames": 20
+        },
+        "accept": [
+          "done"
+        ]
+      },
+      {
+        "skill": "walk",
+        "params": {
+          "direction": "$direction",
+          "cells": 1
+        },
+        "accept": [
+          "done"
+        ]
+      }
+    ],
+    "effect": "walking into the target cell is blocked before the item is used and enters it after, and the cell's object id changes",
+    "evidence": [
+      {
+        "outcome": "unreached",
+        "steps": [
+          "blocked"
+        ],
+        "before": 61,
+        "after": 61,
+        "frames": 8,
+        "run": "20261113-162552-7542",
+        "parent": "20261112-103604-0c64",
+        "frame": 64134,
+        "place": [
+          224,
+          0
+        ],
+        "cell": [
+          7,
+          3
+        ],
+        "stand": [
+          7,
+          4
+        ],
+        "direction": "left"
+      },
+      {
+        "outcome": "unreached",
+        "steps": [
+          "blocked"
+        ],
+        "before": 61,
+        "after": 61,
+        "frames": 8,
+        "run": "20261113-162632-0681",
+        "parent": "20261112-103604-0c64",
+        "frame": 64134,
+        "place": [
+          224,
+          0
+        ],
+        "cell": [
+          7,
+          3
+        ],
+        "stand": [
+          7,
+          2
+        ],
+        "direction": "right"
+      },
+      {
+        "outcome": "unreached",
+        "steps": [
+          "blocked"
+        ],
+        "before": 61,
+        "after": 61,
+        "frames": 8,
+        "run": "20261113-162712-ab81",
+        "parent": "20261112-103604-0c64",
+        "frame": 64134,
+        "place": [
+          224,
+          0
+        ],
+        "cell": [
+          7,
+          3
+        ],
+        "stand": [
+          6,
+          3
+        ],
+        "direction": "down"
+      },
+      {
+        "outcome": "unreached",
+        "steps": [
+          "blocked"
+        ],
+        "before": 61,
+        "after": 61,
+        "frames": 10,
+        "run": "20261113-162753-70cd",
+        "parent": "20261112-103604-0c64",
+        "frame": 65912,
+        "place": [
+          192,
+          0
+        ],
+        "cell": [
+          6,
+          8
+        ],
+        "stand": [
+          7,
+          8
+        ],
+        "direction": "up"
+      },
+      {
+        "outcome": "unreached",
+        "steps": [
+          "blocked"
+        ],
+        "before": 61,
+        "after": 61,
+        "frames": 10,
+        "run": "20261113-162831-2f82",
+        "parent": "20261112-103604-0c64",
+        "frame": 65912,
+        "place": [
+          192,
+          0
+        ],
+        "cell": [
+          6,
+          8
+        ],
+        "stand": [
+          6,
+          9
+        ],
+        "direction": "left"
+      },
+      {
+        "outcome": "unreached",
+        "steps": [
+          "blocked"
+        ],
+        "before": 61,
+        "after": 61,
+        "frames": 10,
+        "run": "20261113-162910-8399",
+        "parent": "20261112-103604-0c64",
+        "frame": 65912,
+        "place": [
+          192,
+          0
+        ],
+        "cell": [
+          6,
+          8
+        ],
+        "stand": [
+          6,
+          7
+        ],
+        "direction": "right"
+      },
+      {
+        "outcome": "unreached",
+        "steps": [
+          "blocked"
+        ],
+        "before": 61,
+        "after": 61,
+        "frames": 10,
+        "run": "20261113-162949-29a9",
+        "parent": "20261112-103604-0c64",
+        "frame": 65912,
+        "place": [
+          192,
+          0
+        ],
+        "cell": [
+          6,
+          8
+        ],
+        "stand": [
+          5,
+          8
+        ],
+        "direction": "down"
+      },
+      {
+        "outcome": "unreached",
+        "steps": [
+          "blocked"
+        ],
+        "before": 61,
+        "after": 61,
+        "frames": 10,
+        "run": "20261113-163028-fc64",
+        "parent": "20261112-103604-0c64",
+        "frame": 65912,
+        "place": [
+          192,
+          0
+        ],
+        "cell": [
+          2,
+          8
+        ],
+        "stand": [
+          3,
+          8
+        ],
+        "direction": "up"
+      },
+      {
+        "outcome": "unreached",
+        "steps": [
+          "blocked"
+        ],
+        "before": 61,
+        "after": 61,
+        "frames": 10,
+        "run": "20261113-163107-2e66",
+        "parent": "20261112-103604-0c64",
+        "frame": 65912,
+        "place": [
+          192,
+          0
+        ],
+        "cell": [
+          2,
+          8
+        ],
+        "stand": [
+          2,
+          9
+        ],
+        "direction": "left"
+      },
+      {
+        "outcome": "unreached",
+        "steps": [
+          "blocked"
+        ],
+        "before": 61,
+        "after": 61,
+        "frames": 10,
+        "run": "20261113-163146-4064",
+        "parent": "20261112-103604-0c64",
+        "frame": 65912,
+        "place": [
+          192,
+          0
+        ],
+        "cell": [
+          2,
+          8
+        ],
+        "stand": [
+          2,
+          7
+        ],
+        "direction": "right"
+      },
+      {
+        "outcome": "unreached",
+        "steps": [
+          "blocked"
+        ],
+        "before": 61,
+        "after": 61,
+        "frames": 10,
+        "run": "20261113-163225-b3dc",
+        "parent": "20261112-103604-0c64",
+        "frame": 65912,
+        "place": [
+          192,
+          0
+        ],
+        "cell": [
+          2,
+          8
+        ],
+        "stand": [
+          1,
+          8
+        ],
+        "direction": "down"
+      },
+      {
+        "outcome": "failure",
+        "steps": [
+          "done",
+          "blocked",
+          "done",
+          "done",
+          "blocked"
+        ],
+        "before": 61,
+        "after": 61,
+        "frames": 94,
+        "run": "20261113-163304-5a35",
+        "parent": "20261112-103604-0c64",
+        "frame": 66018,
+        "place": [
+          209,
+          0
+        ],
+        "cell": [
+          2,
+          2
+        ],
+        "stand": [
+          2,
+          1
+        ],
+        "direction": "right"
+      }
+    ],
+    "source": "koholint learn: item 1 gained at frame 60404 of run 20261112-103604-0c64; object 61 seen after it and never stood on",
+    "history": [
+      {
+        "version": 1,
+        "status": "hypothesis",
+        "reason": "item 1 gained in run 20261112-103604-0c64"
+      },
+      {
+        "version": 2,
+        "status": "inconclusive",
+        "reason": "inconclusive by koholint learn: 1 failure, 11 unreached"
+      }
+    ]
+  },
+  {
+    "id": "sword-on-object-200",
+    "name": "sword_on_object_200",
+    "version": 2,
+    "status": "rejected",
+    "trigger": {
+      "run": "20261112-103604-0c64",
+      "frame": 60404,
+      "item": 1
+    },
+    "target": {
+      "object": 200
+    },
+    "steps": [
+      {
+        "skill": "goto",
+        "params": {
+          "row": "$row",
+          "col": "$col"
+        },
+        "accept": [
+          "done"
+        ]
+      },
+      {
+        "skill": "step",
+        "params": {
+          "direction": "$direction",
+          "pixels": 16
+        },
+        "accept": [
+          "blocked"
+        ]
+      },
+      {
+        "skill": "use_item",
+        "params": {
+          "item": "sword",
+          "frames": 3
+        },
+        "accept": [
+          "done"
+        ]
+      },
+      {
+        "skill": "wait",
+        "params": {
+          "frames": 20
+        },
+        "accept": [
+          "done"
+        ]
+      },
+      {
+        "skill": "walk",
+        "params": {
+          "direction": "$direction",
+          "cells": 1
+        },
+        "accept": [
+          "done"
+        ]
+      }
+    ],
+    "effect": "walking into the target cell is blocked before the item is used and enters it after, and the cell's object id changes",
+    "evidence": [
+      {
+        "outcome": "not_solid",
+        "steps": [
+          "done",
+          "done"
+        ],
+        "before": 200,
+        "after": 200,
+        "frames": 31,
+        "run": "20261113-164154-051c",
+        "parent": "20261112-103604-0c64",
+        "frame": 60404,
+        "place": [
+          242,
+          0
+        ],
+        "cell": [
+          4,
+          7
+        ],
+        "stand": [
+          4,
+          6
+        ],
+        "direction": "right"
+      },
+      {
+        "outcome": "failure",
+        "steps": [
+          "done",
+          "blocked",
+          "done",
+          "done",
+          "blocked"
+        ],
+        "before": 200,
+        "after": 200,
+        "frames": 133,
+        "run": "20261113-164231-3968",
+        "parent": "20261112-103604-0c64",
+        "frame": 61110,
+        "place": [
+          243,
+          0
+        ],
+        "cell": [
+          4,
+          3
+        ],
+        "stand": [
+          4,
+          2
+        ],
+        "direction": "right"
+      },
+      {
+        "outcome": "failure",
+        "steps": [
+          "done",
+          "blocked",
+          "done",
+          "done",
+          "blocked"
+        ],
+        "before": 200,
+        "after": 200,
+        "frames": 108,
+        "run": "20261113-164335-5860",
+        "parent": "20261112-103604-0c64",
+        "frame": 63531,
+        "place": [
+          241,
+          0
+        ],
+        "cell": [
+          4,
+          6
+        ],
+        "stand": [
+          3,
+          6
+        ],
+        "direction": "down"
+      },
+      {
+        "outcome": "failure",
+        "steps": [
+          "done",
+          "blocked",
+          "done",
+          "done",
+          "blocked"
+        ],
+        "before": 200,
+        "after": 200,
+        "frames": 283,
+        "run": "20261113-164357-821e",
+        "parent": "20261112-103604-0c64",
+        "frame": 63531,
+        "place": [
+          241,
+          0
+        ],
+        "cell": [
+          3,
+          3
+        ],
+        "stand": [
+          3,
+          4
+        ],
+        "direction": "left"
+      }
+    ],
+    "source": "koholint learn: item 1 gained at frame 60404 of run 20261112-103604-0c64; object 200 seen after it and never stood on",
+    "history": [
+      {
+        "version": 1,
+        "status": "hypothesis",
+        "reason": "item 1 gained in run 20261112-103604-0c64"
+      },
+      {
+        "version": 2,
+        "status": "rejected",
+        "reason": "rejected by koholint learn: 3 failure, 1 not_solid"
+      }
+    ]
+  },
+  {
+    "id": "sword-on-object-98",
+    "name": "sword_on_object_98",
+    "version": 2,
+    "status": "inconclusive",
+    "trigger": {
+      "run": "20261112-103604-0c64",
+      "frame": 60404,
+      "item": 1
+    },
+    "target": {
+      "object": 98
+    },
+    "steps": [
+      {
+        "skill": "goto",
+        "params": {
+          "row": "$row",
+          "col": "$col"
+        },
+        "accept": [
+          "done"
+        ]
+      },
+      {
+        "skill": "step",
+        "params": {
+          "direction": "$direction",
+          "pixels": 16
+        },
+        "accept": [
+          "blocked"
+        ]
+      },
+      {
+        "skill": "use_item",
+        "params": {
+          "item": "sword",
+          "frames": 3
+        },
+        "accept": [
+          "done"
+        ]
+      },
+      {
+        "skill": "wait",
+        "params": {
+          "frames": 20
+        },
+        "accept": [
+          "done"
+        ]
+      },
+      {
+        "skill": "walk",
+        "params": {
+          "direction": "$direction",
+          "cells": 1
+        },
+        "accept": [
+          "done"
+        ]
+      }
+    ],
+    "effect": "walking into the target cell is blocked before the item is used and enters it after, and the cell's object id changes",
+    "evidence": [
+      {
+        "outcome": "failure",
+        "steps": [
+          "done",
+          "blocked",
+          "done",
+          "done",
+          "blocked"
+        ],
+        "before": 98,
+        "after": 98,
+        "frames": 57,
+        "run": "20261113-164424-f541",
+        "parent": "20261112-103604-0c64",
+        "frame": 68444,
+        "place": [
+          160,
+          0
+        ],
+        "cell": [
+          6,
+          6
+        ],
+        "stand": [
+          7,
+          6
+        ],
+        "direction": "up"
+      },
+      {
+        "outcome": "unreached",
+        "steps": [
+          "blocked"
+        ],
+        "before": 98,
+        "after": 98,
+        "frames": 40,
+        "run": "20261113-164428-cb2d",
+        "parent": "20261112-103604-0c64",
+        "frame": 68444,
+        "place": [
+          160,
+          0
+        ],
+        "cell": [
+          5,
+          6
+        ],
+        "stand": [
+          5,
+          5
+        ],
+        "direction": "right"
+      },
+      {
+        "outcome": "unreached",
+        "steps": [
+          "blocked"
+        ],
+        "before": 98,
+        "after": 98,
+        "frames": 88,
+        "run": "20261113-164431-d868",
+        "parent": "20261112-103604-0c64",
+        "frame": 68444,
+        "place": [
+          160,
+          0
+        ],
+        "cell": [
+          5,
+          6
+        ],
+        "stand": [
+          4,
+          6
+        ],
+        "direction": "down"
+      },
+      {
+        "outcome": "unreached",
+        "steps": [
+          "blocked"
+        ],
+        "before": 98,
+        "after": 98,
+        "frames": 15,
+        "run": "20261113-164436-f3e3",
+        "parent": "20261112-103604-0c64",
+        "frame": 68444,
+        "place": [
+          160,
+          0
+        ],
+        "cell": [
+          5,
+          6
+        ],
+        "stand": [
+          5,
+          7
+        ],
+        "direction": "left"
+      },
+      {
+        "outcome": "failure",
+        "steps": [
+          "done",
+          "blocked",
+          "done",
+          "done",
+          "blocked"
+        ],
+        "before": 98,
+        "after": 98,
+        "frames": 192,
+        "run": "20261113-164438-f623",
+        "parent": "20261112-103604-0c64",
+        "frame": 68563,
+        "place": [
+          161,
+          0
+        ],
+        "cell": [
+          3,
+          6
+        ],
+        "stand": [
+          4,
+          6
+        ],
+        "direction": "up"
+      }
+    ],
+    "source": "koholint learn: item 1 gained at frame 60404 of run 20261112-103604-0c64; object 98 seen after it and never stood on",
+    "history": [
+      {
+        "version": 1,
+        "status": "hypothesis",
+        "reason": "item 1 gained in run 20261112-103604-0c64"
+      },
+      {
+        "version": 2,
+        "status": "inconclusive",
+        "reason": "inconclusive by koholint learn: 2 failure, 3 unreached"
+      }
+    ]
+  },
+  {
+    "id": "sword-on-object-55",
+    "name": "sword_on_object_55",
+    "version": 2,
+    "status": "inconclusive",
+    "trigger": {
+      "run": "20261112-103604-0c64",
+      "frame": 60404,
+      "item": 1
+    },
+    "target": {
+      "object": 55
+    },
+    "steps": [
+      {
+        "skill": "goto",
+        "params": {
+          "row": "$row",
+          "col": "$col"
+        },
+        "accept": [
+          "done"
+        ]
+      },
+      {
+        "skill": "step",
+        "params": {
+          "direction": "$direction",
+          "pixels": 16
+        },
+        "accept": [
+          "blocked"
+        ]
+      },
+      {
+        "skill": "use_item",
+        "params": {
+          "item": "sword",
+          "frames": 3
+        },
+        "accept": [
+          "done"
+        ]
+      },
+      {
+        "skill": "wait",
+        "params": {
+          "frames": 20
+        },
+        "accept": [
+          "done"
+        ]
+      },
+      {
+        "skill": "walk",
+        "params": {
+          "direction": "$direction",
+          "cells": 1
+        },
+        "accept": [
+          "done"
+        ]
+      }
+    ],
+    "effect": "walking into the target cell is blocked before the item is used and enters it after, and the cell's object id changes",
+    "evidence": [
+      {
+        "outcome": "unreached",
+        "steps": [
+          "blocked"
+        ],
+        "before": 55,
+        "after": 55,
+        "frames": 68,
+        "run": "20261113-164451-1d84",
+        "parent": "20261112-103604-0c64",
+        "frame": 63531,
+        "place": [
+          241,
+          0
+        ],
+        "cell": [
+          5,
+          9
+        ],
+        "stand": [
+          4,
+          9
+        ],
+        "direction": "down"
+      },
+      {
+        "outcome": "unreached",
+        "steps": [
+          "blocked"
+        ],
+        "before": 55,
+        "after": 55,
+        "frames": 68,
+        "run": "20261113-164511-8f72",
+        "parent": "20261112-103604-0c64",
+        "frame": 63531,
+        "place": [
+          241,
+          0
+        ],
+        "cell": [
+          5,
+          9
+        ],
+        "stand": [
+          6,
+          9
+        ],
+        "direction": "up"
+      },
+      {
+        "outcome": "unreached",
+        "steps": [
+          "blocked"
+        ],
+        "before": 55,
+        "after": 55,
+        "frames": 68,
+        "run": "20261113-164532-5e1f",
+        "parent": "20261112-103604-0c64",
+        "frame": 63531,
+        "place": [
+          241,
+          0
+        ],
+        "cell": [
+          5,
+          9
+        ],
+        "stand": [
+          5,
+          8
+        ],
+        "direction": "right"
+      },
+      {
+        "outcome": "unreached",
+        "steps": [
+          "blocked"
+        ],
+        "before": 55,
+        "after": 55,
+        "frames": 69,
+        "run": "20261113-164553-6995",
+        "parent": "20261112-103604-0c64",
+        "frame": 63531,
+        "place": [
+          241,
+          0
+        ],
+        "cell": [
+          0,
+          8
+        ],
+        "stand": [
+          1,
+          8
+        ],
+        "direction": "up"
+      },
+      {
+        "outcome": "unreached",
+        "steps": [
+          "blocked"
+        ],
+        "before": 55,
+        "after": 55,
+        "frames": 69,
+        "run": "20261113-164613-7078",
+        "parent": "20261112-103604-0c64",
+        "frame": 63531,
+        "place": [
+          241,
+          0
+        ],
+        "cell": [
+          0,
+          8
+        ],
+        "stand": [
+          0,
+          9
+        ],
+        "direction": "left"
+      },
+      {
+        "outcome": "failure",
+        "steps": [
+          "done",
+          "blocked",
+          "done",
+          "done",
+          "blocked"
+        ],
+        "before": 55,
+        "after": 55,
+        "frames": 120,
+        "run": "20261113-164634-d7aa",
+        "parent": "20261112-103604-0c64",
+        "frame": 63531,
+        "place": [
+          241,
+          0
+        ],
+        "cell": [
+          0,
+          8
+        ],
+        "stand": [
+          0,
+          7
+        ],
+        "direction": "right"
+      },
+      {
+        "outcome": "unreached",
+        "steps": [
+          "blocked"
+        ],
+        "before": 55,
+        "after": 55,
+        "frames": 275,
+        "run": "20261113-164656-40be",
+        "parent": "20261112-103604-0c64",
+        "frame": 64001,
+        "place": [
+          240,
+          0
+        ],
+        "cell": [
+          2,
+          0
+        ],
+        "stand": [
+          2,
+          1
+        ],
+        "direction": "left"
+      },
+      {
+        "outcome": "unreached",
+        "steps": [
+          "blocked"
+        ],
+        "before": 55,
+        "after": 55,
+        "frames": 62,
+        "run": "20261113-164739-5102",
+        "parent": "20261112-103604-0c64",
+        "frame": 64001,
+        "place": [
+          240,
+          0
+        ],
+        "cell": [
+          2,
+          0
+        ],
+        "stand": [
+          3,
+          0
+        ],
+        "direction": "up"
+      },
+      {
+        "outcome": "unreached",
+        "steps": [
+          "blocked"
+        ],
+        "before": 55,
+        "after": 55,
+        "frames": 275,
+        "run": "20261113-164815-6c97",
+        "parent": "20261112-103604-0c64",
+        "frame": 64001,
+        "place": [
+          240,
+          0
+        ],
+        "cell": [
+          1,
+          0
+        ],
+        "stand": [
+          1,
+          1
+        ],
+        "direction": "left"
+      },
+      {
+        "outcome": "unreached",
+        "steps": [
+          "blocked"
+        ],
+        "before": 55,
+        "after": 55,
+        "frames": 8,
+        "run": "20261113-164857-c24c",
+        "parent": "20261112-103604-0c64",
+        "frame": 64134,
+        "place": [
+          224,
+          0
+        ],
+        "cell": [
+          7,
+          0
+        ],
+        "stand": [
+          7,
+          1
+        ],
+        "direction": "left"
+      },
+      {
+        "outcome": "unreached",
+        "steps": [
+          "blocked"
+        ],
+        "before": 55,
+        "after": 55,
+        "frames": 8,
+        "run": "20261113-164936-3513",
+        "parent": "20261112-103604-0c64",
+        "frame": 64134,
+        "place": [
+          224,
+          0
+        ],
+        "cell": [
+          6,
+          0
+        ],
+        "stand": [
+          6,
+          1
+        ],
+        "direction": "left"
+      }
+    ],
+    "source": "koholint learn: item 1 gained at frame 60404 of run 20261112-103604-0c64; object 55 seen after it and never stood on",
+    "history": [
+      {
+        "version": 1,
+        "status": "hypothesis",
+        "reason": "item 1 gained in run 20261112-103604-0c64"
+      },
+      {
+        "version": 2,
+        "status": "inconclusive",
+        "reason": "inconclusive by koholint learn: 1 failure, 10 unreached"
       }
     ]
   }

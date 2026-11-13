@@ -266,3 +266,11 @@ Those entries are now in `data/capabilities.json`. `0x1F` failed in 2 places, so
 retryable. So the done criterion (a real clearable object within the default limit) is **not met**. Most blocked cells in this
 lineage belong to scenery that explore's vision took for passable or unknown. `0x5C` is capped by its few cells: 4 in 160/0,
 where every pooled block comes from, and the cap44 forks cleared those before ever walking into them.
+
+**Retries and limit 10 (review of PR 6).** A retry now tries only (place, cell, stand) triples that are not already in the entry's
+evidence, and a pair stays retryable while some triple is left; this replaced the stop after failures in 2 places. With
+`LIMIT` raised to 10, `learn` with the defaults on `0c64` took **3933 s** (about 66 minutes), against a copy of the capabilities
+file without `sword-on-object-92`. It tried 0x48, 0x49, 0x60, 0x25, 0x39, 0x3D, 0x5C, 0xC8, 0x62 and 0x37, in ranking order.
+It **validated `sword-on-object-92` by itself at $0** (3 successes in 224/0 and 193/0, 8 unreached). 0xC8 was rejected
+(3 failures, 1 not solid), and the other 8 were inconclusive, mostly unreached. 0x1F was not retried because no untried triple
+was left in its first places. The new entries, except the duplicate 0x5C one, are in `data/capabilities.json`.
