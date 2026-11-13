@@ -1,4 +1,5 @@
 $LOAD_PATH.unshift(File.expand_path('../lib', __dir__))
+require 'support/frame_count'
 require 'minitest/autorun'
 require 'koholint'
 

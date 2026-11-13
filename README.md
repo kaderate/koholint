@@ -74,7 +74,7 @@ Every command and option (budgets, resume, fork, branch, A/B, censuses, run stor
 ## Tests
 
 ```sh
-rake test:fast   # skips the ROM-heavy files, about 35 s
+rake test:fast   # skips the ROM-heavy files (HEAVY in the Rakefile), about 25 s
 rake test:ci     # every file with the ROM hidden (ROM tests skip), about 25 s: what CI runs
 rake test        # full suite, about 4 min on a busy Mac (the first run builds an emulator state cache in tmp/)
 ```
