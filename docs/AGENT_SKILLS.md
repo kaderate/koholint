@@ -20,8 +20,9 @@ The skills, protocols and harness behaviours the agent works with. Versioned wit
   the entity at or next to the cell, followed when it walks away, and may cover several cells; silent at talk reach, it
   tries once more pressed against the person.
 - A scripted scene (Link held by `link_frozen`, e.g. a character arriving to speak, or something Link touches) stops any
-  skill with `scene`; the harness waits through it, advances its dialogues (past the 40-page cap once) and waits 30 more
-  frames after a long lock before asking the model. Unidentified things on screen are offered as `examine-ROW-COL`.
+  skill with `scene`; the harness waits through it until Link is free, advances its dialogues (past the 40-page cap once) and,
+  after any lock, waits as long as the lock (up to 30 frames) before asking the model; `wait frames until_free` ends
+  early when Link is free. Unidentified things on screen are offered as `examine-ROW-COL`.
 - `attack row col` walks next to the enemy at or next to the cell, lines up within the measured sword reach, faces it
   and strikes with the sword's button until it dies (up to 6 strikes, walking up again after a knockback); it stops
   `done` (`killed`), `damage`, `refused` (no sword on A or B), `no_target`, `target_gone`, `no_kill`, `out_of_reach` or

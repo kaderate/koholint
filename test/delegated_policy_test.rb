@@ -686,7 +686,7 @@ class DelegatedPolicyTest < Minitest::Test
     results = 3.times.map { |i| locked_step(p, 100 + (i * 30)) }
     assert_equal calls, client.calls.size
     results.each do |r|
-      assert_equal [{ skill: 'wait', params: { frames: 30 } }, 'locked: waiting for Link to be free', 'delegated', 0.0, false, nil, nil],
+      assert_equal [{ skill: 'wait', params: { frames: 30, until_free: true } }, 'locked: waiting for Link to be free', 'delegated', 0.0, false, nil, nil],
                    r.values_at(:choice, :justification, :agent, :cost_usd, :fallback, :prompt, :image)
     end
     assert_equal 0, @objectives.attempts_for_prompt.to_s.scan('wait').size
@@ -705,6 +705,47 @@ class DelegatedPolicyTest < Minitest::Test
     assert_equal calls, client.calls.size
     advance(p, settle, state(frame: 190), 190)
     decide_with_shot(p, state(frame: 190))
+    assert_equal calls + 1, client.calls.size
+  end
+
+  def test_a_short_lock_is_followed_by_a_wait_as_long_as_itself
+    client = ScriptedClient.new(objective: objective, skill: walk)
+    p = policy(client)
+    decide(p)
+    calls = client.calls.size
+    at = state(frame: 100, **LOCKED)
+    advance(p, decide_with_shot(p, at), at, 106)
+    free = state(frame: 106)
+    p.observe(free, frame: 106)
+    settle = decide_with_shot(p, free)
+    assert_equal [{ skill: 'wait', params: { frames: 6 } }, 'delegated'], settle.values_at(:choice, :agent)
+    assert_equal calls, client.calls.size
+  end
+
+  def test_a_one_frame_release_between_two_locks_does_not_reach_the_model
+    client = ScriptedClient.new(objective: objective, skill: walk)
+    p = policy(client)
+    decide(p)
+    calls = client.calls.size
+    first = state(frame: 100, **LOCKED)
+    advance(p, decide_with_shot(p, first), first, 115)
+    released = state(frame: 115)
+    p.observe(released, frame: 115)
+    settle = decide_with_shot(p, released)
+    assert_equal({ skill: 'wait', params: { frames: 15 } }, settle[:choice])
+    advance(p, settle, released, 116)
+    again = state(frame: 116, **LOCKED)
+    p.observe(again, frame: 116)
+    relock = decide_with_shot(p, again)
+    assert_equal({ skill: 'wait', params: { frames: 30, until_free: true } }, relock[:choice])
+    advance(p, relock, again, 174)
+    free = state(frame: 174)
+    p.observe(free, frame: 174)
+    long = decide_with_shot(p, free)
+    assert_equal({ skill: 'wait', params: { frames: 30 } }, long[:choice])
+    assert_equal calls, client.calls.size
+    advance(p, long, free, 204)
+    decide_with_shot(p, state(frame: 204))
     assert_equal calls + 1, client.calls.size
   end
 

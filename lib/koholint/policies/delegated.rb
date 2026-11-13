@@ -51,7 +51,7 @@ module Koholint
       LOCK_BUFFER = 8
       LOCK_SKILLS = %w[walk step goto talk_to explore].freeze
       PATH_SKILLS = %w[goto talk_to explore attack].freeze
-      LOCKED_WAIT = { skill: 'wait', params: { frames: 30 } }.freeze
+      LOCKED_WAIT = { skill: 'wait', params: { frames: 30, until_free: true } }.freeze
       LOCKED_WAIT_LIMIT_FRAMES = 900
       SETTLE_FRAMES = 30
       HEMMED_WAIT_LIMIT = 1800 / HEMMED_WAIT[:params][:frames]
@@ -60,7 +60,6 @@ module Koholint
       SCREEN_ONLY = %w[close_menu close_map menu_move menu_assign choose_option].freeze
       SCREEN_WAIT = { skill: 'wait', params: { frames: 5 } }.freeze
       SCREEN_WAIT_LIMIT_FRAMES = 300
-      WAIT_PHASES = %i[locked cutscene].freeze
       SPEAKER_LIMIT = Trace::SPEAKER_MAX
       REVISIT_BUDGET_SHARE = 0.05
       STUCK_STOPS = %w[no_frontier no_path blocked stalled].freeze
@@ -370,7 +369,7 @@ module Koholint
         @prompt = Agents::Context.build(state:, grid: grid_for(state, context), objective: @objectives.current, history: @objectives.history, entities: @entities,
                                        attempts: @objectives.attempts_for_prompt, manual: @manual, last_results: @last_results, ledger: @ledger, refusals: @refusals, plan: @plan,
                                        triggers: @triggers, talk_log: @talk_log, signs: objects_now, locked: (@hemmed[:attempts] if @hemmed && hemmed?(state)),
-                                       locked_frames: (locked_frames(state) if WAIT_PHASES.include?(state.phase)), goal: goal_line, leads: @leads.with_status, stamp: stamp(state),
+                                       locked_frames: (locked_frames(state) if Modes::HELD.include?(state.phase)), goal: goal_line, leads: @leads.with_status, stamp: stamp(state),
                                        place_name: @leads.name_of([state.room_id, state.map_id]), candidates: (Candidates.lines(@candidates) if decision_point.name == :choose_objective),
                                        learned: (@learned if decision_point.name == :choose_skill),
                                        resolve: @leads.method(:place_for), hp_lost: @hp_lost, died: @died, alerts: alerts(state), route: route_line(state))
