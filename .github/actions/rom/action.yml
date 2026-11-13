@@ -1,5 +1,5 @@
 name: ROM
-description: Restore the age-encrypted ROM from the Actions cache (downloading it when allowed), decrypt it into the runner's temp dir, check its SHA-256 and export KOHOLINT_ROM
+description: Restore the age-encrypted ROM from the Actions cache (downloading it when allowed), decrypt it into the runner's temp dir, check its SHA-256 (rom.env) and export KOHOLINT_ROM
 inputs:
   rom-url:
     description: Direct download link of the encrypted ROM (secret ROM_URL)
@@ -13,7 +13,8 @@ inputs:
 runs:
   using: composite
   steps:
-    - name: Check the ROM secrets
+    - id: rom
+      name: Check the ROM secrets
       shell: bash
       env:
         ROM_URL: ${{ inputs.rom-url }}
@@ -27,44 +28,50 @@ runs:
           echo "::error::Missing Actions secret(s): ${missing[*]}. Add them in Settings > Secrets and variables > Actions (see docs/OPERATING.md, ROM in CI)."
           exit 1
         fi
+        source "$GITHUB_ACTION_PATH/rom.env"
+        echo "sha256=$ROM_SHA256" >> "$GITHUB_OUTPUT"
+        echo "cache-key=rom-age-$ROM_SHA256-v$ROM_CACHE_VERSION" >> "$GITHUB_OUTPUT"
     - id: cache
       if: inputs.download != 'always'
-      uses: actions/cache/restore@v4
+      uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
       with:
         path: ${{ runner.temp }}/rom-age/rom.age
-        key: rom-age-${{ env.ROM_SHA256 }}-v1
-        fail-on-cache-miss: ${{ inputs.download == 'never' }}
+        key: ${{ steps.rom.outputs.cache-key }}
+    - if: inputs.download == 'never' && steps.cache.outputs.cache-hit != 'true'
+      shell: bash
+      run: |
+        echo "::error::The encrypted ROM is not in the Actions cache: the fetch ROM job should have saved it."
+        exit 1
     - name: Download the encrypted ROM
       if: inputs.download == 'always' || steps.cache.outputs.cache-hit != 'true'
       shell: bash
       env:
         ROM_URL: ${{ inputs.rom-url }}
-      run: mkdir -p "$RUNNER_TEMP/rom-age" && bin/fetch_asset "$ROM_URL" "$RUNNER_TEMP/rom-age/rom.age"
+      run: mkdir -p "$RUNNER_TEMP/rom-age" && ruby bin/fetch_asset "$ROM_URL" "$RUNNER_TEMP/rom-age/rom.age"
     - name: Decrypt and check the ROM
       shell: bash
       env:
         ROM_AGE_KEY: ${{ inputs.age-key }}
+        ROM_SHA256: ${{ steps.rom.outputs.sha256 }}
       run: |
         command -v age >/dev/null || { sudo apt-get update -qq && sudo apt-get install -y -qq age; }
         umask 077
         mkdir -p "$RUNNER_TEMP/rom"
-        printf '%s\n' "$ROM_AGE_KEY" > "$RUNNER_TEMP/rom/key.txt"
         if ! head -c 21 "$RUNNER_TEMP/rom-age/rom.age" | grep -qE '^(age-encryption.org/v1|-----BEGIN AGE)'; then
           echo "::error::The downloaded ROM is not an age file: ROM_URL must point at zelda_dx_rev1.gbc.age itself."
           exit 1
         fi
-        if ! age -d -i "$RUNNER_TEMP/rom/key.txt" -o "$RUNNER_TEMP/rom/game.gbc" "$RUNNER_TEMP/rom-age/rom.age"; then
-          echo "::error::age could not decrypt the ROM: ROM_AGE_KEY does not match the key the file was encrypted to."
+        if ! age -d -i <(printf '%s\n' "$ROM_AGE_KEY") -o "$RUNNER_TEMP/rom/game.gbc" "$RUNNER_TEMP/rom-age/rom.age"; then
+          echo "::error::age could not decrypt the ROM: ROM_AGE_KEY does not match the key the file was encrypted to (after a re-encryption, bump ROM_CACHE_VERSION in .github/actions/rom/rom.env)."
           exit 1
         fi
-        rm "$RUNNER_TEMP/rom/key.txt"
         if ! echo "$ROM_SHA256  $RUNNER_TEMP/rom/game.gbc" | sha256sum -c --status; then
           echo "::error::The decrypted ROM's SHA-256 is not $ROM_SHA256: wrong file behind ROM_URL."
           exit 1
         fi
         echo "KOHOLINT_ROM=$RUNNER_TEMP/rom/game.gbc" >> "$GITHUB_ENV"
-    - if: inputs.download != 'always' && steps.cache.outputs.cache-hit != 'true'
-      uses: actions/cache/save@v4
+    - if: inputs.download == 'on-miss' && steps.cache.outputs.cache-hit != 'true'
+      uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
       with:
         path: ${{ runner.temp }}/rom-age/rom.age
-        key: rom-age-${{ env.ROM_SHA256 }}-v1
+        key: ${{ steps.rom.outputs.cache-key }}

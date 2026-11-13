@@ -13,8 +13,8 @@ on:
         description: koholint learn --object (optional)
         default: ''
 
-env:
-  ROM_SHA256: 211a1d1559dc2684d63d87f62a6b1e9109201a6383b4004e9dd5e18ee926ee83
+permissions:
+  contents: read
 
 jobs:
   learn:
@@ -24,12 +24,13 @@ jobs:
     env:
       EMU_GB_HOME: ${{ github.workspace }}/gemboy
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           repository: kaderate/gemboy
+          ref: 4dfa60660a6c229533c0b603c67df7b9765d2ef7
           path: gemboy
-      - uses: ruby/setup-ruby@v1
+      - uses: ruby/setup-ruby@b3aaceaef7e0ee231b499e7b5f49c03fc1d32199 # v1.338.0
         with:
           bundler-cache: true
       - name: Install emu-gb's SDL dependencies
@@ -61,7 +62,7 @@ jobs:
           [ -z "$OBJECT" ] || args+=(--object "$OBJECT")
           bin/koholint "${args[@]}" | tee learn.log
       - if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: learn-${{ github.run_id }}
           path: |

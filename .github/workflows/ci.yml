@@ -5,8 +5,8 @@ on:
   push:
     branches: [main]
 
-env:
-  ROM_SHA256: 211a1d1559dc2684d63d87f62a6b1e9109201a6383b4004e9dd5e18ee926ee83
+permissions:
+  contents: read
 
 jobs:
   test:
@@ -16,12 +16,13 @@ jobs:
     env:
       EMU_GB_HOME: ${{ github.workspace }}/gemboy
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           repository: kaderate/gemboy
+          ref: 4dfa60660a6c229533c0b603c67df7b9765d2ef7
           path: gemboy
-      - uses: ruby/setup-ruby@v1
+      - uses: ruby/setup-ruby@b3aaceaef7e0ee231b499e7b5f49c03fc1d32199 # v1.338.0
         with:
           bundler-cache: true
       - run: rake test:ci
@@ -33,7 +34,7 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: ./.github/actions/rom
         with:
           rom-url: ${{ secrets.ROM_URL }}
@@ -53,12 +54,13 @@ jobs:
       EMU_GB_HOME: ${{ github.workspace }}/gemboy
       SHARD: ${{ matrix.shard }}/4
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           repository: kaderate/gemboy
+          ref: 4dfa60660a6c229533c0b603c67df7b9765d2ef7
           path: gemboy
-      - uses: ruby/setup-ruby@v1
+      - uses: ruby/setup-ruby@b3aaceaef7e0ee231b499e7b5f49c03fc1d32199 # v1.338.0
         with:
           bundler-cache: true
       - name: Install emu-gb's SDL dependencies
@@ -69,4 +71,15 @@ jobs:
       - uses: ./.github/actions/rom
         with:
           age-key: ${{ secrets.ROM_AGE_KEY }}
+      # Only the timings: the rest of tmp/ holds emulator states derived from the ROM
+      - uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: tmp/test_times.json
+          key: test-times-${{ github.run_id }}-${{ matrix.shard }}
+          restore-keys: test-times-
       - run: rake test
+      - if: always() && hashFiles('tmp/test_times.json') != ''
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: tmp/test_times.json
+          key: test-times-${{ github.run_id }}-${{ github.run_attempt }}-${{ matrix.shard }}
