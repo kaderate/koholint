@@ -66,8 +66,8 @@ module Koholint
 
       def name = @entry['name']
 
-      # A capability needs the item it was learned with; a context without the held items does not restrict it.
-      def usable?(held) = held.nil? || held.include?(@entry.dig('trigger', 'item'))
+      # A capability needs the item it was learned with.
+      def usable?(held) = Array(held).include?(@entry.dig('trigger', 'item'))
 
       def max_frames = @entry['steps'].sum { |step| CAPS.fetch(step['skill']) }
 

@@ -1,7 +1,6 @@
 require 'digest'
 require 'set'
 require 'fileutils'
-require 'koholint/dialogues'
 require 'koholint/budget'
 require 'koholint/canonical_save'
 require 'koholint/entities'
@@ -179,7 +178,7 @@ module Koholint
 
     def context_for(grid, state)
       context = @builder ? { grid: } : {}
-      context[:held] = Dialogues.items(state.inventory, state.item_a, state.item_b)
+      context[:held] = Items.held(state)
       context.merge(dialogue_shot: -> { Vision::DialogueShot.crop(@emulator) }, dialogue_rgb: -> { Vision::DialogueShot.rgb(@emulator) },
                     entities: -> { Entities.read(@emulator) }, objects: -> { Entities.objects(@emulator) },
                     room_objects: -> { Entities.room_objects(@emulator) })

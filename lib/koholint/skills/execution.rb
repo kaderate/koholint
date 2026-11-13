@@ -1,5 +1,6 @@
 require 'koholint/entities'
 require 'koholint/geometry'
+require 'koholint/items'
 require 'koholint/skills/clearing'
 
 module Koholint
@@ -74,10 +75,11 @@ module Koholint
         @exit = { row:, col:, direction: } if direction && row && room(state) == room(@start)
       end
 
-      # Stationary enemies the raised shield pushes aside (sea urchins) sit on cells their sprites make look like objects.
+      # Stationary enemies the raised shield pushes aside (sea urchins) sit on cells their sprites make look like objects; only with the shield held.
       # Cells of objects a published capability clears are passable at the same last-resort cost.
       def pushable_of(context)
-        urchins = context[:entities] && -> { Array(context[:entities].call).select { |e| e[:kind].to_s == 'enemy' && e[:moves] == false && e[:cell] }.map { |e| e[:cell] } }
+        shield = Array(context[:held]).include?(Items::SHIELD)
+        urchins = context[:entities] && shield ? -> { Array(context[:entities].call).select { |e| e[:kind].to_s == 'enemy' && e[:moves] == false && e[:cell] }.map { |e| e[:cell] } } : nil
         clearing = Clearing.of(context) or return urchins
         -> { Array(urchins&.call) | clearing.cells.keys }
       end

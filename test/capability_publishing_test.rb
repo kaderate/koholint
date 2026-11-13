@@ -87,7 +87,7 @@ class CapabilityPublishingTest < Minitest::Test
     policy = Koholint::Policies::Delegated.new(client:, registry: Koholint::Skills::Registry.default(extra: [composite]),
                                                objectives: (@objectives = Koholint::Objectives.new(trace:)), manual: 'notes')
     objects = Array.new(8) { Array.new(10, 4) }
-    context = -> { { grid:, room_objects: -> { objects } } }
+    context = -> { { grid:, room_objects: -> { objects }, held: [1, 4] } }
     point = policy.tap { |p| p.prepare(context.call) }.decision_point_for(state)
     policy.decide(point, state, context.call)
     refute_includes skill_names(policy, context.call), 'sword_on_object_92'
