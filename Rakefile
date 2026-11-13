@@ -22,6 +22,8 @@ task :test do
   end
   times = File.file?(TIMES) ? JSON.parse(File.read(TIMES)) : {}
   jobs.sort_by! { |file, args| -times.fetch((file + args.join), 0) }
+  # The longest jobs set the wall clock: shorter ones yield the cores to them
+  critical = times.values.max.to_f / 2
   started = {}
   queue = jobs.dup
   running = {}
@@ -31,6 +33,7 @@ task :test do
       file, args = job
       log = Tempfile.new(File.basename(file))
       pid = Process.spawn(RbConfig.ruby, '--yjit', '-Ilib', '-Itest', file, *args, %i[out err] => log.path)
+      Process.setpriority(Process::PRIO_PROCESS, pid, 5) if times.fetch(file + args.join, 0) < critical
       running[pid] = [file, log]
       started[pid] = [file + args.join, Process.clock_gettime(Process::CLOCK_MONOTONIC)]
     end
