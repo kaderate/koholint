@@ -121,7 +121,8 @@ counts `replans` and lists the edges it went around in `avoided`, which `Ledger.
 ledger and learn record them too); explore's legs and `talk_to` keep their own replanning (explore blocks the edge and picks its next target, `talk_to`
 its next standing cell). flow-54: before that, a goto blocked off-centre backs off to the cell's centre along its move,
 centres exactly across it and tries the same edge once more with no tolerance, since stairs and one-cell gaps take Link only when
-exactly centred (208/0's stairs refuse him 3 px off). `ledger.rb`
+exactly centred (208/0's stairs refuse him 3 px off). The retry happens once per cell and heading, never in a direction the
+triggers forbid, and the zero tolerance ends at the next cell or replan; talk_to's and attack's walks share it, as do explore's legs. `ledger.rb`
 counts blocked edges per place (doubtful edges), `triggers.rb` forbids inputs that re-fire a scripted event,
 `talk_to` resolves the person to the entity at or next to the target cell
 (an `npc`, else any non-enemy entity in that cell; never an entity type the census found mute, i.e. catalogued with a kind

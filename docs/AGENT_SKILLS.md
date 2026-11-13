@@ -15,7 +15,7 @@ The skills, protocols and harness behaviours the agent works with. Versioned wit
   attempts in a row walked no new cell), `no_frontier` (with the exits already tried), `locked`, `damage` or `budget` (600 frames). What it walked, the walls it found, the
   exits it tried and the things it offered are kept per place and rebuilt from the trace on resume.
 - `goto row col` walks to a cell of the known grid by a shortest path with the fewest turns (stops `done`, `blocked`,
-  `no_path`, ...; a result carries `blocked_at` when a move hit a wall; flow-51: a wall the grid believed open is avoided and the path planned again, up to 3 times, and the edges gone around are listed in `avoided`; flow-54: first it centres exactly and tries the edge once more, for stairs and narrow gaps); `step direction pixels` moves a few pixels;
+  `no_path`, ...; a result carries `blocked_at` when a move hit a wall; flow-51: a wall the grid believed open is avoided and the path planned again, up to 3 times, and the edges gone around are listed in `avoided`; flow-54: first it centres exactly and tries the edge once more, for stairs and narrow gaps; talk_to, attack and explore walk the same way); `step direction pixels` moves a few pixels;
   `talk_to row col` walks next to a person, faces them and presses A, trying other sides on no response; the person is
   the entity at or next to the cell, followed when it walks away, and may cover several cells; silent at talk reach, it
   tries once more pressed against the person.

@@ -61,7 +61,8 @@ module Koholint
         def restart(state, path)
           @path = path
           @index = 0
-          @arrived_by = @idle_reason = @centring = nil
+          @arrived_by = @idle_reason = @centring = @recentre = nil
+          @exact = false
           @settle = 0
           @still = 0
           @heading = nil
@@ -115,17 +116,20 @@ module Koholint
         # Back off to the cell's centre along the move, centre across it, then move on with no tolerance.
         def recentre(state)
           heading = @recentre
-          if @still >= STILL_FRAMES || state.cell != @centred.first
+          if state.cell == @centred.first
+            horizontal = %i[left right].include?(heading)
+            dx, dy = Geometry.offset(state.x, state.y, state.cell)
+            along, across = horizontal ? [dx, dy] : [dy, dx]
+            ahead = Navigation::Planner::DELTAS.fetch(heading)[horizontal ? 1 : 0]
+            direction = if (along * ahead).positive? then BACK.fetch(heading)
+                        elsif !across.zero? then horizontal ? (across.positive? ? :up : :down) : (across.positive? ? :left : :right)
+                        end
+          end
+          if @still >= STILL_FRAMES || state.cell != @centred.first || (direction && forbidden_at(state).include?(direction))
             @recentre = nil
             return reroute(state) || finish(:blocked)
           end
-
-          horizontal = %i[left right].include?(heading)
-          dx, dy = Geometry.offset(state.x, state.y, state.cell)
-          along, across = horizontal ? [dx, dy] : [dy, dx]
-          ahead = Navigation::Planner::DELTAS.fetch(heading)[horizontal ? 1 : 0]
-          return [BACK.fetch(heading)] if (along * ahead).positive?
-          return [horizontal ? (across.positive? ? :up : :down) : (across.positive? ? :left : :right)] unless across.zero?
+          return [direction] if direction
 
           @recentre = nil
           @exact = true
