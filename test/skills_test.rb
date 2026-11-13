@@ -144,6 +144,15 @@ class SkillsTest < Minitest::Test
     assert_equal({ row: 0, col: 5, direction: :up }, result[:exit])
   end
 
+  def test_a_walk_done_off_the_grid_waits_for_the_room_change
+    execution = registry.start('walk', state(x: 104, y: 108), { direction: :down, cells: 2 })
+    edge = Array.new(30) { state(x: 104, y: 141) }
+    inputs = drive(execution, [state(x: 104, y: 124), state(x: 104, y: 141)] + edge + [state(x: 104, y: 26, room_id: 2)])
+    result = execution.result(state(x: 104, y: 26, room_id: 2))
+    assert_equal :room_change, result[:stopped_by]
+    assert_equal [[:down]] + [[]] * 31, inputs
+  end
+
   def test_advance_dialogue_runs_one_cycle_while_open
     open = state(dialog_state: 129)
     execution = registry.start('advance_dialogue', open, {})

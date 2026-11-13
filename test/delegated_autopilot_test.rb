@@ -125,6 +125,28 @@ class DelegatedAutopilotTest < Minitest::Test
     refute_includes client.calls.last[:prompt], 'LOOP'
   end
 
+  def test_a_detected_loop_drops_the_objective_and_explores_toward_the_nearest_untried_place_once
+    log = Koholint::ExploreLog.new
+    log.absorb({ from: { room: 163, map: 16 }, exits: [{ row: 3, col: 0, direction: :left, outcome: :left, to: [164, 16] }, { row: 0, col: 5, direction: :up, outcome: :left, to: [165, 16] }],
+                 survey: { sides: { left: [{ row: 3, col: 0 }], up: [{ row: 0, col: 5 }] }, doors: [] } })
+    log.absorb({ from: { room: 164, map: 16 }, exits: [{ row: 3, col: 9, direction: :right, outcome: :left, to: [163, 16] }], survey: { sides: { right: [{ row: 3, col: 9 }] }, doors: [] } })
+    client = ScriptedClient.new(objective: objective(kind: 'reach_place', place: [146, 16]), default: explore)
+    @objectives = Koholint::Objectives.new(trace: trace)
+    p = Koholint::Policies::Delegated.new(client:, registry: Koholint::Skills::Registry.default, objectives: @objectives, manual: '', explore_log: log)
+    results = [163, 164, 163, 164, 163, 164, 163, 164, 163, 163].each_with_index.map do |room, i|
+      now = state(frame: 100 + (i * 300), room_id: room)
+      p.observe(now, frame: now.frame)
+      context = { grid: }
+      [p.decide(p.decision_point_for(now), now, context), context]
+    end
+    broken, context = results[8]
+    assert_equal ['delegated', 'explore', { place: [165, 16] }], [broken[:agent], broken[:choice][:skill], context[:aim]]
+    assert_match(/\Aloop in 163-16, 164-16: explore toward 165-16/, broken[:justification])
+    assert_equal 'loop', @objectives.history.last[:reason]
+    assert_equal 'new_place', @objectives.current[:predicate][:kind]
+    assert_equal 'claude', results[9][0][:agent]
+  end
+
   def test_untried_objects_continue_and_other_stops_go_to_the_model
     client = ScriptedClient.new(objective: new_place, default: explore)
     results = tours(autopiloted(client), 4, stop: :untried_object)
@@ -253,6 +275,19 @@ class DelegatedAutopilotTest < Minitest::Test
     result = p.decide(p.decision_point_for(state(frame: 210)), state(frame: 210), { grid:, entities: -> { [] } })
     assert_equal 'talk_to', result[:choice][:skill]
     refute result[:autopilot]
+  end
+
+  def test_a_revisit_waits_while_a_surveyed_place_still_has_untried_work
+    revisit = Class.new(Koholint::Revisit) do
+      def candidate(danger: false, **) = !danger
+      def next_action(danger: false, **) = danger ? nil : { skill: 'talk_to', params: { row: 2, col: 3 }, npc: { type: 5, cell: [2, 3] }, round: 1 }
+    end.new(talk_log: Koholint::TalkLog.new)
+    p = autopiloted(ScriptedClient.new(objective: new_place, default: explore), revisit:)
+    log = p.instance_variable_get(:@explore_log)
+    p.decide(Koholint::DecisionPoint.choose_objective, state, { grid:, entities: -> { [] } })
+    assert_equal 'talk_to', p.decide(p.decision_point_for(state), state, { grid:, entities: -> { [] } })[:choice][:skill]
+    log.absorb({ from: { room: 163, map: 16 }, exits: [], survey: { sides: { up: [{ row: 0, col: 5 }] }, doors: [] } })
+    refute_equal 'talk_to', p.decide(p.decision_point_for(state), state, { grid:, entities: -> { [] } })[:choice][:skill]
   end
 
   def test_a_wait_or_guard_next_to_a_hostile_creature_becomes_explore

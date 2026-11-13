@@ -229,6 +229,49 @@ class ExploreTest < Minitest::Test
     assert_equal({ kind: :exit, row: 0, col: 5, direction: :up }, result[:target])
   end
 
+  def test_a_clearable_object_here_comes_before_an_aimed_place_and_keeps_the_place_pending
+    require 'koholint/learn'
+    rows = with(CLOSED, [0, 5], '.')
+    log = Koholint::ExploreLog.new
+    log.absorb({ from: { room: 1, map: 0 }, exits: [{ row: 0, col: 5, direction: :up, outcome: :left, to: [3, 0] }] })
+    log.absorb({ from: { room: 3, map: 0 }, exits: [{ row: 7, col: 5, direction: :down, outcome: :left, to: [1, 0] }], survey: { sides: { down: [{ row: 7, col: 5 }] }, doors: [] } })
+    objects = Array.new(8) { Array.new(10, 0) }.tap { |grid| grid[4][9] = 92 }
+    composite = Koholint::Skills::Composite.new(Koholint::Learn.hypothesis(gain: { item: 1, frame: 1 }, object: 92, run: 'r'))
+    @registry = Koholint::Skills::Registry.default(extra: [composite])
+    result, = explore(rows, exits: [[[0, 5], :up]], explore_log: log, aim: { place: [3, 0] }, room_objects: -> { objects }, limit: 1)
+    assert_equal({ kind: :frontier, row: 4, col: 8, direction: :right }, result[:target])
+    assert result[:survey][:pending]
+    log.absorb({ from: { room: 1, map: 0 }, clears: [{ target: { row: 4, col: 9 }, effect: false }] })
+    assert_equal [[4, 9]], log.failed_clears([1, 0])
+    result, = explore(rows, exits: [[[0, 5], :up]], explore_log: log, aim: { place: [3, 0] }, room_objects: -> { objects }, limit: 1)
+    assert_equal({ kind: :exit, row: 0, col: 5, direction: :up }, result[:target], 'a failed clear is no longer a frontier')
+    refute result[:survey][:pending]
+    @registry = nil
+    result, = explore(rows, exits: [[[0, 5], :up]], explore_log: log, aim: { place: [3, 0] }, room_objects: -> { objects }, limit: 1)
+    assert_equal({ kind: :exit, row: 0, col: 5, direction: :up }, result[:target])
+  end
+
+  def test_frontiers_behind_an_object_cleared_in_this_call_come_before_an_aimed_place
+    rows = with(CLOSED, [0, 5], '.', [4, 8], '?')
+    log = Koholint::ExploreLog.new
+    log.absorb({ from: { room: 1, map: 0 }, exits: [{ row: 0, col: 5, direction: :up, outcome: :left, to: [3, 0] }], survey: { sides: { up: [{ row: 0, col: 5 }] }, doors: [] } })
+    log.absorb({ from: { room: 3, map: 0 }, exits: [{ row: 7, col: 5, direction: :down, outcome: :left, to: [1, 0] }], survey: { sides: { down: [{ row: 7, col: 5 }] }, doors: [] } })
+    cleared = Struct.new(:uses) do
+      def cells = {}
+      def active? = false
+      def start(*) = nil
+    end
+    original = Koholint::Skills::Clearing.method(:of)
+    targets = [[{ effect: true }], []].map do |uses|
+      Koholint::Skills::Clearing.define_singleton_method(:of) { |_context| cleared.new(uses) }
+      result, = explore(rows, exits: [[[0, 5], :up]], explore_log: log, aim: { place: [3, 0] }, limit: 1)
+      result[:target][:kind]
+    end
+    assert_equal %i[frontier exit], targets
+  ensure
+    Koholint::Skills::Clearing.define_singleton_method(:of, original) if original
+  end
+
   def test_a_route_whose_first_exit_cannot_be_reached_from_link_takes_the_next_route
     rows = with(CLOSED, [7, 5], '.', [0, 5], '.', [1, 5], '#')
     log = Koholint::ExploreLog.new

@@ -208,3 +208,32 @@ per 1000 frames and the other arm 0.178. In every fork, the agent's first decisi
 The forks then went back and forth between 177/0 and 169/16 (or 161/0 and 178/18), mostly ending in `no_frontier` and
 "revisit npc" rounds, until the dollar cap. The harness clears the object only when explore picks a frontier behind it, and the
 objective-driven autopilot never let it pick one.
+
+## PR 4: frontier priority and loops (flow-44)
+
+The cap43 traces showed why the harness never cleared anything in the agent loop. Room 160/0 had been surveyed with nothing
+pending, so explore followed the first objective's aimed route out through a known exit. Later explores in 177/0 and 169/16
+ended in `no_frontier`, and the loop detector only added a hint to the prompt. flow-44 changes this:
+- Explore takes a clearable object's frontier in the current place before an aimed route.
+- Once an object is cleared in a call, the frontiers behind it come next, and the survey stays pending while they remain.
+- A place whose survey is pending explores its frontiers.
+- A detected loop abandons the objective and explores toward the nearest place with untried work, once per detection.
+- NPC revisits wait while a surveyed place still has untried work.
+
+**Agent-loop proof ($0, manual measurement).** An ad-hoc script ran the real delegated policy and autopilot, built by
+`CLI.policy_factory`, with a stub model. The stub always took the first candidate objective, which is the cap43 model's choice,
+or a `new_place` objective, and answered `explore` to every skill question. It ran 6000 frames per arm from
+`clearable-objects-160`.
+- With the capability: 8 clears, and Link reached 164/17, a place new to the lineage.
+- Without the capability: 160/0, 161/0, 177/0, and no new place.
+
+**A/B (tag `cap44`, 3 forks per arm, 6000 frames, `--max-dollars 1` each, 4.24 USD).** It **passed** the use criterion
+(chosen in 3 forks, 40 of 42 uses cleared the object).
+
+| arm | frames | usd | usd per 1000 f | new places | progress | uses | cleared |
+|---|---|---|---|---|---|---|---|
+| capabilities | 18000 | 1.51 | 0.084 | 4 | 4 | 42 | 40 |
+| no-capabilities | 17163 | 2.73 | 0.159 | 0 | 0 | 0 | 0 |
+
+Every capabilities fork reached 164/17, and one also reached 128/0; none of the forks without the capability reached a new place.
+Each capabilities fork broke one loop, the lineage's loop inherited at the fork frame, at its first decision. The loop break fired in 3 of 3 capabilities forks and 0 of 3 baseline forks, because only the clearable cells gave 160/0 untried work. So "chosen in 3 of 3" overstates organic use; the cost per 1000 frames and the clear rate are unaffected.
