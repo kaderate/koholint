@@ -24,6 +24,7 @@ module Koholint
           @idle_reason = nil
           @crossed = []
           @replans = 0
+          @avoided = []
           @clearing = clearing_for(context)
         end
 
@@ -31,6 +32,7 @@ module Koholint
           merged = super.merge(path_length: @initial_length.to_i, steps_done: @index, crossed: @crossed.map(&:dup))
           merged[:clears] = @clearing.uses if @clearing&.uses&.any?
           merged[:replans] = @replans if @replans.positive?
+          merged[:avoided] = @avoided.map(&:dup) if @avoided.any?
           merged[:cause] = @cause if @cause && !@path
           merged
         end
@@ -99,6 +101,7 @@ module Koholint
           @planner.avoid(cell, @heading)
           path = @planner.path(from: cell, to: @target) or return nil
           @replans += 1
+          @avoided << { row: cell[0], col: cell[1], direction: @heading }
           restart(state, path)
           advance(state)
         end

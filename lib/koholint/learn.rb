@@ -36,8 +36,9 @@ module Koholint
     class Trial
       attr_reader :before, :after, :outcome
 
-      def initialize(registry:, choice:, target:, budget:, ledger: nil)
-        @ledger = ledger
+      def initialize(registry:, choice:, target:, budget:, place: nil, walls: [])
+        @place = place
+        @walls = walls
         @point = DecisionPoint.choose_skill(registry)
         @choice = choice
         @target = target
@@ -47,7 +48,8 @@ module Koholint
       def decision_point_for(_state) = @point
 
       def prepare(context)
-        context[:ledger] ||= @ledger if @ledger
+        @ledger ||= Learn.ledger(@place, @walls, context[:ledger] || Ledger.new)
+        context[:ledger] = @ledger
         @room_objects ||= context[:room_objects]
       end
 
@@ -180,16 +182,22 @@ module Koholint
       end
     end
 
-    # Edges that stopped the walk to a standing cell in earlier trials, per place.
+    # Edges that stopped the walk to a standing cell, per place, with the trial runs that hit each.
     def walls(entries)
-      walls = Hash.new { |hash, place| hash[place] = Set.new }
-      entries.each { |entry| entry['evidence'].each { |trial| walls[trial['place']] << trial['blocked_at'] if trial['blocked_at'] } }
+      walls = Hash.new { |hash, place| hash[place] = Hash.new { |edges, edge| edges[edge] = Set.new } }
+      entries.each { |entry| entry['evidence'].each { |trial| note_walls(walls, trial) } }
       walls
     end
 
-    # Known walls as doubtful edges, so the trial's goto plans around them like a run that was blocked there twice.
-    def ledger(place, walls)
-      ledger = Ledger.new
+    def note_walls(walls, trial)
+      Array(trial['blocked_edges']).each { |edge| walls[trial['place']][edge] << trial['run'] }
+    end
+
+    # A wall counts once trials in 2 different runs hit it, like a fact checked twice; one blocked trial may be a passing enemy.
+    def confirmed(walls, place) = walls.key?(place) ? walls[place].select { |_, runs| runs.size >= Ledger::DOUBT_AT }.keys : []
+
+    # Confirmed walls as doubtful edges, so the trial's goto plans around them like a run that was blocked there twice.
+    def ledger(place, walls, ledger = Ledger.new)
       walls.each { |row, col, direction| Ledger::DOUBT_AT.times { ledger.record(place:, blocked_at: { row:, col:, direction: }) } }
       ledger
     end
@@ -199,7 +207,7 @@ module Koholint
       return true unless sighting[:walk] && sighting[:arrival]
 
       planner = Navigation::Planner.new(grid: sighting[:walk], ledger: nil, place: sighting[:place])
-      walls[sighting[:place]].each { |row, col, direction| planner.avoid([row, col], direction.to_sym) }
+      confirmed(walls, sighting[:place]).each { |row, col, direction| planner.avoid([row, col], direction.to_sym) }
       !planner.path(from: sighting[:arrival], to: stand).nil?
     end
 
@@ -243,7 +251,7 @@ module Koholint
 
     # Per place (up to PLACES) and target cell (up to CELLS, nearest the arrival first), standing sides nearest first until one is reached;
     # a (place, cell, stand) already in the entry's evidence is never tried again, nor one the planner cannot reach past the known walls.
-    def try(run, entry, places, root:, out:, walls: Hash.new { |hash, place| hash[place] = Set.new })
+    def try(run, entry, places, root:, out:, walls: Learn.walls([]))
       done = tried(entry)
       reached = Set.new
       evidence = []
@@ -256,8 +264,8 @@ module Koholint
           next
         end
 
-        trial = trial(run, entry, sighting, cell, stand, direction, root:, walls: walls[sighting[:place]])
-        walls[sighting[:place]] << trial['blocked_at'] if trial['blocked_at']
+        trial = trial(run, entry, sighting, cell, stand, direction, root:, walls: confirmed(walls, sighting[:place]))
+        note_walls(walls, trial)
         out.puts "  #{sighting[:place].join('-')} #{cell.inspect} from #{stand.inspect} #{direction}: #{trial['outcome']}"
         evidence << trial
         reached << [sighting[:place], cell] unless trial['outcome'] == 'unreached'
@@ -289,7 +297,7 @@ module Koholint
       budget = Budget.new(frames: composite.max_frames + Engine::NOT_READY_STUCK_FRAMES)
       child = run.fork(at_frame: sighting[:frame], flow_version: FLOW_VERSION, root:, tag: "learn-#{entry['id']}")
       policy = Trial.new(registry:, choice: { skill: composite.name, params: { row: stand[0], col: stand[1], direction: direction.to_s } }, target: cell, budget:,
-                         ledger: ledger(sighting[:place], walls))
+                         place: sighting[:place], walls:)
       Engine.resume(child.dir, policy:, budget:, grid: true).run
       outcome(policy, entry).merge('run' => child.id, 'parent' => run.id, 'frame' => sighting[:frame], 'place' => sighting[:place],
                                    'cell' => cell, 'stand' => stand, 'direction' => direction.to_s)
@@ -304,9 +312,9 @@ module Koholint
               elsif result[:effect] && policy.before == object && policy.after != object then 'success'
               else 'failure'
               end
-      wall = Array(result[:steps]).first&.dig(:blocked_at) if label == 'unreached'
+      edges = label == 'unreached' ? Ledger.edges_of(Array(result[:steps]).first || {}) : []
       { 'outcome' => label, 'steps' => steps, 'before' => policy.before, 'after' => policy.after, 'frames' => result[:frames].to_i,
-        'blocked_at' => wall && wall.values_at(:row, :col, :direction).then { |row, col, direction| [row, col, direction.to_s] } }.compact
+        'blocked_edges' => edges.map { |edge| [edge[:row], edge[:col], edge[:direction].to_s] }.uniq.then { |list| list unless list.empty? } }.compact
     end
 
     def judge(evidence)

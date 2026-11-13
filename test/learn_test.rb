@@ -132,9 +132,9 @@ class LearnTest < Minitest::Test
     assert_equal 'not_solid', L.outcome(Policy.new({ steps: steps.(:done, :done), effect: false }, 92, 92), entry)['outcome']
     assert_equal 'unreached', L.outcome(Policy.new({ steps: steps.(:no_path), effect: false }, 92, 92), entry)['outcome']
     assert_equal 'unreached', L.outcome(Policy.new(nil, nil, nil), entry)['outcome']
-    stopped = { steps: [{ stopped_by: :blocked, blocked_at: { row: 5, col: 8, direction: :up } }], effect: false }
-    assert_equal [5, 8, 'up'], L.outcome(Policy.new(stopped, 92, 92), entry)['blocked_at']
-    refute L.outcome(Policy.new(good, 92, 4), entry).key?('blocked_at')
+    stopped = { steps: [{ stopped_by: :blocked, blocked_at: { row: 5, col: 8, direction: :up }, avoided: [{ row: 6, col: 8, direction: :right }] }], effect: false }
+    assert_equal [[5, 8, 'up'], [6, 8, 'right']], L.outcome(Policy.new(stopped, 92, 92), entry)['blocked_edges']
+    refute L.outcome(Policy.new(good, 92, 4), entry).key?('blocked_edges')
   end
 
   # Open except column 5, which only row 0 crosses.
@@ -145,13 +145,15 @@ class LearnTest < Minitest::Test
 
   def test_a_stand_the_planner_cannot_reach_past_known_walls_is_skipped_without_a_trial
     sighting = { place: [224, 0], frame: 120, arrival: [4, 2], grid: grid(at: { [4, 8] => 92 }), walk: Walk.new, cells: [[4, 8]] }
-    walls = L.walls([{ 'evidence' => [{ 'place' => [224, 0], 'blocked_at' => [0, 5, 'right'] }] }])
-    assert L.reachable?(sighting, [4, 7], Hash.new { |hash, place| hash[place] = Set.new })
+    wall = ->(run) { { 'place' => [224, 0], 'run' => run, 'blocked_edges' => [[0, 5, 'right']] } }
+    assert L.reachable?(sighting, [4, 7], L.walls([{ 'evidence' => [wall.('a'), wall.('a')] }])), 'one run is not enough'
+    walls = L.walls([{ 'evidence' => [wall.('a'), wall.('b')] }])
+    assert_equal [[0, 5, 'right']], L.confirmed(walls, [224, 0])
     refute L.reachable?(sighting, [4, 7], walls)
     assert L.reachable?(sighting, [4, 3], walls)
     out = StringIO.new
     entry = L.hypothesis(gain:, object: 92, run: '20261112-103604-0c64')
-    assert_empty L.try(nil, entry, [sighting], root: nil, out:, walls: L.walls([{ 'evidence' => [{ 'place' => [224, 0], 'blocked_at' => [0, 5, 'right'] }] }]))
+    assert_empty L.try(nil, entry, [sighting], root: nil, out:, walls:)
     assert_equal 4, out.string.scan('skipped, no path').size
   end
 
@@ -168,10 +170,28 @@ class LearnTest < Minitest::Test
     policy.after_action(choice: answer[:choice], outcome: { stopped_by: :done }, state: nil, frame: 1)
     assert_equal [92, 4], [policy.before, policy.after]
     assert_equal :trial_done, budget.exhausted
-    ledger = L.ledger([224, 0], [[5, 8, 'up']])
-    assert ledger.doubtful?([224, 0], [5, 8], :up)
-    context = { room_objects: -> { cells } }
-    L::Trial.new(registry:, choice: answer[:choice], target: [6, 5], budget:, ledger:).prepare(context)
-    assert_same ledger, context[:ledger]
+  end
+
+  class OpenGrid
+    def static_sprite(_row, _col) = nil
+    def passable(_row, _col, _direction) = :yes
+  end
+
+  def test_a_trial_goto_plans_around_its_confirmed_walls_and_keeps_an_existing_ledger
+    registry = Koholint::Skills::Registry.default
+    start = Koholint::GameState.new(frame: 0, room_id: 224, map_id: 0, x: 88, y: 80, hp: 24, dialog_state: 0, game_mode: 0x0B, game_submode: 7, milestone: :none)
+    first = lambda do |walls, ledger = nil|
+      context = { room_objects: -> { grid }, grid: OpenGrid.new, ledger: }.compact
+      L::Trial.new(registry:, choice: { skill: 'goto', params: { row: 4, col: 8 } }, target: [4, 8], budget: Koholint::Budget.new, place: [224, 0], walls:).prepare(context)
+      [registry.start('goto', start, { row: 4, col: 8 }, context).next_input(start), context[:ledger]]
+    end
+    assert_equal [:right], first.([]).first
+    refute_equal [:right], first.([[4, 5, 'right']]).first
+    existing = Koholint::Ledger.new
+    existing.record(place: [224, 0], blocked_at: { row: 1, col: 1, direction: :up })
+    _, ledger = first.([[4, 5, 'right']], existing)
+    assert_same existing, ledger
+    assert ledger.doubtful?([224, 0], [4, 5], :right)
+    assert_equal 1, ledger.count([224, 0], [1, 1], :up)
   end
 end

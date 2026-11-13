@@ -282,9 +282,10 @@ nowhere: 192/0's arrival is a door cell whose only exit is back down (a walk up 
 upper part is cut off at (5,8) up. Learn kept trying every other standing cell there, and each trial hit the same wall.
 
 The fix lives in the existing layers. goto now avoids a blocked edge and replans from where Link stands, up to 3 times (explore
-and talk_to keep their own replanning). An unreached trial records the edge that stopped it. Learn skips a standing cell the
-shared planner cannot reach from the arrival while avoiding the walls known for that place, and it gives each trial a ledger
-holding those walls as doubtful edges.
+and talk_to keep their own replanning). goto returns the edges it went around (`avoided`), and the delegated ledger records them with `blocked_at`. An unreached trial
+records every edge that stopped its goto. A wall counts once trials in 2 different runs hit it, like any fact checked twice,
+because one blocked trial may be a passing enemy. Learn skips a standing cell the shared planner cannot reach from the arrival
+while avoiding the confirmed walls of that place, and it adds those walls to each trial's ledger as doubtful edges.
 
 Same start (the catalogue at 05d5280 without `sword-on-object-92`), defaults, `0c64`, $0:
 

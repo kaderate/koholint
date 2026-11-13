@@ -464,6 +464,8 @@ class SkillsTest < Minitest::Test
     result, = goto(4, 8, walls: [[4, 7]])
     assert_equal [:done, 1], result.values_at(:stopped_by, :replans)
     assert_equal [4, 8], [result[:to][:row], result[:to][:col]]
+    assert_equal [{ row: 4, col: 6, direction: :right }], result[:avoided]
+    assert_equal [{ row: 4, col: 6, direction: :right }], Koholint::Ledger.edges_of(result)
     wall = (0..7).map { |row| [row, 7] }
     result, = goto(4, 8, walls: wall)
     assert_equal [:blocked, 3], result.values_at(:stopped_by, :replans)
