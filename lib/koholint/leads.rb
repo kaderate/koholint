@@ -15,6 +15,7 @@ module Koholint
     WHERE_MAX = 40
     NAME_MAX = 40
     REFUTE_AT = 2
+    NAVIGATION_REASONS = %w[loop stall unreachable resume].freeze
     PLACE_ID = /\A\[?\s*(\d+)\s*[-,\/ ]\s*(\d+)\s*\]?\z/
 
     attr_reader :all, :goal, :goal_frame, :goal_objectives, :names
@@ -70,20 +71,27 @@ module Koholint
 
       @attempts[id] = { objective: id, lead:, title: Ledger.pick(done, :title), outcome: (Ledger.pick(done, :outcome) || Ledger.pick(done, :status)).to_s,
                         place: Ledger.pick(target, :place) || Ledger.pick(Ledger.pick(done, :predicate) || {}, :place),
-                        frame: Ledger.pick(done, :ended_frame) || Ledger.pick(done, :frame) }
+                        frame: Ledger.pick(done, :ended_frame) || Ledger.pick(done, :frame), reason: Ledger.pick(done, :reason)&.to_s }.compact
     end
 
-    # tested: an objective that followed the lead was achieved; refuted: REFUTE_AT objectives followed it and none was.
+    # tested: an objective that followed the lead was achieved; refuted: REFUTE_AT of them failed, navigation and restarts not counted.
     def status(lead)
       tries = @attempts.values.select { |attempt| attempt[:lead] == lead[:id] }
+      refuting = tries.count { |attempt| attempt[:outcome] == 'failed' || (attempt[:outcome] == 'abandoned' && !NAVIGATION_REASONS.include?(attempt[:reason])) }
       verdict = if tries.any? { |attempt| attempt[:outcome] == 'achieved' } then 'tested'
-                elsif tries.size >= REFUTE_AT then 'refuted'
+                elsif refuting >= REFUTE_AT then 'refuted'
                 else 'open'
                 end
       { status: verdict, evidence: tries }
     end
 
     def with_status = @all.map { |lead| lead.merge(status(lead)) }
+
+    # A lead stays a candidate unless refuted or an achieved objective reached the place it points to.
+    def settled?(lead)
+      found = status(lead)
+      found[:status] == 'refuted' || found[:evidence].any? { |attempt| attempt[:outcome] == 'achieved' && attempt[:place] && attempt[:place] == place_for(lead) }
+    end
 
     def restore(event)
       lead = %w[id place source quote claim importance].to_h { |key| [key.to_sym, Ledger.pick(event, key)] }

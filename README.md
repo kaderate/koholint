@@ -115,8 +115,8 @@ checked against the run id and its flow, e.g. `bin/koholint branch runs/20261111
   to five leads (`quote`, `claim`, importance `high|normal|low|tip`, `tip` for how-to-play advice); a lead whose quote is not in that transcription is
   dropped. Both are trace events (`goal`, `lead`), shown in the context and the live view and written to `world.json`;
   an objective can cite the lead behind it (`because`). A lead may carry `where` (a place id such as `161-0` or a name the agent gave).
-  A lead is `open` until an objective follows it, `tested` once one is achieved and `refuted` after 2 that were not; the context shows
-  the status with those objectives as evidence and lists open leads first.
+  A lead is `open` until an objective follows it, `tested` once one is achieved and `refuted` after 2 that failed (a loop, stall,
+  unreachable target or restart does not count); the context shows the status with the last 3 of those objectives and lists open leads first.
 - At `choose_objective` the context lists candidate objectives with ids (`candidates.rb`): untried exits by side (`exit-up`) and doors
   (`door-R-C`) of this place, people (`person-tT`, listed first) and unread signs (`sign-R-C`) here worth a visit, known places with untried exits
   (`place-R-M`), people and unread signs of other known places (from their place cards) and places tied to a lead by its `where`

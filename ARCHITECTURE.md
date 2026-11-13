@@ -224,8 +224,10 @@ place and the 4 newest tips). A lead whose quote is not in the transcription of 
 `lead_rejected`), duplicates are dropped by quote. Goal and leads are rebuilt from the `goal` and `lead` trace events on
 resume. flow-48: each lead has a status derived from the objectives that followed it (`because`, or a `lead` candidate's target), read from the finished
 objectives (`Leads#note_objective`, fed with `Objectives#history` before each prompt and rebuilt from the `objective` events on resume): `open` until one
-follows it, `tested` once one is achieved, `refuted` after `REFUTE_AT` (2) that were not. The evidence is those objectives (id, title, outcome, place, frame).
-The context tags a followed lead with its status and evidence and lists open leads first, a lead that is not open is no longer a `lead-N` candidate, and
+follows it, `tested` once one is achieved, `refuted` after `REFUTE_AT` (2) that failed, or were abandoned for a reason other than `loop`, `stall`, `unreachable`
+or `resume` (navigation and restarts say nothing of the claim). The evidence is those objectives (id, title, outcome, place, frame, reason).
+The context tags a followed lead with its status and its last 3 objectives and lists open leads first; a lead stops being a `lead-N` candidate once refuted
+or once an achieved objective reached the place it points to (a loosely cited `tested` keeps it), and
 `world.json` carries `status` and `evidence` per lead.
 
 **Agents** (`agents/`) — `context.rb` renders state for the model (grid map, neighbours, entities and objects on screen, people's names,

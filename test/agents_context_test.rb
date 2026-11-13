@@ -389,6 +389,12 @@ class AgentsContextTest < Minitest::Test
                   '- [lead-1 high tested: obj-70 "Leave by the up side" achieved in 81-0 at frame 75199] claim 1 — "some words"'], section.lines.drop(1).map(&:chomp)
   end
 
+  def test_a_lead_shows_its_last_three_objectives_as_evidence
+    tries = (1..5).map { |i| { objective: "obj-#{i}", title: 'Go', outcome: 'failed', place: nil, frame: i } }
+    line = build(leads: [lead(1, 'high').merge(status: 'refuted', evidence: tries)])[/- \[lead-1.*$/]
+    assert_equal %w[obj-3 obj-4 obj-5], line.scan(/obj-\d/)
+  end
+
   def test_leads_are_capped_newest_first
     leads = (1..10).map { |i| lead(i, 'high') } + (11..17).map { |i| lead(i, 'normal') }
     shown = build(leads:).scan(/\[(lead-\d+)/).flatten

@@ -94,10 +94,16 @@ class LeadsTest < Minitest::Test
       leads = Koholint::Leads.from_events(Koholint::Trace.read(File.join(dir, 'trace.jsonl')))
       assert_equal ['open', 'tested'], leads.with_status.map { |lead| lead[:status] }
       assert_equal [{ objective: 'obj-2', lead: 'lead-2', title: 'Leave by the right side', outcome: 'achieved', place: [1, 2], frame: 150 }], leads.status(leads.all[1])[:evidence]
-      assert_equal [{ objective: 'obj-1', lead: 'lead-1', title: 'Go to place 5-0', outcome: 'abandoned', place: [5, 0], frame: 90 }], leads.status(leads.all[0])[:evidence]
+      assert_equal [{ objective: 'obj-1', lead: 'lead-1', title: 'Go to place 5-0', outcome: 'abandoned', place: [5, 0], frame: 90, reason: 'stall' }], leads.status(leads.all[0])[:evidence]
       leads.note_objective({ id: 'obj-4', title: 'Go to place 5-0', predicate: { kind: 'reach_place', place: [5, 0] }, outcome: :abandoned, ended_frame: 400, target: { kind: 'lead', place: [5, 0], lead: 'lead-1' } })
       leads.note_objective({ id: 'obj-4', title: 'again', outcome: :achieved, because: 'lead-1' })
-      assert_equal ['refuted', 2], leads.status(leads.all[0]).then { |found| [found[:status], found[:evidence].size] }
+      assert_equal ['open', 2], leads.status(leads.all[0]).then { |found| [found[:status], found[:evidence].size] }, 'a stalled objective does not refute'
+      leads.note_objective({ id: 'obj-5', title: 'Go', outcome: :abandoned, reason: 'loop', ended_frame: 500, because: 'lead-1' })
+      leads.note_objective({ id: 'obj-6', title: 'Go', outcome: :abandoned, reason: 'unreachable', ended_frame: 600, because: 'lead-1' })
+      leads.note_objective({ id: 'obj-7', title: 'Go', outcome: :abandoned, reason: 'resume', ended_frame: 700, because: 'lead-1' })
+      assert_equal 'open', leads.status(leads.all[0])[:status], 'loops, unreachable targets and restarts do not refute'
+      leads.note_objective({ id: 'obj-8', title: 'Go', outcome: :failed, ended_frame: 800, because: 'lead-1' })
+      assert_equal 'refuted', leads.status(leads.all[0])[:status]
     end
   end
 

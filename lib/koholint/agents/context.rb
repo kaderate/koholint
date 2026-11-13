@@ -23,6 +23,7 @@ module Koholint
       HIGH_LEADS = 8
       NORMAL_LEADS = 5
       TIP_LEADS = 4
+      EVIDENCE_SHOWN = 3
       QUOTE_LIMIT = 80
 
       def self.build(state:, grid:, objective:, history:, attempts:, manual:, last_results:, max_chars: 9000, ledger: nil, refusals: [], plan: nil, triggers: nil, talk_log: nil, locked: nil, locked_frames: nil, goal: nil, leads: [], stamp: nil, entities: [], signs: [],
@@ -260,7 +261,7 @@ module Koholint
         lines = (high + normal + tips).map do |lead|
           quote = lead[:quote].size > QUOTE_LIMIT ? "#{lead[:quote][0, QUOTE_LIMIT - 3]}..." : lead[:quote]
           where = lead[:where] ? " (where: #{lead[:where]}#{(found = resolve&.call(lead)) ? ", place #{found.join('-')}" : ''})" : ''
-          tries = Array(lead[:evidence]).map do |try|
+          tries = Array(lead[:evidence]).last(EVIDENCE_SHOWN).map do |try|
             "#{try[:objective]} \"#{try[:title]}\" #{try[:outcome]}#{" in #{try[:place].join('-')}" if try[:place]} at frame #{try[:frame]}"
           end
           status = tries.empty? ? '' : " #{lead[:status]}: #{tries.join('; ')}"
@@ -269,7 +270,7 @@ module Koholint
         return [] if lines.empty?
 
         ["Leads from texts you read (all high ones, normal ones of this place, the newest how-to-play tips). A lead is open until an objective follows it (give its id in because): " \
-         "tested once one was achieved, refuted after #{Leads::REFUTE_AT} that were not, with those objectives as evidence. Prefer open leads; do not chase a tested or refuted one again " \
+         "tested once one was achieved, refuted after #{Leads::REFUTE_AT} that failed (not for a loop, a stall or an unreachable target), with the last of those objectives as evidence. Prefer open leads; do not chase a tested or refuted one again " \
          "without a new reason.\n#{lines.join("\n")}"]
       end
       private_class_method :leads_block
