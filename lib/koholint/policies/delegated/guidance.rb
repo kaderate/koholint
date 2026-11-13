@@ -137,11 +137,20 @@ module Koholint
 
           place = [state.room_id, state.map_id]
           return unless @explore_log.untried?(place) || @explore_log.route(place)
+          return if unmet_person?(state, place)
 
           @objectives.start(frame: state.frame, **AUTO_OBJECTIVE, autopilot: true)
           @autopilot.adopt(@objectives.current)
           { choice: AUTO_OBJECTIVE.dup, justification: 'autopilot: the last explore chain reached a place and achieved its objective; keep exploring', confidence: 1.0,
             agent: 'delegated', latency_ms: 0, cost_usd: 0.0, fallback: false, autopilot: true, prompt: nil, image: nil }
+        end
+
+        # A person here never tried is offered first at the model's objective choice, which keeping on exploring would skip.
+        def unmet_person?(state, place)
+          entities_now.any? do |entity|
+            entity[:kind].to_s == 'npc' && entity[:cell] && @talk_log.attempts(place, [[:entity, entity[:type]]]).zero? &&
+              @talk_log.status(place:, entity: entity[:type], stamp: stamp(state)) == :never
+          end
         end
 
         def revisit_low? = @budget ? @budget.nearly_exhausted?(frames: Revisit::CYCLE_FRAMES, share: REVISIT_BUDGET_SHARE) : false

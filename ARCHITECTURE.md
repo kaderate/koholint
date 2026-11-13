@@ -182,7 +182,7 @@ skill decision after the model's call: `explore` with the exit's direction, or w
 a place to route to through `ExploreLog#route(goal:)`; a model `explore` with no direction gets the same aim, or the objective's place, and the prompt shows the known route to that place, `ExploreLog#path`), or one `talk_to` of a person or sign of the current place (a `new_text` target left behind is not routed back to; a door Link stands on or just below is not a candidate); a new goal
 from that call does not hold it. When a chain stopped `new_place` or `known_place` and achieved the model's objective, the next
 `choose_objective` is answered by the policy (`new_place`, `autopilot: true` on the objective) while the place or a routed place has
-untried exits and the caps allow it. Results of autopilot decisions are marked `(autopilot)` in the context's results and attempts. Autopilot explores are objective attempts like any other (loop and stall
+untried exits and the caps allow it, and (flow-52) no person on screen was never tried (no talk attempt with its type here): such a person is the first candidate of the model's objective choice (run `20261113-160556-fef5` kept exploring past the never-tried type 49 at (5,5) of 242/0 and left). Results of autopilot decisions are marked `(autopilot)` in the context's results and attempts. Autopilot explores are objective attempts like any other (loop and stall
 abandonment still apply) and leave the engine's consecutive failure and refusal counters untouched; `--autopilot off`
 (manifest `autopilot`) disables it),
 `policies/walk_and_talk.rb` and `start_game.rb` (deterministic baselines and the intro). In `delegated.rb` an invalid
