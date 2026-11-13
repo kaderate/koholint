@@ -7,6 +7,7 @@ require 'koholint/boot_script'
 require 'koholint/emulator'
 require 'koholint/input_log'
 require 'koholint/perception'
+require 'support/frame_count'
 
 module EmulatorCache
   BOOT_FRAME_LIMIT = 3000
@@ -38,17 +39,22 @@ module EmulatorCache
     def recorded(name, into:, sources:)
       stem = "#{key_for(key_sources + recording_sources + sources.map { |f| File.read(f) })}-#{name}"
       stored = File.join(dir, stem)
+      built = false
       unless File.directory?(stored)
         FileUtils.mkdir_p(dir)
         File.open(lock_path(stem), File::RDWR | File::CREAT) do |lock|
           lock.flock(File::LOCK_EX)
           unless File.directory?(stored)
             root = Dir.mktmpdir('recording', dir)
+            before = FrameCount.frames
             yield root
+            File.write(File.join(root, 'frames'), FrameCount.frames - before)
             File.rename(root, stored)
+            built = true
           end
         end
       end
+      FrameCount.charge(stem) { File.read(File.join(stored, 'frames')).to_i } unless built
       run_dir = Dir.children(stored).map { |child| File.join(stored, child) }.find { |child| File.directory?(child) }
       FileUtils.cp_r(run_dir, into)
       File.join(into, File.basename(run_dir))
@@ -100,7 +106,11 @@ module EmulatorCache
       Koholint::Perception.read(moved).to_h.values_at(:x, :y) != Koholint::Perception.read(control).to_h.values_at(:x, :y)
     end
 
-    def fetch(stem, expect_hash)
+    def fetch(stem, expect_hash, &)
+      FrameCount.uncounted { cached_or_built(stem, expect_hash, &) }.tap { |emulator| FrameCount.charge(stem) { emulator.frame } }
+    end
+
+    def cached_or_built(stem, expect_hash)
       usable = ->(cached) { cached && (expect_hash.nil? || cached.state_hash == expect_hash) }
       cached = load(stem)
       return cached if usable.call(cached)

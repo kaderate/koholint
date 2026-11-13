@@ -10,8 +10,8 @@ HEAVY = %w[
   test/registry_test.rb test/resilience_test.rb test/start_game_test.rb test/readiness_test.rb test/object_census_test.rb
   test/screens_test.rb test/dialogue_shot_test.rb
 ].freeze
-# Emulated frames above which a file belongs in HEAVY; the heaviest light file emulates about 1500
-HEAVY_FRAMES = 2000
+# Frames a file costs alone on a cold cache above which it belongs in HEAVY; the heaviest light file (use_item) counts 4245
+HEAVY_FRAMES = 6000
 TIMES = 'tmp/test_times.json'.freeze
 
 desc 'Run every test file in its own process, in parallel'
@@ -28,6 +28,8 @@ task :test do
   # The longest jobs set the wall clock: shorter ones yield the cores to them
   critical = times.values.max.to_f / 2
   renice = Process.getpriority(Process::PRIO_PROCESS, 0) < 5
+  # Ruby subprocesses of a test (bin/koholint) count their frames into the same log
+  counted = [ENV.fetch('RUBYOPT', nil), "-I#{File.expand_path('lib')} -r#{File.expand_path('test/support/frame_count')}"].compact.join(' ')
   started = {}
   queue = jobs.dup
   running = {}
@@ -38,7 +40,7 @@ task :test do
       file, args = job
       log = Tempfile.new(File.basename(file))
       count = Tempfile.new("#{File.basename(file)}-frames")
-      pid = Process.spawn({ 'KOHOLINT_FRAMES_LOG' => count.path }, RbConfig.ruby, '--yjit', '-Ilib', '-Itest', file, *args,
+      pid = Process.spawn({ 'KOHOLINT_FRAMES_LOG' => count.path, 'RUBYOPT' => counted }, RbConfig.ruby, '--yjit', '-Ilib', '-Itest', file, *args,
                           %i[out err] => log.path)
       Process.setpriority(Process::PRIO_PROCESS, pid, 5) if renice && times.fetch(file + args.join, 0) < critical
       running[pid] = [file, log, count]
@@ -46,7 +48,7 @@ task :test do
     end
     pid, status = Process.wait2
     file, log, count = running.delete(pid)
-    frames[file] += File.read(count.path).to_i
+    frames[file] += File.readlines(count.path).sum(&:to_i)
     count.close!
     key, t0 = started.delete(pid)
     times[key] = (Process.clock_gettime(Process::CLOCK_MONOTONIC) - t0).round(1)
