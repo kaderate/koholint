@@ -209,7 +209,8 @@ class DelegatedEngineTest < Minitest::Test
       objectives = Koholint::Objectives.new(trace: run.trace, stall_frames: 30)
       far = ok('title' => 'far', 'predicate' => { 'kind' => 'reach_place', 'place' => [0, 0] })
       client = ScriptedClient.new(objective: [far, far, far], default: wait)
-      delegated = Koholint::Policies::Delegated.new(client:, registry: Koholint::Skills::Registry.default, objectives:, on_step: budget.method(:step_done))
+      delegated = Koholint::Policies::Delegated.new(client:, registry: Koholint::Skills::Registry.default, objectives:, on_step: budget.method(:step_done),
+                                                    revisit: QuietRevisit.new(talk_log: Koholint::TalkLog.new))
       policy = Koholint::Policies::StartGame.new(delegated, ready: ->(s) { %i[playing dialogue].include?(s.phase) })
       eng = Koholint::Engine.new(run:, policy:, budget:, grid: true, emulator: EmulatorCache.interactive)
       assert_equal :steps, eng.run
