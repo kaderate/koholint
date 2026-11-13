@@ -217,6 +217,18 @@ class ExploreTest < Minitest::Test
     assert_equal [:door, 3, 2], result[:target].values_at(:kind, :row, :col)
   end
 
+  def test_least_visited_is_the_reachable_place_entered_least_nearest_first_outside_the_loop
+    log = Koholint::ExploreLog.new
+    log.absorb({ from: { room: 1, map: 0 }, exits: [{ row: 0, col: 5, direction: :up, outcome: :left, to: [2, 0] }, { row: 7, col: 5, direction: :down, outcome: :left, to: [4, 0] }] })
+    log.absorb({ from: { room: 2, map: 0 }, exits: [{ row: 0, col: 5, direction: :up, outcome: :left, to: [3, 0] }] })
+    log.absorb({ from: { room: 3, map: 0 }, exits: [{ row: 0, col: 5, direction: :up, outcome: :left, to: [5, 0] }] })
+    [[1, 2], [2, 1], [1, 4], [4, 1], [1, 2], [2, 1]].each { |from, to| log.note({ from: { room: from, map: 0 }, to: { room: to, map: 0 } }) }
+    assert_equal({ goal: [3, 0], next: [2, 0], via: :up }, log.least_visited([1, 0]), 'nearest among the least entered')
+    assert_equal [5, 0], log.least_visited([1, 0], avoid: [[3, 0]])[:goal]
+    assert_equal [4, 0], log.least_visited([1, 0], avoid: [[3, 0], [5, 0]])[:goal]
+    assert_nil log.least_visited([1, 0], avoid: [[2, 0], [3, 0], [4, 0], [5, 0]])
+  end
+
   def test_an_aimed_place_is_routed_to_before_local_untried_exits
     rows = with(CLOSED, [7, 5], '.', [0, 5], '.')
     log = Koholint::ExploreLog.new

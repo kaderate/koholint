@@ -152,6 +152,13 @@ module Koholint
       { goal: hops.last[:to], next: hops.first[:to], via: hops.first[:via] }
     end
 
+    # Where a loop goes when no place has untried work: the reachable place entered least, nearest first, outside the loop.
+    def least_visited(from, avoid: [])
+      far = hops(from).reject { |place, _| place == from || avoid.include?(place) }
+      far.sort_by { |place, count| [@visits[place], count, place] }.each { |place, _| (found = route(from, goal: place)) and return found }
+      nil
+    end
+
     def path(from, goal: nil, avoid: [])
       seen = { from => nil }
       queue = [from]

@@ -147,6 +147,29 @@ class DelegatedAutopilotTest < Minitest::Test
     assert_equal 'claude', results[9][0][:agent]
   end
 
+  def test_a_loop_with_no_untried_work_anywhere_goes_to_the_least_entered_place_outside_it_on_every_detection
+    log = Koholint::ExploreLog.new
+    log.absorb({ from: { room: 163, map: 16 }, exits: [{ row: 3, col: 0, direction: :left, outcome: :left, to: [164, 16] }, { row: 0, col: 5, direction: :up, outcome: :left, to: [165, 16] }],
+                 survey: { sides: { left: [{ row: 3, col: 0 }], up: [{ row: 0, col: 5 }] }, doors: [] } })
+    log.absorb({ from: { room: 164, map: 16 }, exits: [{ row: 3, col: 9, direction: :right, outcome: :left, to: [163, 16] }], survey: { sides: { right: [{ row: 3, col: 9 }] }, doors: [] } })
+    log.absorb({ from: { room: 165, map: 16 }, exits: [{ row: 7, col: 5, direction: :down, outcome: :left, to: [163, 16] }], survey: { sides: { down: [{ row: 7, col: 5 }] }, doors: [] } })
+    client = ScriptedClient.new(objective: new_place, default: walk)
+    @objectives = Koholint::Objectives.new(trace: trace)
+    p = Koholint::Policies::Delegated.new(client:, registry: Koholint::Skills::Registry.default, objectives: @objectives, manual: '', explore_log: log)
+    broken = [165, 163, 164, 163, 164, 163, 164, 163, 164, 163, 164, 163, 164, 163, 164, 163, 164].each_with_index.filter_map do |room, i|
+      now = state(frame: 100 + (i * 200), room_id: room)
+      p.observe(now, frame: now.frame)
+      context = { grid: }
+      result = p.decide(p.decision_point_for(now), now, context)
+      [i, result, context] if result[:agent] == 'delegated'
+    end
+    assert_equal [9, 16], broken.map(&:first), 'each detection is acted on'
+    _, result, context = broken.first
+    assert_equal [{ kind: 'reach_place', place: [165, 16] }, { place: [165, 16] }], [result[:choice][:predicate], context[:aim]]
+    assert_equal 'loop in 163-16, 164-16: no place has untried work: explore toward 165-16, the reachable place entered least', result[:justification]
+    assert_equal [{ kind: 'reach_place', place: [165, 16] }, { kind: 'place', place: [165, 16] }], [@objectives.current[:predicate], @objectives.current[:target]]
+  end
+
   def test_repeated_zero_frame_results_in_one_place_are_answered_by_the_harness
     client = ScriptedClient.new(objective: new_place, default: explore)
     p = autopiloted(client, autopilot: nil)
