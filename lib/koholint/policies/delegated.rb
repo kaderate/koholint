@@ -113,7 +113,7 @@ module Koholint
       def prepare(context)
         @entities_reader = context[:entities] if context[:entities]
         @objects_reader = context[:objects] if context[:objects]
-        offer_learned(context[:room_objects]) if @composites.any? && context[:room_objects]
+        offer_learned(context[:room_objects], context[:held]) if @composites.any? && context[:room_objects]
       end
 
       def decision_point_for(state)
@@ -270,10 +270,10 @@ module Koholint
 
       def offered_candidates = Candidates.offered(@candidates, @candidate)
 
-      # A learned capability is offered only while its object is on screen.
-      def offer_learned(room_objects)
+      # A learned capability is offered only while its item is held and its object is on screen.
+      def offer_learned(room_objects, held)
         grid = room_objects.call
-        cells = @composites.to_h { |skill| [skill, grid.each_with_index.flat_map { |row, r| row.each_index.select { |c| row[c] == skill.entry['target']['object'] }.map { |c| [r, c] } }] }
+        cells = @composites.select { |skill| skill.usable?(held) }.to_h { |skill| [skill, grid.each_with_index.flat_map { |row, r| row.each_index.select { |c| row[c] == skill.entry['target']['object'] }.map { |c| [r, c] } }] }
         present = cells.select { |_, at| at.any? }
         @learned = present.map { |skill, at| "- #{skill.name} (row, col, direction): #{Capabilities.describe(skill.entry)}. Object #{skill.entry['target']['object']} here at #{at.map { |r, c| "(#{r},#{c})" }.join(', ')}; give the free cell next to it where Link stands and the direction facing it." }
         names = @registry.names - SCREEN_ONLY - (@composites - present.keys).map(&:name)

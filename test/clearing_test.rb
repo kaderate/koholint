@@ -33,6 +33,8 @@ class ClearingTest < Minitest::Test
   def test_needs_published_composites_and_the_room_objects
     assert_nil Koholint::Skills::Clearing.of({ registry: StubRegistry.new([]), room_objects: objects([1, 1]) })
     assert_nil Koholint::Skills::Clearing.of({ registry: StubRegistry.new([composite]) })
+    assert_nil Koholint::Skills::Clearing.of({ registry: StubRegistry.new([composite]), room_objects: objects([1, 1]), held: [4] }), 'not without the item it was learned with'
+    refute_nil Koholint::Skills::Clearing.of({ registry: StubRegistry.new([composite]), room_objects: objects([1, 1]), held: [1, 4] })
     clearing = Koholint::Skills::Clearing.of({ registry: StubRegistry.new([composite]), room_objects: objects([1, 1], [2, 3]) })
     assert_equal [[1, 1], [2, 3]], clearing.cells.keys
   end
