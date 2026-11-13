@@ -297,5 +297,6 @@ version, and may set the child's `--tag`, `--autopilot` and `--root`.
 | Measurements of agent runs | `docs/runs/` (`index.md` lists every archived run) |
 | What remains | `ROADMAP.md` |
 | Conventions | `AGENTS.md` |
-| Run storage and viewer usage | `README.md` |
+| Commands, censuses, viewer and run storage | `docs/OPERATING.md` |
+| Agent skills and harness behaviour (per flow) | `docs/AGENT_SKILLS.md` |
 | Game manual digest given to the agent | `docs/AGENT_MANUAL.md` |
