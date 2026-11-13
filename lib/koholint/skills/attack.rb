@@ -98,7 +98,7 @@ module Koholint
         def strike(state)
           now = Array(@entities.call).find { |entity| entity.values_at(:slot, :type) == @enemy.values_at(:slot, :type) }
           @hits += 1 if now && now[:health].to_i < @enemy[:health].to_i
-          return finish(:target_gone) unless now
+          return finish(:target_gone) unless now&.dig(:cell)
           return killed unless now[:status] == @enemy[:status]
 
           @enemy = @enemy.merge(now.slice(:x, :y, :cell, :health))

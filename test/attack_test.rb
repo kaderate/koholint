@@ -86,6 +86,11 @@ class AttackTest < Minitest::Test
     assert_equal [:done, true, 2, 1], result.values_at(:stopped_by, :killed, :hits, :approaches)
   end
 
+  def test_stops_with_target_gone_when_a_strike_knocks_the_enemy_off_the_grid
+    result, = fight([4, 6], [enemy(4, 6, health: 2, type: 198)], knockback: 200)
+    assert_equal [:target_gone, false, 1], result.values_at(:stopped_by, :killed, :hits)
+  end
+
   def test_stops_when_link_is_hurt
     result, = fight([4, 6], [enemy(4, 6)], hurt_at: 10, immune: true)
     assert_equal [:damage, false], result.values_at(:stopped_by, :killed)
