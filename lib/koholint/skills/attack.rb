@@ -51,9 +51,11 @@ module Koholint
 
         def hard_cap = HARD_CAP
 
+        # An unidentified thing the agent names is a target too: new places bring types no census has seen yet.
         def enemy_near(cell)
-          enemies = Array(@entities&.call).select { |entity| entity[:kind].to_s == 'enemy' && entity[:cell] }
-          Entities.near(enemies, cell)&.slice(:slot, :type, :x, :y, :cell, :status, :health, :contact)
+          seen = Array(@entities&.call).select { |entity| entity[:cell] }
+          enemies = seen.select { |entity| entity[:kind].to_s == 'enemy' }
+          (Entities.near(enemies, cell) || Entities.near(seen.select { |entity| Entities.creature?(entity) }, cell))&.slice(:slot, :type, :x, :y, :cell, :status, :health, :contact)
         end
 
         def danger_of(context)
