@@ -235,5 +235,5 @@ or a `new_place` objective, and answered `explore` to every skill question. It r
 | capabilities | 18000 | 1.51 | 0.084 | 4 | 4 | 42 | 40 |
 | no-capabilities | 17163 | 2.73 | 0.159 | 0 | 0 | 0 | 0 |
 
-Every capabilities fork reached 164/17, and one also reached 128/0; none of the 0x5C-free forks reached a new place.
+Every capabilities fork reached 164/17, and one also reached 128/0; none of the forks without the capability reached a new place.
 Each capabilities fork broke one loop, the lineage's loop inherited at the fork frame, at its first decision.
