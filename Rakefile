@@ -25,6 +25,10 @@ task :test do
   end
   times = File.file?(TIMES) ? JSON.parse(File.read(TIMES)) : {}
   jobs.sort_by! { |file, args| -times.fetch((file + args.join), 0) }
+  if ENV['SHARD']
+    index, count = ENV['SHARD'].split('/').map(&:to_i)
+    jobs = jobs.select.with_index { |_, position| position % count == index - 1 }
+  end
   # The longest jobs set the wall clock: shorter ones yield the cores to them
   critical = times.values.max.to_f / 2
   renice = Process.getpriority(Process::PRIO_PROCESS, 0) < 5
@@ -62,14 +66,14 @@ task :test do
   failed.each { |file, (_, output)| puts "== #{file}", output.lines.reject { |l| l.include?('warning:') }.join }
   counts = results.values.flat_map { |_, out| out.scan(/^(\d+) runs, .* (\d+) skips$/) }
   total, skips = counts.transpose.map { |column| column.sum(&:to_i) }
-  puts "#{files.size} files, #{total} runs, #{skips} skips, #{failed.size} failing file(s)"
+  puts "#{results.size} files, #{total} runs, #{skips} skips, #{failed.size} failing file(s)"
   light = frames.select { |file, count| count > HEAVY_FRAMES && !HEAVY.include?(file) }
   light.each { |file, count| puts "#{file} emulated #{count} frames (over #{HEAVY_FRAMES}): add it to HEAVY in the Rakefile" }
   abort unless failed.empty? && light.empty?
 end
 
 namespace :test do
-  desc 'Run the tests that do not boot the ROM (agents loop; run the full suite before merging)'
+  desc 'Skip the ROM-heavy files (agents loop; CI runs the full suite)'
   task :fast do
     ENV['FAST'] = '1'
     Rake::Task[:test].invoke

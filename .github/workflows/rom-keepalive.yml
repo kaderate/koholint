@@ -1,0 +1,23 @@
+name: ROM keep-alive
+
+# gofile deletes a free file after about 10 days without a download, and CI reads the ROM from the Actions cache
+on:
+  schedule:
+    - cron: '17 5 * * 1'
+  workflow_dispatch:
+
+env:
+  ROM_SHA256: 211a1d1559dc2684d63d87f62a6b1e9109201a6383b4004e9dd5e18ee926ee83
+
+jobs:
+  download:
+    name: download and check the ROM
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/rom
+        with:
+          rom-url: ${{ secrets.ROM_URL }}
+          age-key: ${{ secrets.ROM_AGE_KEY }}
+          download: always

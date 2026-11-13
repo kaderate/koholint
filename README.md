@@ -79,7 +79,7 @@ rake test:ci     # every file with the ROM hidden (ROM tests skip), about 25 s: 
 rake test        # full suite, about 4 min on a busy Mac (the first run builds an emulator state cache in tmp/)
 ```
 
-GitHub Actions runs `rake test:ci` on every pull request and push to `main`, with emu-gb cloned from `kaderate/gemboy`. The full suite needs the ROM and emu-gb configured as above, and is run locally once before each merge. After a boot script or perception change, `bin/generate_start_fixture` regenerates `test/fixtures/start_game.expected.json`, which `test/perception_test.rb` reads.
+GitHub Actions runs `rake test:ci` and the whole suite with the ROM (4 shards) on every pull request and push to `main`, with emu-gb cloned from `kaderate/gemboy` and the ROM decrypted from an age-encrypted download (see `docs/OPERATING.md`), so the full suite need not run locally before a merge. After a boot script or perception change, `bin/generate_start_fixture` regenerates `test/fixtures/start_game.expected.json`, which `test/perception_test.rb` reads.
 
 ## Project layout
 
