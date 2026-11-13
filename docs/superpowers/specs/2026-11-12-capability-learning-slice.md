@@ -275,7 +275,7 @@ It **validated `sword-on-object-92` by itself at $0** (3 successes in 224/0 and 
 (3 failures, 1 not solid), and the other 8 were inconclusive, mostly unreached. 0x1F was not retried because no untried triple
 was left in its first places. The new entries, except the duplicate 0x5C one, are in `data/capabilities.json`.
 
-**Reaching the standing cell (flow-50).** In that run 94 of 115 trials were unreached: the composite's goto ended `blocked` 86
+**Reaching the standing cell (flow-51).** In that run 94 of 115 trials were unreached: the composite's goto ended `blocked` 86
 times, `no_path` 7 times and `room_change` once. Re-running goto alone toward 24 of them showed two causes. Some edges the grid
 believed open were walls, and goto gave up at the first one even when another route existed (241/0 from (3,9)). Others led
 nowhere: 192/0's arrival is a door cell whose only exit is back down (a walk up stops after 3 px, left does not move), and 208/0's
@@ -292,11 +292,11 @@ Same start (the catalogue at 05d5280 without `sword-on-object-92`), defaults, `0
 | | trials | unreached | failure | success | not solid | skipped, no path | wall time |
 |---|---|---|---|---|---|---|---|
 | before (flow-49) | 115 | 94 (82%) | 17 | 3 | 1 | – | 3933 s |
-| after (flow-50) | 57 | 34 (60%) | 19 | 3 | 1 | 28 | 2621 s |
+| after (flow-51) | 61 | 38 (62%) | 19 | 3 | 1 | 24 | 2988 s |
 
 The verdicts did not change: `sword-on-object-92` validated again, 0xC8 rejected, the other 8 inconclusive. So nothing new
-was recorded in `data/capabilities.json`. The 34 unreached trials left:
-- 9 hit the composite's frame cap during goto (8 in 240/0).
-- 18 were blocked: pockets and one-way areas, each reached once per place now.
-- 5 were `no_path`, where the live grid disagrees with the sighting's.
-- 2 were `room_change` into the off-grid exit at the bottom of 208/0.
+was recorded in `data/capabilities.json`. The 38 unreached trials left:
+- 9 hit the composite's frame cap during goto.
+- 21 were blocked: pockets and one-way areas, each hit until trials in 2 runs confirm the wall.
+- 6 were `no_path`, where the live grid disagrees with the sighting's.
+- 2 were `room_change`: one into the off-grid exit at the bottom of 208/0, one in 176/0.
