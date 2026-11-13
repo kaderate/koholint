@@ -122,7 +122,11 @@ ledger and learn record them too); explore's legs and `talk_to` keep their own r
 its next standing cell). flow-54: before that, a goto blocked off-centre backs off to the cell's centre along its move,
 centres exactly across it and tries the same edge once more with no tolerance, since stairs and one-cell gaps take Link only when
 exactly centred (208/0's stairs refuse him 3 px off). The retry happens once per cell and heading, never in a direction the
-triggers forbid, and the zero tolerance ends at the next cell or replan; talk_to's and attack's walks share it, as do explore's legs. `ledger.rb`
+triggers forbid, and the zero tolerance ends at the next cell or replan; talk_to's and attack's walks share it, as do explore's legs. flow-56: an
+explore whose leg or outward step makes the game open a dialogue by itself blocks the edge Link pushed before it stops `dialogue`, so its
+survey's `pending` counts only work reachable without that edge (the 21b0 forks: 69/0's door and exits lay behind a rock the grid reads as
+open; triggers and the ledger forget it when Link leaves, so the place stayed untried and explore came back from 68/0 to push it 13 times
+per fork, loop breaks included). `ledger.rb`
 counts blocked edges per place (doubtful edges), `triggers.rb` forbids inputs that re-fire a scripted event,
 `talk_to` resolves the person to the entity at or next to the target cell
 (an `npc`, else any non-enemy entity in that cell; never an entity type the census found mute, i.e. catalogued with a kind

@@ -119,7 +119,7 @@ module Koholint
           return @clearing.step(state) if @clearing&.active? && !@leg
           return depart(state) if room(state) != @place
           return harmed if state.hp.to_i < @start.hp.to_i
-          return stop_now(:dialogue) if state.dialog_open?
+          return interrupted if state.dialog_open?
           return entering if walking_in?(state)
 
           @locked = state.locked? ? @locked + 1 : 0
@@ -144,6 +144,12 @@ module Koholint
 
           @idle = reason
           []
+        end
+
+        # A dialogue the game opens by itself mid-walk (a rock too heavy to push) bars the edge Link pushed, so the survey's pending work leaves it out.
+        def interrupted
+          block({ row: @cell[0], col: @cell[1], direction: @heading }) if (@leg || @outward) && @cell && @heading
+          stop_now(:dialogue)
         end
 
         def harmed
