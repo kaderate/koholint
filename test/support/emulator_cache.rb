@@ -33,7 +33,7 @@ module EmulatorCache
 
     def interactive(expect_hash: nil) = fetch("#{key}-interactive", expect_hash) { build_interactive }
 
-    def replayed(run_dir, frame) = fetch("#{replay_key}-#{File.basename(run_dir)}-#{frame}", nil) { replay(run_dir, frame) }
+    def replayed(run_dir, frame) = fetch("#{replay_prefix(run_dir)}#{frame}", nil) { replay(run_dir, frame) }
 
     def recorded(name, into:, sources:)
       stem = "#{key_for(key_sources + recording_sources + sources.map { |f| File.read(f) })}-#{name}"
@@ -84,7 +84,7 @@ module EmulatorCache
     end
 
     def nearest_replayed(run_dir, frame)
-      prefix = "#{replay_key}-#{File.basename(run_dir)}-"
+      prefix = replay_prefix(run_dir)
       earlier = Dir[File.join(dir, "#{prefix}*.zlib")].map { |f| File.basename(f, '.zlib').delete_prefix(prefix) }
                                                       .grep(/\A\d+\z/).map(&:to_i).select { |f| f < frame }.max
       load("#{prefix}#{earlier}") if earlier
@@ -128,7 +128,9 @@ module EmulatorCache
 
     def key = key_for(key_sources)
 
-    def replay_key = key_for([File.read(File.join(Koholint::Config::ROOT, 'lib', 'koholint', 'emulator.rb')), File.read(__FILE__)])
+    def replay_key = key_for(%w[emulator input_log].map { |f| File.read(File.join(Koholint::Config::ROOT, 'lib', 'koholint', "#{f}.rb")) } << File.read(__FILE__))
+
+    def replay_prefix(run_dir) = "#{replay_key}-#{File.basename(run_dir)}-#{Digest::SHA256.file(File.join(run_dir, 'inputs.log')).hexdigest[0, 12]}-"
 
     def path(stem) = File.join(dir, "#{stem}.zlib")
 
