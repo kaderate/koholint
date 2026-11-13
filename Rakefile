@@ -11,7 +11,7 @@ SHARDED = %w[
 ].freeze
 TIMES = 'tmp/test_times.json'.freeze
 
-desc 'Run every test file in its own process, in parallel (E2E=1 adds the full-boot tests)'
+desc 'Run every test file in its own process, in parallel'
 task :test do
   files = Dir['test/**/*_test.rb'].sort
   files -= SHARDED if ENV['FAST']
@@ -49,8 +49,9 @@ task :test do
   File.write(TIMES, JSON.generate(times))
   failed = results.reject { |_, (ok, _)| ok }
   failed.each { |file, (_, output)| puts "== #{file}", output.lines.reject { |l| l.include?('warning:') }.join }
-  total = results.values.sum { |_, out| out.scan(/(\d+) runs, /).flatten.sum(&:to_i) }
-  puts "#{files.size} files, #{total} runs, #{failed.size} failing file(s)"
+  counts = results.values.flat_map { |_, out| out.scan(/^(\d+) runs, .* (\d+) skips$/) }
+  total, skips = counts.transpose.map { |column| column.sum(&:to_i) }
+  puts "#{files.size} files, #{total} runs, #{skips} skips, #{failed.size} failing file(s)"
   abort unless failed.empty?
 end
 
@@ -61,9 +62,9 @@ namespace :test do
     Rake::Task[:test].invoke
   end
 
-  desc 'Run the tests including the full-boot end-to-end ones'
-  task :e2e do
-    ENV['E2E'] = '1'
+  desc 'Run every test with the ROM hidden, as CI does: ROM tests skip'
+  task :ci do
+    ENV['KOHOLINT_ROM'] = ''
     Rake::Task[:test].invoke
   end
 end

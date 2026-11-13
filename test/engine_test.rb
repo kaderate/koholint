@@ -6,6 +6,7 @@ require 'koholint/policies/walk_and_talk'
 
 class EngineTest < Minitest::Test
   def with_run(**options)
+    skip_without_rom!
     Dir.mktmpdir do |dir|
       yield dir, Koholint::Run.create(root: dir, flow_version: Koholint::FLOW_VERSION, budget: {}, **options)
     end

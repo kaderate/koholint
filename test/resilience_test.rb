@@ -11,6 +11,7 @@ class ResilienceTest < Minitest::Test
   FLOW = Koholint::FLOW_VERSION
 
   def with_run(rom_dir: nil)
+    skip_without_rom!
     Dir.mktmpdir do |dir|
       yield dir, Koholint::Run.create(root: dir, flow_version: FLOW, budget: {})
     end
@@ -78,6 +79,7 @@ class ResilienceTest < Minitest::Test
   end
 
   def test_missing_run_dir_is_a_one_line_error
+    skip_without_rom!
     code, _out, err = cli('summary', '/nope/run')
     assert_equal 1, code
     assert_equal 1, err.lines.size
