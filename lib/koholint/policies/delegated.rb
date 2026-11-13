@@ -173,6 +173,9 @@ module Koholint
             @locks.clear
           end
 
+          broken = loop_break(decision_point, state, context)
+          return broken if broken
+
           autopilot = autopilot_choice(decision_point, state, context)
           return autopilot if autopilot
 
@@ -873,6 +876,25 @@ module Koholint
         end
       end
 
+      # A detected loop drops the current objective and explores toward the nearest place with untried work, once per detection.
+      def loop_break(decision_point, state, context)
+        hint = @loop_watch.hint
+        return if hint.nil? || hint.equal?(@loop_broken) || @sequence || !%i[choose_skill choose_objective].include?(decision_point.name)
+
+        place = [state.room_id, state.map_id]
+        route = @explore_log.route(place)
+        return unless route || @explore_log.untried?(place)
+
+        @loop_broken = hint
+        @objectives.abandon(frame: state.frame, reason: 'loop')
+        @objectives.start(frame: state.frame, **AUTO_OBJECTIVE, autopilot: true)
+        @autopilot&.adopt(@objectives.current)
+        context[:aim] = { place: route[:goal] } if route
+        choice = decision_point.name == :choose_objective ? AUTO_OBJECTIVE.dup : EXPLORE
+        { choice:, justification: "loop in #{hint[:places].join(', ')}: explore #{route ? "toward #{route[:goal].join('-')}" : 'here'}, the nearest place with untried work",
+          confidence: 1.0, agent: 'delegated', latency_ms: 0, cost_usd: 0.0, fallback: false, autopilot: true, prompt: nil, image: nil }
+      end
+
       def auto_objective(decision_point, state)
         return unless @autopilot && decision_point.name == :choose_objective
         return if @autopilot.objective_hold(state:, last: @objectives.history.last)
@@ -888,7 +910,11 @@ module Koholint
 
       def revisit_low? = @budget ? @budget.nearly_exhausted?(frames: Revisit::CYCLE_FRAMES, share: REVISIT_BUDGET_SHARE) : false
 
-      def revisit_danger?(state) = hemmed?(state)
+      # Untried exits or clearable objects left in a surveyed place come before talking to people again.
+      def revisit_danger?(state)
+        place = [state.room_id, state.map_id]
+        hemmed?(state) || (@explore_log.surveyed?(place) && @explore_log.untried?(place))
+      end
 
       def revisit_candidate(state)
         return unless @entities_reader

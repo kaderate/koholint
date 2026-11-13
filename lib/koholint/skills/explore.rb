@@ -299,6 +299,12 @@ module Koholint
         def candidates(from)
           paths = {}
           path_to = ->(cell) { paths.fetch(cell) { paths[cell] = @planner.path(from:, to: cell) } }
+          clear = clearable(from, path_to)
+          return order(clear) if clear.any?
+
+          frontier = gather(from, path_to) { |cell, direction| frontier_kind(cell, direction) }
+          return order(frontier) if frontier.any? && opened?
+
           if @aim[:place] && @aim[:place] != @place
             aimed = routed(from, path_to)
             return order(aimed) if aimed.any?
@@ -306,8 +312,7 @@ module Koholint
           local = untried(from, path_to)
           return order(local) if local.any?
 
-          frontier = gather(from, path_to) { |cell, direction| frontier_kind(cell, direction) }
-          return order(frontier) if frontier.any? && (@fresh || untried(from, nil).any?)
+          return order(frontier) if frontier.any? && (@fresh || untried(from, nil).any? || @log&.untried?(@place))
 
           routed = routed(from, path_to)
           return order(routed) if routed.any?
@@ -324,7 +329,16 @@ module Koholint
           return false unless @planner && @cell
 
           path_to = ->(cell) { @planner.path(from: @cell, to: cell) }
-          untried(@cell, path_to).any? || (untried(@cell, nil).any? && gather(@cell, path_to) { |cell, direction| frontier_kind(cell, direction) }.any?)
+          untried(@cell, path_to).any? || clearable(@cell, path_to).any? ||
+            ((opened? || untried(@cell, nil).any?) && gather(@cell, path_to) { |cell, direction| frontier_kind(cell, direction) }.any?)
+        end
+
+        # A cleared object opens cells no survey has seen, so the frontiers behind it count as work here.
+        def opened? = @clearing&.uses&.any? { |use| use[:effect] }
+
+        def clearable(from, path_to)
+          cells = @clearing ? @clearing.cells.keys - @walls : []
+          cells.empty? ? [] : gather(from, path_to) { |cell, direction| frontier_kind(cell, direction) if cells.include?(neighbour(cell, direction)) }
         end
 
         def routed(from, path_to)
