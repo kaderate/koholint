@@ -6,15 +6,18 @@ require 'koholint/replay'
 require 'koholint/policies/start_game'
 require 'koholint/policies/walk_and_talk'
 require 'koholint/viewer/follower'
+require 'support/emulator_cache'
 
 class FollowerTest < Minitest::Test
   def with_recorded_run(frames: 600, keyframe_every: 300)
     skip_without_rom!
     Dir.mktmpdir do |dir|
-      run = Koholint::Run.create(root: dir, flow_version: Koholint::FLOW_VERSION, budget: {})
-      policy = Koholint::Policies::StartGame.new(Koholint::Policies::WalkAndTalk.new)
-      Koholint::Engine.new(run:, policy:, budget: Koholint::Budget.new(frames:), keyframe_every:).run
-      yield run
+      run_dir = EmulatorCache.recorded("walk-#{frames}-#{keyframe_every}", into: dir, sources: [__FILE__]) do |root|
+        run = Koholint::Run.create(root:, flow_version: Koholint::FLOW_VERSION, budget: {})
+        policy = Koholint::Policies::StartGame.new(Koholint::Policies::WalkAndTalk.new)
+        Koholint::Engine.new(run:, policy:, budget: Koholint::Budget.new(frames:), keyframe_every:).run
+      end
+      yield Koholint::Run.open(run_dir, flow_version: Koholint::FLOW_VERSION)
     end
   end
 

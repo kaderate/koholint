@@ -1,5 +1,6 @@
 require 'digest'
 require 'fileutils'
+require 'tmpdir'
 require 'zlib'
 require 'koholint'
 require 'koholint/boot_script'
@@ -26,20 +27,39 @@ module EmulatorCache
       common.empty? ? Koholint::Config::ROOT : File.dirname(File.expand_path(common, Koholint::Config::ROOT))
     end
 
-    def at(frame, expect_hash: nil) = fetch(frame.to_s, expect_hash) { build(frame) }
+    def at(frame, expect_hash: nil) = fetch("#{key}-#{frame}", expect_hash) { build(frame) }
 
-    def playable(expect_hash: nil) = fetch('playable', expect_hash) { build(nil) }
+    def playable(expect_hash: nil) = fetch("#{key}-playable", expect_hash) { build(nil) }
 
-    def interactive(expect_hash: nil) = fetch('interactive', expect_hash) { build_interactive }
+    def interactive(expect_hash: nil) = fetch("#{key}-interactive", expect_hash) { build_interactive }
 
-    def replayed(run_dir, frame) = fetch("#{File.basename(run_dir)}-#{frame}", nil) { replay(run_dir, frame) }
+    def replayed(run_dir, frame) = fetch("#{replay_key}-#{File.basename(run_dir)}-#{frame}", nil) { replay(run_dir, frame) }
+
+    def recorded(name, into:, sources:)
+      stem = "#{key_for(key_sources + recording_sources + sources.map { |f| File.read(f) })}-#{name}"
+      stored = File.join(dir, stem)
+      unless File.directory?(stored)
+        FileUtils.mkdir_p(dir)
+        File.open(lock_path(stem), File::RDWR | File::CREAT) do |lock|
+          lock.flock(File::LOCK_EX)
+          unless File.directory?(stored)
+            root = Dir.mktmpdir('recording', dir)
+            yield root
+            File.rename(root, stored)
+          end
+        end
+      end
+      run_dir = Dir.children(stored).map { |child| File.join(stored, child) }.find { |child| File.directory?(child) }
+      FileUtils.cp_r(run_dir, into)
+      File.join(into, File.basename(run_dir))
+    end
 
     private
 
     def build_interactive
       emulator = playable
       start = emulator.frame
-      until moves?(emulator, :right)
+      until !Koholint::Perception.read(emulator).dialog_open? && moves?(emulator, :right)
         raise Koholint::Error, 'dialogue chain never released Link' if emulator.frame - start > INTERACTIVE_FRAME_LIMIT
 
         TALK_PRESS_FRAMES.times { emulator.step([:a]) }
@@ -53,13 +73,21 @@ module EmulatorCache
     end
 
     def replay(run_dir, frame)
-      emulator = Koholint::Emulator.boot
-      Koholint::InputLog.new(File.join(run_dir, 'inputs.log')).each_frame do |buttons|
+      emulator = nearest_replayed(run_dir, frame) || Koholint::Emulator.boot
+      Koholint::InputLog.new(File.join(run_dir, 'inputs.log')).each_frame.with_index do |buttons, index|
+        next if index < emulator.frame
         break if emulator.frame >= frame
 
         emulator.step(buttons)
       end
       emulator
+    end
+
+    def nearest_replayed(run_dir, frame)
+      prefix = "#{replay_key}-#{File.basename(run_dir)}-"
+      earlier = Dir[File.join(dir, "#{prefix}*.zlib")].map { |f| File.basename(f, '.zlib').delete_prefix(prefix) }
+                                                      .grep(/\A\d+\z/).map(&:to_i).select { |f| f < frame }.max
+      load("#{prefix}#{earlier}") if earlier
     end
 
     def moves?(emulator, direction)
@@ -72,26 +100,40 @@ module EmulatorCache
       Koholint::Perception.read(moved).to_h.values_at(:x, :y) != Koholint::Perception.read(control).to_h.values_at(:x, :y)
     end
 
-    def fetch(name, expect_hash)
-      cached = load(name)
-      return cached if cached && (expect_hash.nil? || cached.state_hash == expect_hash)
+    def fetch(stem, expect_hash)
+      usable = ->(cached) { cached && (expect_hash.nil? || cached.state_hash == expect_hash) }
+      cached = load(stem)
+      return cached if usable.call(cached)
 
-      yield.tap { |emulator| store(name, emulator) }
+      FileUtils.mkdir_p(dir)
+      File.open(lock_path(stem), File::RDWR | File::CREAT) do |lock|
+        lock.flock(File::LOCK_EX)
+        cached = load(stem)
+        return cached if usable.call(cached)
+
+        yield.tap { |emulator| store(stem, emulator) }
+      end
     end
+
+    def lock_path(stem) = File.join(Dir.tmpdir, "koholint-emulator-cache-#{Digest::SHA256.hexdigest(File.join(dir, stem))[0, 16]}.lock")
 
     def key_sources
       lib = %w[boot_script perception game_state emulator].map { |f| File.read(File.join(Koholint::Config::ROOT, 'lib', 'koholint', "#{f}.rb")) }
       lib << File.read(__FILE__)
     end
 
+    def recording_sources = Dir[File.join(Koholint::Config::ROOT, '{lib,data}', '**', '*.{rb,json}')].sort.map { |f| File.read(f) }
+
     def key_for(sources) = Digest::SHA256.hexdigest(Digest::SHA256.file(Koholint.rom_path).hexdigest + sources.join)[0, 12]
 
     def key = key_for(key_sources)
 
-    def path(name) = File.join(dir, "#{key}-#{name}.zlib")
+    def replay_key = key_for([File.read(File.join(Koholint::Config::ROOT, 'lib', 'koholint', 'emulator.rb')), File.read(__FILE__)])
 
-    def load(name)
-      Koholint::Emulator.restore(Zlib::Inflate.inflate(File.binread(path(name)))) if File.file?(path(name))
+    def path(stem) = File.join(dir, "#{stem}.zlib")
+
+    def load(stem)
+      Koholint::Emulator.restore(Zlib::Inflate.inflate(File.binread(path(stem)))) if File.file?(path(stem))
     rescue Zlib::Error, TypeError, ArgumentError
       nil
     end
@@ -110,11 +152,10 @@ module EmulatorCache
       emulator
     end
 
-    def store(name, emulator)
-      FileUtils.mkdir_p(dir)
-      tmp = "#{path(name)}.tmp"
+    def store(stem, emulator)
+      tmp = "#{path(stem)}.#{Process.pid}.tmp"
       File.binwrite(tmp, Zlib::Deflate.deflate(emulator.dump))
-      File.rename(tmp, path(name))
+      File.rename(tmp, path(stem))
     end
   end
 end
