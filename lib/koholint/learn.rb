@@ -113,13 +113,28 @@ module Koholint
       end
     end
 
+    # A cell entered only after a capability changed its object says nothing about that object being walkable.
     def stood(events)
+      cleared = cleared(events)
       events.each_with_object(Hash.new { |hash, key| hash[key] = Set.new }) do |event, cells|
         next unless event['type'] == 'perception' && event.dig('state', 'game_mode') == PLAY_MODE
 
         state = event['state']
+        place = [state['room_id'], state['map_id']]
         cell = GameState.cell_at(state['x'].to_i, state['y'].to_i) or next
-        cells[[state['room_id'], state['map_id']]] << cell
+        cells[place] << cell unless cleared[place].include?(cell)
+      end
+    end
+
+    def cleared(events)
+      events.each_with_object(Hash.new { |hash, key| hash[key] = Set.new }) do |event, cells|
+        result = event['result'] if event['type'] == 'action'
+        place = result.is_a?(Hash) && Ledger.place_of(result['from']) or next
+        [*Array(result['clears']), (result if result['capability'])].compact.each do |use|
+          next unless use['target'].is_a?(Hash) && use['object_before'] != use['object_after']
+
+          cells[place] << [use['target']['row'].to_i, use['target']['col'].to_i]
+        end
       end
     end
 
