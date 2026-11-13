@@ -1,0 +1,60 @@
+#!/usr/bin/env ruby
+# Downloads a CI asset (the age-encrypted ROM, a run archive) from a direct link: fetch_asset URL OUT
+require 'net/http'
+require 'openssl'
+require 'uri'
+
+ATTEMPTS = 3
+NETWORK_ERRORS = [SocketError, Timeout::Error, IOError, SystemCallError, OpenSSL::SSL::SSLError, Net::ProtocolError].freeze
+
+class Transient < StandardError; end
+
+def fail!(message)
+  warn "fetch_asset: #{message}"
+  exit 1
+end
+
+def download(uri, out)
+  5.times do
+    response = Net::HTTP.start(uri.host, uri.port, use_ssl: uri.scheme == 'https', open_timeout: 30, read_timeout: 120) do |http|
+      http.request(Net::HTTP::Get.new(uri))
+    end
+    case response
+    when Net::HTTPRedirection
+      uri = URI.join(uri, response['location'])
+    when Net::HTTPSuccess
+      body = response.body.to_s
+      if response['content-type'].to_s.include?('text/html') || body.lstrip.start_with?('<')
+        fail!("#{uri.host} answered with a web page, not the file: the link is a share page or the file was deleted " \
+              '(gofile deletes free files after about 10 days without a download)')
+      end
+      fail!("#{uri.host} answered with an empty file") if body.empty?
+      File.binwrite(out, body)
+      return puts "fetch_asset: #{body.bytesize} bytes from #{uri.host}"
+    when Net::HTTPServerError, Net::HTTPTooManyRequests
+      raise Transient, "#{uri.host} answered HTTP #{response.code}"
+    else
+      fail!("#{uri.host} answered HTTP #{response.code}: the link is wrong or the file is gone")
+    end
+  end
+  fail!('too many redirects')
+end
+
+url, out = ARGV
+fail!('usage: fetch_asset URL OUT') unless url && out && !url.empty?
+uri = URI(url)
+fail!('the link is not an http(s) URL') unless uri.is_a?(URI::HTTP)
+if uri.host.to_s.end_with?('gofile.io') && uri.path.start_with?('/d/')
+  fail!('a gofile.io/d/ share page needs a token only its browser code generates; ' \
+        'use a direct download link (a gofile premium direct link, a Dropbox link ending in dl=1, a public bucket URL)')
+end
+
+ATTEMPTS.times do |attempt|
+  download(uri, out)
+  exit 0
+rescue Transient, *NETWORK_ERRORS => e
+  message = "attempt #{attempt + 1}/#{ATTEMPTS} to reach #{uri.host} failed: #{e.class}#{": #{e.message}" if e.is_a?(Transient)}"
+  fail!(message) if attempt + 1 == ATTEMPTS
+  warn "fetch_asset: #{message}, retrying"
+  sleep 5 * (attempt + 1)
+end

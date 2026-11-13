@@ -1,0 +1,70 @@
+name: learn
+
+on:
+  workflow_dispatch:
+    inputs:
+      run_url:
+        description: Direct download link of a .tar.gz holding one full run directory (trace.jsonl, inputs.log, manifest.json, save/)
+        required: true
+      limit:
+        description: koholint learn --limit
+        default: '10'
+      object:
+        description: koholint learn --object (optional)
+        default: ''
+
+permissions:
+  contents: read
+
+jobs:
+  learn:
+    name: koholint learn
+    runs-on: ubuntu-24.04
+    timeout-minutes: 360
+    env:
+      EMU_GB_HOME: ${{ github.workspace }}/gemboy
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: kaderate/gemboy
+          ref: 4dfa60660a6c229533c0b603c67df7b9765d2ef7
+          path: gemboy
+      - uses: ruby/setup-ruby@b3aaceaef7e0ee231b499e7b5f49c03fc1d32199 # v1.338.0
+        with:
+          bundler-cache: true
+      - name: Install emu-gb's SDL dependencies
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq libsdl2-dev libsdl2-ttf-dev pkg-config age
+          gem install sdl2-bindings
+      - uses: ./.github/actions/rom
+        with:
+          rom-url: ${{ secrets.ROM_URL }}
+          age-key: ${{ secrets.ROM_AGE_KEY }}
+          download: on-miss
+      - name: Fetch the run
+        env:
+          RUN_URL: ${{ inputs.run_url }}
+        run: |
+          bin/fetch_asset "$RUN_URL" "$RUNNER_TEMP/run.tar.gz"
+          mkdir -p "$RUNNER_TEMP/runs"
+          tar -xzf "$RUNNER_TEMP/run.tar.gz" -C "$RUNNER_TEMP/runs"
+          run=$(dirname "$(find "$RUNNER_TEMP/runs" -name manifest.json | head -1)")
+          [ -f "$run/trace.jsonl" ] || { echo "::error::The archive holds no run directory with manifest.json and trace.jsonl."; exit 1; }
+          echo "RUN_DIR=$run" >> "$GITHUB_ENV"
+      - name: Learn
+        env:
+          LIMIT: ${{ inputs.limit }}
+          OBJECT: ${{ inputs.object }}
+        run: |
+          args=(learn "$RUN_DIR" --limit "$LIMIT")
+          [ -z "$OBJECT" ] || args+=(--object "$OBJECT")
+          bin/koholint "${args[@]}" | tee learn.log
+      - if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: learn-${{ github.run_id }}
+          path: |
+            data/capabilities.json
+            learn.log

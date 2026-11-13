@@ -1,0 +1,23 @@
+name: ROM keep-alive
+
+# Only needed while ROM_URL points at a host that deletes idle files (free gofile: about 10 days); CI reads the ROM from the cache
+on:
+  schedule:
+    - cron: '17 5 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  download:
+    name: download and check the ROM
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: ./.github/actions/rom
+        with:
+          rom-url: ${{ secrets.ROM_URL }}
+          age-key: ${{ secrets.ROM_AGE_KEY }}
+          download: always

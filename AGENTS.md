@@ -13,7 +13,7 @@ High-level architecture: `ARCHITECTURE.md` (update it in the same commit as any 
   local have the same name; the project's Ruby version supports it.
 - Time is the frame. No `sleep`, no wall clock in game logic; wait for a state condition.
 - The ROM and the game manual are never committed (`$KOHOLINT_ROM`, `manual/`).
-- The full `rake test` runs locally on ABK's Mac once before each merge; CI runs the ROM-free set (`rake test:ci`).
+- CI runs the whole suite with the ROM on every pull request (`rom` shards) and the ROM-free set (`rake test:ci`); locally, `rake test:fast` and targeted files, no full `rake test` before a merge.
 - Only the engine writes a run's `trace.jsonl` and `save/`. A run resumes only with the same
   `flow_version`, ROM hash and capabilities digest (the operational entries of `data/capabilities.json`). A change to the
   play flow in code means a new `flow_version`; publishing or retiring a capability changes the digest, never `flow_version`.
