@@ -32,28 +32,34 @@ class ExploreTest < Minitest::Test
     rows
   end
 
-  def explore(rows, truth: rows, exits: [], harm: [], start: [88, 80], params: {}, limit: 1000, **context)
+  def explore(rows, truth: rows, exits: [], harm: [], rocks: [], callouts: [], start: [88, 80], params: {}, limit: 1000, **context)
     walls = truth.each_with_index.flat_map { |line, row| line.chars.each_index.select { |col| '#o'.include?(line[col]) }.map { |col| [row, col] } }
     execution = registry.start('explore', state(x: start[0], y: start[1]), params, { grid: MapGrid.new(rows), **context })
     x, y = start
     room_id = 1
     hp = 24
+    dialog_state = 0
     inputs = []
     limit.times do
       hp = 20 if harm.include?(Koholint::Geometry.cell_for(x, y))
-      buttons = execution.next_input(state(x:, y:, room_id:, hp:)) or break
+      buttons = execution.next_input(state(x:, y:, room_id:, hp:, dialog_state:)) or break
       inputs << buttons
       dx, dy = DELTA.fetch(buttons.first, [0, 0])
       next if dx.zero? && dy.zero?
 
       ahead = Koholint::Geometry.cell_for(x + dx + (7 * dx), y + dy + (7 * dy))
       room_id = 2 if ahead.nil? && exits.include?([Koholint::Geometry.cell_for(x, y), buttons.first])
-      next if ahead.nil? || walls.include?(ahead)
+      row, col = Koholint::Geometry.cell_for(x, y)
+      ox, oy = Koholint::Geometry.offset(x + dx, y + dy, [row, col])
+      pushed = rocks.include?([row + dy, col + dx]) && ((dx * ox) > 4 || (dy * oy) > 6)
+      dialog_state = 1 if pushed
+      next if ahead.nil? || walls.include?(ahead) || pushed
 
       x += dx
       y += dy
+      dialog_state = 1 if callouts.include?(Koholint::Geometry.cell_for(x, y))
     end
-    [execution.result(state(x:, y:, room_id:, hp:)), inputs]
+    [execution.result(state(x:, y:, room_id:, hp:, dialog_state:)), inputs]
   end
 
   def test_walks_to_the_nearest_frontier_and_steps_into_the_unknown
@@ -544,6 +550,43 @@ class ExploreTest < Minitest::Test
     refute_equal :damage, result[:stopped_by]
     refute_includes result[:crossed], [4, 6, :right]
     assert_equal [1, 5], result[:to].values_at(:row, :col)
+  end
+
+  # 69/0 in the 21b0 forks: the only way to the place's untried work pushes a rock the grid reads as open, and the game answers with a
+  # dialogue. Without the barred edge the place stayed untried and every explore from next door came back to push it again.
+  def test_a_dialogue_the_game_opens_mid_walk_bars_the_edge_so_the_place_reads_as_exhausted
+    rows = with(CLOSED, *(1..6).flat_map { |row| [[row, 3], '#'] }, [3, 3], '.', [3, 0], '.', [7, 6], '.')
+    log = Koholint::ExploreLog.new
+    log.absorb({ from: { room: 1, map: 0 }, exits: [{ row: 3, col: 0, direction: :left, outcome: :left, to: [2, 0] }] })
+    assert_equal({ goal: PLACE, next: PLACE, via: :right }, log.route([2, 0]))
+    result, = explore(rows, rocks: [[3, 3]], start: Koholint::Geometry.center_of(3, 1), explore_log: log)
+    assert_equal :dialogue, result[:stopped_by]
+    assert_equal({ kind: :exit, row: 7, col: 6, direction: :down }, result[:target])
+    assert_includes result[:blocked_edges], { row: 3, col: 2, direction: :right }
+    refute result.dig(:survey, :pending)
+    log.absorb(result)
+    refute log.untried?(PLACE)
+    assert_nil log.route([2, 0])
+  end
+
+  def test_a_dialogue_that_opens_while_link_walks_bars_nothing
+    rows = with(CLOSED, *(1..6).flat_map { |row| [[row, 3], '#'] }, [3, 3], '.', [3, 0], '.', [7, 6], '.')
+    log = Koholint::ExploreLog.new
+    log.absorb({ from: { room: 1, map: 0 }, exits: [{ row: 3, col: 0, direction: :left, outcome: :left, to: [2, 0] }] })
+    result, = explore(rows, callouts: [[3, 4]], start: Koholint::Geometry.center_of(3, 1), explore_log: log)
+    assert_equal :dialogue, result[:stopped_by]
+    assert_empty result[:blocked_edges]
+    assert result.dig(:survey, :pending)
+    log.absorb(result)
+    assert log.untried?(PLACE)
+  end
+
+  def test_a_dialogue_the_game_opens_on_an_outward_step_bars_that_edge
+    rows = with(CLOSED, [3, 3], '?')
+    result, = explore(rows, truth: with(CLOSED, [3, 3], '.'), rocks: [[3, 3]], start: Koholint::Geometry.center_of(3, 2))
+    assert_equal :dialogue, result[:stopped_by]
+    assert_equal({ kind: :frontier, row: 3, col: 2, direction: :right }, result[:target])
+    assert_equal [{ row: 3, col: 2, direction: :right }], result[:blocked_edges]
   end
 
   def test_an_open_dialogue_at_the_start_stops_after_one_idle_frame
