@@ -40,7 +40,8 @@ module Koholint
           end
           rgb = context[:dialogue_rgb]&.call or return
           unless @sequence
-            @sequence = { pages: [], rows: [], start: state.frame, place: [state.room_id, state.map_id], source: @talk_source }
+            @sequence = { pages: [], rows: [], start: state.frame, place: [state.room_id, state.map_id], source: @talk_source, contact: @contact }
+            @contact = nil
             @objectives.touch(frame: state.frame)
           end
           @sequence[:last] = state.frame
@@ -78,14 +79,17 @@ module Koholint
           here = [state.room_id, state.map_id]
           name = @leads.name_place(here, output['place_name']) if output['place_name'].is_a?(String) && state.phase(booted: true) != :loading
           notes[:place_name] = { place: here, name: } if name
-          return notes unless output.key?('leads')
+          read = @images || @reading
+          contact = @read_at[:contact] if read
+          return notes unless output.key?('leads') || contact
 
           pages = [transcription].flatten(1).compact
-          place = @read_at && @images ? @read_at[:place] : [state.room_id, state.map_id]
+          place = @read_at && read ? @read_at[:place] : [state.room_id, state.map_id]
           source = @images ? @read_at[:source] : @talk_source
           texts = pages.map { |page| page[:text] }
-          leads, rejected = @leads.absorb(output['leads'], transcription: [texts.join(' '), Dialogues.text(texts)], place:, source:)
-          notes.merge(leads:, leads_rejected: rejected)
+          leads, rejected = output.key?('leads') ? @leads.absorb(output['leads'], transcription: [texts.join(' '), Dialogues.text(texts)], place:, source:) : [[], 0]
+          found = contact && @leads.contact(contact, text: Dialogues.text(texts), place:)
+          notes.merge(leads: found ? leads + [found] : leads, leads_rejected: rejected)
         end
 
         def clean(text, cap: TRANSCRIPTION_LIMIT) = text.gsub(/[^\P{Cntrl}\n]/, '').strip.then { |t| cap ? t[0, cap] : t }
@@ -123,7 +127,7 @@ module Koholint
           pages = conversation && @talk_log.pages_for(conversation)
           return unless pages
 
-          @read_at = @sequence.slice(:start, :place, :source).merge(conversation:)
+          @read_at = @sequence.slice(:start, :place, :source, :contact).merge(conversation:)
           speaker = @talk_log.speaker_for(conversation)
           @page = @sequence[:pages].size
           @sequence = nil

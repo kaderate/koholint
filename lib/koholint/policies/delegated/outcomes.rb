@@ -102,12 +102,29 @@ module Koholint
         def feed_triggers(choice, outcome, state)
           clearing = Triggers.clearing(skill: choice[:skill], params: choice[:params], result: outcome)
           @triggers.clear(**clearing) if clearing
+          @contact = nil
           return unless Triggers.scripted?(skill: choice[:skill], params: choice[:params], result: outcome)
 
           cell = Triggers.cell_of(outcome)
+          note_contact(cell, outcome[:trigger_input]&.first)
           @triggers.record(place: place_of(outcome, :to, state), cell:, skill: choice[:skill], direction: Triggers.direction_of(choice[:skill], choice[:params]),
                             input: outcome[:trigger_input]&.first)
           cell && @triggers.count(place_of(outcome, :to, state), cell)
+        end
+
+        # What fills the cell Link pressed into when the game opened a text is the thing that answered: a person on it, else its object.
+        def note_contact(cell, input)
+          delta = Navigation::Planner::DELTAS[input&.to_sym] if input
+          return unless cell && delta
+
+          row = cell[0] + delta[0]
+          col = cell[1] + delta[1]
+          return unless row.between?(0, Geometry::ROWS - 1) && col.between?(0, Geometry::COLS - 1)
+
+          person = entities_now.find { |entity| entity[:cell] == [row, col] && entity[:kind].to_s == 'npc' }
+          object = @room_objects_reader&.call&.dig(row, col)
+          thing = person ? { entity: person[:type] } : ({ object: } if object)
+          @contact = { row:, col:, **thing } if thing
         end
 
         def feed_talk_log(choice, outcome, state)

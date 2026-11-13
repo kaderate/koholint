@@ -905,6 +905,21 @@ class DelegatedPolicyTest < Minitest::Test
     assert_includes client.calls.last[:prompt], '- [lead-1 high] a key is needed — "find the KEY"'
   end
 
+  def test_a_text_the_game_opens_when_link_walks_into_an_object_is_a_high_lead_about_that_object
+    sheet = ok('skill' => 'wait', 'params' => { 'frames' => 3 }, 'transcription' => "Oh là... C'est bien trop lourd!")
+    client = ScriptedClient.new(objective: objective, skill: [sheet, walk])
+    p = policy(client)
+    decide_with_shot(p, state)
+    objects = Array.new(8) { Array.new(10, 4) }.tap { |rows| rows[3][3] = 32 }
+    p.prepare({ room_objects: -> { objects } })
+    p.after_action(choice: { skill: 'walk', params: { 'direction' => 'right', 'cells' => 1 } },
+                   outcome: { stopped_by: 'dialogue', dialog_before: false, dialog_after: true, trigger_input: [:right], to: { room: 163, map: 16, row: 3, col: 2 } },
+                   state:, frame: 100)
+    pages(p, 2)
+    lead = flush(p, 300)[:leads].last
+    assert_equal [[163, 16], 'high', '163-16', { row: 3, col: 3, object: 32 }, "Oh là... C'est bien trop lourd!"], lead.values_at(:place, :importance, :where, :contact, :quote)
+  end
+
   def test_a_transcribed_text_not_read_before_achieves_new_text
     sheet = ok('skill' => 'wait', 'params' => { 'frames' => 3 }, 'transcription' => "Go no\n\nGo north, then east.")
     client = ScriptedClient.new(objective: ok('title' => 'read', 'predicate' => { 'kind' => 'new_text' }), skill: [sheet, walk])

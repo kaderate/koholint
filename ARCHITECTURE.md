@@ -248,7 +248,10 @@ follows it, `tested` once one is achieved, `refuted` after `REFUTE_AT` (2) that 
 or `resume` (navigation and restarts say nothing of the claim). The evidence is those objectives (id, title, outcome, place, frame, reason).
 The context tags a followed lead with its status and its last 3 objectives and lists open leads first; a lead stops being a `lead-N` candidate once refuted
 or once an achieved objective reached the place it points to (a loosely cited `tested` keeps it), and
-`world.json` carries `status` and `evidence` per lead.
+`world.json` carries `status` and `evidence` per lead. flow-58: when a skill opens a text without pressing A (`Triggers.scripted?`, the barred edge), the policy
+notes what fills the cell ahead in the `trigger_input` direction (an `npc` entity's type, else the `room_objects` id) in the dialogue sequence, and the
+call that reads that text adds `Leads#contact`: a `high` lead with the text as quote, the place as `where` and `contact` (`row`, `col`, `object` or `entity`),
+one per thing and text, restored from its `lead` event like the others.
 
 **Agents** (`agents/`) — `context.rb` renders state for the model (grid map, neighbours, entities and objects on screen, people's names,
 goal, leads — every `high` one, `normal` ones of the current place, never `low` ones —, recent results, plan), `prompts.rb` holds the system prompts, `claude_cli.rb` calls `claude -p` with a JSON

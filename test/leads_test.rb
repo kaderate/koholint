@@ -20,6 +20,20 @@ class LeadsTest < Minitest::Test
     assert_equal [{ id: 'lead-1', place: [1, 2], source: { row: 3, col: 4 }, quote: 'the key IS in the north cave', claim: 'a claim', importance: 'high' }], accepted
   end
 
+  def test_a_contact_text_is_one_high_lead_per_thing_and_text_and_survives_a_resume
+    leads = Koholint::Leads.new
+    heavy = "Oh là... C'est bien trop lourd!"
+    first = leads.contact({ row: 3, col: 3, object: 32 }, text: heavy, place: [69, 0])
+    assert_equal ['high', '69-0', { row: 3, col: 3, object: 32 }], first.values_at(:importance, :where, :contact)
+    assert_equal 'Walking into object 32 at (3,3) shows this text and does not let Link through: the text says what it needs', first[:claim]
+    assert_nil leads.contact({ row: 6, col: 7, object: 32 }, text: heavy, place: [100, 0])
+    assert leads.contact({ row: 1, col: 2, entity: 81 }, text: heavy, place: [81, 0])
+    assert_nil leads.contact({ row: 1, col: 2 }, text: heavy, place: [81, 0])
+    assert_nil leads.contact({ row: 1, col: 2, object: 5 }, text: 'Hm', place: [81, 0])
+    events = leads.all.map { |lead| JSON.parse(JSON.generate(lead.merge(type: 'lead'))) }
+    assert_equal leads.all, Koholint::Leads.from_events(events).all
+  end
+
   def test_a_quote_may_match_the_stitched_text_or_the_raw_pages
     pages = ['the key is in', 'key is in the north cave']
     texts = [pages.join(' '), Koholint::Dialogues.text(pages)]

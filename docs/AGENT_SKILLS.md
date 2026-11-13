@@ -1,6 +1,6 @@
 # Agent skills
 
-The skills, protocols and harness behaviours the agent works with. Versioned with the play flow (currently `flow-56`): update this page, not the README, when a flow changes. Layers and data flow are in [ARCHITECTURE.md](../ARCHITECTURE.md).
+The skills, protocols and harness behaviours the agent works with. Versioned with the play flow (currently `flow-58`): update this page, not the README, when a flow changes. Layers and data flow are in [ARCHITECTURE.md](../ARCHITECTURE.md).
 
 
 - Learned capabilities (`data/capabilities.json`, `bin/koholint capability list`): an `operational` entry is a composite of the skills below, offered in the skill schema and listed under "Learned skills" only while its trigger item is held (flow-49) and its object is on screen (today `sword_on_object_92 row col direction`: stand next to object 92, face it, use the sword, step into its cell). `explore` and `goto` also run it themselves when blocked facing such a cell, and the planner routes through those cells as a last resort. `learn` and `capability publish|retire` are offline commands.
@@ -42,6 +42,9 @@ The skills, protocols and harness behaviours the agent works with. Versioned wit
   an objective can cite the lead behind it (`because`). A lead may carry `where` (a place id such as `161-0` or a name the agent gave).
   A lead is `open` until an objective follows it, `tested` once one is achieved and `refuted` after 2 that failed (a loop, stall,
   unreachable target or restart does not count); the context shows the status with the last 3 of those objectives and lists open leads first.
+  flow-58: a text the game opens when Link walks into something (the edge it bars) also becomes a `high` lead on its own, whatever the agent
+  extracts: its quote is the text read, its `contact` names the cell pressed into and what fills it (a person's type, else the object id), its `where` is the
+  place, and its claim says the thing does not let Link through and the text says what it needs. There is one such lead per thing and text.
 - At `choose_objective` the context lists candidate objectives with ids (`candidates.rb`): untried exits by side (`exit-up`) and doors
   (`door-R-C`) of this place, people (`person-tT`, listed first) and unread signs (`sign-R-C`) here worth a visit, known places with untried exits
   (`place-R-M`), people and unread signs of other known places (from their place cards) and places tied to a lead by its `where`

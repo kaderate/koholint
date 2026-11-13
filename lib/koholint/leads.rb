@@ -97,6 +97,8 @@ module Koholint
       lead = %w[id place source quote claim importance].to_h { |key| [key.to_sym, Ledger.pick(event, key)] }
       where = Ledger.pick(event, :where)
       lead[:where] = where if where
+      contact = Ledger.pick(event, :contact)
+      lead[:contact] = contact.transform_keys(&:to_sym) if contact.is_a?(Hash)
       @all << lead unless known?(lead[:id])
     end
 
@@ -141,6 +143,20 @@ module Koholint
         accepted << added
       end
       [accepted, rejected]
+    end
+
+    # A text the game opens when Link walks into something shuts the way and names its own condition: one lead per thing and text.
+    def contact(contact, text:, place:)
+      quote = self.class.clean(text, QUOTE_MAX)
+      thing = contact.slice(:object, :entity)
+      return if self.class.normalize(quote).length < QUOTE_MIN || thing.empty?
+      return if @all.any? { |known| known[:contact]&.slice(:object, :entity) == thing && self.class.compact(known[:quote]) == self.class.compact(quote) }
+
+      what = contact[:entity] ? "person #{contact[:entity]}" : "object #{contact[:object]}"
+      claim = "Walking into #{what} at (#{contact[:row]},#{contact[:col]}) shows this text and does not let Link through: the text says what it needs"
+      lead = { id: "lead-#{@all.size + 1}", place:, source: nil, quote:, claim:, importance: 'high', where: place.join('-'), contact: }
+      @all << lead
+      lead
     end
 
     def change_goal(text, frame: nil, objectives: nil)
