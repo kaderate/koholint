@@ -21,7 +21,7 @@ module Koholint
 
     def self.edges_of(result)
       edges = pick(result, :blocked_edges)
-      edges.is_a?(Array) ? edges : [pick(result, :blocked_at)].compact
+      (edges.is_a?(Array) ? edges : [pick(result, :blocked_at)].compact) + Array(pick(result, :avoided))
     end
 
     def self.pick(hash, key)

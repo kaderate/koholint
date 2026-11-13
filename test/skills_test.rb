@@ -453,9 +453,23 @@ class SkillsTest < Minitest::Test
     assert_equal [[4, 5, :right], [4, 6, :right], [4, 7, :right]], result[:crossed]
   end
 
+  def row_only(row) = OpenGrid.new(walls: (0..7).to_a.product((0..9).to_a).reject { |r, _| r == row })
+
   def test_goto_blocked_after_one_step_crosses_one_edge
-    result, = goto(4, 8, walls: [[4, 7]])
+    result, = goto(4, 8, grid: row_only(4), walls: [[4, 7]])
     assert_equal [[4, 5, :right]], result[:crossed]
+  end
+
+  def test_goto_blocked_by_an_edge_the_grid_believed_open_plans_around_it
+    result, = goto(4, 8, walls: [[4, 7]])
+    assert_equal [:done, 1], result.values_at(:stopped_by, :replans)
+    assert_equal [4, 8], [result[:to][:row], result[:to][:col]]
+    assert_equal [{ row: 4, col: 6, direction: :right }], result[:avoided]
+    assert_equal [{ row: 4, col: 6, direction: :right }], Koholint::Ledger.edges_of(result)
+    wall = (0..7).map { |row| [row, 7] }
+    result, = goto(4, 8, walls: wall)
+    assert_equal [:blocked, 3], result.values_at(:stopped_by, :replans)
+    assert_equal :right, result[:blocked_at][:direction]
   end
 
   def test_goto_turns_after_centring
@@ -466,7 +480,7 @@ class SkillsTest < Minitest::Test
   end
 
   def test_goto_blocked_segment_reports_blocked_at
-    result, = goto(4, 8, grid: OpenGrid.new, walls: [[4, 7]])
+    result, = goto(4, 8, grid: row_only(4), walls: [[4, 7]])
     assert_equal :blocked, result[:stopped_by]
     assert_equal({ row: 4, col: 6, direction: :right }, result[:blocked_at])
     assert_operator result[:steps_done], :<, result[:path_length]

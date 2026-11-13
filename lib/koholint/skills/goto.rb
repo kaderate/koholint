@@ -7,6 +7,7 @@ module Koholint
       STILL_FRAMES = 8
       SETTLE_FRAMES = 16
       SETTLE_STILL = 2
+      REPLANS = 3
 
       class Run < Execution
         def initialize(target:, context:, **rest)
@@ -22,12 +23,16 @@ module Koholint
           @still = 0
           @idle_reason = nil
           @crossed = []
+          @replans = 0
+          @avoided = []
           @clearing = clearing_for(context)
         end
 
         def result(state = @last)
           merged = super.merge(path_length: @initial_length.to_i, steps_done: @index, crossed: @crossed.map(&:dup))
           merged[:clears] = @clearing.uses if @clearing&.uses&.any?
+          merged[:replans] = @replans if @replans.positive?
+          merged[:avoided] = @avoided.map(&:dup) if @avoided.any?
           merged[:cause] = @cause if @cause && !@path
           merged
         end
@@ -81,12 +86,25 @@ module Koholint
           return finish(:room_change) if room(state) != room(@start)
           return finish(:damage) if state.hp.to_i < @start.hp.to_i
           return finish(:dialogue) if state.dialog_open? && !@start.dialog_open?
-          return @clearing&.start(state, @heading) || finish(:blocked) if @still >= STILL_FRAMES
+          return @clearing&.start(state, @heading) || reroute(state) || finish(:blocked) if @still >= STILL_FRAMES
 
           advance(state)
         end
 
         def clearing_for(context) = Clearing.of(context)
+
+        # A blocked edge the grid believed open: avoid it and plan again from here, like talk_to, up to REPLANS times.
+        def reroute(state)
+          cell = state.cell
+          return nil unless @planner && cell && @heading && @replans < REPLANS
+
+          @planner.avoid(cell, @heading)
+          path = @planner.path(from: cell, to: @target) or return nil
+          @replans += 1
+          @avoided << { row: cell[0], col: cell[1], direction: @heading }
+          restart(state, path)
+          advance(state)
+        end
 
         def clearing(state)
           @still = 0

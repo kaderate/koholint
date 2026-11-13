@@ -164,6 +164,9 @@ module Koholint
           nil
         end
 
+        # talk_to replans a blocked walk itself, toward another standing cell.
+        def reroute(_state) = nil
+
         def restart(state, path)
           super
           @phase = :walk

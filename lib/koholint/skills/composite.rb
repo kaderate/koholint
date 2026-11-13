@@ -31,7 +31,7 @@ module Koholint
         def result(state = @last)
           last = @done.last
           entered = @stopped_by == :done && last && [last.dig(:to, :row), last.dig(:to, :col)] == @target
-          super.merge(capability: @capability, steps: @done.map { |step| step.slice(:skill, :stopped_by, :frames) },
+          super.merge(capability: @capability, steps: @done.map { |step| step.slice(:skill, :stopped_by, :frames, :blocked_at, :avoided).compact },
                       target: { row: @target[0], col: @target[1] }, effect: entered ? true : false,
                       **(@objects ? { object_before: @before, object_after: object_at_target } : {}))
         end
