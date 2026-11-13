@@ -11,6 +11,8 @@ module Koholint
     RGB_UNPACK = ('a3x' * (SCREEN_WIDTH * SCREEN_HEIGHT)).freeze
     BUTTONS = %i[up down left right a b start select].freeze
 
+    SILENCE = Object.new.tap { |sink| sink.define_singleton_method(:<<) { |_sample| sink } }.freeze
+
     @roms = {}
 
     class << self
@@ -23,6 +25,7 @@ module Koholint
           driver = Driver.build(copy)
         end
         detach_battery(driver)
+        mute(driver)
         @roms[rom_path] = driver.motherboard.mmu.mbc.rom
         new(driver, 0)
       end
@@ -34,6 +37,7 @@ module Koholint
         motherboard = Motherboard.load(data[:motherboard], rom_bytes: @roms.fetch(rom_path))
         driver = Driver.new(motherboard)
         detach_battery(driver)
+        mute(driver)
         restore_pending_ime(motherboard.cpu, data.fetch(:pending_ime, 0))
         new(driver, data[:frame])
       end
@@ -56,6 +60,9 @@ module Koholint
         ram = driver.motherboard.mmu.mbc.external_ram
         ram.instance_variable_set(:@battery_path, nil)
       end
+
+      # Headless, nobody drains the APU's sample queue: it would hold every sample of the run in memory
+      def mute(driver) = driver.motherboard.apu.instance_variable_set(:@audio_queue, SILENCE)
     end
 
     attr_reader :frame
