@@ -14,13 +14,13 @@ Only what is left to do. When something lands, delete it here (git is the histor
 7. **Save in the loop.** "Continue" after death is automatic (flow-22, met live in run `20261105-221719-7000`: 5 deaths, run continued); add a `save_game` skill (needs the boot script to resume from the title after quitting and a check that the cartridge RAM changed; the four-button combination is not reachable through `press`).
 8. **Finer navigation, interactions beyond walking, combat.** Tile lattice and tile-level beliefs, exits straddling two cells; push, dive/swim, item use; combat beyond single strikes (spin attack, groups of enemies, enemies the sword does not hurt).
 9. **Viewer and live control.** Fork from the UI, pause/stop of the live engine; optional `--live-clock` with pause-on-danger and a reflex layer; background music (comfort, low priority: YouTube IFrame player, track per place kind via `data/music.json`, replay only); creatures overlay and map-cell thumbnails on hover; item icons captured from VRAM.
-10. **Cap repeated zero-frame results before long live runs.** In the flow-44 agent-loop proof, 164/17 produced about 2,900 explore results of `no_frontier` in 1 frame each, and each goes back to the model. The harness should stop or redirect after a few identical zero-frame results instead of paying for each one.
 
 ## Cleanups
 - `resume` without `--agent` on an agent run silently continues with WalkAndTalk: make it an error (WalkAndTalk stays: no-agent baseline, `StartGame` fallback, 13 test files).
 - Archive the finished plans of `docs/superpowers/plans/`; `probes/readiness_census.rb` has no test (test it or drop it); keep the other census probes (provenance of `data/addresses.json` and `data/entities.json`).
 
 ## Open questions and unmeasured limits (one line each, details in `docs/loose-ends.md`)
+- Zero-frame cap (flow-45): its thresholds are not measured: 3 identical results, at most 1 frame each, then a 120-frame wait. The key is place + skill + stop, so a model alternating two instant skills never trips it.
 - Heal sources: no heart was picked up in the attack demos and enemy drops after a kill are not watched; hp stays 8/24 or lower.
 - Does entering a house or cave heal? Not observed (hp stayed 4/24 in two houses for 2600 frames; caves untested): the `shelter` candidate was removed in flow-34 (no retreat at low hp).
 - Routes over known places: an exit reachable from one landing of a place is assumed reachable from every landing except a pocket cell (one landing cell kept per side); in the scripted run from `sword-obtained` (flow-39) Link reached 192 in 1837 frames, found 192 up to 176 is a ledge, and then had no known route to 177-0 and no untried exit within reach (the bushes the sword may cut and the urchins are not frontiers yet).

@@ -147,6 +147,42 @@ class DelegatedAutopilotTest < Minitest::Test
     assert_equal 'claude', results[9][0][:agent]
   end
 
+  def test_repeated_zero_frame_results_in_one_place_are_answered_by_the_harness
+    client = ScriptedClient.new(objective: new_place, default: explore)
+    p = autopiloted(client, autopilot: nil)
+    decide(p)
+    instant = outcome(:no_frontier, 0).merge(frames: 1, moved_cells: 0, cells_walked: 0)
+    3.times do |i|
+      result = p.decide(p.decision_point_for(state), state, { grid: })
+      assert_equal 'claude', result[:agent]
+      p.after_action(choice: result[:choice], outcome: instant, state:, frame: 200 + i)
+    end
+    calls = client.calls.size
+    result = p.decide(p.decision_point_for(state), state, { grid: })
+    assert_equal [{ skill: 'wait', params: { frames: 120 } }, 'delegated', calls], [result[:choice], result[:agent], client.calls.size]
+    assert_equal ['zero-frame: explore no_frontier 3 times in a row in 163-16'], result[:notables].map { |note| note[:detail] }
+    p.after_action(choice: result[:choice], outcome: { skill: 'wait', params: { frames: 120 }, frames: 120, stopped_by: 'done' }, state:, frame: 500)
+    result = p.decide(p.decision_point_for(state), state, { grid: })
+    assert_equal 'claude', result[:agent]
+    p.after_action(choice: result[:choice], outcome: instant, state:, frame: 501)
+    result = p.decide(p.decision_point_for(state), state, { grid: })
+    assert_equal 'delegated', result[:agent], 'one more instant repeat waits again'
+    p.after_action(choice: result[:choice], outcome: { skill: 'wait', params: { frames: 120 }, frames: 120, stopped_by: 'done' }, state:, frame: 502)
+    p.after_action(choice: { skill: 'walk', params: {} }, outcome: instant.merge(frames: 16, stopped_by: 'done'), state:, frame: 520)
+    assert_equal 'claude', p.decide(p.decision_point_for(state), state, { grid: })[:agent]
+    p.instance_variable_get(:@explore_log).absorb({ from: { room: 163, map: 16 }, exits: [{ row: 0, col: 5, direction: :up, outcome: :left, to: [147, 16] }] })
+    3.times { |i| p.after_action(choice: { skill: 'explore', params: {} }, outcome: instant, state:, frame: 600 + i) }
+    context = { grid: }
+    result = p.decide(p.decision_point_for(state), state, context)
+    assert_equal ['explore', { place: [147, 16] }], [result[:choice][:skill], context[:aim]]
+    p.after_action(choice: result[:choice], outcome: instant, state:, frame: 700)
+    result = p.decide(p.decision_point_for(state), state, { grid: })
+    assert_equal 'claude', result[:agent]
+    p.after_action(choice: result[:choice], outcome: instant, state:, frame: 701)
+    result = p.decide(p.decision_point_for(state), state, { grid: })
+    assert_equal({ skill: 'wait', params: { frames: 120 } }, result[:choice], 'a harness explore that came back instantly escalates to the wait')
+  end
+
   def test_untried_objects_continue_and_other_stops_go_to_the_model
     client = ScriptedClient.new(objective: new_place, default: explore)
     results = tours(autopiloted(client), 4, stop: :untried_object)

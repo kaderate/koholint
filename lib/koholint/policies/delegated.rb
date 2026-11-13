@@ -10,6 +10,7 @@ require 'koholint/explore_log'
 require 'koholint/leads'
 require 'koholint/ledger'
 require 'koholint/loop_watch'
+require 'koholint/zero_watch'
 require 'koholint/navigation/planner'
 require 'koholint/revisit'
 require 'koholint/talk_log'
@@ -64,14 +65,16 @@ module Koholint
       REVISIT_BUDGET_SHARE = 0.05
       STUCK_STOPS = %w[no_frontier no_path blocked stalled].freeze
       STUCK_AT = 6
+      ZERO_WAIT = { skill: 'wait', params: { frames: 120 } }.freeze
       FALL_MOTION = 6
       EXPLORE = { skill: 'explore', params: {} }.freeze
       AUTO_OBJECTIVE = { title: 'Explore the nearest untried exits (picked by the harness)', predicate: { kind: 'new_place' } }.freeze
 
       def initialize(client:, registry:, objectives:, manual: '', on_step: nil, on_activity: nil, ledger: nil, triggers: nil, talk_log: nil, leads: nil, explore_log: nil, revisit: nil,
-                     budget: nil, autopilot: nil, cards: {}, loop_watch: nil)
+                     budget: nil, autopilot: nil, cards: {}, loop_watch: nil, zero_watch: nil)
         @cards = cards.dup
         @loop_watch = loop_watch || LoopWatch.new
+        @zero_watch = zero_watch || ZeroWatch.new
         @candidates = []
         @budget = budget
         @autopilot = autopilot
@@ -185,6 +188,9 @@ module Koholint
           broken = loop_break(decision_point, state, context)
           return broken if broken
 
+          capped = zero_cap(decision_point, state, context)
+          return capped if capped
+
           autopilot = autopilot_choice(decision_point, state, context)
           return autopilot if autopilot
 
@@ -226,6 +232,7 @@ module Koholint
         return unless choice.key?(:skill)
 
         @autopilot&.acted(skill: choice[:skill], outcome:) unless @revisit_acting
+        @zero_watch.note(place: Ledger.place_of(outcome[:from]) || [state.room_id, state.map_id], skill: choice[:skill], stop: outcome[:stopped_by], frames: outcome[:frames])
         @frame = frame
         @page += 1 if choice[:skill] == 'advance_dialogue'
         unless state.phase == :dialogue
