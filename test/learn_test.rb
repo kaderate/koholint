@@ -50,6 +50,14 @@ class LearnTest < Minitest::Test
     assert_equal [92], L.candidates(gain:, sightings:, stood:, known: [], limit: 1).map { |c| c[:object] }
   end
 
+  def test_a_cell_entered_only_after_a_capability_cleared_it_is_not_stood_on
+    x, y = Koholint::Geometry.center_of(1, 7)
+    use = ->(skill, before, after) { { 'type' => 'action', 'skill' => skill, 'result' => { 'from' => { 'room' => 225, 'map' => 0 }, 'capability' => { 'id' => 'sword-on-object-92' },
+                                                                                          'target' => { 'row' => 1, 'col' => 7 }, 'object_before' => before, 'object_after' => after } } }
+    assert_equal Set[[1, 7]], L.stood([use.('sword_on_object_92', 92, 92), perception(10, 225, x, y)])[[225, 0]]
+    assert_empty L.stood([use.('sword_on_object_92', 92, 4), perception(10, 225, x, y)])[[225, 0]]
+  end
+
   def test_objects_that_stopped_link_come_before_widespread_ones
     events = [{ 'type' => 'action', 'skill' => 'walk', 'result' => { 'from' => { 'room' => 224, 'map' => 0 }, 'blocked_at' => { 'row' => 1, 'col' => 0, 'direction' => 'up' } } },
               { 'type' => 'action', 'skill' => 'explore', 'result' => { 'from' => { 'room' => 193, 'map' => 0 }, 'walls' => [{ 'row' => 2, 'col' => 2 }],
