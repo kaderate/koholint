@@ -109,6 +109,21 @@ class AttackTest < Minitest::Test
     assert_equal :no_target, result[:stopped_by]
   end
 
+  def test_strikes_an_unidentified_thing_the_way_it_strikes_an_enemy
+    unknown = enemy(4, 6, health: 2, type: 11).merge(kind: :unknown).except(:contact)
+    result, = fight([4, 6], [unknown])
+    assert_equal [:done, true, 2], result.values_at(:stopped_by, :killed, :hits)
+    assert_equal 11, result[:target][:type]
+  end
+
+  def test_prefers_an_enemy_over_an_unidentified_thing_and_never_targets_a_person
+    unknown = enemy(4, 6, slot: 1, type: 12).merge(kind: :unknown)
+    result, = fight([4, 6], [unknown, enemy(4, 6, slot: 2)])
+    assert_equal 2, result[:target][:slot]
+    person, = fight([4, 6], [enemy(4, 6, type: 62).merge(kind: :npc)])
+    assert_equal :no_target, person[:stopped_by]
+  end
+
   def test_backs_off_when_closer_than_the_enemy_contact_before_striking
     near = enemy(4, 6)
     near[:x] -= 6
