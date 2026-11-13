@@ -4,7 +4,7 @@ Command reference for running, resuming and forking runs, the offline censuses, 
 
 ## Tests
 
-`rake test` runs one process per file (ROM-heavy files one process per test, about 4 min on a busy Mac; the first run builds an emulator state cache in `tmp/`); `rake test:fast` skips the ROM-heavy files (about 35 s); `rake test:ci` runs every file with the ROM hidden, so ROM tests skip (about 25 s): GitHub Actions runs it on every pull request and push to `main`, with emu-gb cloned from `kaderate/gemboy`. `bin/generate_start_fixture` regenerates `test/fixtures/start_game.expected.json` (read by `test/perception_test.rb`) after a boot script or perception change.
+`rake test` runs one process per file (ROM-heavy files one process per test, about 4 min on a busy Mac; the first run builds an emulator state cache in `tmp/`); `rake test:fast` skips the ROM-heavy files listed in `HEAVY` in the Rakefile (about 25 s with a warm cache, 110 s of CPU cold); every run counts the frames each file emulates and fails when a file outside `HEAVY` emulates more than `HEAVY_FRAMES` (2000), so a test that replays a long journal goes into `HEAVY` instead of slowing `test:fast` (a warm emulator cache serves states without emulating them, so the count is exact only on a cold cache); `rake test:ci` runs every file with the ROM hidden, so ROM tests skip (about 25 s): GitHub Actions runs it on every pull request and push to `main`, with emu-gb cloned from `kaderate/gemboy`. `bin/generate_start_fixture` regenerates `test/fixtures/start_game.expected.json` (read by `test/perception_test.rb`) after a boot script or perception change.
 
 ## Running
 
