@@ -27,6 +27,7 @@ task :test do
   jobs.sort_by! { |file, args| -times.fetch((file + args.join), 0) }
   # The longest jobs set the wall clock: shorter ones yield the cores to them
   critical = times.values.max.to_f / 2
+  renice = Process.getpriority(Process::PRIO_PROCESS, 0) < 5
   started = {}
   queue = jobs.dup
   running = {}
@@ -39,7 +40,7 @@ task :test do
       count = Tempfile.new("#{File.basename(file)}-frames")
       pid = Process.spawn({ 'KOHOLINT_FRAMES_LOG' => count.path }, RbConfig.ruby, '--yjit', '-Ilib', '-Itest', file, *args,
                           %i[out err] => log.path)
-      Process.setpriority(Process::PRIO_PROCESS, pid, 5) if times.fetch(file + args.join, 0) < critical
+      Process.setpriority(Process::PRIO_PROCESS, pid, 5) if renice && times.fetch(file + args.join, 0) < critical
       running[pid] = [file, log, count]
       started[pid] = [file + args.join, Process.clock_gettime(Process::CLOCK_MONOTONIC)]
     end
