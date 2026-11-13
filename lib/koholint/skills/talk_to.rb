@@ -260,7 +260,7 @@ module Koholint
           return idle(:no_response) if @non_person && @frames.zero?
           return super if @phase == :walk
           return finish(:room_change) if room(state) != room(@start)
-          return finish(:damage) if state.hp.to_i < @start.hp.to_i
+          return finish(:damage) if state.health < @start.health
 
           if @phase == :face
             return finish(:dialogue) if state.dialog_open? && !@start.dialog_open?

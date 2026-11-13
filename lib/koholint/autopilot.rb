@@ -22,7 +22,7 @@ module Koholint
     def model_called(state:, objective:, news: false)
       @chain = 0
       @since = state.frame
-      @hp = state.hp.to_i
+      @hp = state.health
       @objective = objective&.dig(:id)
       @news = news
       @stop = nil
@@ -82,7 +82,7 @@ module Koholint
       return 'new lead or goal' if news && @news
       return 'explore loop' if @returns.values.max.to_i >= RETURNS
       return "phase #{state.phase}" unless state.phase == :playing
-      return 'hp dropped' if state.hp.to_i < @hp
+      return 'hp dropped' if state.health < @hp
 
       nil
     end

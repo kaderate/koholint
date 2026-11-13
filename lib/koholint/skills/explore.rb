@@ -123,7 +123,7 @@ module Koholint
           @position = [state.x, state.y]
           return @clearing.step(state) if @clearing&.active? && !@leg
           return depart(state) if room(state) != @place
-          return harmed if state.hp.to_i < @start.hp.to_i
+          return harmed if state.health < @start.health
           return interrupted(state) if state.dialog_open?
           return entering if walking_in?(state)
 

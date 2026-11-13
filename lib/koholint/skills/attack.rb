@@ -102,7 +102,7 @@ module Koholint
           return killed unless now[:status] == @enemy[:status]
 
           @enemy = @enemy.merge(now.slice(:x, :y, :cell, :health))
-          return finish(:damage) if state.hp.to_i < @start.hp.to_i
+          return finish(:damage) if state.health < @start.health
           return swing if @swing
           return finish(:no_kill) if @strikes >= MAX_STRIKES
           return reapproach(state) if far?(state) && @approaches < APPROACHES
