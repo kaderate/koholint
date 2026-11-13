@@ -237,3 +237,40 @@ or a `new_place` objective, and answered `explore` to every skill question. It r
 
 Every capabilities fork reached 164/17, and one also reached 128/0; none of the forks without the capability reached a new place.
 Each capabilities fork broke one loop, the lineage's loop inherited at the fork frame, at its first decision. The loop break fired in 3 of 3 capabilities forks and 0 of 3 baseline forks, because only the clearable cells gave 160/0 untried work. So "chosen in 3 of 3" overstates organic use; the cost per 1000 frames and the clear rate are unaffected.
+
+## PR 6: ranking learn candidates by blocking evidence (flow-45, play unchanged)
+
+`learn` now ranks uncatalogued object ids by how many distinct cells holding them stopped Link, pooled over the run's lineage:
+- the cell ahead of a blocked move or edge;
+- the walls explore found;
+- the target of a capability use whose step into it was blocked.
+
+Ties go to the id seen in the most places. The lineage is the run's oldest ancestor under the same runs directory plus every run
+descending from it. That makes 32 runs for `0c64`, including the flow-44 run `21b0` and the cap44 forks.
+
+**Measured on `0c64` ($0, sword gained at frame 60404, 17 places):**
+
+| evidence | top of the ranking (blocked cells / places) |
+|---|---|
+| widest first (before) | 0x27 (10p), 0x2F (10p), 0x25 (9p); 0x5C 15th |
+| the run's own trace | 0x1F (29/4), 0x49 (7/5), 0x60 (7/1); 0x5C 17th (2/5) |
+| pooled lineage | 0x1F (33/4), 0x48 (8/5), 0x49 (8/5), 0x60 (7/1); 0x5C 8th (5/5) |
+
+Learn with the default limit on the run's own ranking tried `0x1F`, `0x49` and `0x60` with the sword. All three came back
+inconclusive, with failures and no clear:
+- `0x1F`: 3 failures in 242/0 and 243/0, 3 unreached.
+- `0x49`: 1 failure in 224/0, 14 unreached.
+- `0x60`: 1 failure in 177/0, 4 unreached.
+
+Those entries are now in `data/capabilities.json`. `0x1F` failed in 2 places, so it is no longer retried; the other two stay
+retryable. So the done criterion (a real clearable object within the default limit) is **not met**. Most blocked cells in this
+lineage belong to scenery that explore's vision took for passable or unknown. `0x5C` is capped by its few cells: 4 in 160/0,
+where every pooled block comes from, and the cap44 forks cleared those before ever walking into them.
+
+**Retries and limit 10 (review of PR 6).** A retry now tries only (place, cell, stand) triples that are not already in the entry's
+evidence, and a pair stays retryable while some triple is left; this replaced the stop after failures in 2 places. With
+`LIMIT` raised to 10, `learn` with the defaults on `0c64` took **3933 s** (about 66 minutes), against a copy of the capabilities
+file without `sword-on-object-92`. It tried 0x48, 0x49, 0x60, 0x25, 0x39, 0x3D, 0x5C, 0xC8, 0x62 and 0x37, in ranking order.
+It **validated `sword-on-object-92` by itself at $0** (3 successes in 224/0 and 193/0, 8 unreached). 0xC8 was rejected
+(3 failures, 1 not solid), and the other 8 were inconclusive, mostly unreached. 0x1F was not retried because no untried triple
+was left in its first places. The new entries, except the duplicate 0x5C one, are in `data/capabilities.json`.

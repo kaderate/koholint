@@ -15,7 +15,7 @@ module Koholint
   # Offline capability learning: an item first held in a run suggests using it facing the uncatalogued objects seen after the gain;
   # each suggestion is tried in throwaway forks of the run through existing skills only, then judged from the trials.
   module Learn
-    LIMIT = 3
+    LIMIT = 10
     PLACES = 3
     CELLS = 2
     TRIALS = 12
@@ -65,14 +65,15 @@ module Koholint
     def learn(run, limit: LIMIT, object: nil, path: Capabilities::DEFAULT_PATH, root: ROOT, out: $stdout)
       events = Trace.read(File.join(run.dir, 'trace.jsonl'))
       entries = Capabilities.load(path)
+      blocked = lineage_blocks(run)
       triggers(events, since: run.manifest.dig('parent', 'frame').to_i).each do |gain|
         sightings = sightings(run, first_frames(events, gain[:frame]))
-        candidates(gain:, sightings:, stood: stood(events), known: entries, limit:, object:).each do |candidate|
-          entry = hypothesis(gain:, object: candidate[:object], run: run.id, selected: !object.nil?)
-          out.puts "#{entry['id']}: #{candidate[:places].size} places"
-          evidence = try(run, entry, candidate[:places], root:, out:)
+        candidates(gain:, sightings:, stood: stood(events), blocked:, known: entries, limit:, object:).each do |candidate|
+          entry = known(entries, gain[:item], candidate[:object]) || hypothesis(gain:, object: candidate[:object], run: run.id, selected: !object.nil?)
+          out.puts "#{entry['id']}: #{candidate[:blocks]} blocks in the lineage, #{candidate[:places].size} places"
+          evidence = entry['evidence'] + try(run, entry, candidate[:places], root:, out:)
           status = judge(evidence)
-          entries += [Capabilities.transition(entry, status, verdict(evidence, status), evidence:)]
+          entries = entries.reject { |other| other['id'] == entry['id'] } + [Capabilities.transition(entry, status, verdict(evidence, status), evidence:)]
           Capabilities.write(entries, path)
           out.puts "#{entry['id']}: #{status} (#{verdict(evidence, status)})"
         end
@@ -111,14 +112,66 @@ module Koholint
       end
     end
 
+    # Cells that stopped Link, per place: a blocked move or edge (the cell ahead of it), the walls an explore found and the target of a
+    # capability use whose step into it was blocked.
+    def blocks(events)
+      events.each_with_object(Hash.new { |hash, key| hash[key] = Set.new }) do |event, cells|
+        result = event['result'] if event['type'] == 'action'
+        place = result.is_a?(Hash) && Ledger.place_of(result['from']) or next
+        ahead = [*Array(result['blocked_edges']), result['blocked_at']].compact.filter_map do |edge|
+          delta = Skills::Composite::DELTAS[edge['direction'].to_s.to_sym] or next
+          [edge['row'].to_i + delta[0], edge['col'].to_i + delta[1]]
+        end
+        uses = [*Array(result['clears']), (result if result['capability'])].compact
+        faced = uses.filter_map do |use|
+          [use['target']['row'].to_i, use['target']['col'].to_i] if use['target'].is_a?(Hash) && Array(use['steps']).any? { |step| step['skill'] == 'step' && step['stopped_by'] == 'blocked' }
+        end
+        (ahead + faced + Array(result['walls']).map { |wall| [wall['row'].to_i, wall['col'].to_i] }).each do |row, col|
+          cells[place] << [row, col] if row.between?(0, Geometry::ROWS - 1) && col.between?(0, Geometry::COLS - 1)
+        end
+      end
+    end
+
+    # The run's tree under its root directory: its oldest ancestor there and every run descending from it. Blocks are sets, so the
+    # trace prefix a fork copies from its parent counts once.
+    def lineage(run)
+      root = File.dirname(run.dir)
+      parents = Dir.glob(File.join(root, '*', 'manifest.json')).to_h { |path| [File.basename(File.dirname(path)), JSON.parse(File.read(path)).dig('parent', 'id')] }
+      origin = ->(id) { parents.key?(parents[id]) ? origin.(parents[id]) : id }
+      top = origin.(run.id)
+      parents.keys.select { |id| origin.(id) == top }.sort.map { |id| File.join(root, id) } | [run.dir]
+    end
+
+    def lineage_blocks(run)
+      lineage(run).each_with_object(Hash.new { |hash, key| hash[key] = Set.new }) do |dir, all|
+        blocks(Trace.read(File.join(dir, 'trace.jsonl'))).each { |place, cells| all[place].merge(cells) }
+      end
+    end
+
+    # The entry already tried for an (item, object) pair; it is retried while inconclusive and some (place, cell, stand) is still untried.
+    def known(entries, item, object) = entries.find { |entry| entry['trigger']['item'] == item && entry['target']['object'] == object }
+
+    def retryable?(entry, places)
+      done = tried(entry)
+      entry['status'] == 'inconclusive' && triples(places).any? { |sighting, cell, stand| !done.include?([sighting[:place], cell, stand]) }
+    end
+
+    def tried(entry) = entry['evidence'].to_set { |trial| [trial['place'], trial['cell'], trial['stand']] }
+
+    def triples(places)
+      places.first(PLACES).flat_map do |sighting|
+        nearest(sighting[:cells], sighting[:arrival]).first(CELLS).flat_map { |cell| stands(cell, sighting).map { |stand, direction| [sighting, cell, stand, direction] } }
+      end
+    end
+
     def sightings(run, firsts)
       firsts.to_h { |place, first| [place, first.merge(grid: Entities.room_objects(Replay.to(run, first[:frame])))] }
     end
 
-    # Uncatalogued object ids Link never stood on, most widespread first; an (item, object) pair already in the file is never retried.
-    def candidates(gain:, sightings:, stood:, known:, limit: LIMIT, object: nil)
+    # Uncatalogued object ids Link never stood on, the ones that stopped him most often first, then the most widespread; an (item, object)
+    # pair already in the file is retried only while retryable?.
+    def candidates(gain:, sightings:, stood:, known:, blocked: {}, limit: LIMIT, object: nil)
       stood_ids = stood.flat_map { |place, cells| (grid = sightings.dig(place, :grid)) ? cells.map { |row, col| grid[row][col] } : [] }.to_set
-      tried = known.filter_map { |entry| entry['target']['object'] if entry['trigger']['item'] == gain[:item] }
       places = Hash.new { |hash, key| hash[key] = [] }
       sightings.each do |place, sighting|
         cells = Hash.new { |hash, key| hash[key] = [] }
@@ -126,9 +179,13 @@ module Koholint
         cells.each { |id, at| places[id] << { place:, frame: sighting[:frame], arrival: sighting[:arrival], grid: sighting[:grid], cells: at } }
       end
       catalogued = Entities.object_catalogue.keys
-      ids = places.keys.reject { |id| catalogued.include?(id) || stood_ids.include?(id) || tried.include?(id) }
+      ids = places.keys.reject do |id|
+        entry = known(known, gain[:item], id)
+        catalogued.include?(id) || stood_ids.include?(id) || (entry && !retryable?(entry, places[id]))
+      end
       ids = ids.select { |id| id == object } if object
-      ids.sort_by { |id| [-places[id].size, id] }.first(limit).map { |id| { object: id, places: places[id] } }
+      hits = blocked.sum([]) { |place, cells| (grid = sightings.dig(place, :grid)) ? cells.map { |row, col| grid[row][col] } : [] }.tally
+      ids.sort_by { |id| [-hits[id].to_i, -places[id].size, id] }.first(limit).map { |id| { object: id, places: places[id], blocks: hits[id].to_i } }
     end
 
     def hypothesis(gain:, object:, run:, selected: false)
@@ -149,21 +206,21 @@ module Koholint
        { 'skill' => 'walk', 'params' => { 'direction' => '$direction', 'cells' => 1 }, 'accept' => %w[done] }]
     end
 
-    # Per place (up to PLACES) and target cell (up to CELLS, nearest the arrival first), standing sides nearest first until one is reached.
+    # Per place (up to PLACES) and target cell (up to CELLS, nearest the arrival first), standing sides nearest first until one is reached;
+    # a (place, cell, stand) already in the entry's evidence is never tried again.
     def try(run, entry, places, root:, out:)
+      done = tried(entry)
+      reached = Set.new
       evidence = []
-      places.first(PLACES).each do |sighting|
-        nearest(sighting[:cells], sighting[:arrival]).first(CELLS).each do |cell|
-          stands(cell, sighting).each do |stand, direction|
-            break if evidence.count { |trial| trial['outcome'] != 'unreached' } >= TRIALS
+      triples(places).each do |sighting, cell, stand, direction|
+        next if done.include?([sighting[:place], cell, stand]) || reached.include?([sighting[:place], cell])
+        break if evidence.count { |trial| trial['outcome'] != 'unreached' } >= TRIALS
 
-            trial = trial(run, entry, sighting, cell, stand, direction, root:)
-            out.puts "  #{sighting[:place].join('-')} #{cell.inspect} from #{stand.inspect} #{direction}: #{trial['outcome']}"
-            evidence << trial
-            break unless trial['outcome'] == 'unreached'
-          end
-          return evidence if judge(evidence) == 'validated'
-        end
+        trial = trial(run, entry, sighting, cell, stand, direction, root:)
+        out.puts "  #{sighting[:place].join('-')} #{cell.inspect} from #{stand.inspect} #{direction}: #{trial['outcome']}"
+        evidence << trial
+        reached << [sighting[:place], cell] unless trial['outcome'] == 'unreached'
+        return evidence if judge(entry['evidence'] + evidence) == 'validated'
       end
       evidence
     end

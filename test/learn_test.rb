@@ -1,5 +1,8 @@
 require_relative 'test_helper'
 require 'koholint/learn'
+require 'tmpdir'
+require 'stringio'
+require 'fileutils'
 
 class LearnTest < Minitest::Test
   L = Koholint::Learn
@@ -45,6 +48,52 @@ class LearnTest < Minitest::Test
     assert_equal 92, place[:grid].dig(stand[0] + dr, stand[1] + dc)
     assert_equal [37], L.candidates(gain:, sightings:, stood:, known: [], object: 37).map { |c| c[:object] }
     assert_equal [92], L.candidates(gain:, sightings:, stood:, known: [], limit: 1).map { |c| c[:object] }
+  end
+
+  def test_objects_that_stopped_link_come_before_widespread_ones
+    events = [{ 'type' => 'action', 'skill' => 'walk', 'result' => { 'from' => { 'room' => 224, 'map' => 0 }, 'blocked_at' => { 'row' => 1, 'col' => 0, 'direction' => 'up' } } },
+              { 'type' => 'action', 'skill' => 'explore', 'result' => { 'from' => { 'room' => 193, 'map' => 0 }, 'walls' => [{ 'row' => 2, 'col' => 2 }],
+                                                                     'blocked_edges' => [{ 'row' => 2, 'col' => 3, 'direction' => 'left' }, { 'row' => 0, 'col' => 0, 'direction' => 'up' }] } },
+              { 'type' => 'action', 'skill' => 'explore', 'result' => { 'from' => { 'room' => 209, 'map' => 0 }, 'clears' => [
+                { 'target' => { 'row' => 5, 'col' => 6 }, 'steps' => [{ 'skill' => 'goto', 'stopped_by' => 'done' }, { 'skill' => 'step', 'stopped_by' => 'blocked' }] },
+                { 'target' => { 'row' => 7, 'col' => 9 }, 'steps' => [{ 'skill' => 'goto', 'stopped_by' => 'blocked' }] }] } }]
+    blocked = L.blocks(events)
+    assert_equal({ [224, 0] => Set[[0, 0]], [193, 0] => Set[[2, 2]], [209, 0] => Set[[5, 6]] }, blocked)
+    found = L.candidates(gain:, sightings:, stood:, known: [], blocked:)
+    assert_equal [[37, 2], [92, 1]], found.map { |c| [c[:object], c[:blocks]] }
+  end
+
+  def test_an_inconclusive_pair_is_retried_on_new_place_cell_and_stand_triples_only
+    entry = ->(trials) { Koholint::Capabilities.transition(L.hypothesis(gain:, object: 92, run: 'r'), 'inconclusive', 'test', evidence: trials) }
+    places = L.candidates(gain:, sightings:, stood:, known: []).first[:places]
+    all = L.triples(places).map { |sighting, cell, stand| { 'outcome' => 'failure', 'place' => sighting[:place], 'cell' => cell, 'stand' => stand } }
+    partial = entry.(all.first(2))
+    assert_equal [92, 37], L.candidates(gain:, sightings:, stood:, known: [partial]).map { |c| c[:object] }
+    assert_equal partial, L.known([partial], 1, 92)
+    assert_equal [37], L.candidates(gain:, sightings:, stood:, known: [entry.(all)]).map { |c| c[:object] }
+    calls = []
+    original = L.method(:trial)
+    L.define_singleton_method(:trial) do |_run, _entry, sighting, cell, stand, _direction, root:|
+      calls << [sighting[:place], cell, stand]
+      { 'outcome' => 'failure', 'place' => sighting[:place], 'cell' => cell, 'stand' => stand }
+    end
+    fresh = L.try(nil, partial, places, root: nil, out: StringIO.new)
+    refute_empty fresh
+    assert_empty calls & all.first(2).map { |trial| trial.values_at('place', 'cell', 'stand') }, 'a triple already in the evidence is not tried again'
+    assert_equal calls.uniq, calls
+  ensure
+    L.define_singleton_method(:trial, original) if original
+  end
+
+  def test_the_lineage_is_the_tree_of_runs_under_the_same_root
+    Dir.mktmpdir do |root|
+      { 'a' => nil, 'b' => 'a', 'c' => 'b', 'd' => nil, 'e' => 'd' }.each do |id, parent|
+        FileUtils.mkdir_p(File.join(root, id))
+        File.write(File.join(root, id, 'manifest.json'), JSON.generate({ 'parent' => parent && { 'id' => parent, 'frame' => 1 } }.compact))
+      end
+      run = Struct.new(:dir, :id).new(File.join(root, 'b'), 'b')
+      assert_equal %w[a b c], L.lineage(run).map { |dir| File.basename(dir) }
+    end
   end
 
   def test_a_pair_already_in_the_file_is_never_retried
