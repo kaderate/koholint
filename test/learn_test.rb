@@ -1,6 +1,7 @@
 require_relative 'test_helper'
 require 'koholint/learn'
 require 'tmpdir'
+require 'stringio'
 require 'fileutils'
 
 class LearnTest < Minitest::Test
@@ -62,13 +63,26 @@ class LearnTest < Minitest::Test
     assert_equal [[37, 2], [92, 1]], found.map { |c| [c[:object], c[:blocks]] }
   end
 
-  def test_an_inconclusive_pair_is_retried_until_it_fails_in_two_places
+  def test_an_inconclusive_pair_is_retried_on_new_place_cell_and_stand_triples_only
     entry = ->(trials) { Koholint::Capabilities.transition(L.hypothesis(gain:, object: 92, run: 'r'), 'inconclusive', 'test', evidence: trials) }
-    unreached = entry.([trial('unreached', [224, 0]), trial('unreached', [209, 0]), trial('failure', [224, 0])])
-    assert_equal [92, 37], L.candidates(gain:, sightings:, stood:, known: [unreached]).map { |c| c[:object] }
-    assert_equal unreached, L.known([unreached], 1, 92)
-    failed = entry.([trial('failure', [224, 0]), trial('failure', [209, 0])])
-    assert_equal [37], L.candidates(gain:, sightings:, stood:, known: [failed]).map { |c| c[:object] }
+    places = L.candidates(gain:, sightings:, stood:, known: []).first[:places]
+    all = L.triples(places).map { |sighting, cell, stand| { 'outcome' => 'failure', 'place' => sighting[:place], 'cell' => cell, 'stand' => stand } }
+    partial = entry.(all.first(2))
+    assert_equal [92, 37], L.candidates(gain:, sightings:, stood:, known: [partial]).map { |c| c[:object] }
+    assert_equal partial, L.known([partial], 1, 92)
+    assert_equal [37], L.candidates(gain:, sightings:, stood:, known: [entry.(all)]).map { |c| c[:object] }
+    calls = []
+    original = L.method(:trial)
+    L.define_singleton_method(:trial) do |_run, _entry, sighting, cell, stand, _direction, root:|
+      calls << [sighting[:place], cell, stand]
+      { 'outcome' => 'failure', 'place' => sighting[:place], 'cell' => cell, 'stand' => stand }
+    end
+    fresh = L.try(nil, partial, places, root: nil, out: StringIO.new)
+    refute_empty fresh
+    assert_empty calls & all.first(2).map { |trial| trial.values_at('place', 'cell', 'stand') }, 'a triple already in the evidence is not tried again'
+    assert_equal calls.uniq, calls
+  ensure
+    L.define_singleton_method(:trial, original) if original
   end
 
   def test_the_lineage_is_the_tree_of_runs_under_the_same_root

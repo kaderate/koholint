@@ -15,7 +15,7 @@ module Koholint
   # Offline capability learning: an item first held in a run suggests using it facing the uncatalogued objects seen after the gain;
   # each suggestion is tried in throwaway forks of the run through existing skills only, then judged from the trials.
   module Learn
-    LIMIT = 3
+    LIMIT = 10
     PLACES = 3
     CELLS = 2
     TRIALS = 12
@@ -148,12 +148,20 @@ module Koholint
       end
     end
 
-    # The entry already tried for an (item, object) pair; it is retried only while inconclusive with failures in fewer than 2 places
-    # (unreached trials are a goto problem, not evidence against the object).
+    # The entry already tried for an (item, object) pair; it is retried while inconclusive and some (place, cell, stand) is still untried.
     def known(entries, item, object) = entries.find { |entry| entry['trigger']['item'] == item && entry['target']['object'] == object }
 
-    def retryable?(entry)
-      entry['status'] == 'inconclusive' && entry['evidence'].select { |trial| trial['outcome'] == 'failure' }.map { |trial| trial['place'] }.uniq.size < 2
+    def retryable?(entry, places)
+      done = tried(entry)
+      entry['status'] == 'inconclusive' && triples(places).any? { |sighting, cell, stand| !done.include?([sighting[:place], cell, stand]) }
+    end
+
+    def tried(entry) = entry['evidence'].to_set { |trial| [trial['place'], trial['cell'], trial['stand']] }
+
+    def triples(places)
+      places.first(PLACES).flat_map do |sighting|
+        nearest(sighting[:cells], sighting[:arrival]).first(CELLS).flat_map { |cell| stands(cell, sighting).map { |stand, direction| [sighting, cell, stand, direction] } }
+      end
     end
 
     def sightings(run, firsts)
@@ -164,7 +172,6 @@ module Koholint
     # pair already in the file is retried only while retryable?.
     def candidates(gain:, sightings:, stood:, known:, blocked: {}, limit: LIMIT, object: nil)
       stood_ids = stood.flat_map { |place, cells| (grid = sightings.dig(place, :grid)) ? cells.map { |row, col| grid[row][col] } : [] }.to_set
-      tried = known.filter_map { |entry| entry['target']['object'] if entry['trigger']['item'] == gain[:item] && !retryable?(entry) }
       places = Hash.new { |hash, key| hash[key] = [] }
       sightings.each do |place, sighting|
         cells = Hash.new { |hash, key| hash[key] = [] }
@@ -172,7 +179,10 @@ module Koholint
         cells.each { |id, at| places[id] << { place:, frame: sighting[:frame], arrival: sighting[:arrival], grid: sighting[:grid], cells: at } }
       end
       catalogued = Entities.object_catalogue.keys
-      ids = places.keys.reject { |id| catalogued.include?(id) || stood_ids.include?(id) || tried.include?(id) }
+      ids = places.keys.reject do |id|
+        entry = known(known, gain[:item], id)
+        catalogued.include?(id) || stood_ids.include?(id) || (entry && !retryable?(entry, places[id]))
+      end
       ids = ids.select { |id| id == object } if object
       hits = blocked.sum([]) { |place, cells| (grid = sightings.dig(place, :grid)) ? cells.map { |row, col| grid[row][col] } : [] }.tally
       ids.sort_by { |id| [-hits[id].to_i, -places[id].size, id] }.first(limit).map { |id| { object: id, places: places[id], blocks: hits[id].to_i } }
@@ -196,21 +206,21 @@ module Koholint
        { 'skill' => 'walk', 'params' => { 'direction' => '$direction', 'cells' => 1 }, 'accept' => %w[done] }]
     end
 
-    # Per place (up to PLACES) and target cell (up to CELLS, nearest the arrival first), standing sides nearest first until one is reached.
+    # Per place (up to PLACES) and target cell (up to CELLS, nearest the arrival first), standing sides nearest first until one is reached;
+    # a (place, cell, stand) already in the entry's evidence is never tried again.
     def try(run, entry, places, root:, out:)
+      done = tried(entry)
+      reached = Set.new
       evidence = []
-      places.first(PLACES).each do |sighting|
-        nearest(sighting[:cells], sighting[:arrival]).first(CELLS).each do |cell|
-          stands(cell, sighting).each do |stand, direction|
-            break if evidence.count { |trial| trial['outcome'] != 'unreached' } >= TRIALS
+      triples(places).each do |sighting, cell, stand, direction|
+        next if done.include?([sighting[:place], cell, stand]) || reached.include?([sighting[:place], cell])
+        break if evidence.count { |trial| trial['outcome'] != 'unreached' } >= TRIALS
 
-            trial = trial(run, entry, sighting, cell, stand, direction, root:)
-            out.puts "  #{sighting[:place].join('-')} #{cell.inspect} from #{stand.inspect} #{direction}: #{trial['outcome']}"
-            evidence << trial
-            break unless trial['outcome'] == 'unreached'
-          end
-          return evidence if judge(evidence) == 'validated'
-        end
+        trial = trial(run, entry, sighting, cell, stand, direction, root:)
+        out.puts "  #{sighting[:place].join('-')} #{cell.inspect} from #{stand.inspect} #{direction}: #{trial['outcome']}"
+        evidence << trial
+        reached << [sighting[:place], cell] unless trial['outcome'] == 'unreached'
+        return evidence if judge(entry['evidence'] + evidence) == 'validated'
       end
       evidence
     end
