@@ -30,8 +30,9 @@ class LearnTest < Minitest::Test
   def test_triggers_and_first_frames_after_the_gain
     held = ->(event, a) { event.tap { |e| e['state'].merge!('item_a' => a, 'item_b' => 4, 'inventory' => [0] * 10) } }
     events = [held.(perception(50, 224, 72, 66), 0), held.(perception(120, 224, 72, 66), 1), perception(130, 224, 88, 66), perception(300, 209, 40, 40)]
-    assert_equal [{ item: 1, name: 'sword', frame: 120 }], L.triggers(events, since: 100)
-    assert_equal [4, 1], L.triggers(events).map { |t| t[:item] }
+    assert_equal [{ item: 1, name: 'sword', frame: 120 }, { item: 4, name: 'shield', frame: 120 }], L.triggers(events, since: 100),
+                 'a fork also learns from the items held at its first frame, from that frame'
+    assert_equal [{ item: 4, name: 'shield', frame: 50 }, { item: 1, name: 'sword', frame: 120 }], L.triggers(events)
     firsts = L.first_frames(events, 120)
     assert_equal({ frame: 120, arrival: Koholint::GameState.cell_at(72, 66) }, firsts[[224, 0]])
     assert_equal 300, firsts[[209, 0]][:frame]
@@ -54,8 +55,25 @@ class LearnTest < Minitest::Test
     x, y = Koholint::Geometry.center_of(1, 7)
     use = ->(skill, before, after) { { 'type' => 'action', 'skill' => skill, 'result' => { 'from' => { 'room' => 225, 'map' => 0 }, 'capability' => { 'id' => 'sword-on-object-92' },
                                                                                           'target' => { 'row' => 1, 'col' => 7 }, 'object_before' => before, 'object_after' => after } } }
-    assert_equal Set[[1, 7]], L.stood([use.('sword_on_object_92', 92, 92), perception(10, 225, x, y)])[[225, 0]]
-    assert_empty L.stood([use.('sword_on_object_92', 92, 4), perception(10, 225, x, y)])[[225, 0]]
+    from = { [225, 0] => 0 }
+    assert_equal Set[[1, 7]], L.stood([use.('sword_on_object_92', 92, 92), perception(10, 225, x, y)], from:)[[225, 0]]
+    assert_empty L.stood([use.('sword_on_object_92', 92, 4), perception(10, 225, x, y)], from:)[[225, 0]]
+  end
+
+  def test_a_clear_by_a_moving_skill_counts_in_its_own_place_only
+    x, y = Koholint::Geometry.center_of(1, 6)
+    explore = { 'type' => 'action', 'skill' => 'explore', 'result' => { 'from' => { 'room' => 225, 'map' => 0 }, 'clears' => [
+      { 'capability' => { 'id' => 'sword-on-object-92' }, 'target' => { 'row' => 1, 'col' => 6 }, 'object_before' => 92, 'object_after' => 4 }] } }
+    stood = L.stood([explore, perception(10, 225, x, y), perception(20, 224, x, y)], from: { [225, 0] => 0, [224, 0] => 0 })
+    assert_empty stood[[225, 0]]
+    assert_equal Set[[1, 6]], stood[[224, 0]]
+  end
+
+  def test_a_stand_before_the_sighting_of_its_place_is_not_evidence
+    x, y = Koholint::Geometry.center_of(3, 8)
+    events = [perception(25_509, 160, x, y), perception(80_743, 160, 40, 40)]
+    refute_includes L.stood(events, from: { [160, 0] => 80_743 })[[160, 0]], [3, 8], 'fef5 stood on 160/0 (3,8) long before the sighting where it holds 0x5C'
+    assert_includes L.stood(events + [perception(80_800, 160, x, y)], from: { [160, 0] => 80_743 })[[160, 0]], [3, 8]
   end
 
   def test_objects_that_stopped_link_come_before_widespread_ones

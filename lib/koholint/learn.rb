@@ -79,7 +79,8 @@ module Koholint
       walls = walls(entries)
       triggers(events, since: run.manifest.dig('parent', 'frame').to_i).each do |gain|
         sightings = sightings(run, first_frames(events, gain[:frame]), events)
-        candidates(gain:, sightings:, stood: stood(events), blocked:, known: entries, limit:, object:).each do |candidate|
+        stood = stood(events, from: sightings.transform_values { |sighting| sighting[:frame] })
+        candidates(gain:, sightings:, stood:, blocked:, known: entries, limit:, object:).each do |candidate|
           entry = known(entries, gain[:item], candidate[:object]) || hypothesis(gain:, object: candidate[:object], run: run.id, selected: !object.nil?)
           out.puts "#{entry['id']}: #{candidate[:blocks]} blocks in the lineage, #{candidate[:places].size} places"
           evidence = entry['evidence'] + try(run, entry, candidate[:places], root:, out:, walls:)
@@ -92,16 +93,17 @@ module Koholint
       0
     end
 
-    # Items first held at or after the run's own first frame; read from perceptions, since a fork drops the item_gained of its fork frame.
+    # Items held from the run's own first frame on, read from perceptions: a fork also learns from an item its parent gained, over the
+    # places it sees after its fork frame.
     def triggers(events, since: 0)
       seen = {}
       events.each do |event|
-        next unless event['type'] == 'perception' && event.dig('state', 'game_mode') == PLAY_MODE
+        next unless event['type'] == 'perception' && event['frame'] >= since && event.dig('state', 'game_mode') == PLAY_MODE
 
         state = event['state']
         [state['item_a'], state['item_b'], *Array(state['inventory']).first(Items::SLOTS)].map(&:to_i).reject(&:zero?).each { |id| seen[id] ||= event['frame'] }
       end
-      seen.filter_map { |id, frame| { item: id, name: Items.name(id), frame: } if frame >= since }
+      seen.map { |id, frame| { item: id, name: Items.name(id), frame: } }
     end
 
     def first_frames(events, since)
@@ -113,14 +115,17 @@ module Koholint
       end
     end
 
-    # A cell entered only after a capability changed its object says nothing about that object being walkable.
-    def stood(events)
+    # Cells Link stood on in each place from the frame of its sighting (`from`) on, when the sighting's grid was what lay under him; a cell
+    # entered only after a capability changed its object says nothing about that object being walkable.
+    def stood(events, from:)
       cleared = cleared(events)
       events.each_with_object(Hash.new { |hash, key| hash[key] = Set.new }) do |event, cells|
         next unless event['type'] == 'perception' && event.dig('state', 'game_mode') == PLAY_MODE
 
         state = event['state']
         place = [state['room_id'], state['map_id']]
+        next unless from[place] && event['frame'] >= from[place]
+
         cell = GameState.cell_at(state['x'].to_i, state['y'].to_i) or next
         cells[place] << cell unless cleared[place].include?(cell)
       end
@@ -130,13 +135,14 @@ module Koholint
       events.each_with_object(Hash.new { |hash, key| hash[key] = Set.new }) do |event, cells|
         result = event['result'] if event['type'] == 'action'
         place = result.is_a?(Hash) && Ledger.place_of(result['from']) or next
-        [*Array(result['clears']), (result if result['capability'])].compact.each do |use|
-          next unless use['target'].is_a?(Hash) && use['object_before'] != use['object_after']
-
-          cells[place] << [use['target']['row'].to_i, use['target']['col'].to_i]
-        end
+        uses(result).each { |use| cells[place] << target_of(use) if use['object_before'] != use['object_after'] }
       end
     end
+
+    # The capability uses of a skill result with a target: the skill itself, or the clears of a moving skill.
+    def uses(result) = [*Array(result['clears']), (result if result['capability'])].compact.select { |use| use['target'].is_a?(Hash) }
+
+    def target_of(use) = [use['target']['row'].to_i, use['target']['col'].to_i]
 
     # Cells that stopped Link, per place: a blocked move or edge (the cell ahead of it), the walls an explore found and the target of a
     # capability use whose step into it was blocked.
@@ -148,10 +154,7 @@ module Koholint
           delta = Skills::Composite::DELTAS[edge['direction'].to_s.to_sym] or next
           [edge['row'].to_i + delta[0], edge['col'].to_i + delta[1]]
         end
-        uses = [*Array(result['clears']), (result if result['capability'])].compact
-        faced = uses.filter_map do |use|
-          [use['target']['row'].to_i, use['target']['col'].to_i] if use['target'].is_a?(Hash) && Array(use['steps']).any? { |step| step['skill'] == 'step' && step['stopped_by'] == 'blocked' }
-        end
+        faced = uses(result).filter_map { |use| target_of(use) if Array(use['steps']).any? { |step| step['skill'] == 'step' && step['stopped_by'] == 'blocked' } }
         (ahead + faced + Array(result['walls']).map { |wall| [wall['row'].to_i, wall['col'].to_i] }).each do |row, col|
           cells[place] << [row, col] if row.between?(0, Geometry::ROWS - 1) && col.between?(0, Geometry::COLS - 1)
         end
