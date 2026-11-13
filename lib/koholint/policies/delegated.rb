@@ -51,7 +51,7 @@ module Koholint
       LOCK_BUFFER = 8
       LOCK_SKILLS = %w[walk step goto talk_to explore].freeze
       PATH_SKILLS = %w[goto talk_to explore attack].freeze
-      LOCKED_WAIT = { skill: 'wait', params: { frames: 30 } }.freeze
+      LOCKED_WAIT = { skill: 'wait', params: { frames: 30, until_free: true } }.freeze
       LOCKED_WAIT_LIMIT_FRAMES = 900
       SETTLE_FRAMES = 30
       HEMMED_WAIT_LIMIT = 1800 / HEMMED_WAIT[:params][:frames]

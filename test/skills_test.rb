@@ -72,6 +72,17 @@ class SkillsTest < Minitest::Test
     assert_equal :done, execution.result(state)[:stopped_by]
   end
 
+  def test_a_wait_until_free_ends_the_frame_link_is_released
+    locked = Koholint::GameState.new(frame: 0, room_id: 1, map_id: 0, x: 88, y: 80, hp: 24, dialog_state: 0, game_mode: 0x0B, game_submode: 7,
+                                     milestone: :none, motion_blocked: 2)
+    execution = registry.start('wait', locked, { frames: 30, until_free: true })
+    assert_equal [[]] * 5, drive(execution, Array.new(5) { locked } + Array.new(10) { state })
+    assert_equal [5, :released], execution.result(state).values_at(:frames, :stopped_by)
+    plain = registry.start('wait', locked, { frames: 30 })
+    assert_equal 30, drive(plain, Array.new(5) { locked } + Array.new(40) { state }).size
+    assert_raises(ArgumentError) { registry.validate('wait', { frames: 5, until_free: 'yes' }) }
+  end
+
   def test_press_holds_then_idles
     execution = registry.start('press', state, { button: :a, frames: 3 })
     inputs = drive(execution, Array.new(30) { state })

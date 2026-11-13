@@ -73,7 +73,7 @@ module Koholint
               @objectives.touch(frame: state.frame)
             end
           elsif @locked_since && !state.loading?
-            @settle_until = state.frame + SETTLE_FRAMES if state.phase == :playing && locked_frames(state) >= SETTLE_FRAMES
+            @settle_until = state.frame + [locked_frames(state), SETTLE_FRAMES].min if state.phase == :playing && locked_frames(state).positive?
             @locked_since = nil
             @objectives.touch(frame: state.frame)
           end
@@ -99,7 +99,7 @@ module Koholint
             fallback: false, prompt: nil, image: nil }
         end
 
-        # The sword scene of 242/0 released Link for 3 frames between two locks, so a long lock is trusted over only after a short wait.
+        # Scenes release Link for a few frames between two locks (3 in the sword scene of 242/0, 1 after the owl of 128/0), so a lock is trusted over only after a wait as long as itself, up to SETTLE_FRAMES.
         def settling?(state) = !!@settle_until && state.phase == :playing && state.frame < @settle_until
 
         def settle_wait(state)
