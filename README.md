@@ -1,5 +1,7 @@
 # Koholint
 
+[![CI](https://github.com/kaderate/koholint/actions/workflows/ci.yml/badge.svg)](https://github.com/kaderate/koholint/actions/workflows/ci.yml)
+
 **An autonomous player of *The Legend of Zelda: Link's Awakening DX*: a deterministic engine, LLM agents called only when a decision is needed, and a loop that improves the framework as the game teaches it new things.**
 
 ![Places the agent discovered on Koholint Island](docs/places-montage.png)
@@ -72,11 +74,12 @@ Every command and option (budgets, resume, fork, branch, A/B, censuses, run stor
 ## Tests
 
 ```sh
-rake test:fast   # skips the ROM-heavy files, about 25 s
-rake test        # full suite, about 2 min (the first run builds an emulator state cache in tmp/)
+rake test:fast   # skips the ROM-heavy files, about 35 s
+rake test:ci     # every file with the ROM hidden (ROM tests skip), about 25 s: what CI runs
+rake test        # full suite, about 4 min on a busy Mac (the first run builds an emulator state cache in tmp/)
 ```
 
-`rake test:e2e` adds the tests that play the full boot from frame 0. The suite needs the ROM and emu-gb configured as above. After a boot script or perception change, `bin/generate_start_fixture` regenerates `test/fixtures/start_game.expected.json`, which `test/perception_test.rb` reads.
+GitHub Actions runs `rake test:ci` on every pull request and push to `main`, with emu-gb cloned from `kaderate/gemboy`. The full suite needs the ROM and emu-gb configured as above, and is run locally once before each merge. After a boot script or perception change, `bin/generate_start_fixture` regenerates `test/fixtures/start_game.expected.json`, which `test/perception_test.rb` reads.
 
 ## Project layout
 

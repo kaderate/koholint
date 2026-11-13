@@ -4,7 +4,7 @@ Command reference for running, resuming and forking runs, the offline censuses, 
 
 ## Tests
 
-`rake test` runs one process per file (ROM-heavy files one process per test, about 2 min; the first run builds an emulator state cache in `tmp/`); `rake test:fast` skips the ROM-heavy files (about 25 s); `rake test:e2e` also plays the full boot from frame 0. `bin/generate_start_fixture` regenerates `test/fixtures/start_game.expected.json` (read by `test/perception_test.rb`) after a boot script or perception change.
+`rake test` runs one process per file (ROM-heavy files one process per test, about 4 min on a busy Mac; the first run builds an emulator state cache in `tmp/`); `rake test:fast` skips the ROM-heavy files (about 35 s); `rake test:ci` runs every file with the ROM hidden, so ROM tests skip (about 25 s): GitHub Actions runs it on every pull request and push to `main`, with emu-gb cloned from `kaderate/gemboy`. `bin/generate_start_fixture` regenerates `test/fixtures/start_game.expected.json` (read by `test/perception_test.rb`) after a boot script or perception change.
 
 ## Running
 
@@ -139,7 +139,7 @@ under the runs root (`[A-Za-z0-9_.-]`, no leading dot, no `..`); anything else i
 
 ## Run storage
 
-Every finished run is kept in git as a light bundle under `runs/<id>/` (about 60 KB): `manifest.json` (with `tag`,
+Every finished run is kept in git as a light bundle under `runs/<id>/` (tens to a few hundred KB): `manifest.json` (with `tag`,
 `harness_sha`, `prompts_sha`, `model`), `inputs.log`, `trace.jsonl.gz`, `world.json`, `suggestions.md`, `summary.json`
 (written by the engine at every stop), `star.json` when starred and `notes.md` when the owner wrote notes in the viewer, and `screens/<room>-<map>.png` (one 160x144 screenshot per place, about 3-8 KB each, taken by the engine 20 frames after the place became playable and ready). `bin/koholint screens <run_dir>` writes the missing ones for an older run by replaying its journal from boot (about one minute per 6000 frames; idempotent). `prune-heavy` keeps `screens/`. `summary.json` (`v: 3`) also holds `cost_by_skill`
 (model calls and dollars per skill), `decisions_by_agent` (free decisions included) and `usage` (goal changes, leads
