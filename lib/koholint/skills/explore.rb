@@ -46,6 +46,9 @@ module Koholint
         def planner_for(_context) = @shared
 
         def clearing_for(_context) = @shared_clearing
+
+        # Explore reroutes a blocked leg itself (it blocks the edge and picks the next target), so the leg reports the block at once.
+        def reroute(_state) = nil
       end
 
       class Run < Execution

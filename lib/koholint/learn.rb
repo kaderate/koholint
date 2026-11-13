@@ -6,10 +6,14 @@ require 'koholint/engine'
 require 'koholint/entities'
 require 'koholint/game_state'
 require 'koholint/items'
+require 'koholint/ledger'
+require 'koholint/navigation/planner'
 require 'koholint/replay'
 require 'koholint/run'
 require 'koholint/skills/registry'
 require 'koholint/trace'
+require 'koholint/vision/capabilities'
+require 'koholint/vision/world'
 
 module Koholint
   # Offline capability learning: an item first held in a run suggests using it facing the uncatalogued objects seen after the gain;
@@ -32,7 +36,8 @@ module Koholint
     class Trial
       attr_reader :before, :after, :outcome
 
-      def initialize(registry:, choice:, target:, budget:)
+      def initialize(registry:, choice:, target:, budget:, ledger: nil)
+        @ledger = ledger
         @point = DecisionPoint.choose_skill(registry)
         @choice = choice
         @target = target
@@ -41,7 +46,10 @@ module Koholint
 
       def decision_point_for(_state) = @point
 
-      def prepare(context) = @room_objects ||= context[:room_objects]
+      def prepare(context)
+        context[:ledger] ||= @ledger if @ledger
+        @room_objects ||= context[:room_objects]
+      end
 
       def decide(_decision_point, _state, context)
         prepare(context)
@@ -66,12 +74,13 @@ module Koholint
       events = Trace.read(File.join(run.dir, 'trace.jsonl'))
       entries = Capabilities.load(path)
       blocked = lineage_blocks(run)
+      walls = walls(entries)
       triggers(events, since: run.manifest.dig('parent', 'frame').to_i).each do |gain|
-        sightings = sightings(run, first_frames(events, gain[:frame]))
+        sightings = sightings(run, first_frames(events, gain[:frame]), events)
         candidates(gain:, sightings:, stood: stood(events), blocked:, known: entries, limit:, object:).each do |candidate|
           entry = known(entries, gain[:item], candidate[:object]) || hypothesis(gain:, object: candidate[:object], run: run.id, selected: !object.nil?)
           out.puts "#{entry['id']}: #{candidate[:blocks]} blocks in the lineage, #{candidate[:places].size} places"
-          evidence = entry['evidence'] + try(run, entry, candidate[:places], root:, out:)
+          evidence = entry['evidence'] + try(run, entry, candidate[:places], root:, out:, walls:)
           status = judge(evidence)
           entries = entries.reject { |other| other['id'] == entry['id'] } + [Capabilities.transition(entry, status, verdict(evidence, status), evidence:)]
           Capabilities.write(entries, path)
@@ -164,8 +173,34 @@ module Koholint
       end
     end
 
-    def sightings(run, firsts)
-      firsts.to_h { |place, first| [place, first.merge(grid: Entities.room_objects(Replay.to(run, first[:frame])))] }
+    def sightings(run, firsts, events)
+      firsts.to_h do |place, first|
+        walk = Vision::World.from_events(events, at_frame: first[:frame]).grid_for(place, Vision::Capabilities.new)
+        [place, first.merge(grid: Entities.room_objects(Replay.to(run, first[:frame])), walk:)]
+      end
+    end
+
+    # Edges that stopped the walk to a standing cell in earlier trials, per place.
+    def walls(entries)
+      walls = Hash.new { |hash, place| hash[place] = Set.new }
+      entries.each { |entry| entry['evidence'].each { |trial| walls[trial['place']] << trial['blocked_at'] if trial['blocked_at'] } }
+      walls
+    end
+
+    # Known walls as doubtful edges, so the trial's goto plans around them like a run that was blocked there twice.
+    def ledger(place, walls)
+      ledger = Ledger.new
+      walls.each { |row, col, direction| Ledger::DOUBT_AT.times { ledger.record(place:, blocked_at: { row:, col:, direction: }) } }
+      ledger
+    end
+
+    # The planner goto uses, over the place's grid at the sighting, finds a way from the arrival that avoids the known walls.
+    def reachable?(sighting, stand, walls)
+      return true unless sighting[:walk] && sighting[:arrival]
+
+      planner = Navigation::Planner.new(grid: sighting[:walk], ledger: nil, place: sighting[:place])
+      walls[sighting[:place]].each { |row, col, direction| planner.avoid([row, col], direction.to_sym) }
+      !planner.path(from: sighting[:arrival], to: stand).nil?
     end
 
     # Uncatalogued object ids Link never stood on, the ones that stopped him most often first, then the most widespread; an (item, object)
@@ -176,7 +211,7 @@ module Koholint
       sightings.each do |place, sighting|
         cells = Hash.new { |hash, key| hash[key] = [] }
         sighting[:grid].each_with_index { |row, r| row.each_with_index { |id, c| cells[id] << [r, c] } }
-        cells.each { |id, at| places[id] << { place:, frame: sighting[:frame], arrival: sighting[:arrival], grid: sighting[:grid], cells: at } }
+        cells.each { |id, at| places[id] << { place:, frame: sighting[:frame], arrival: sighting[:arrival], grid: sighting[:grid], walk: sighting[:walk], cells: at } }
       end
       catalogued = Entities.object_catalogue.keys
       ids = places.keys.reject do |id|
@@ -207,8 +242,8 @@ module Koholint
     end
 
     # Per place (up to PLACES) and target cell (up to CELLS, nearest the arrival first), standing sides nearest first until one is reached;
-    # a (place, cell, stand) already in the entry's evidence is never tried again.
-    def try(run, entry, places, root:, out:)
+    # a (place, cell, stand) already in the entry's evidence is never tried again, nor one the planner cannot reach past the known walls.
+    def try(run, entry, places, root:, out:, walls: Hash.new { |hash, place| hash[place] = Set.new })
       done = tried(entry)
       reached = Set.new
       evidence = []
@@ -216,7 +251,13 @@ module Koholint
         next if done.include?([sighting[:place], cell, stand]) || reached.include?([sighting[:place], cell])
         break if evidence.count { |trial| trial['outcome'] != 'unreached' } >= TRIALS
 
-        trial = trial(run, entry, sighting, cell, stand, direction, root:)
+        unless reachable?(sighting, stand, walls)
+          out.puts "  #{sighting[:place].join('-')} #{cell.inspect} from #{stand.inspect} #{direction}: skipped, no path"
+          next
+        end
+
+        trial = trial(run, entry, sighting, cell, stand, direction, root:, walls: walls[sighting[:place]])
+        walls[sighting[:place]] << trial['blocked_at'] if trial['blocked_at']
         out.puts "  #{sighting[:place].join('-')} #{cell.inspect} from #{stand.inspect} #{direction}: #{trial['outcome']}"
         evidence << trial
         reached << [sighting[:place], cell] unless trial['outcome'] == 'unreached'
@@ -242,12 +283,13 @@ module Koholint
       items.sort_by { |item| key.(item).zip(from).sum { |a, b| (a - b).abs } }
     end
 
-    def trial(run, entry, sighting, cell, stand, direction, root:)
+    def trial(run, entry, sighting, cell, stand, direction, root:, walls: [])
       composite = Skills::Composite.new(entry)
       registry = Skills::Registry.default(extra: [composite])
       budget = Budget.new(frames: composite.max_frames + Engine::NOT_READY_STUCK_FRAMES)
       child = run.fork(at_frame: sighting[:frame], flow_version: FLOW_VERSION, root:, tag: "learn-#{entry['id']}")
-      policy = Trial.new(registry:, choice: { skill: composite.name, params: { row: stand[0], col: stand[1], direction: direction.to_s } }, target: cell, budget:)
+      policy = Trial.new(registry:, choice: { skill: composite.name, params: { row: stand[0], col: stand[1], direction: direction.to_s } }, target: cell, budget:,
+                         ledger: ledger(sighting[:place], walls))
       Engine.resume(child.dir, policy:, budget:, grid: true).run
       outcome(policy, entry).merge('run' => child.id, 'parent' => run.id, 'frame' => sighting[:frame], 'place' => sighting[:place],
                                    'cell' => cell, 'stand' => stand, 'direction' => direction.to_s)
@@ -262,7 +304,9 @@ module Koholint
               elsif result[:effect] && policy.before == object && policy.after != object then 'success'
               else 'failure'
               end
-      { 'outcome' => label, 'steps' => steps, 'before' => policy.before, 'after' => policy.after, 'frames' => result[:frames].to_i }
+      wall = Array(result[:steps]).first&.dig(:blocked_at) if label == 'unreached'
+      { 'outcome' => label, 'steps' => steps, 'before' => policy.before, 'after' => policy.after, 'frames' => result[:frames].to_i,
+        'blocked_at' => wall && wall.values_at(:row, :col, :direction).then { |row, col, direction| [row, col, direction.to_s] } }.compact
     end
 
     def judge(evidence)

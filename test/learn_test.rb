@@ -73,7 +73,7 @@ class LearnTest < Minitest::Test
     assert_equal [37], L.candidates(gain:, sightings:, stood:, known: [entry.(all)]).map { |c| c[:object] }
     calls = []
     original = L.method(:trial)
-    L.define_singleton_method(:trial) do |_run, _entry, sighting, cell, stand, _direction, root:|
+    L.define_singleton_method(:trial) do |_run, _entry, sighting, cell, stand, _direction, root:, walls:|
       calls << [sighting[:place], cell, stand]
       { 'outcome' => 'failure', 'place' => sighting[:place], 'cell' => cell, 'stand' => stand }
     end
@@ -132,6 +132,27 @@ class LearnTest < Minitest::Test
     assert_equal 'not_solid', L.outcome(Policy.new({ steps: steps.(:done, :done), effect: false }, 92, 92), entry)['outcome']
     assert_equal 'unreached', L.outcome(Policy.new({ steps: steps.(:no_path), effect: false }, 92, 92), entry)['outcome']
     assert_equal 'unreached', L.outcome(Policy.new(nil, nil, nil), entry)['outcome']
+    stopped = { steps: [{ stopped_by: :blocked, blocked_at: { row: 5, col: 8, direction: :up } }], effect: false }
+    assert_equal [5, 8, 'up'], L.outcome(Policy.new(stopped, 92, 92), entry)['blocked_at']
+    refute L.outcome(Policy.new(good, 92, 4), entry).key?('blocked_at')
+  end
+
+  # Open except column 5, which only row 0 crosses.
+  class Walk
+    def static_sprite(_row, _col) = nil
+    def passable(row, col, _direction) = col == 5 && row.positive? ? :no : :yes
+  end
+
+  def test_a_stand_the_planner_cannot_reach_past_known_walls_is_skipped_without_a_trial
+    sighting = { place: [224, 0], frame: 120, arrival: [4, 2], grid: grid(at: { [4, 8] => 92 }), walk: Walk.new, cells: [[4, 8]] }
+    walls = L.walls([{ 'evidence' => [{ 'place' => [224, 0], 'blocked_at' => [0, 5, 'right'] }] }])
+    assert L.reachable?(sighting, [4, 7], Hash.new { |hash, place| hash[place] = Set.new })
+    refute L.reachable?(sighting, [4, 7], walls)
+    assert L.reachable?(sighting, [4, 3], walls)
+    out = StringIO.new
+    entry = L.hypothesis(gain:, object: 92, run: '20261112-103604-0c64')
+    assert_empty L.try(nil, entry, [sighting], root: nil, out:, walls: L.walls([{ 'evidence' => [{ 'place' => [224, 0], 'blocked_at' => [0, 5, 'right'] }] }]))
+    assert_equal 4, out.string.scan('skipped, no path').size
   end
 
   def test_the_trial_policy_reads_the_cell_around_one_action_and_stops
@@ -147,5 +168,10 @@ class LearnTest < Minitest::Test
     policy.after_action(choice: answer[:choice], outcome: { stopped_by: :done }, state: nil, frame: 1)
     assert_equal [92, 4], [policy.before, policy.after]
     assert_equal :trial_done, budget.exhausted
+    ledger = L.ledger([224, 0], [[5, 8, 'up']])
+    assert ledger.doubtful?([224, 0], [5, 8], :up)
+    context = { room_objects: -> { cells } }
+    L::Trial.new(registry:, choice: answer[:choice], target: [6, 5], budget:, ledger:).prepare(context)
+    assert_same ledger, context[:ledger]
   end
 end
