@@ -4,6 +4,12 @@ require 'koholint/game_state'
 class GameStateTest < Minitest::Test
   def state(**fields) = Koholint::GameState.new(milestone: :none, **fields)
 
+  def test_health_is_hp_less_the_damage_still_to_drain
+    assert_equal 20, state(hp: 24, pending_damage: 4).health
+    assert_equal 20, state(hp: 22, pending_damage: 2).health
+    assert_equal 24, state(hp: 24).health
+  end
+
   def test_controllable_needs_hp_and_a_position
     assert state(hp: 24, x: 80).controllable?
     refute state(hp: 0, x: 80).controllable?
