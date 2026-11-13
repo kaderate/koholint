@@ -124,6 +124,13 @@ class AttackTest < Minitest::Test
     assert_equal :no_target, person[:stopped_by]
   end
 
+  def test_strikes_a_creature_but_never_a_thing_of_another_kind
+    creature, = fight([4, 6], [enemy(4, 6, type: 45).merge(kind: :creature)])
+    assert_equal [:done, true], creature.values_at(:stopped_by, :killed)
+    object, = fight([4, 6], [enemy(4, 6, type: 99).merge(kind: :object)])
+    assert_equal :no_target, object[:stopped_by]
+  end
+
   def test_backs_off_when_closer_than_the_enemy_contact_before_striking
     near = enemy(4, 6)
     near[:x] -= 6

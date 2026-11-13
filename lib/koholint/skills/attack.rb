@@ -53,9 +53,9 @@ module Koholint
 
         # An unidentified thing the agent names is a target too: new places bring types no census has seen yet.
         def enemy_near(cell)
-          targets = Array(@entities&.call).select { |entity| entity[:cell] && entity[:kind].to_s != 'npc' }
-          enemies, others = targets.partition { |entity| entity[:kind].to_s == 'enemy' }
-          (Entities.near(enemies, cell) || Entities.near(others, cell))&.slice(:slot, :type, :x, :y, :cell, :status, :health, :contact)
+          seen = Array(@entities&.call).select { |entity| entity[:cell] }
+          enemies = seen.select { |entity| entity[:kind].to_s == 'enemy' }
+          (Entities.near(enemies, cell) || Entities.near(seen.select { |entity| Entities.creature?(entity) }, cell))&.slice(:slot, :type, :x, :y, :cell, :status, :health, :contact)
         end
 
         def danger_of(context)
