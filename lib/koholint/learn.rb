@@ -79,8 +79,7 @@ module Koholint
       walls = walls(entries)
       triggers(events, since: run.manifest.dig('parent', 'frame').to_i).each do |gain|
         sightings = sightings(run, first_frames(events, gain[:frame]), events)
-        stood = stood(events, from: sightings.transform_values { |sighting| sighting[:frame] })
-        candidates(gain:, sightings:, stood:, blocked:, known: entries, limit:, object:).each do |candidate|
+        candidates(gain:, sightings:, stood: stood_since(events, sightings), blocked:, known: entries, limit:, object:).each do |candidate|
           entry = known(entries, gain[:item], candidate[:object]) || hypothesis(gain:, object: candidate[:object], run: run.id, selected: !object.nil?)
           out.puts "#{entry['id']}: #{candidate[:blocks]} blocks in the lineage, #{candidate[:places].size} places"
           evidence = entry['evidence'] + try(run, entry, candidate[:places], root:, out:, walls:)
@@ -93,17 +92,20 @@ module Koholint
       0
     end
 
-    # Items held from the run's own first frame on, read from perceptions: a fork also learns from an item its parent gained, over the
-    # places it sees after its fork frame.
+    # Items held from the run's own first frame on (`frame`), with the frame each was first held in the trace (`gained`, an ancestor's for a fork).
     def triggers(events, since: 0)
-      seen = {}
+      first = {}
+      held = {}
       events.each do |event|
-        next unless event['type'] == 'perception' && event['frame'] >= since && event.dig('state', 'game_mode') == PLAY_MODE
+        next unless event['type'] == 'perception' && event.dig('state', 'game_mode') == PLAY_MODE
 
         state = event['state']
-        [state['item_a'], state['item_b'], *Array(state['inventory']).first(Items::SLOTS)].map(&:to_i).reject(&:zero?).each { |id| seen[id] ||= event['frame'] }
+        [state['item_a'], state['item_b'], *Array(state['inventory']).first(Items::SLOTS)].map(&:to_i).reject(&:zero?).each do |id|
+          first[id] ||= event['frame']
+          held[id] ||= event['frame'] if event['frame'] >= since
+        end
       end
-      seen.map { |id, frame| { item: id, name: Items.name(id), frame: } }
+      held.map { |id, frame| { item: id, name: Items.name(id), frame:, gained: first[id] } }
     end
 
     def first_frames(events, since)
@@ -115,8 +117,9 @@ module Koholint
       end
     end
 
-    # Cells Link stood on in each place from the frame of its sighting (`from`) on, when the sighting's grid was what lay under him; a cell
-    # entered only after a capability changed its object says nothing about that object being walkable.
+    def stood_since(events, sightings) = stood(events, from: sightings.transform_values { |sighting| sighting[:frame] })
+
+    # Stands from each place's sighting frame on (a proxy for the sighting's grid lying under Link), minus cells a capability changed.
     def stood(events, from:)
       cleared = cleared(events)
       events.each_with_object(Hash.new { |hash, key| hash[key] = Set.new }) do |event, cells|
@@ -252,11 +255,14 @@ module Koholint
     def hypothesis(gain:, object:, run:, selected: false)
       item = Items.name(gain[:item]).to_s.delete('?').strip
       slug = item.downcase.gsub(/[^a-z0-9]+/, '_').gsub(/\A_|_\z/, '')
+      gained = gain.fetch(:gained, gain[:frame])
+      held = gain[:frame] if gained < gain[:frame]
+      origin = held ? "first held at frame #{gained} of the lineage and held from the fork frame #{held} of run #{run}" : "gained at frame #{gained} of run #{run}"
       { 'id' => "#{slug.tr('_', '-')}-on-object-#{object}", 'name' => "#{slug}_on_object_#{object}", 'version' => 1, 'status' => 'hypothesis',
-        'trigger' => { 'run' => run, 'frame' => gain[:frame], 'item' => gain[:item] }, 'target' => { 'object' => object },
+        'trigger' => { 'run' => run, 'frame' => gained, 'item' => gain[:item], **(held ? { 'held_from' => held } : {}) }, 'target' => { 'object' => object },
         'steps' => steps(item), 'effect' => EFFECT, 'evidence' => [],
-        'source' => "koholint learn: item #{gain[:item]} gained at frame #{gain[:frame]} of run #{run}; object #{object} seen after it and never stood on#{'; the object id was selected by --object (manual override of the ranking)' if selected}",
-        'history' => [{ 'version' => 1, 'status' => 'hypothesis', 'reason' => "item #{gain[:item]} gained in run #{run}" }] }
+        'source' => "koholint learn: item #{gain[:item]} #{origin}; object #{object} seen after it and never stood on#{'; the object id was selected by --object (manual override of the ranking)' if selected}",
+        'history' => [{ 'version' => 1, 'status' => 'hypothesis', 'reason' => "item #{gain[:item]} #{held ? "held from the fork frame of run #{run}" : "gained in run #{run}"}" }] }
     end
 
     def steps(item)

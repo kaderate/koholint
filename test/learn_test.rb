@@ -30,9 +30,13 @@ class LearnTest < Minitest::Test
   def test_triggers_and_first_frames_after_the_gain
     held = ->(event, a) { event.tap { |e| e['state'].merge!('item_a' => a, 'item_b' => 4, 'inventory' => [0] * 10) } }
     events = [held.(perception(50, 224, 72, 66), 0), held.(perception(120, 224, 72, 66), 1), perception(130, 224, 88, 66), perception(300, 209, 40, 40)]
-    assert_equal [{ item: 1, name: 'sword', frame: 120 }, { item: 4, name: 'shield', frame: 120 }], L.triggers(events, since: 100),
-                 'a fork also learns from the items held at its first frame, from that frame'
-    assert_equal [{ item: 4, name: 'shield', frame: 50 }, { item: 1, name: 'sword', frame: 120 }], L.triggers(events)
+    assert_equal [{ item: 1, name: 'sword', frame: 120, gained: 120 }, { item: 4, name: 'shield', frame: 120, gained: 50 }], L.triggers(events, since: 100),
+                 'a fork also learns from the items held at its first frame, keeping the frame they were first held'
+    assert_equal [{ item: 4, name: 'shield', frame: 50, gained: 50 }, { item: 1, name: 'sword', frame: 120, gained: 120 }], L.triggers(events)
+    inherited = L.hypothesis(gain: { item: 1, name: 'sword', frame: 75_334, gained: 64_774 }, object: 92, run: '20261113-213856-0b19')
+    assert_equal({ 'run' => '20261113-213856-0b19', 'frame' => 64_774, 'item' => 1, 'held_from' => 75_334 }, inherited['trigger'])
+    assert_includes inherited['source'], 'first held at frame 64774 of the lineage and held from the fork frame 75334 of run 20261113-213856-0b19'
+    assert_equal({ 'run' => 'r', 'frame' => 100, 'item' => 1 }, L.hypothesis(gain:, object: 92, run: 'r')['trigger'])
     firsts = L.first_frames(events, 120)
     assert_equal({ frame: 120, arrival: Koholint::GameState.cell_at(72, 66) }, firsts[[224, 0]])
     assert_equal 300, firsts[[209, 0]][:frame]
@@ -67,6 +71,14 @@ class LearnTest < Minitest::Test
     stood = L.stood([explore, perception(10, 225, x, y), perception(20, 224, x, y)], from: { [225, 0] => 0, [224, 0] => 0 })
     assert_empty stood[[225, 0]]
     assert_equal Set[[1, 6]], stood[[224, 0]]
+  end
+
+  def test_stands_count_from_each_sighting_frame_on_including_the_arrival_cell_at_that_frame
+    arrival = Koholint::Geometry.center_of(4, 4)
+    early = Koholint::Geometry.center_of(6, 5)
+    stood = L.stood_since([perception(119, 224, *early), perception(120, 224, *arrival), perception(299, 209, *early)], sightings)
+    assert_equal Set[[4, 4]], stood[[224, 0]]
+    assert_empty stood[[209, 0]]
   end
 
   def test_a_stand_before_the_sighting_of_its_place_is_not_evidence
