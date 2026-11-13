@@ -85,6 +85,8 @@ module Koholint
           @new_walls = []
           @cells_walked = 0
           @stuck = 0
+          @still = 0
+          @position = nil
           @fruitless = 0
           @found = false
           @legs = 0
@@ -116,10 +118,13 @@ module Koholint
 
         def input_for(state)
           return finish(@idle) if @idle
+
+          @still = [state.x, state.y] == @position ? @still + 1 : 0
+          @position = [state.x, state.y]
           return @clearing.step(state) if @clearing&.active? && !@leg
           return depart(state) if room(state) != @place
           return harmed if state.hp.to_i < @start.hp.to_i
-          return interrupted if state.dialog_open?
+          return interrupted(state) if state.dialog_open?
           return entering if walking_in?(state)
 
           @locked = state.locked? ? @locked + 1 : 0
@@ -146,10 +151,20 @@ module Koholint
           []
         end
 
-        # A dialogue the game opens by itself mid-walk (a rock too heavy to push) bars the edge Link pushed, so the survey's pending work leaves it out.
-        def interrupted
-          block({ row: @cell[0], col: @cell[1], direction: @heading }) if (@leg || @outward) && @cell && @heading
+        # A dialogue that opens as Link stops flush against his cell's edge (a rock too heavy to push) bars that edge, so the survey's pending
+        # work leaves it out; one that opens anywhere else (a call-out, a scene, a talking door, a cell just crossed) bars nothing.
+        def interrupted(state)
+          block({ row: @cell[0], col: @cell[1], direction: @heading }) if pushing?(state)
           stop_now(:dialogue)
+        end
+
+        def pushing?(state)
+          return false unless (@leg || @outward) && @heading && @cell && state.cell == @cell && @still.positive?
+
+          dx, dy = Geometry.offset(state.x, state.y, @cell)
+          footprint = Geometry.fact(:link_footprint)
+          band = footprint['row_band']
+          { right: dx >= footprint['width'] / 2, left: dx <= -footprint['width'] / 2, down: dy >= band['max_offset'], up: dy <= band['min_offset'] }.fetch(@heading)
         end
 
         def harmed

@@ -15,8 +15,8 @@ The skills, protocols and harness behaviours the agent works with. Versioned wit
   `new_place`, `known_place` (a return to a place already seen), `dialogue`, `untried_object` (once per thing never talked to within 3 cells), `blocked`, `stalled` (3
   attempts in a row walked no new cell), `no_frontier` (with the exits already tried), `locked`, `damage` or `budget` (600 frames). What it walked, the walls it found, the
   exits it tried and the things it offered are kept per place and rebuilt from the trace on resume. flow-56: a dialogue the game opens by
-  itself during a leg or step (a rock too heavy to push) bars the edge Link pushed for the rest of the call (in `blocked_edges`), so
-  the place's `pending` work leaves out what lies only behind it.
+  itself while Link stands flush against his cell's edge during a leg or step (a rock too heavy to push) bars that edge for the rest of
+  the call (in `blocked_edges`), so the place's `pending` work leaves out what lies only behind it; elsewhere it bars nothing.
 - `goto row col` walks to a cell of the known grid by a shortest path with the fewest turns (stops `done`, `blocked`,
   `no_path`, ...; a result carries `blocked_at` when a move hit a wall; flow-51: a wall the grid believed open is avoided and the path planned again, up to 3 times, and the edges gone around are listed in `avoided`; flow-54: first it centres exactly and tries the edge once more, for stairs and narrow gaps; talk_to, attack and explore walk the same way); `step direction pixels` moves a few pixels;
   `talk_to row col` walks next to a person, faces them and presses A, trying other sides on no response; the person is
