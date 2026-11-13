@@ -154,6 +154,8 @@ class LearnTest < Minitest::Test
     assert_equal 'validated', L.judge([trial('success', [224, 0]), trial('failure', [224, 0]), trial('success', [209, 0])])
     assert_equal 'inconclusive', L.judge([trial('success', [224, 0]), trial('success', [224, 0])])
     assert_equal 'rejected', L.judge([trial('failure', [224, 0]), trial('not_solid', [224, 0]), trial('failure', [209, 0]), trial('failure', [209, 0])])
+    assert_equal 'inconclusive', L.judge([trial('dialogue', [224, 0]), trial('dialogue', [224, 0]), trial('dialogue', [209, 0]), trial('dialogue', [209, 0])])
+    assert_equal 'inconclusive', L.judge([trial('dialogue', [224, 0]), trial('failure', [224, 0]), trial('failure', [209, 0]), trial('failure', [209, 0])])
     assert_equal 'inconclusive', L.judge([trial('failure', [224, 0])] * 4)
     assert_equal 'inconclusive', L.judge([trial('unreached', [224, 0]), trial('unreached', [209, 0])] * 3)
   end
@@ -168,6 +170,7 @@ class LearnTest < Minitest::Test
     assert_equal 'failure', L.outcome(Policy.new(good, 92, 92), entry)['outcome']
     assert_equal 'failure', L.outcome(Policy.new(good.merge(effect: false), 92, 4), entry)['outcome']
     assert_equal 'not_solid', L.outcome(Policy.new({ steps: steps.(:done, :done), effect: false }, 92, 92), entry)['outcome']
+    assert_equal 'dialogue', L.outcome(Policy.new({ steps: steps.(:done, :dialogue), effect: false }, 32, 32), entry)['outcome']
     assert_equal 'unreached', L.outcome(Policy.new({ steps: steps.(:no_path), effect: false }, 92, 92), entry)['outcome']
     assert_equal 'unreached', L.outcome(Policy.new(nil, nil, nil), entry)['outcome']
     stopped = { steps: [{ stopped_by: :blocked, blocked_at: { row: 5, col: 8, direction: :up }, avoided: [{ row: 6, col: 8, direction: :right }] }], effect: false }

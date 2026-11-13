@@ -24,6 +24,7 @@ module Koholint
     CELLS = 2
     TRIALS = 12
     REACHED_TO_REJECT = 4
+    UNCOUNTED = %w[unreached dialogue].freeze
     SETTLE_FRAMES = 20
     # A blocked walk recentres Link and turns him away from the obstacle; a blocked step leaves him facing it.
     FACE_PIXELS = 16
@@ -281,7 +282,7 @@ module Koholint
       evidence = []
       triples(places).each do |sighting, cell, stand, direction|
         next if done.include?([sighting[:place], cell, stand]) || reached.include?([sighting[:place], cell])
-        break if evidence.count { |trial| trial['outcome'] != 'unreached' } >= TRIALS
+        break if evidence.count { |trial| !UNCOUNTED.include?(trial['outcome']) } >= TRIALS
 
         unless reachable?(sighting, stand, walls)
           out.puts "  #{sighting[:place].join('-')} #{cell.inspect} from #{stand.inspect} #{direction}: skipped, no path"
@@ -332,6 +333,7 @@ module Koholint
       steps = Array(result[:steps]).map { |step| step[:stopped_by].to_s }
       object = entry['target']['object']
       label = if steps.first != 'done' then 'unreached'
+              elsif steps[1] == 'dialogue' then 'dialogue'
               elsif steps[1] != 'blocked' then 'not_solid'
               elsif result[:effect] && policy.before == object && policy.after != object then 'success'
               else 'failure'
@@ -342,7 +344,7 @@ module Koholint
     end
 
     def judge(evidence)
-      reached = evidence.reject { |trial| trial['outcome'] == 'unreached' }
+      reached = evidence.reject { |trial| UNCOUNTED.include?(trial['outcome']) }
       successes = reached.select { |trial| trial['outcome'] == 'success' }
       return 'validated' if successes.map { |trial| trial['place'] }.uniq.size >= Capabilities::PLACES_TO_VALIDATE
       return 'rejected' if successes.empty? && reached.size >= REACHED_TO_REJECT && reached.map { |trial| trial['place'] }.uniq.size >= 2
