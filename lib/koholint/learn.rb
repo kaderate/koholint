@@ -332,6 +332,7 @@ module Koholint
       steps = Array(result[:steps]).map { |step| step[:stopped_by].to_s }
       object = entry['target']['object']
       label = if steps.first != 'done' then 'unreached'
+              elsif steps[1] == 'dialogue' then 'dialogue'
               elsif steps[1] != 'blocked' then 'not_solid'
               elsif result[:effect] && policy.before == object && policy.after != object then 'success'
               else 'failure'
@@ -342,7 +343,7 @@ module Koholint
     end
 
     def judge(evidence)
-      reached = evidence.reject { |trial| trial['outcome'] == 'unreached' }
+      reached = evidence.reject { |trial| %w[unreached dialogue].include?(trial['outcome']) }
       successes = reached.select { |trial| trial['outcome'] == 'success' }
       return 'validated' if successes.map { |trial| trial['place'] }.uniq.size >= Capabilities::PLACES_TO_VALIDATE
       return 'rejected' if successes.empty? && reached.size >= REACHED_TO_REJECT && reached.map { |trial| trial['place'] }.uniq.size >= 2
