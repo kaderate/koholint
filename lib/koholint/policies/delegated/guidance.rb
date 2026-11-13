@@ -88,22 +88,30 @@ module Koholint
           end
         end
 
-        # A detected loop drops the current objective and explores toward the nearest place with untried work, once per detection.
+        # A detected loop drops the current objective, once per detection, and explores toward the nearest place with untried work,
+        # or, when no place has any, goes to the reachable place entered least outside the loop.
         def loop_break(decision_point, state, context)
           hint = @loop_watch.pending_hint
           return if hint.nil? || @sequence || !%i[choose_skill choose_objective].include?(decision_point.name)
 
           place = [state.room_id, state.map_id]
           route = @explore_log.route(place)
-          return unless route || @explore_log.untried?(place)
+          unless route || @explore_log.untried?(place)
+            away = @explore_log.least_visited(place, avoid: hint[:places].map { |at| at.split('-').map(&:to_i) }) or return
+          end
 
           @loop_watch.act!
           @objectives.abandon(frame: state.frame, reason: 'loop')
-          @objectives.start(frame: state.frame, **AUTO_OBJECTIVE, autopilot: true)
+          objective = away ? { title: "Leave the loop for #{away[:goal].join('-')}, the reachable place entered least", predicate: { kind: 'reach_place', place: away[:goal] } } : AUTO_OBJECTIVE
+          @objectives.start(frame: state.frame, **objective, target: ({ kind: 'place', place: away[:goal] } if away), autopilot: true)
           @autopilot&.adopt(@objectives.current)
-          context[:aim] = { place: route[:goal] } if route
-          choice = decision_point.name == :choose_objective ? AUTO_OBJECTIVE.dup : EXPLORE
-          { choice:, justification: "#{LoopWatch::BREAK} #{hint[:places].join(', ')}: explore #{route ? "toward #{route[:goal].join('-')}" : 'here'}, the nearest place with untried work",
+          goal = (route || away)&.dig(:goal)
+          context[:aim] = { place: goal } if goal
+          choice = decision_point.name == :choose_objective ? objective.dup : EXPLORE
+          what = if away then "no place has untried work: explore toward #{goal.join('-')}, the reachable place entered least"
+                 else "explore #{route ? "toward #{goal.join('-')}" : 'here'}, the nearest place with untried work"
+                 end
+          { choice:, justification: "#{LoopWatch::BREAK} #{hint[:places].join(', ')}: #{what}",
             confidence: 1.0, agent: 'delegated', latency_ms: 0, cost_usd: 0.0, fallback: false, autopilot: true, prompt: nil, image: nil }
         end
 
