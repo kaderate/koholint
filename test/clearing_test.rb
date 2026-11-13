@@ -53,6 +53,15 @@ class ClearingTest < Minitest::Test
     assert_nil clearing.start(state, :down)
   end
 
+  def test_a_use_records_the_tile_it_cleared
+    row, col = state.cell
+    grid = Struct.new(:look) { def appearance(_row, _col) = look }.new('5ba789e1')
+    clearing = Koholint::Skills::Clearing.of({ registry: StubRegistry.new([composite]), room_objects: objects([row + 1, col]), held: [1], grid: })
+    clearing.start(state, :down)
+    clearing.step(state)
+    assert_equal ['5ba789e1'], clearing.uses.map { |use| use[:look] }
+  end
+
   def test_a_composite_never_clears_from_its_own_steps
     registry = StubRegistry.new([composite])
     context = { registry:, room_objects: objects([1, 1]), held: [1] }

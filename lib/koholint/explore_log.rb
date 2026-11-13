@@ -10,6 +10,7 @@ module Koholint
     def self.from_events(events)
       log = new
       events.each do |event|
+        log.screen(event['place'], event['grid']) if event['type'] == 'screen'
         next unless Ledger.pick(event, :type).to_s == 'action'
 
         result = Ledger.pick(event, :result)
@@ -34,6 +35,13 @@ module Koholint
       @doubted = {}
       @visits = Hash.new(0)
       @failed = Hash.new { |hash, key| hash[key] = [] }
+      @screens = {}
+      @looks = {}
+      @cleared_here = []
+    end
+
+    def screen(place, grid)
+      @screens[place] = grid if place.is_a?(Array) && grid.is_a?(Array)
     end
 
     def absorb(result)
@@ -43,6 +51,7 @@ module Koholint
       know(place)
       survey = Ledger.pick(result, :survey)
       keep(place, parse_survey(survey).merge(provisional: provisional?(result))) if survey.is_a?(Hash)
+      @cleared_here << place if (Ledger.pick(survey || {}, :clearing) || Ledger.pick(result, :clears)) && !@cleared_here.include?(place)
       note_pocket(place, result)
       Array(Ledger.pick(result, :exits)).each { |exit| take_exit(place, exit) }
       drop_unreachable(place, result) if Ledger.pick(result, :dead_end)
@@ -90,6 +99,34 @@ module Koholint
       to = Ledger.place_of(Ledger.pick(result, :to))
       @visits[to] += 1 if from && to && from != to
       note_crossing(result)
+      note_looks(from, result) if from
+    end
+
+    # The tile a capability cleared; the same tile elsewhere is a hypothesis of a clearable object.
+    def note_looks(place, result)
+      Array(Ledger.pick(result, :clears)).each do |use|
+        next unless Ledger.pick(use, :effect)
+
+        cell = cell_of(Ledger.pick(use, :target) || {})
+        look = Ledger.pick(use, :look) || (@screens.dig(place, *cell) if cell.all?(Integer))
+        @looks[look] ||= { place:, cell: } if look
+      end
+    end
+
+    # Cells of a place surveyed before any capability could clear there whose tile matches one a capability cleared, next to a walked
+    # cell; each names the clear it was inferred from.
+    def inferred_clearable(place)
+      grid = @screens[place]
+      return [] if grid.nil? || @looks.empty? || @cleared_here.include?(place)
+
+      walked = @walked.fetch(place, [])
+      Geometry::ROWS.times.to_a.product(Geometry::COLS.times.to_a).filter_map do |cell|
+        look = grid.dig(*cell)
+        next unless @looks.key?(look) && !@failed.fetch(place, []).include?(cell)
+        next unless Navigation::Planner::DELTAS.values.any? { |dr, dc| walked.include?([cell[0] + dr, cell[1] + dc]) }
+
+        { cell:, look:, source: @looks[look] }
+      end
     end
 
     # Without an exit cell, only walk and step cross in the direction they were given; the result's from is where the skill began, not where it crossed.
@@ -139,6 +176,10 @@ module Koholint
     def door_tried?(place, cell) = tried?(place, [cell[0] + 1, cell[1]], :up)
 
     def untried?(place)
+      surveyed_untried?(place) || inferred_clearable(place).any?
+    end
+
+    def surveyed_untried?(place)
       survey = @surveys[place] or return true
       return true if survey[:provisional]
       return survey[:pending] unless survey[:pending].nil?

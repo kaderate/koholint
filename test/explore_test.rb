@@ -131,6 +131,37 @@ class ExploreTest < Minitest::Test
     assert_equal({ kind: :exit, row: 0, col: 5, direction: :up }, result[:target])
   end
 
+  def inferring_log(survey_of_three)
+    looks = Array.new(8) { Array.new(10, 'wall') }
+    bushes = looks.map(&:dup).tap { |grid| grid[3][1] = 'bush' }
+    clear = { 'type' => 'action', 'skill' => 'goto', 'result' => { 'from' => { 'room' => 160, 'map' => 0 },
+                                                                    'clears' => [{ 'target' => { 'row' => 3, 'col' => 8 }, 'effect' => true }] } }
+    events = [{ 'type' => 'screen', 'place' => [160, 0], 'grid' => looks.map(&:dup).tap { |grid| grid[3][8] = 'bush' } },
+              { 'type' => 'screen', 'place' => [3, 0], 'grid' => bushes }, clear]
+    log = Koholint::ExploreLog.from_events(events)
+    log.absorb({ from: { room: 1, map: 0 }, exits: [{ row: 0, col: 5, direction: :up, outcome: :left, to: [3, 0] }], survey: { sides: { up: [{ row: 0, col: 5 }] }, doors: [] } })
+    log.absorb({ from: { room: 3, map: 0 }, exits: [{ row: 7, col: 5, direction: :down, outcome: :left, to: [1, 0] }], crossed: [[3, 2, :down]], survey: survey_of_three })
+    log
+  end
+
+  def test_a_tile_a_capability_cleared_makes_an_old_survey_untried_with_its_source
+    log = inferring_log({ sides: { down: [{ row: 7, col: 5 }] }, doors: [], pending: false })
+    assert_equal [{ cell: [3, 1], look: 'bush', source: { place: [160, 0], cell: [3, 8] } }], log.inferred_clearable([3, 0])
+    assert log.untried?([3, 0])
+    rows = with(CLOSED, [0, 5], '.', [7, 5], '.')
+    result, = explore(rows, exits: [[[0, 5], :up]], explore_log: log)
+    assert_equal({ goal: [3, 0], next: [3, 0], clearable: log.inferred_clearable([3, 0]) }, result[:route])
+    log.absorb({ from: { room: 3, map: 0 }, clears: [{ target: { row: 3, col: 1 }, effect: false }] })
+    assert_empty log.inferred_clearable([3, 0]), 'a failed clear or a visit with the capability ends the hypothesis'
+    refute log.untried?([3, 0])
+  end
+
+  def test_a_survey_made_with_the_capability_infers_nothing
+    log = inferring_log({ sides: {}, doors: [], pending: false, clearing: true })
+    assert_empty log.inferred_clearable([3, 0])
+    refute log.untried?([3, 0])
+  end
+
   def test_untried_exits_that_cannot_be_reached_yet_send_explore_to_the_frontier_before_another_place
     rows = with(CLOSED, [0, 5], '.', [1, 5], '#', [1, 4], '#', [1, 6], '#', [2, 5], '?', [7, 5], '.')
     log = Koholint::ExploreLog.new
