@@ -182,6 +182,9 @@ module Koholint
             @locks.clear
           end
 
+          broken = loop_break(decision_point, state, context)
+          return broken if broken
+
           autopilot = autopilot_choice(decision_point, state, context)
           return autopilot if autopilot
 

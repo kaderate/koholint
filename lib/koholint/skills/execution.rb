@@ -8,6 +8,7 @@ module Koholint
       HARD_CAP = 400
       CENTRING_FRAMES = 16
       CENTRING_STILL = 3
+      EDGE_FRAMES = 120
       DIRECTIONS = %i[up right down left].freeze
 
       attr_reader :frames, :stopped_by
@@ -128,6 +129,9 @@ module Koholint
                 elsif state.hp.to_i < @start.hp.to_i then :damage
                 elsif state.dialog_open? && !@start.dialog_open? then :dialogue
                 end
+        # Off the grid is a border crossing whose room id changes only after the scroll.
+        return [] if !event && state.cell.nil? && (@centring[:edge] = @centring[:edge].to_i + 1) <= EDGE_FRAMES
+
         position = [state.x, state.y]
         @centring[:still] = position == @centring[:position] ? @centring[:still].to_i + 1 : 0
         @centring[:position] = position

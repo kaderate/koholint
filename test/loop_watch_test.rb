@@ -38,4 +38,17 @@ class LoopWatchTest < Minitest::Test
     assert_empty watch.notes
     assert_equal [1, 0], watch.hint[:place]
   end
+
+  def test_a_detection_acted_on_stays_acted_on_after_a_resume
+    events = [[0, 1], [10, 2], [20, 1], [30, 2], [40, 1], [50, 2], [60, 1], [70, 2], [80, 1]].map do |frame, room|
+      { 'type' => 'perception', 'frame' => frame, 'state' => { 'room_id' => room, 'map_id' => 0, 'game_mode' => 0x0B } }
+    end
+    assert_equal [1, 0], Koholint::LoopWatch.from_events(events).pending_hint[:place]
+    events << { 'type' => 'decision', 'frame' => 80, 'justification' => 'loop in 1-0, 2-0: explore here, the nearest place with untried work' }
+    watch = Koholint::LoopWatch.from_events(events)
+    assert watch.hint
+    assert_nil watch.pending_hint
+    enter(watch, [[90, 2], [100, 3], [110, 1], [120, 3], [130, 1], [140, 3], [150, 1], [160, 3], [170, 1]])
+    assert_equal [1, 0], watch.pending_hint[:place], 'a new detection is acted on again'
+  end
 end

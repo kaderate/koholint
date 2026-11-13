@@ -5,6 +5,8 @@ module Koholint
     ENTRIES = 4
     WINDOW_FRAMES = 3600
 
+    BREAK = 'loop in'
+
     attr_reader :hint, :notes
 
     def self.from_events(events)
@@ -12,6 +14,7 @@ module Koholint
       events.each do |event|
         state = event['state'] if event['type'] == 'perception'
         watch.observe(place: [state['room_id'], state['map_id']], frame: event['frame']) if state && state['game_mode'] == Koholint::PLAY_MODE
+        watch.act! if event['type'] == 'decision' && event['justification'].to_s.start_with?(BREAK)
       end
       watch.notes.clear
       watch
@@ -25,6 +28,11 @@ module Koholint
       @times = 0
       @notes = []
     end
+
+    # The policy acts once per detection, also across a resume.
+    def act! = @acted = true
+
+    def pending_hint = (@hint unless @acted)
 
     def observe(place:, frame:)
       return if place == @place
@@ -45,6 +53,7 @@ module Koholint
       span = frame - here.first[0]
       @times += 1
       @hint = { place:, places:, span: }
+      @acted = false
       @notes << { kind: 'stuck', detail: "loop: #{place.join('-')} entered #{ENTRIES} times in #{span} frames without a new place (#{places.join(', ')}), #{@times} times this run" }
       @entries.clear
     end
