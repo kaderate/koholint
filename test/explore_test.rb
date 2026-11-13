@@ -131,22 +131,26 @@ class ExploreTest < Minitest::Test
     assert_equal({ kind: :exit, row: 0, col: 5, direction: :up }, result[:target])
   end
 
-  def inferring_log(survey_of_three)
-    looks = Array.new(8) { Array.new(10, 'wall') }
-    bushes = looks.map(&:dup).tap { |grid| grid[3][1] = 'bush' }
-    clear = { 'type' => 'action', 'skill' => 'goto', 'result' => { 'from' => { 'room' => 160, 'map' => 0 },
-                                                                    'clears' => [{ 'target' => { 'row' => 3, 'col' => 8 }, 'effect' => true }] } }
-    events = [{ 'type' => 'screen', 'place' => [160, 0], 'grid' => looks.map(&:dup).tap { |grid| grid[3][8] = 'bush' } },
-              { 'type' => 'screen', 'place' => [3, 0], 'grid' => bushes }, clear]
-    log = Koholint::ExploreLog.from_events(events)
-    log.absorb({ from: { room: 1, map: 0 }, exits: [{ row: 0, col: 5, direction: :up, outcome: :left, to: [3, 0] }], survey: { sides: { up: [{ row: 0, col: 5 }] }, doors: [] } })
-    log.absorb({ from: { room: 3, map: 0 }, exits: [{ row: 7, col: 5, direction: :down, outcome: :left, to: [1, 0] }], crossed: [[3, 2, :down]], survey: survey_of_three })
-    log
+  # Place 3 is explored (bushes at (3,1) and (4,1), Link walked (3,2), (4,2) and (4,1)), then a capability clears a bush in 160/0.
+  def inferring_log(clears: [{ 'target' => { 'row' => 3, 'col' => 8 }, 'effect' => true }], explored_after: false)
+    walls = Array.new(8) { Array.new(10, 'wall') }
+    bushes = walls.map(&:dup).tap { |grid| grid[3][1] = grid[4][1] = 'bush' }
+    explore = ->(frame) { { 'type' => 'action', 'frame' => frame, 'skill' => 'explore', 'result' => { 'from' => { 'room' => 3, 'map' => 0 }, 'crossed' => [[3, 2, 'down'], [4, 2, 'left']],
+                                                                                                    'exits' => [{ 'row' => 7, 'col' => 5, 'direction' => 'down', 'outcome' => 'left', 'to' => [1, 0] }],
+                                                                                                    'survey' => { 'sides' => { 'down' => [{ 'row' => 7, 'col' => 5 }] }, 'doors' => [], 'pending' => false } } } }
+    events = [{ 'type' => 'screen', 'place' => [3, 0], 'grid' => bushes }, explore.(1),
+              { 'type' => 'action', 'frame' => 2, 'skill' => 'explore', 'result' => { 'from' => { 'room' => 1, 'map' => 0 }, 'survey' => { 'sides' => { 'up' => [{ 'row' => 0, 'col' => 5 }] }, 'doors' => [] },
+                                                                                      'exits' => [{ 'row' => 0, 'col' => 5, 'direction' => 'up', 'outcome' => 'left', 'to' => [3, 0] }] } },
+              { 'type' => 'screen', 'place' => [160, 0], 'grid' => walls.map(&:dup).tap { |grid| grid[3][8] = grid[2][4] = 'bush' } },
+              { 'type' => 'action', 'frame' => 3, 'skill' => 'goto', 'result' => { 'from' => { 'room' => 160, 'map' => 0 }, 'clears' => clears } }]
+    events << explore.(4) if explored_after
+    Koholint::ExploreLog.from_events(events)
   end
 
-  def test_a_tile_a_capability_cleared_makes_an_old_survey_untried_with_its_source
-    log = inferring_log({ sides: { down: [{ row: 7, col: 5 }] }, doors: [], pending: false })
-    assert_equal [{ cell: [3, 1], look: 'bush', source: { place: [160, 0], cell: [3, 8] } }], log.inferred_clearable([3, 0])
+  def test_a_tile_a_capability_cleared_makes_a_place_explored_before_untried_with_its_source
+    log = inferring_log
+    assert_equal [{ cell: [3, 1], look: 'bush', source: { place: [160, 0], cell: [3, 8] }, wins: 1, losses: 0 }], log.inferred_clearable([3, 0]),
+                 'the tile is read from the screen events; the walked bush at (4,1) is no object'
     assert log.untried?([3, 0])
     rows = with(CLOSED, [0, 5], '.', [7, 5], '.')
     result, = explore(rows, exits: [[[0, 5], :up]], explore_log: log)
@@ -156,10 +160,17 @@ class ExploreTest < Minitest::Test
     refute log.untried?([3, 0])
   end
 
-  def test_a_survey_made_with_the_capability_infers_nothing
-    log = inferring_log({ sides: {}, doors: [], pending: false, clearing: true })
+  def test_a_place_explored_after_a_clear_infers_nothing
+    log = inferring_log(explored_after: true)
     assert_empty log.inferred_clearable([3, 0])
     refute log.untried?([3, 0])
+  end
+
+  def test_a_tile_that_failed_as_often_as_it_cleared_infers_nothing
+    failed = { 'target' => { 'row' => 2, 'col' => 4 }, 'effect' => false }
+    assert_empty inferring_log(clears: [{ 'target' => { 'row' => 3, 'col' => 8 }, 'effect' => true }, failed]).inferred_clearable([3, 0])
+    looks = [{ 'target' => { 'row' => 3, 'col' => 8 }, 'effect' => true, 'look' => 'bush' }, { 'target' => { 'row' => 2, 'col' => 4 }, 'effect' => true, 'look' => 'bush' }, failed]
+    assert_equal [2, 1], inferring_log(clears: looks).inferred_clearable([3, 0]).first.values_at(:wins, :losses)
   end
 
   def test_untried_exits_that_cannot_be_reached_yet_send_explore_to_the_frontier_before_another_place

@@ -185,7 +185,7 @@ module Koholint
             end
             [side, cells.map { |row, col| { row:, col: } }]
           end
-          { sides: sides.reject { |_, cells| cells.empty? }, doors: @doors.map { |row, col| { row:, col: } }, **(@clearing ? { clearing: true } : {}) }
+          { sides: sides.reject { |_, cells| cells.empty? }, doors: @doors.map { |row, col| { row:, col: } } }
         end
 
         def enter(state)

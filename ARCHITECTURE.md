@@ -115,9 +115,10 @@ attempts that walked no new cell, `no_frontier`, `locked`, `budget` at 600 frame
 tried (left, or blocked twice) with their destination, the survey of each explored place (open border cells by side, doors, `pending`),
 the places seen in any action and the things already offered, rebuilt from the `action` events on resume. flow-55: it also keeps
 each place's latest `screen` grid (tile appearances, from the trace on resume) and the tile of every cell a capability cleared (`look`,
-recorded by `Clearing` on each use, or read from the screen grid for older traces). In a place whose survey was made without the capability
-(no survey `clearing` flag and no clear there), a cell with a cleared tile next to a walked cell, not a failed clear, is an inferred
-clearable cell (`ExploreLog#inferred_clearable`: cell, tile, and the place and cell of the clear it comes from); such a place counts
+recorded by `Clearing` on each use, or read from the screen grid for older traces), with the clears of that tile that worked and failed.
+In a place last explored before the first clear (in trace order), a cell Link never entered with any skill, next to one he did, whose
+tile cleared more often than it failed and that is not a failed clear itself, is an inferred clearable cell
+(`ExploreLog#inferred_clearable`: cell, tile, the place and cell of the tile's first clear, its wins and losses); such a place counts
 as untried, so explore's route goes there (the route's `clearable` lists them), and once there the live clearing path takes over. A skill is a bounded, deterministic action with
 validated parameters (the perpendicular settle of `goto` and the centring after a move give up once Link stops moving);
 it reports how it stopped (`done`, `blocked`, `no_path`, `no_response`…). flow-51: a `goto` stopped by an edge its grid believed

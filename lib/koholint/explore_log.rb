@@ -37,7 +37,8 @@ module Koholint
       @failed = Hash.new { |hash, key| hash[key] = [] }
       @screens = {}
       @looks = {}
-      @cleared_here = []
+      @explored_since_clear = []
+      @stood = Hash.new { |hash, key| hash[key] = [] }
     end
 
     def screen(place, grid)
@@ -51,7 +52,7 @@ module Koholint
       know(place)
       survey = Ledger.pick(result, :survey)
       keep(place, parse_survey(survey).merge(provisional: provisional?(result))) if survey.is_a?(Hash)
-      @cleared_here << place if (Ledger.pick(survey || {}, :clearing) || Ledger.pick(result, :clears)) && !@cleared_here.include?(place)
+      @explored_since_clear << place if (@looks.any? { |_, record| record[:wins].positive? } || Ledger.pick(result, :clears)) && !@explored_since_clear.include?(place)
       note_pocket(place, result)
       Array(Ledger.pick(result, :exits)).each { |exit| take_exit(place, exit) }
       drop_unreachable(place, result) if Ledger.pick(result, :dead_end)
@@ -100,32 +101,47 @@ module Koholint
       @visits[to] += 1 if from && to && from != to
       note_crossing(result)
       note_looks(from, result) if from
+      note_stood(from, result) if from
     end
 
-    # The tile a capability cleared; the same tile elsewhere is a hypothesis of a clearable object.
-    def note_looks(place, result)
-      Array(Ledger.pick(result, :clears)).each do |use|
-        next unless Ledger.pick(use, :effect)
-
-        cell = cell_of(Ledger.pick(use, :target) || {})
-        look = Ledger.pick(use, :look) || (@screens.dig(place, *cell) if cell.all?(Integer))
-        @looks[look] ||= { place:, cell: } if look
+    # Cells Link entered with any skill, which no object fills.
+    def note_stood(place, result)
+      Array(Ledger.pick(result, :crossed)).each do |row, col, direction|
+        delta = Navigation::Planner::DELTAS[direction.to_s.to_sym] or next
+        @stood[place] |= [[row, col], [row + delta[0], col + delta[1]]]
       end
     end
 
-    # Cells of a place surveyed before any capability could clear there whose tile matches one a capability cleared, next to a walked
-    # cell; each names the clear it was inferred from.
+    # The tiles capabilities ran on, with the clears that worked and failed; a tile that clears more often than not is a hypothesis elsewhere.
+    def note_looks(place, result)
+      Array(Ledger.pick(result, :clears)).each do |use|
+        cell = cell_of(Ledger.pick(use, :target) || {})
+        look = Ledger.pick(use, :look) || (@screens.dig(place, *cell) if cell.all?(Integer))
+        next unless look
+
+        record = @looks[look] ||= { wins: 0, losses: 0, first: nil }
+        if Ledger.pick(use, :effect)
+          record[:wins] += 1
+          record[:first] ||= { place:, cell: }
+        else
+          record[:losses] += 1
+        end
+      end
+    end
+
+    # Cells of a place last explored before any clear whose tile clears more often than not, never walked but next to a walked cell;
+    # each names the first clear of its tile and the tile's record.
     def inferred_clearable(place)
       grid = @screens[place]
-      return [] if grid.nil? || @looks.empty? || @cleared_here.include?(place)
+      return [] if grid.nil? || @explored_since_clear.include?(place)
 
-      walked = @walked.fetch(place, [])
+      walked = @walked.fetch(place, []) | @stood.fetch(place, [])
       Geometry::ROWS.times.to_a.product(Geometry::COLS.times.to_a).filter_map do |cell|
-        look = grid.dig(*cell)
-        next unless @looks.key?(look) && !@failed.fetch(place, []).include?(cell)
+        record = @looks[grid.dig(*cell)]
+        next unless record && record[:wins] > record[:losses] && !walked.include?(cell) && !@failed.fetch(place, []).include?(cell)
         next unless Navigation::Planner::DELTAS.values.any? { |dr, dc| walked.include?([cell[0] + dr, cell[1] + dc]) }
 
-        { cell:, look:, source: @looks[look] }
+        { cell:, look: grid.dig(*cell), source: record[:first], wins: record[:wins], losses: record[:losses] }
       end
     end
 
