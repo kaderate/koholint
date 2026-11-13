@@ -33,14 +33,16 @@ class ClearingTest < Minitest::Test
   def test_needs_published_composites_and_the_room_objects
     assert_nil Koholint::Skills::Clearing.of({ registry: StubRegistry.new([]), room_objects: objects([1, 1]) })
     assert_nil Koholint::Skills::Clearing.of({ registry: StubRegistry.new([composite]) })
-    clearing = Koholint::Skills::Clearing.of({ registry: StubRegistry.new([composite]), room_objects: objects([1, 1], [2, 3]) })
+    assert_nil Koholint::Skills::Clearing.of({ registry: StubRegistry.new([composite]), room_objects: objects([1, 1]), held: [4] }), 'not without the item it was learned with'
+    refute_nil Koholint::Skills::Clearing.of({ registry: StubRegistry.new([composite]), room_objects: objects([1, 1]), held: [1, 4] })
+    clearing = Koholint::Skills::Clearing.of({ registry: StubRegistry.new([composite]), room_objects: objects([1, 1], [2, 3]), held: [1] })
     assert_equal [[1, 1], [2, 3]], clearing.cells.keys
   end
 
   def test_runs_the_composite_once_when_blocked_facing_its_object
     row, col = state.cell
     registry = StubRegistry.new([composite])
-    clearing = Koholint::Skills::Clearing.of({ registry:, room_objects: objects([row + 1, col]) })
+    clearing = Koholint::Skills::Clearing.of({ registry:, room_objects: objects([row + 1, col]), held: [1] })
     assert_nil clearing.start(state, :up)
     assert_equal [], clearing.start(state, :down)
     assert clearing.active?
@@ -53,7 +55,7 @@ class ClearingTest < Minitest::Test
 
   def test_a_composite_never_clears_from_its_own_steps
     registry = StubRegistry.new([composite])
-    context = { registry:, room_objects: objects([1, 1]) }
+    context = { registry:, room_objects: objects([1, 1]), held: [1] }
     run = composite.start(state, { row: 1, col: 0, direction: 'right' }, context)
     steps = run.instance_variable_get(:@context)
     assert_equal composite.name, steps[:composite]
@@ -63,8 +65,9 @@ class ClearingTest < Minitest::Test
   end
 
   def test_object_cells_join_the_pushable_cells
-    context = { registry: StubRegistry.new([composite]), room_objects: objects([3, 8]), entities: -> { [{ kind: 'enemy', moves: false, cell: [1, 1] }] } }
+    context = { registry: StubRegistry.new([composite]), room_objects: objects([3, 8]), held: [1, 4], entities: -> { [{ kind: 'enemy', moves: false, cell: [1, 1] }] } }
     host = Koholint::Skills::Execution.new(skill: 'goto', params: {}, state:)
     assert_equal [[1, 1], [3, 8]], host.send(:pushable_of, context).call
+    assert_equal [[3, 8]], host.send(:pushable_of, context.merge(held: [1])).call, 'urchins are pushed aside only with the shield held'
   end
 end

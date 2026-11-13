@@ -114,7 +114,7 @@ module Koholint
       @policy.observe(state, frame: state.frame) if @policy.respond_to?(:observe)
       return if @budget.exhausted
 
-      context = context_for(grid)
+      context = context_for(grid, state)
       @policy.prepare(context) if @policy.respond_to?(:prepare)
       decision_point = @policy.respond_to?(:decision_point_for) ? @policy.decision_point_for(state) : @decision_point
       activity(:deciding, 'deciding what to do', decision_point: decision_point.name.to_s)
@@ -176,8 +176,9 @@ module Koholint
       @run.write_activity(kind:, label:, frame: @emulator.frame, detail:)
     end
 
-    def context_for(grid)
+    def context_for(grid, state)
       context = @builder ? { grid: } : {}
+      context[:held] = Items.held(state)
       context.merge(dialogue_shot: -> { Vision::DialogueShot.crop(@emulator) }, dialogue_rgb: -> { Vision::DialogueShot.rgb(@emulator) },
                     entities: -> { Entities.read(@emulator) }, objects: -> { Entities.objects(@emulator) },
                     room_objects: -> { Entities.room_objects(@emulator) })

@@ -87,7 +87,7 @@ class CapabilityPublishingTest < Minitest::Test
     policy = Koholint::Policies::Delegated.new(client:, registry: Koholint::Skills::Registry.default(extra: [composite]),
                                                objectives: (@objectives = Koholint::Objectives.new(trace:)), manual: 'notes')
     objects = Array.new(8) { Array.new(10, 4) }
-    context = -> { { grid:, room_objects: -> { objects } } }
+    context = -> { { grid:, room_objects: -> { objects }, held: [1, 4] } }
     point = policy.tap { |p| p.prepare(context.call) }.decision_point_for(state)
     policy.decide(point, state, context.call)
     refute_includes skill_names(policy, context.call), 'sword_on_object_92'
@@ -100,6 +100,9 @@ class CapabilityPublishingTest < Minitest::Test
     assert_includes client.calls.last[:prompt], 'sword_on_object_92 (row, col, direction): uses the sword facing object 92'
     assert_includes client.calls.last[:prompt], 'Object 92 here at (6,5)'
     assert_includes client.calls.last[:schema].to_s, 'sword_on_object_92'
+    without = -> { { grid:, room_objects: -> { objects }, held: [4] } }
+    refute_includes skill_names(policy, without.call), 'sword_on_object_92', 'not offered without its item (fef5: 194 uses before the sword)'
+    assert_includes skill_names(policy, without.call.merge(held: [1, 4])), 'sword_on_object_92'
   end
 
   def test_a_use_records_the_object_before_and_after

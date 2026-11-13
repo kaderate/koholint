@@ -10,7 +10,7 @@ module Koholint
 
       def self.of(context)
         registry = context[:registry]
-        new(context) if !context[:composite] && context[:room_objects] && registry.respond_to?(:composites) && registry.composites.any?
+        new(context) if !context[:composite] && context[:room_objects] && registry.respond_to?(:composites) && registry.composites.any? { |skill| skill.usable?(context[:held]) }
       end
 
       def initialize(context)
@@ -24,7 +24,7 @@ module Koholint
 
       def cells
         grid = @objects.call
-        @registry.composites.each_with_object({}) do |skill, found|
+        @registry.composites.select { |skill| skill.usable?(@context[:held]) }.each_with_object({}) do |skill, found|
           grid.each_with_index { |row, r| row.each_index { |c| found[[r, c]] ||= skill if row[c] == skill.entry['target']['object'] } }
         end
       end
