@@ -9,6 +9,7 @@ class LockTest < Minitest::Test
   FLOW = Koholint::FLOW_VERSION
 
   def with_run
+    skip_without_rom!
     Dir.mktmpdir { |dir| yield dir, Koholint::Run.create(root: dir, flow_version: FLOW, budget: {}) }
   end
 
