@@ -118,6 +118,19 @@ class SkillsTest < Minitest::Test
     assert_equal :frame_cap, execution.result(state)[:stopped_by]
   end
 
+  # A hit sets pending_damage to its whole loss and hp drains one unit every 2 frames (cc52 at 90261): one damage stop on the hit frame,
+  # and a skill started during the drain is not stopped by the rest of it.
+  def test_a_hit_stops_once_on_its_frame_and_not_again_while_health_drains
+    drain = ->(y, hp, pending) { Koholint::GameState.new(**state(y:, hp:).to_h, pending_damage: pending) }
+    execution = registry.start('walk', state, { direction: :up, cells: 3 })
+    drive(execution, [state, drain.(71, 24, 4)])
+    assert_equal [:damage, 1], execution.result(drain.(71, 24, 4)).values_at(:stopped_by, :frames)
+    start = drain.(71, 23, 3)
+    execution = registry.start('walk', start, { direction: :up, cells: 1 })
+    drive(execution, [start, drain.(70, 23, 3), drain.(69, 22, 2), drain.(68, 22, 2), drain.(67, 21, 1), drain.(66, 21, 1), drain.(65, 20, 0)])
+    refute_equal :damage, execution.result(drain.(65, 20, 0))[:stopped_by]
+  end
+
   def test_walk_stops_on_dialogue_room_change_and_damage
     {
       dialogue: state(y: 71, dialog_state: 129),

@@ -128,7 +128,7 @@ module Koholint
       def centre(state)
         reason = @centring[:reason]
         event = if room(state) != room(@start) then :room_change
-                elsif state.hp.to_i < @start.hp.to_i then :damage
+                elsif state.health < @start.health then :damage
                 elsif state.dialog_open? && !@start.dialog_open? then :dialogue
                 end
         # Off the grid is a border crossing whose room id changes only after the scroll.

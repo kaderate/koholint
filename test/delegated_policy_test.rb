@@ -1003,41 +1003,6 @@ class DelegatedPolicyTest < Minitest::Test
     refute decide(p, over).last[:notables]&.any? { |note| note[:kind] == 'death' }
   end
 
-  # 189/10 in fork 9618: one heart drained 24 -> 20 over 8 frames and every unit stopped a fresh model choice after 2 frames.
-  def test_a_damage_stop_waits_out_the_health_drain_before_asking_the_model_again
-    client = ScriptedClient.new(objective: objective, default: walk)
-    p = policy(client)
-    decide(p)
-    _point, first = decide(p)
-    calls = client.calls.size
-    damaged = { skill: 'walk', frames: 2, hp_delta: -1, stopped_by: 'damage' }
-    p.after_action(choice: first[:choice], outcome: damaged, state: state(frame: 102, hp: 23), frame: 102)
-    [[102, 23, -2], [106, 21, -1], [110, 20, 0]].each do |frame, hp, delta|
-      _point, waited = decide(p, state(frame:, hp:))
-      assert_equal [{ skill: 'wait', params: { frames: 4 } }, 'delegated', 0.0], waited.values_at(:choice, :agent, :cost_usd)
-      p.after_action(choice: waited[:choice], outcome: { skill: 'wait', frames: 4, hp_delta: delta, stopped_by: 'done' }, state: state(frame: frame + 4, hp: hp + delta), frame: frame + 4)
-    end
-    assert_equal calls, client.calls.size
-    _point, asked = decide(p, state(frame: 114, hp: 20))
-    assert_equal 'claude', asked[:agent]
-    assert_equal calls + 1, client.calls.size
-  end
-
-  def test_a_drain_that_never_ends_goes_back_to_the_model
-    client = ScriptedClient.new(objective: objective, default: walk)
-    p = policy(client)
-    decide(p)
-    _point, first = decide(p)
-    p.after_action(choice: first[:choice], outcome: { skill: 'walk', frames: 2, hp_delta: -1, stopped_by: 'damage' }, state: state(hp: 23), frame: 102)
-    agents = 14.times.map do |i|
-      _point, result = decide(p, state(frame: 102 + (4 * i), hp: 23))
-      p.after_action(choice: result[:choice], outcome: { skill: 'wait', frames: 4, hp_delta: -1, stopped_by: 'done' }, state: state(hp: 23), frame: 106 + (4 * i))
-      result[:agent]
-    end
-    assert_equal ['delegated'] * 12, agents.first(12)
-    assert_equal 'claude', agents[12]
-  end
-
   def test_hp_drops_emit_a_damage_notable_and_show_in_the_next_prompt
     client = ScriptedClient.new(objective: objective, default: walk)
     p = policy(client)
