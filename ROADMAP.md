@@ -15,6 +15,7 @@ Only what is left to do. When something lands, delete it here (git is the histor
 8. **Save in the loop.** "Continue" after death is automatic (flow-22, met live in run `20261105-221719-7000`: 5 deaths, run continued); add a `save_game` skill (needs the boot script to resume from the title after quitting and a check that the cartridge RAM changed; the four-button combination is not reachable through `press`).
 9. **Finer navigation, interactions beyond walking, combat.** Tile lattice and tile-level beliefs, exits straddling two cells; push, dive/swim, item use; combat beyond single strikes (spin attack, groups of enemies, enemies the sword does not hurt).
 10. **Viewer and live control.** Fork from the UI, pause/stop of the live engine; optional `--live-clock` with pause-on-danger and a reflex layer; background music (comfort, low priority: YouTube IFrame player, track per place kind via `data/music.json`, replay only); creatures overlay and map-cell thumbnails on hover; item icons captured from VRAM.
+11. **Cap repeated zero-frame results before long live runs.** In the flow-44 agent-loop proof, 164/17 produced about 2,900 explore results of `no_frontier` in 1 frame each, and each goes back to the model. The harness should stop or redirect after a few identical zero-frame results instead of paying for each one.
 
 ## Cleanups
 - `resume` without `--agent` on an agent run silently continues with WalkAndTalk: make it an error (WalkAndTalk stays: no-agent baseline, `StartGame` fallback, 13 test files).

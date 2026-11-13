@@ -33,6 +33,7 @@ module Koholint
       @assumed = []
       @doubted = {}
       @visits = Hash.new(0)
+      @failed = Hash.new { |hash, key| hash[key] = [] }
     end
 
     def absorb(result)
@@ -47,6 +48,10 @@ module Koholint
       drop_unreachable(place, result) if Ledger.pick(result, :dead_end)
       Array(Ledger.pick(result, :offered)).each { |object| offer(place, cell_of(object)) }
       Array(Ledger.pick(result, :walls)).each { |wall| (@walls[place] << cell_of(wall)).uniq! }
+      Array(Ledger.pick(result, :clears)).each do |use|
+        cell = cell_of(Ledger.pick(use, :target) || {})
+        Ledger.pick(use, :effect) ? @failed[place].delete(cell) : (@failed[place] << cell).uniq!
+      end
       Array(Ledger.pick(result, :crossed)).each do |row, col, direction|
         delta = Navigation::Planner::DELTAS[direction.to_s.to_sym] or next
         walk(place, [row, col])
@@ -227,6 +232,9 @@ module Koholint
     end
 
     def walls(place) = @walls.fetch(place, []).dup
+
+    # Object cells a capability ran on without clearing them: no longer frontiers there.
+    def failed_clears(place) = @failed.fetch(place, []).dup
 
     def walk(place, cell)
       return unless cell.all?(Integer) && cell[0].between?(0, Geometry::ROWS - 1) && cell[1].between?(0, Geometry::COLS - 1)

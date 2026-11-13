@@ -236,4 +236,4 @@ or a `new_place` objective, and answered `explore` to every skill question. It r
 | no-capabilities | 17163 | 2.73 | 0.159 | 0 | 0 | 0 | 0 |
 
 Every capabilities fork reached 164/17, and one also reached 128/0; none of the forks without the capability reached a new place.
-Each capabilities fork broke one loop, the lineage's loop inherited at the fork frame, at its first decision.
+Each capabilities fork broke one loop, the lineage's loop inherited at the fork frame, at its first decision. The loop break fired in 3 of 3 capabilities forks and 0 of 3 baseline forks, because only the clearable cells gave 160/0 untried work. So "chosen in 3 of 3" overstates organic use; the cost per 1000 frames and the clear rate are unaffected.

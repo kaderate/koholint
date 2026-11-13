@@ -241,6 +241,11 @@ class ExploreTest < Minitest::Test
     result, = explore(rows, exits: [[[0, 5], :up]], explore_log: log, aim: { place: [3, 0] }, room_objects: -> { objects }, limit: 1)
     assert_equal({ kind: :frontier, row: 4, col: 8, direction: :right }, result[:target])
     assert result[:survey][:pending]
+    log.absorb({ from: { room: 1, map: 0 }, clears: [{ target: { row: 4, col: 9 }, effect: false }] })
+    assert_equal [[4, 9]], log.failed_clears([1, 0])
+    result, = explore(rows, exits: [[[0, 5], :up]], explore_log: log, aim: { place: [3, 0] }, room_objects: -> { objects }, limit: 1)
+    assert_equal({ kind: :exit, row: 0, col: 5, direction: :up }, result[:target], 'a failed clear is no longer a frontier')
+    refute result[:survey][:pending]
     @registry = nil
     result, = explore(rows, exits: [[[0, 5], :up]], explore_log: log, aim: { place: [3, 0] }, room_objects: -> { objects }, limit: 1)
     assert_equal({ kind: :exit, row: 0, col: 5, direction: :up }, result[:target])

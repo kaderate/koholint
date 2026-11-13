@@ -77,7 +77,8 @@ module Koholint
           @crossed = []
           @excluded = []
           # Runs without the capability logged clearable objects as walls.
-          @walls = (@log ? @log.walls(@place) : []) - Array(@clearing&.cells&.keys)
+          @failed = @log ? @log.failed_clears(@place) : []
+          @walls = (@log ? @log.walls(@place) : []) - (Array(@clearing&.cells&.keys) - @failed)
           @new_walls = []
           @cells_walked = 0
           @stuck = 0
@@ -337,7 +338,7 @@ module Koholint
         def opened? = @clearing&.uses&.any? { |use| use[:effect] }
 
         def clearable(from, path_to)
-          cells = @clearing ? @clearing.cells.keys - @walls : []
+          cells = @clearing ? @clearing.cells.keys - @walls - @failed : []
           cells.empty? ? [] : gather(from, path_to) { |cell, direction| frontier_kind(cell, direction) if cells.include?(neighbour(cell, direction)) }
         end
 

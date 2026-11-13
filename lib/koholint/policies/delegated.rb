@@ -878,20 +878,20 @@ module Koholint
 
       # A detected loop drops the current objective and explores toward the nearest place with untried work, once per detection.
       def loop_break(decision_point, state, context)
-        hint = @loop_watch.hint
-        return if hint.nil? || hint.equal?(@loop_broken) || @sequence || !%i[choose_skill choose_objective].include?(decision_point.name)
+        hint = @loop_watch.pending_hint
+        return if hint.nil? || @sequence || !%i[choose_skill choose_objective].include?(decision_point.name)
 
         place = [state.room_id, state.map_id]
         route = @explore_log.route(place)
         return unless route || @explore_log.untried?(place)
 
-        @loop_broken = hint
+        @loop_watch.act!
         @objectives.abandon(frame: state.frame, reason: 'loop')
         @objectives.start(frame: state.frame, **AUTO_OBJECTIVE, autopilot: true)
         @autopilot&.adopt(@objectives.current)
         context[:aim] = { place: route[:goal] } if route
         choice = decision_point.name == :choose_objective ? AUTO_OBJECTIVE.dup : EXPLORE
-        { choice:, justification: "loop in #{hint[:places].join(', ')}: explore #{route ? "toward #{route[:goal].join('-')}" : 'here'}, the nearest place with untried work",
+        { choice:, justification: "#{LoopWatch::BREAK} #{hint[:places].join(', ')}: explore #{route ? "toward #{route[:goal].join('-')}" : 'here'}, the nearest place with untried work",
           confidence: 1.0, agent: 'delegated', latency_ms: 0, cost_usd: 0.0, fallback: false, autopilot: true, prompt: nil, image: nil }
       end
 
