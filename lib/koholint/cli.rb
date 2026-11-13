@@ -177,7 +177,10 @@ module Koholint
       entries = Capabilities.load
       case action
       when 'list'
-        entries.each { |entry| out.puts "#{entry['id']} v#{entry['version']} #{entry['status']}: #{Capabilities.describe(entry)}" }
+        entries.each do |entry|
+          about = %w[validated operational deprecated].include?(entry['status']) ? Capabilities.describe(entry) : entry['history'].last['reason']
+          out.puts "#{entry['id']} v#{entry['version']} #{entry['status']}: #{about}"
+        end
         out.puts "digest #{Capabilities.digest(Capabilities.operational(entries))}"
         return 0
       when 'publish', 'retire'
