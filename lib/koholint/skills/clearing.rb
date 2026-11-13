@@ -39,6 +39,7 @@ module Koholint
         return nil unless skill && !@tried.include?(ahead)
 
         @tried << ahead
+        @look = @context[:grid]&.appearance(*ahead)
         @run = @registry.start(skill.name, state, { row: cell[0], col: cell[1], direction: direction.to_s }, @context)
         step(state)
       end
@@ -47,7 +48,7 @@ module Koholint
         buttons = @run.next_input(state)
         return buttons if buttons
 
-        @uses << @run.result(state)
+        @uses << @run.result(state).merge(look: @look).compact
         @run = nil
         []
       end

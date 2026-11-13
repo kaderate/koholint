@@ -10,6 +10,7 @@ module Koholint
     def self.from_events(events)
       log = new
       events.each do |event|
+        log.screen(event['place'], event['grid']) if event['type'] == 'screen'
         next unless Ledger.pick(event, :type).to_s == 'action'
 
         result = Ledger.pick(event, :result)
@@ -34,6 +35,14 @@ module Koholint
       @doubted = {}
       @visits = Hash.new(0)
       @failed = Hash.new { |hash, key| hash[key] = [] }
+      @screens = {}
+      @looks = {}
+      @explored_since_clear = []
+      @stood = Hash.new { |hash, key| hash[key] = [] }
+    end
+
+    def screen(place, grid)
+      @screens[place] = grid if place.is_a?(Array) && grid.is_a?(Array)
     end
 
     def absorb(result)
@@ -43,6 +52,7 @@ module Koholint
       know(place)
       survey = Ledger.pick(result, :survey)
       keep(place, parse_survey(survey).merge(provisional: provisional?(result))) if survey.is_a?(Hash)
+      @explored_since_clear << place if (@looks.any? { |_, record| record[:wins].positive? } || Ledger.pick(result, :clears)) && !@explored_since_clear.include?(place)
       note_pocket(place, result)
       Array(Ledger.pick(result, :exits)).each { |exit| take_exit(place, exit) }
       drop_unreachable(place, result) if Ledger.pick(result, :dead_end)
@@ -90,6 +100,49 @@ module Koholint
       to = Ledger.place_of(Ledger.pick(result, :to))
       @visits[to] += 1 if from && to && from != to
       note_crossing(result)
+      note_looks(from, result) if from
+      note_stood(from, result) if from
+    end
+
+    # Cells Link entered with any skill, which no object fills.
+    def note_stood(place, result)
+      Array(Ledger.pick(result, :crossed)).each do |row, col, direction|
+        delta = Navigation::Planner::DELTAS[direction.to_s.to_sym] or next
+        @stood[place] |= [[row, col], [row + delta[0], col + delta[1]]]
+      end
+    end
+
+    # The tiles capabilities ran on, with the clears that worked and failed; a tile that clears more often than not is a hypothesis elsewhere.
+    def note_looks(place, result)
+      Array(Ledger.pick(result, :clears)).each do |use|
+        cell = cell_of(Ledger.pick(use, :target) || {})
+        look = Ledger.pick(use, :look) || (@screens.dig(place, *cell) if cell.all?(Integer))
+        next unless look
+
+        record = @looks[look] ||= { wins: 0, losses: 0, first: nil }
+        if Ledger.pick(use, :effect)
+          record[:wins] += 1
+          record[:first] ||= { place:, cell: }
+        else
+          record[:losses] += 1
+        end
+      end
+    end
+
+    # Cells of a place last explored before any clear whose tile clears more often than not, never walked but next to a walked cell;
+    # each names the first clear of its tile and the tile's record.
+    def inferred_clearable(place)
+      grid = @screens[place]
+      return [] if grid.nil? || @explored_since_clear.include?(place)
+
+      walked = @walked.fetch(place, []) | @stood.fetch(place, [])
+      Geometry::ROWS.times.to_a.product(Geometry::COLS.times.to_a).filter_map do |cell|
+        record = @looks[grid.dig(*cell)]
+        next unless record && record[:wins] > record[:losses] && !walked.include?(cell) && !@failed.fetch(place, []).include?(cell)
+        next unless Navigation::Planner::DELTAS.values.any? { |dr, dc| walked.include?([cell[0] + dr, cell[1] + dc]) }
+
+        { cell:, look: grid.dig(*cell), source: record[:first], wins: record[:wins], losses: record[:losses] }
+      end
     end
 
     # Without an exit cell, only walk and step cross in the direction they were given; the result's from is where the skill began, not where it crossed.
@@ -139,6 +192,10 @@ module Koholint
     def door_tried?(place, cell) = tried?(place, [cell[0] + 1, cell[1]], :up)
 
     def untried?(place)
+      surveyed_untried?(place) || inferred_clearable(place).any?
+    end
+
+    def surveyed_untried?(place)
       survey = @surveys[place] or return true
       return true if survey[:provisional]
       return survey[:pending] unless survey[:pending].nil?
