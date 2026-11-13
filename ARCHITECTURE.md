@@ -163,7 +163,7 @@ scrolling text box into the full text without losing a word; the stored events s
 
 **Decision points and policies** — `decision.rb` defines the points (`choose_objective`, `choose_skill`,
 `move`, macros) with their output schema and validation. A policy answers them: `policies/delegated.rb`
-(agent-driven; owns the context, plan memory, automatic dialogue pages, lock/hemmed handling, and before asking the model
+(agent-driven, with its concerns mixed in from `policies/delegated/`: `dialogue.rb`, `waits.rb`, `outcomes.rb`, `guidance.rb`; owns the context, plan memory, automatic dialogue pages, lock/hemmed handling, and before asking the model
 the revisit of people and signs (its `prepare(context)` gets the entity and object readers before `decision_point_for`, so
 the first decision of a visit or a run engages too) and the reuse of conversations already read: a dialogue closed when read (dialog state back to 0) whose signature (at least 2 full rows) is known is not sent
 as sheets, its stored text is emitted again with `cached: true`; when a revisit is due it replaces the model's skill choice,
