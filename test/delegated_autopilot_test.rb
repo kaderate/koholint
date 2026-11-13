@@ -58,6 +58,43 @@ class DelegatedAutopilotTest < Minitest::Test
     assert_equal 3, client.calls.size
   end
 
+  class ChainDone
+    def objective_hold(**) = nil
+    def adopt(_objective) = nil
+    def next_choice(**) = nil
+    def model_called(**) = nil
+    def acted(**) = nil
+  end
+
+  def test_the_harness_keeps_exploring_after_an_arrival_unless_a_person_here_was_never_talked_to
+    client = ScriptedClient.new(objective: new_place, default: explore)
+    p = autopiloted(client, autopilot: ChainDone.new)
+    people = []
+    ctx = { grid:, entities: -> { people } }
+    p.prepare(ctx)
+    auto = p.decide(p.decision_point_for(state), state, ctx)
+    assert_equal ['delegated', 'new_place'], [auto[:agent], auto[:choice][:predicate][:kind]]
+    @objectives.abandon(frame: 120, reason: 'test')
+    people << { kind: :npc, type: 49, cell: [5, 5] }
+    asked = p.decide(p.decision_point_for(state(frame: 130)), state(frame: 130), ctx)
+    assert_equal 'claude', asked[:agent], 'fef5 242/0: the type 49 at (5,5) was never offered'
+    assert_includes client.calls.last[:prompt], 'person-t49'
+    @objectives.abandon(frame: 140, reason: 'test')
+    p.instance_variable_get(:@talk_log).record(place: [163, 16], row: 5, col: 5, talked: false, entity: 49)
+    tried = p.decide(p.decision_point_for(state(frame: 150)), state(frame: 150), ctx)
+    assert_equal 'delegated', tried[:agent], 'a person tried once without a talk no longer holds the harness'
+  end
+
+  def test_a_person_already_talked_to_does_not_hold_the_harness_after_an_arrival
+    client = ScriptedClient.new(objective: new_place, default: explore)
+    p = autopiloted(client, autopilot: ChainDone.new)
+    talk_log = p.instance_variable_get(:@talk_log)
+    talk_log.record(place: [163, 16], row: 5, col: 5, talked: true, entity: 49)
+    ctx = { grid:, entities: -> { [{ kind: :npc, type: 49, cell: [5, 5] }] } }
+    p.prepare(ctx)
+    assert_equal 'delegated', p.decide(p.decision_point_for(state), state, ctx)[:agent]
+  end
+
   def lap(policy, now, stop, ctx: { grid: }, to: { room: 163, map: 16, row: 3, col: 4 })
     policy.observe(now, frame: now.frame)
     result = policy.decide(policy.decision_point_for(now), now, ctx)

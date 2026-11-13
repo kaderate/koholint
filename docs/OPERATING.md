@@ -25,7 +25,7 @@ budget or near an object never tried (`untried_object`) is followed by another `
 outside free play, after damage, when the objective changes or is not `new_place`, `leave_place` or `new_text`, and after
 6 such explores or 2400 frames since its last call. When such a chain reaches a place and achieves its objective, the harness also
 starts the next objective itself (`new_place`, "Explore the nearest untried exits", `autopilot: true` on the `objective` and
-`decision` events) instead of a paid `choose_objective`, under the same caps, as long as this place or a place routed to has untried exits.
+`decision` events) instead of a paid `choose_objective`, under the same caps, as long as this place or a place routed to has untried exits and (flow-52) no person on screen was never tried.
 An objective picked from the candidate menu (see [AGENT_SKILLS.md](AGENT_SKILLS.md)) is followed the same way: `explore` towards its exit, door or place, or one
 `talk_to` of the person or sign here. Results chosen this way are marked `(autopilot)` in the model's context.
 
