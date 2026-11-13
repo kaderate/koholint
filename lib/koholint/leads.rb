@@ -14,6 +14,7 @@ module Koholint
     GOAL_MAX = 120
     WHERE_MAX = 40
     NAME_MAX = 40
+    REFUTE_AT = 2
     PLACE_ID = /\A\[?\s*(\d+)\s*[-,\/ ]\s*(\d+)\s*\]?\z/
 
     attr_reader :all, :goal, :goal_frame, :goal_objectives, :names
@@ -21,12 +22,19 @@ module Koholint
     def self.from_events(events)
       leads = new
       done = 0
+      started = {}
       events.each do |event|
         case Ledger.pick(event, :type).to_s
         when 'lead' then leads.restore(event)
         when 'place_name' then leads.name_place(Ledger.pick(event, :place), Ledger.pick(event, :name))
         when 'goal' then leads.change_goal(Ledger.pick(event, :text), frame: Ledger.pick(event, :frame), objectives: done)
-        when 'objective' then done += 1 if Objectives::TERMINAL.include?(Ledger.pick(event, :status).to_s)
+        when 'objective'
+          id = Ledger.pick(event, :id)
+          started[id] = event if Ledger.pick(event, :status).to_s == 'started'
+          next unless Objectives::TERMINAL.include?(Ledger.pick(event, :status).to_s)
+
+          done += 1
+          leads.note_objective(started.fetch(id, {}).merge(event))
         end
       end
       leads
@@ -42,7 +50,7 @@ module Koholint
       events = Trace.read(File.join(dir, 'trace.jsonl'))
       leads = from_events(events)
       path = File.join(dir, 'world.json')
-      File.write("#{path}.tmp", "#{JSON.pretty_generate({ goal: leads.goal, leads: leads.all, places: PlaceCard.world(events, names: leads.names) })}\n")
+      File.write("#{path}.tmp", "#{JSON.pretty_generate({ goal: leads.goal, leads: leads.with_status, places: PlaceCard.world(events, names: leads.names) })}\n")
       File.rename("#{path}.tmp", path)
     end
 
@@ -50,7 +58,32 @@ module Koholint
       @all = []
       @goal = nil
       @names = {}
+      @attempts = {}
     end
+
+    # A finished objective that followed a lead (its because, or a lead candidate's target) is evidence about that lead.
+    def note_objective(done)
+      id = Ledger.pick(done, :id)
+      target = Ledger.pick(done, :target) || {}
+      lead = Ledger.pick(done, :because) || Ledger.pick(target, :lead)
+      return if id.nil? || lead.nil? || @attempts.key?(id)
+
+      @attempts[id] = { objective: id, lead:, title: Ledger.pick(done, :title), outcome: (Ledger.pick(done, :outcome) || Ledger.pick(done, :status)).to_s,
+                        place: Ledger.pick(target, :place) || Ledger.pick(Ledger.pick(done, :predicate) || {}, :place),
+                        frame: Ledger.pick(done, :ended_frame) || Ledger.pick(done, :frame) }
+    end
+
+    # tested: an objective that followed the lead was achieved; refuted: REFUTE_AT objectives followed it and none was.
+    def status(lead)
+      tries = @attempts.values.select { |attempt| attempt[:lead] == lead[:id] }
+      verdict = if tries.any? { |attempt| attempt[:outcome] == 'achieved' } then 'tested'
+                elsif tries.size >= REFUTE_AT then 'refuted'
+                else 'open'
+                end
+      { status: verdict, evidence: tries }
+    end
+
+    def with_status = @all.map { |lead| lead.merge(status(lead)) }
 
     def restore(event)
       lead = %w[id place source quote claim importance].to_h { |key| [key.to_sym, Ledger.pick(event, key)] }

@@ -365,11 +365,12 @@ module Koholint
 
       def ask(decision_point, state, context)
         entities_now
+        @objectives.history.each { |done| @leads.note_objective(done) }
         @candidates = decision_point.name == :choose_objective ? build_candidates(state, context) : []
         @prompt = Agents::Context.build(state:, grid: grid_for(state, context), objective: @objectives.current, history: @objectives.history, entities: @entities,
                                        attempts: @objectives.attempts_for_prompt, manual: @manual, last_results: @last_results, ledger: @ledger, refusals: @refusals, plan: @plan,
                                        triggers: @triggers, talk_log: @talk_log, signs: objects_now, locked: (@hemmed[:attempts] if @hemmed && hemmed?(state)),
-                                       locked_frames: (locked_frames(state) if WAIT_PHASES.include?(state.phase)), goal: goal_line, leads: @leads.all, stamp: stamp(state),
+                                       locked_frames: (locked_frames(state) if WAIT_PHASES.include?(state.phase)), goal: goal_line, leads: @leads.with_status, stamp: stamp(state),
                                        place_name: @leads.name_of([state.room_id, state.map_id]), candidates: (Candidates.lines(@candidates) if decision_point.name == :choose_objective),
                                        learned: (@learned if decision_point.name == :choose_skill),
                                        resolve: @leads.method(:place_for), hp_lost: @hp_lost, died: @died, alerts: alerts(state), route: route_line(state))

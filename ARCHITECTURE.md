@@ -222,7 +222,11 @@ agent extracts from texts it read (dialogue, signs, objects), each with a verbat
 (`high`, `normal`, `low`, or `tip` for how-to-play advice; the context shows all high leads, the normal ones of the
 place and the 4 newest tips). A lead whose quote is not in the transcription of the same call is dropped (`notable`
 `lead_rejected`), duplicates are dropped by quote. Goal and leads are rebuilt from the `goal` and `lead` trace events on
-resume.
+resume. flow-48: each lead has a status derived from the objectives that followed it (`because`, or a `lead` candidate's target), read from the finished
+objectives (`Leads#note_objective`, fed with `Objectives#history` before each prompt and rebuilt from the `objective` events on resume): `open` until one
+follows it, `tested` once one is achieved, `refuted` after `REFUTE_AT` (2) that were not. The evidence is those objectives (id, title, outcome, place, frame).
+The context tags a followed lead with its status and evidence and lists open leads first, a lead that is not open is no longer a `lead-N` candidate, and
+`world.json` carries `status` and `evidence` per lead.
 
 **Agents** (`agents/`) — `context.rb` renders state for the model (grid map, neighbours, entities and objects on screen, people's names,
 goal, leads — every `high` one, `normal` ones of the current place, never `low` ones —, recent results, plan), `prompts.rb` holds the system prompts, `claude_cli.rb` calls `claude -p` with a JSON

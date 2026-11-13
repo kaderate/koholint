@@ -76,7 +76,28 @@ class LeadsTest < Minitest::Test
       Koholint::Leads.write_world(dir)
       world = JSON.parse(File.read(File.join(dir, 'world.json')))
       assert_equal 'second', world['goal']
-      assert_equal [{ 'id' => 'lead-1', 'place' => [1, 2], 'source' => nil, 'quote' => 'Hello, Link', 'claim' => 'a greeting', 'importance' => 'low' }], world['leads']
+      assert_equal [{ 'id' => 'lead-1', 'place' => [1, 2], 'source' => nil, 'quote' => 'Hello, Link', 'claim' => 'a greeting', 'importance' => 'low', 'status' => 'open', 'evidence' => [] }], world['leads']
+    end
+  end
+
+  def test_objectives_that_followed_a_lead_test_or_refute_it_and_are_rebuilt_from_the_trace
+    Dir.mktmpdir do |dir|
+      trace = Koholint::Trace.new(File.join(dir, 'trace.jsonl'))
+      trace.emit(:lead, frame: 1, id: 'lead-1', place: [1, 2], source: nil, quote: 'the key is in the cave', claim: 'a key in the cave', importance: 'high', where: '5-0')
+      trace.emit(:lead, frame: 1, id: 'lead-2', place: [1, 2], source: nil, quote: 'go further east', claim: 'east', importance: 'normal')
+      trace.emit(:objective, frame: 10, id: 'obj-1', status: 'started', title: 'Go to place 5-0', predicate: { kind: 'reach_place', place: [5, 0] }, candidate: 'lead-1', target: { kind: 'lead', place: [5, 0], lead: 'lead-1' })
+      trace.emit(:objective, frame: 90, id: 'obj-1', status: 'abandoned', predicate: { kind: 'reach_place', place: [5, 0] }, reason: 'stall')
+      trace.emit(:objective, frame: 100, id: 'obj-2', status: 'started', title: 'Leave by the right side', predicate: { kind: 'leave_place', place: [1, 2] }, because: 'lead-2')
+      trace.emit(:objective, frame: 150, id: 'obj-2', status: 'achieved', predicate: { kind: 'leave_place', place: [1, 2] })
+      trace.emit(:objective, frame: 200, id: 'obj-3', status: 'started', title: 'Explore', predicate: { kind: 'new_place' })
+      trace.emit(:objective, frame: 250, id: 'obj-3', status: 'failed', predicate: { kind: 'new_place' })
+      leads = Koholint::Leads.from_events(Koholint::Trace.read(File.join(dir, 'trace.jsonl')))
+      assert_equal ['open', 'tested'], leads.with_status.map { |lead| lead[:status] }
+      assert_equal [{ objective: 'obj-2', lead: 'lead-2', title: 'Leave by the right side', outcome: 'achieved', place: [1, 2], frame: 150 }], leads.status(leads.all[1])[:evidence]
+      assert_equal [{ objective: 'obj-1', lead: 'lead-1', title: 'Go to place 5-0', outcome: 'abandoned', place: [5, 0], frame: 90 }], leads.status(leads.all[0])[:evidence]
+      leads.note_objective({ id: 'obj-4', title: 'Go to place 5-0', predicate: { kind: 'reach_place', place: [5, 0] }, outcome: :abandoned, ended_frame: 400, target: { kind: 'lead', place: [5, 0], lead: 'lead-1' } })
+      leads.note_objective({ id: 'obj-4', title: 'again', outcome: :achieved, because: 'lead-1' })
+      assert_equal ['refuted', 2], leads.status(leads.all[0]).then { |found| [found[:status], found[:evidence].size] }
     end
   end
 

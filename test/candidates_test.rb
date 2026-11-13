@@ -100,6 +100,8 @@ class CandidatesTest < Minitest::Test
     assert_equal({ kind: 'lead', place: [3, 0], lead: 'lead-1' }, by_id['lead-1'][:target])
     assert_match(/no known route/, by_id['lead-2'][:label])
     refute by_id.key?('place-3-0')
+    leads.note_objective({ id: 'obj-1', title: 'Go to Beach', outcome: :achieved, ended_frame: 50, target: { kind: 'lead', place: [3, 0], lead: 'lead-1' } })
+    refute build(leads:, cards:).any? { |candidate| candidate[:id] == 'lead-1' }, 'a tested lead is no longer a candidate'
   end
 
   def test_low_health_lists_the_nearest_known_interior_first

@@ -131,7 +131,7 @@ module Koholint
     def lead_places(place, hops, leads, named)
       leads.all.reverse.filter_map do |lead|
         where = leads.place_for(lead)
-        next unless where && where != place
+        next unless where && where != place && leads.status(lead)[:status] == 'open'
 
         route = hops[where] ? moves(hops[where]) : 'no known route'
         { id: lead[:id], label: "go to #{describe(where, named)} (#{lead[:importance]} lead: #{lead[:claim]}), #{route}",

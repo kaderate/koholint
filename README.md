@@ -80,7 +80,7 @@ visited places from the trace; `fork` branches a run at a frame (the parent may 
 `--keep-viewer` keeps it serving after the stop until Ctrl-C (if it could not start, for example on a busy port, `branch` says so and still plays). A checkpoint is a name from `data/checkpoints.json` (`name`, `run`, `frame`, `flow`, `source`),
 checked against the run id and its flow, e.g. `bin/koholint branch runs/20261111-194737-9ba1 --at sword-obtained --frames 3000`.
 
-## Agent skills (`flow-47`)
+## Agent skills (`flow-48`)
 
 - Learned capabilities (`data/capabilities.json`, `bin/koholint capability list`): an `operational` entry is a composite of the skills below, offered in the skill schema and listed under "Learned skills" only while its object is on screen (today `sword_on_object_92 row col direction`: stand next to object 92, face it, use the sword, step into its cell). `explore` and `goto` also run it themselves when blocked facing such a cell, and the planner routes through those cells as a last resort. `learn` and `capability publish|retire` are offline commands.
 - Between decisions the engine waits, with no input, until Link is ready (no screen scroll, door walk, jump or
@@ -115,6 +115,8 @@ checked against the run id and its flow, e.g. `bin/koholint branch runs/20261111
   to five leads (`quote`, `claim`, importance `high|normal|low|tip`, `tip` for how-to-play advice); a lead whose quote is not in that transcription is
   dropped. Both are trace events (`goal`, `lead`), shown in the context and the live view and written to `world.json`;
   an objective can cite the lead behind it (`because`). A lead may carry `where` (a place id such as `161-0` or a name the agent gave).
+  A lead is `open` until an objective follows it, `tested` once one is achieved and `refuted` after 2 that were not; the context shows
+  the status with those objectives as evidence and lists open leads first.
 - At `choose_objective` the context lists candidate objectives with ids (`candidates.rb`): untried exits by side (`exit-up`) and doors
   (`door-R-C`) of this place, people (`person-tT`, listed first) and unread signs (`sign-R-C`) here worth a visit, known places with untried exits
   (`place-R-M`), people and unread signs of other known places (from their place cards) and places tied to a lead by its `where`
