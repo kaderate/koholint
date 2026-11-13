@@ -472,6 +472,49 @@ class SkillsTest < Minitest::Test
     assert_equal :right, result[:blocked_at][:direction]
   end
 
+  def test_goto_blocked_off_centre_in_a_narrow_passage_centres_exactly_and_passes
+    execution = registry.start('goto', state(x: 85, y: 80), { row: 2, col: 5 }, { grid: OpenGrid.new })
+    x, y = 85, 80
+    300.times do
+      buttons = execution.next_input(state(x:, y:)) or break
+      dx, dy = { up: [0, -1], down: [0, 1], left: [-1, 0], right: [1, 0] }.fetch(buttons.first, [0, 0])
+      next if dy.negative? && y <= 72 && y > 56 && x != 88
+
+      x += dx
+      y += dy
+    end
+    result = execution.result(state(x:, y:))
+    assert_equal :done, result[:stopped_by]
+    assert_equal [2, 5], [result[:to][:row], result[:to][:col]]
+    refute result.key?(:replans)
+  end
+
+  def test_goto_off_centre_against_a_true_wall_retries_once_then_replans_and_ends_blocked
+    wall = (0..7).map { |row| [row, 7] }
+    result, = goto(4, 8, start: [88, 78], walls: wall)
+    assert_equal [:blocked, 3], result.values_at(:stopped_by, :replans)
+    assert_operator result[:frames], :<, 400
+  end
+
+  def test_goto_drops_zero_tolerance_when_it_replans
+    execution = registry.start('goto', state(x: 88, y: 78), { row: 4, col: 8 }, { grid: OpenGrid.new })
+    x, y = 88, 78
+    exact_after_replan = nil
+    400.times do
+      buttons = execution.next_input(state(x:, y:)) or break
+      if execution.result(state(x:, y:))[:replans] == 1 && exact_after_replan.nil?
+        exact_after_replan = execution.instance_variable_get(:@exact)
+      end
+      dx, dy = { up: [0, -1], down: [0, 1], left: [-1, 0], right: [1, 0] }.fetch(buttons.first, [0, 0])
+      next if Koholint::Geometry.cell_for(x + dx + (7 * dx), y + dy + (7 * dy)) == [4, 7]
+
+      x += dx
+      y += dy
+    end
+    assert_equal false, exact_after_replan
+    assert_equal :done, execution.result(state(x:, y:))[:stopped_by]
+  end
+
   def test_goto_turns_after_centring
     result, = goto(2, 6, start: [88, 80])
     assert_equal :done, result[:stopped_by]
