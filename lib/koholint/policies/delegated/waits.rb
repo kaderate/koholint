@@ -67,7 +67,7 @@ module Koholint
         end
 
         def track_locked(state)
-          if WAIT_PHASES.include?(state.phase)
+          if Modes::HELD.include?(state.phase)
             unless @locked_since
               @locked_since = state.frame
               @objectives.touch(frame: state.frame)
@@ -83,7 +83,7 @@ module Koholint
 
         def locked_waiting?(state)
           track_locked(state)
-          return false unless WAIT_PHASES.include?(state.phase)
+          return false unless Modes::HELD.include?(state.phase)
           return true if locked_frames(state) < LOCKED_WAIT_LIMIT_FRAMES
 
           unless @lock_capped == @locked_since

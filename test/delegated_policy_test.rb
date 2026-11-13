@@ -722,6 +722,33 @@ class DelegatedPolicyTest < Minitest::Test
     assert_equal calls, client.calls.size
   end
 
+  def test_a_one_frame_release_between_two_locks_does_not_reach_the_model
+    client = ScriptedClient.new(objective: objective, skill: walk)
+    p = policy(client)
+    decide(p)
+    calls = client.calls.size
+    first = state(frame: 100, **LOCKED)
+    advance(p, decide_with_shot(p, first), first, 115)
+    released = state(frame: 115)
+    p.observe(released, frame: 115)
+    settle = decide_with_shot(p, released)
+    assert_equal({ skill: 'wait', params: { frames: 15 } }, settle[:choice])
+    advance(p, settle, released, 116)
+    again = state(frame: 116, **LOCKED)
+    p.observe(again, frame: 116)
+    relock = decide_with_shot(p, again)
+    assert_equal({ skill: 'wait', params: { frames: 30, until_free: true } }, relock[:choice])
+    advance(p, relock, again, 174)
+    free = state(frame: 174)
+    p.observe(free, frame: 174)
+    long = decide_with_shot(p, free)
+    assert_equal({ skill: 'wait', params: { frames: 30 } }, long[:choice])
+    assert_equal calls, client.calls.size
+    advance(p, long, free, 204)
+    decide_with_shot(p, state(frame: 204))
+    assert_equal calls + 1, client.calls.size
+  end
+
   def test_a_lock_past_the_wait_cap_is_noted_once_and_handed_to_the_model
     client = ScriptedClient.new(objective: objective, skill: [walk, walk])
     p = policy(client)

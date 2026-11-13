@@ -19,6 +19,7 @@ module Koholint
     OPTION_KEYS = %w[text quits].freeze
     BYTES = Set.new(0..255).freeze
     IN_PLAY = %i[loading playing locked dialogue cutscene game_over].freeze
+    HELD = %i[locked cutscene].freeze
 
     Mode = Data.define(:name, :kind, :phase, :match, :ready, :enter, :exit, :inputs, :cursor, :options, :source, :confidence,
                        :verified_count, :note, :sets, :ready_sets) do

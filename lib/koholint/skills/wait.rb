@@ -1,10 +1,10 @@
+require 'koholint/modes'
 require 'koholint/skills/execution'
 
 module Koholint
   module Skills
     class Wait
       MAX_FRAMES = 120
-      HELD = %i[locked cutscene].freeze
 
       class Run < Execution
         def initialize(duration:, until_free: false, **rest)
@@ -17,7 +17,7 @@ module Koholint
 
         def input_for(state)
           return finish(:done) if @frames >= @duration
-          return finish(:released) if @until_free && @frames.positive? && !HELD.include?(state.phase)
+          return finish(:released) if @until_free && @frames.positive? && !Modes::HELD.include?(state.phase)
 
           []
         end
