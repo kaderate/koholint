@@ -107,6 +107,22 @@ module Koholint
             confidence: 1.0, agent: 'delegated', latency_ms: 0, cost_usd: 0.0, fallback: false, autopilot: true, prompt: nil, image: nil }
         end
 
+        def zero_cap(decision_point, state, context)
+          place = [state.room_id, state.map_id]
+          return unless decision_point.name == :choose_skill && !@sequence && @zero_watch.due?(place)
+
+          _, skill, stop = @zero_watch.key
+          count = @zero_watch.count
+          @notes << { kind: 'stuck', detail: "zero-frame: #{skill} #{stop} #{count} times in a row in #{place.join('-')}" }
+          route = @zero_watch.explore? && @explore_log.route(place)
+          context[:aim] = { place: route[:goal] } if route
+          choice = route ? EXPLORE : ZERO_WAIT
+          @zero_watch.capping(choice[:skill])
+          what = route ? "explore toward #{route[:goal].join('-')}, the nearest place with untried work" : "wait #{ZERO_WAIT[:params][:frames]} frames before asking again"
+          { choice:, justification: "#{skill} ended #{stop} #{ZeroWatch::MARK} #{count} times here: #{what}",
+            confidence: 1.0, agent: 'delegated', latency_ms: 0, cost_usd: 0.0, fallback: false, autopilot: true, prompt: nil, image: nil }
+        end
+
         def auto_objective(decision_point, state)
           return unless @autopilot && decision_point.name == :choose_objective
           return if @autopilot.objective_hold(state:, last: @objectives.history.last)
