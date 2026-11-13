@@ -2,6 +2,10 @@
 
 Command reference for running, resuming and forking runs, the offline censuses, the viewer and run storage. For a first run see the [README](../README.md); for the agent-side skills see [AGENT_SKILLS.md](AGENT_SKILLS.md).
 
+## Tests
+
+`rake test` runs one process per file (ROM-heavy files one process per test, about 2 min; the first run builds an emulator state cache in `tmp/`); `rake test:fast` skips the ROM-heavy files (about 25 s); `rake test:e2e` also plays the full boot from frame 0. `bin/generate_start_fixture` regenerates `test/fixtures/start_game.expected.json` (read by `test/perception_test.rb`) after a boot script or perception change.
+
 ## Running
 
 **Budgets.** `run`/`resume` accept `--frames N`, `--minutes N`, `--dollars X` (or `--max-dollars X`, default 1.5 with

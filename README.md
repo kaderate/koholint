@@ -18,10 +18,10 @@
 
 Honest numbers, from [`ROADMAP.md`](ROADMAP.md) and [`docs/runs/index.md`](docs/runs/index.md):
 
-- The agent plays from the title screen, explores the overworld, talks to people and reads signs, and **obtained the shield and the sword** (the sword in run `20261111-194737-9ba1`, frame 60404, room 242/0).
+- The agent plays from the title screen, explores the overworld, talks to people and reads signs, and **obtained the shield and the sword** (the sword in run [`20261111-194737-9ba1`](runs/20261111-194737-9ba1/): 42 places, 62,457 frames, 4.32 USD, item gained at frame 60404 in room 242/0).
 - It strikes enemies with the sword and keeps track of leads (open, tested or refuted) found in dialogues.
-- The archived runs span 1 to 28 places discovered per run (best archived: 28 places in `20261101-140253-3cc4`, for about 1.5 USD), at roughly 0.04 to 0.4 USD per 1000 frames.
-- One learned capability, `sword-on-object-92` (use the sword on a room object that blocks the way), is operational; in a checkpointed A/B it let all three forks reach a place (164/17) no archived run had seen.
+- The longest run so far, [`20261113-090835-21b0`](runs/20261113-090835-21b0/), saw **63 places in 84,235 frames for 6.92 USD**: 21 places new to its lineage, found with a learned capability. Archived runs cost roughly 0.04 to 0.4 USD per 1000 frames.
+- That capability, `sword-on-object-92` (use the sword on a room object that blocks the way), is the one operational learned capability; in a checkpointed A/B it let all three forks reach a place (164/17) no archived run had seen.
 - Not done yet: the first dungeon is the next goal, and a validation run from zero is still pending. See the [roadmap](ROADMAP.md) for what remains.
 
 ## How it works
@@ -46,7 +46,7 @@ The engine reads the game state from RAM, builds a belief grid of the screen, an
 
 - Ruby 4.0.1
 - [emu-gb](https://github.com/kaderate/gemboy) (public repo `kaderate/gemboy`), checked out locally
-- Your own copy of the *Link's Awakening DX* ROM. It is **not provided and never committed**.
+- Your own copy of the *Link's Awakening DX* ROM, revision 1 (the file is named `zelda_dx_rev1.gbc` in `.env.example`). It is **not provided and never committed**, and a run resumes only with the same ROM hash, so keep to one revision.
 - The [Claude CLI](https://docs.claude.com/en/docs/claude-code) for agent runs (`claude -p`)
 
 **Configure**
@@ -76,7 +76,7 @@ rake test:fast   # skips the ROM-heavy files, about 25 s
 rake test        # full suite, about 2 min (the first run builds an emulator state cache in tmp/)
 ```
 
-`rake test:e2e` adds the tests that play the full boot from frame 0. The suite needs the ROM and emu-gb configured as above.
+`rake test:e2e` adds the tests that play the full boot from frame 0. The suite needs the ROM and emu-gb configured as above. After a boot script or perception change, `bin/generate_start_fixture` regenerates `test/fixtures/start_game.expected.json`, which `test/perception_test.rb` reads.
 
 ## Project layout
 

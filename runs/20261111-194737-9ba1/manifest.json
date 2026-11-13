@@ -1,0 +1,19 @@
+{
+  "flow_version": "flow-37",
+  "rom_sha256": "211a1d1559dc2684d63d87f62a6b1e9109201a6383b4004e9dd5e18ee926ee83",
+  "seed": 0,
+  "budget": {
+    "active_seconds": 5400.0,
+    "dollars": 4.0
+  },
+  "status": "stopped",
+  "parent": {
+    "id": "20261111-142812-34ca",
+    "frame": 52200
+  },
+  "tag": "flow37-sword",
+  "harness_sha": "a863d83287405e798b81b2ef21fe1ae703cf7aa2",
+  "prompts_sha": "a6db05f863909c9cf714c63da50fa14cdce33d097a2a132219abe83d86dddd3a",
+  "model": "sonnet",
+  "autopilot": true
+}

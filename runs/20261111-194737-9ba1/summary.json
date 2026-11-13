@@ -1,0 +1,180 @@
+{
+  "v": 8,
+  "run_id": "20261111-194737-9ba1",
+  "flow_version": "flow-37",
+  "tag": "flow37-sword",
+  "harness_sha": "a863d83287405e798b81b2ef21fe1ae703cf7aa2",
+  "prompts_sha": "a6db05f863909c9cf714c63da50fa14cdce33d097a2a132219abe83d86dddd3a",
+  "model": "sonnet",
+  "autopilot": true,
+  "capabilities": null,
+  "frames": 62457,
+  "dollars": 4.323988,
+  "calls": 218,
+  "calls_per_1000f": 3.490401,
+  "usd_per_1000f": 0.069231,
+  "latency_ms": {
+    "median": 3796,
+    "p90": 7712
+  },
+  "highest_milestone": "sword",
+  "places_seen": 42,
+  "objectives": {
+    "count": 60,
+    "achieved": 54
+  },
+  "stop_reason": "stopped",
+  "symptoms": [
+    {
+      "kind": "left_with_unexhausted_people",
+      "count": 6,
+      "evidence": [
+        {
+          "frame": 20864,
+          "place": [
+            161,
+            0
+          ],
+          "people": [
+            111
+          ]
+        },
+        {
+          "frame": 22861,
+          "place": [
+            179,
+            0
+          ],
+          "people": [
+            111
+          ]
+        },
+        {
+          "frame": 35331,
+          "place": [
+            161,
+            0
+          ],
+          "people": [
+            111
+          ]
+        },
+        {
+          "frame": 52699,
+          "place": [
+            242,
+            0
+          ],
+          "people": [
+            49
+          ]
+        },
+        {
+          "frame": 53220,
+          "place": [
+            242,
+            0
+          ],
+          "people": [
+            49
+          ]
+        },
+        {
+          "frame": 61279,
+          "place": [
+            242,
+            0
+          ],
+          "people": [
+            49
+          ]
+        }
+      ]
+    }
+  ],
+  "starred": true,
+  "cost_by_skill": {
+    "advance_dialogue": {
+      "calls": 1,
+      "usd": 0.033148
+    },
+    "choose_objective": {
+      "calls": 25,
+      "usd": 0.386092
+    },
+    "close_map": {
+      "calls": 1,
+      "usd": 0.0295
+    },
+    "explore": {
+      "calls": 83,
+      "usd": 1.607263
+    },
+    "goto": {
+      "calls": 28,
+      "usd": 0.567071
+    },
+    "guard": {
+      "calls": 1,
+      "usd": 0.021515
+    },
+    "open_map": {
+      "calls": 1,
+      "usd": 0.021327
+    },
+    "press": {
+      "calls": 2,
+      "usd": 0.040668
+    },
+    "step": {
+      "calls": 2,
+      "usd": 0.039214
+    },
+    "talk_to": {
+      "calls": 19,
+      "usd": 0.518378
+    },
+    "use_item": {
+      "calls": 1,
+      "usd": 0.020997
+    },
+    "walk": {
+      "calls": 54,
+      "usd": 1.038815
+    }
+  },
+  "decisions_by_agent": {
+    "start_game": 53,
+    "claude": 218,
+    "delegated": 817
+  },
+  "usage": {
+    "goal_changes": 2,
+    "leads": {
+      "high": 3,
+      "normal": 8,
+      "low": 2,
+      "tip": 5
+    },
+    "lead_rejected": 0,
+    "objectives_by_kind": {
+      "new_text": 10,
+      "new_place": 36,
+      "reach_place": 6,
+      "leave_place": 8
+    },
+    "because_used": 1,
+    "talks": 46,
+    "talks_to_known": 20,
+    "dialogues": 46,
+    "not_ready_frames": 9498,
+    "not_ready_waits": 242,
+    "deaths": 1,
+    "damage_events": 13,
+    "stuck_events": 1,
+    "autopilot_decisions": 242,
+    "chain_max": 19,
+    "left_with_unexhausted_people": 6
+  },
+  "capability_uses": {}
+}
