@@ -701,7 +701,7 @@ class DelegatedPolicyTest < Minitest::Test
     free = state(frame: 160)
     p.observe(free, frame: 160)
     settle = decide_with_shot(p, free)
-    assert_equal [{ skill: 'wait', params: { frames: 30 } }, 'delegated'], settle.values_at(:choice, :agent)
+    assert_equal [{ skill: 'wait', params: { frames: 30, until_held: true } }, 'delegated'], settle.values_at(:choice, :agent)
     assert_equal calls, client.calls.size
     advance(p, settle, state(frame: 190), 190)
     decide_with_shot(p, state(frame: 190))
@@ -718,7 +718,7 @@ class DelegatedPolicyTest < Minitest::Test
     free = state(frame: 106)
     p.observe(free, frame: 106)
     settle = decide_with_shot(p, free)
-    assert_equal [{ skill: 'wait', params: { frames: 6 } }, 'delegated'], settle.values_at(:choice, :agent)
+    assert_equal [{ skill: 'wait', params: { frames: 6, until_held: true } }, 'delegated'], settle.values_at(:choice, :agent)
     assert_equal calls, client.calls.size
   end
 
@@ -732,7 +732,7 @@ class DelegatedPolicyTest < Minitest::Test
     released = state(frame: 115)
     p.observe(released, frame: 115)
     settle = decide_with_shot(p, released)
-    assert_equal({ skill: 'wait', params: { frames: 15 } }, settle[:choice])
+    assert_equal({ skill: 'wait', params: { frames: 15, until_held: true } }, settle[:choice])
     advance(p, settle, released, 116)
     again = state(frame: 116, **LOCKED)
     p.observe(again, frame: 116)
@@ -742,11 +742,31 @@ class DelegatedPolicyTest < Minitest::Test
     free = state(frame: 174)
     p.observe(free, frame: 174)
     long = decide_with_shot(p, free)
-    assert_equal({ skill: 'wait', params: { frames: 30 } }, long[:choice])
+    assert_equal({ skill: 'wait', params: { frames: 30, until_held: true } }, long[:choice])
     assert_equal calls, client.calls.size
     advance(p, long, free, 204)
     decide_with_shot(p, state(frame: 204))
     assert_equal calls + 1, client.calls.size
+  end
+
+  # The healing scene of 83/0 in fork a8f3 holds Link through a lock that flickers, free 1 to 12 frames at a time.
+  def test_locks_less_than_the_settle_apart_are_one_scene_and_each_release_waits_as_long_as_the_scene
+    client = ScriptedClient.new(objective: objective, skill: walk)
+    p = policy(client)
+    decide(p)
+    calls = client.calls.size
+    settles = (100...140).step(2).map do |frame|
+      held = state(frame:, **LOCKED)
+      p.observe(held, frame:)
+      advance(p, decide_with_shot(p, held), held, frame + 1)
+      free = state(frame: frame + 1)
+      p.observe(free, frame: frame + 1)
+      settle = decide_with_shot(p, free)
+      advance(p, settle, free, frame + 2)
+      settle[:choice]
+    end
+    assert_equal [{ skill: 'wait', params: { frames: 1, until_held: true } }, { skill: 'wait', params: { frames: 30, until_held: true } }], settles.values_at(0, -1)
+    assert_equal calls, client.calls.size
   end
 
   def test_a_lock_past_the_wait_cap_is_noted_once_and_handed_to_the_model
