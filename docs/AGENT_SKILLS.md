@@ -46,8 +46,8 @@ The skills, protocols and harness behaviours the agent works with. Versioned wit
   unreachable target or restart does not count); the context shows the status with the last 3 of those objectives and lists open leads first.
   flow-58: a text the game opens while Link presses toward something (the edge it bars) also becomes a `normal` lead on its own, whatever the agent
   extracts: its quote is the text read, its `source` and `contact` name the cell pressed toward and what is in it (a catalogued npc's type, else the
-  object id, never an id Link has stood on in that place), its `where` is the place, and its claim says only that contact with that thing opened the text.
-  There is one such lead per thing and text (a text overlapping an earlier one about the same thing is dropped), at most 5 per place, and they never
+  object id, never an id Link has stood on in that place or one filling a tenth of the room, a ground kind), its `where` is the place, and its claim says only that contact with that thing opened the text.
+  There is one such lead per thing and text (a text overlapping an earlier one about the same thing, or any lead already quoting it in that place, is dropped), at most 5 per place, and they never
   change the dialogue stamp, so they do not reopen people.
 - At `choose_objective` the context lists candidate objectives with ids (`candidates.rb`): untried exits by side (`exit-up`) and doors
   (`door-R-C`) of this place, people (`person-tT`, listed first) and unread signs (`sign-R-C`) here worth a visit, known places with untried exits

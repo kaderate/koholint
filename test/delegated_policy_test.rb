@@ -933,6 +933,33 @@ class DelegatedPolicyTest < Minitest::Test
     assert_nil flush(p, 300)[:leads]
   end
 
+  def test_a_text_opened_toward_a_ground_kind_filling_the_room_makes_no_lead
+    sheet = ok('skill' => 'wait', 'params' => { 'frames' => 3 }, 'transcription' => 'Welcome to the island, traveller.')
+    client = ScriptedClient.new(objective: objective, skill: [sheet, walk])
+    p = policy(client)
+    decide_with_shot(p, state)
+    p.prepare({ room_objects: -> { Array.new(8) { |row| Array.new(10, row < 4 ? 4 : 5) } } })
+    p.after_action(choice: { skill: 'walk', params: { 'direction' => 'down', 'cells' => 1 } },
+                   outcome: { stopped_by: 'dialogue', dialog_before: false, dialog_after: true, trigger_input: [:down], to: { room: 163, map: 16, row: 3, col: 2 } },
+                   state:, frame: 100)
+    pages(p, 2)
+    assert_nil flush(p, 300)[:leads]
+  end
+
+  def test_a_text_opened_when_link_presses_toward_a_person_is_a_lead_about_that_person
+    sheet = ok('skill' => 'wait', 'params' => { 'frames' => 3 }, 'transcription' => "J'aime pas du tout c'qu'est poudreux!")
+    client = ScriptedClient.new(objective: objective, skill: [sheet, walk])
+    p = policy(client)
+    decide_with_shot(p, state)
+    p.prepare({ room_objects: -> { Array.new(8) { Array.new(10, 4) } }, entities: -> { [{ kind: :npc, type: 140, cell: [3, 3] }] } })
+    p.after_action(choice: { skill: 'walk', params: { 'direction' => 'right', 'cells' => 1 } },
+                   outcome: { stopped_by: 'dialogue', dialog_before: false, dialog_after: true, trigger_input: [:right], to: { room: 163, map: 16, row: 3, col: 2 } },
+                   state:, frame: 100)
+    pages(p, 2)
+    lead = flush(p, 300)[:leads].last
+    assert_equal [{ row: 3, col: 3, entity: 140 }, { row: 3, col: 3, entity: 140 }, 'Contact with person 140 at (3,3) opened this text'], lead.values_at(:contact, :source, :claim)
+  end
+
   def test_a_transcribed_text_not_read_before_achieves_new_text
     sheet = ok('skill' => 'wait', 'params' => { 'frames' => 3 }, 'transcription' => "Go no\n\nGo north, then east.")
     client = ScriptedClient.new(objective: ok('title' => 'read', 'predicate' => { 'kind' => 'new_text' }), skill: [sheet, walk])

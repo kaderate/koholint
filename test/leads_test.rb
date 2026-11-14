@@ -38,6 +38,13 @@ class LeadsTest < Minitest::Test
     assert_equal JSON.parse(JSON.generate(leads.all)), JSON.parse(JSON.generate(restored))
   end
 
+  def test_a_contact_text_a_model_lead_already_quoted_in_that_place_adds_nothing
+    leads = Koholint::Leads.new
+    leads.absorb([lead('the key is in the north cave')], transcription: TEXT, place: [1, 2], source: nil)
+    assert_nil leads.contact({ row: 1, col: 2, object: 32 }, text: TEXT, place: [1, 2])
+    assert leads.contact({ row: 1, col: 2, object: 32 }, text: TEXT, place: [5, 0])
+  end
+
   def test_contact_leads_are_capped_per_place
     leads = Koholint::Leads.new
     7.times { |i| leads.contact({ row: 1, col: i, object: 40 + i }, text: "a text number #{i}", place: [5, 0]) }

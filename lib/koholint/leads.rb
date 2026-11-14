@@ -152,7 +152,10 @@ module Koholint
       key = self.class.compact(quote)
       return if self.class.normalize(quote).length < QUOTE_MIN || thing.empty?
       return if @all.count { |known| known[:contact] && known[:place] == place } >= LIMIT
-      return if @all.any? { |known| known[:contact]&.slice(:object, :entity) == thing && (key.include?(self.class.compact(known[:quote])) || self.class.compact(known[:quote]).include?(key)) }
+      return if @all.any? do |known|
+        (known[:place] == place || known[:contact]&.slice(:object, :entity) == thing) &&
+          (key.include?(self.class.compact(known[:quote])) || self.class.compact(known[:quote]).include?(key))
+      end
 
       what = contact[:entity] ? "person #{contact[:entity]}" : "object #{contact[:object]}"
       claim = "Contact with #{what} at (#{contact[:row]},#{contact[:col]}) opened this text"

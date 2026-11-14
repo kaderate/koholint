@@ -2,6 +2,8 @@ module Koholint
   module Policies
     class Delegated
       module Outcomes
+        FLOOR_SHARE = 0.1
+
         private
 
         def note_damage(state)
@@ -125,9 +127,15 @@ module Koholint
           person = entities_now.find { |entity| entity[:cell] == [row, col] && entity[:kind].to_s == 'npc' }
           objects = @room_objects_reader&.call
           object = objects&.dig(row, col)
-          floor = objects ? (@explore_log.walked(place) | [cell]).map { |r, c| objects.dig(r, c) } : []
-          thing = person ? { entity: person[:type] } : ({ object: } if object && !floor.include?(object))
+          thing = person ? { entity: person[:type] } : ({ object: } if object && !floor?(objects, object, place, cell))
           @contact = { row:, col:, **thing } if thing
+        end
+
+        # Ground is an id Link has stood on here, or one that fills a large share of the room (a ground kind not walked yet).
+        def floor?(objects, object, place, cell)
+          return true if (@explore_log.walked(place) | [cell]).any? { |r, c| objects.dig(r, c) == object }
+
+          objects.flatten.count(object) >= objects.flatten.size * FLOOR_SHARE
         end
 
         def feed_talk_log(choice, outcome, state)
