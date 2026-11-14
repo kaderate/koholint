@@ -45,8 +45,10 @@ The skills, protocols and harness behaviours the agent works with. Versioned wit
   and when Link already stands on or next to the target's cell he strikes from there instead of walking to another cell
   next to it, which the pieces of a split enemy can all block. flow-65: after an attack that stops `done` or `target_gone`,
   the harness attacks the nearest other `enemy` within 2 cells itself, or an unidentified type already struck in this
-  place, with no model call. It hands back to the model when no target is left, health is below 2 hearts or a heart
-  below its level at the last call, an attack stops any other way, or after 8 attacks or 900 frames since that call.
+  visit, never the slot just struck (it stays listed while it dies), with no model call. It hands back to the model when
+  no target is left, health is below 2 hearts or a heart below its level at the last call, an attack stops any other
+  way (a room change is one: `room_change` ends the chain), or after 8 attacks or 900 frames since that call (checked
+  before each attack, so the last one may run past it). The viewer counts no autopilot decision as an objective attempt.
 - A ledger counts blocked edges per place; an edge blocked twice is marked doubtful in the context, and an objective
   that keeps failing is abandoned as `unreachable`.
 - Dialogue pages are advanced automatically (one `decision` with agent `delegated` and cost 0 per page) and read once

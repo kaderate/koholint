@@ -24,7 +24,7 @@ module Koholint
       @acted = false
       @returns = Hash.new(0)
       @fight = 0
-      @struck = Hash.new { |hash, place| hash[place] = [] }
+      @struck = { place: nil, types: [] }
     end
 
     def model_called(state:, objective:, news: false)
@@ -45,9 +45,7 @@ module Koholint
     def acted(skill:, outcome:)
       @acted = true
       @attack_stop = skill.to_s == 'attack' && outcome.is_a?(Hash) ? outcome[:stopped_by].to_s : nil unless skill.to_s == 'wait'
-      struck = outcome[:target] if skill.to_s == 'attack'
-      place = outcome[:from] if struck
-      @struck[[place[:room], place[:map]]] |= [struck[:type]] if struck.is_a?(Hash) && place.is_a?(Hash)
+      note_struck(skill, outcome) if outcome.is_a?(Hash)
       @stop = skill.to_s == 'explore' && outcome.is_a?(Hash) ? outcome[:stopped_by].to_s : nil
       to = outcome[:to] if @stop == 'known_place'
       @returns[[to[:room], to[:map]]] += 1 if to.is_a?(Hash) && @returns
@@ -88,9 +86,11 @@ module Koholint
       return if state.health < FIGHT_FLOOR || state.health < @hp - FIGHT_DROP
       return if @fight >= FIGHT_LIMIT || state.frame - @since >= FIGHT_FRAMES
 
-      struck = @struck[[state.room_id, state.map_id]]
+      here = @struck[:place] == [state.room_id, state.map_id]
+      struck = here ? @struck[:types] : []
       row, col = state.cell
-      target = Array(entities).select { |entity| entity[:cell] && (entity[:kind].to_s == 'enemy' || (entity[:kind].to_s == 'unknown' && struck.include?(entity[:type]))) }
+      target = Array(entities).select { |entity| entity[:cell] && !(here && entity[:slot] == @struck[:slot]) }
+                              .select { |entity| entity[:kind].to_s == 'enemy' || (entity[:kind].to_s == 'unknown' && struck.include?(entity[:type])) }
                               .select { |entity| [(entity[:cell][0] - row).abs, (entity[:cell][1] - col).abs].max <= FIGHT_REACH }
                               .min_by { |entity| [(entity[:cell][0] - row).abs + (entity[:cell][1] - col).abs, entity[:slot]] } or return
       @fight += 1
@@ -117,6 +117,20 @@ module Koholint
       return 'hp dropped' if state.health < @hp
 
       nil
+    end
+
+    # The types struck count for the visit only: leaving the place forgets them, as a resume (which starts with none) would.
+    def note_struck(skill, outcome)
+      from = outcome[:from]
+      target = outcome[:target]
+      if skill.to_s == 'attack' && target.is_a?(Hash) && from.is_a?(Hash)
+        here = [from[:room], from[:map]]
+        @struck = { place: here, types: [] } unless @struck[:place] == here
+        @struck[:types] |= [target[:type]]
+        @struck[:slot] = target[:slot]
+      end
+      to = outcome[:to]
+      @struck = { place: nil, types: [] } if to.is_a?(Hash) && @struck[:place] && [to[:room], to[:map]] != @struck[:place]
     end
 
     def cap_hold(state)

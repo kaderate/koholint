@@ -168,6 +168,19 @@ class AutopilotTest < Minitest::Test
     assert_nil fought.fight_choice(state: state(frame: 200), entities: [foe(3, 5, type: 62, kind: 'npc'), foe(3, 3, type: 205, kind: 'creature')])
   end
 
+  def test_the_slot_just_struck_is_never_the_next_target_while_it_dies
+    corpse = foe(3, 5, slot: 2)
+    assert_nil fought.fight_choice(state: state(frame: 200), entities: [corpse])
+    assert_equal({ row: 4, col: 6 }, fought.fight_choice(state: state(frame: 200), entities: [corpse, foe(4, 6, slot: 7)])[:choice][:params])
+  end
+
+  def test_the_types_struck_are_forgotten_once_link_leaves_the_place
+    pilot = fought(type: 28)
+    pilot.acted(skill: 'explore', outcome: { stopped_by: :known_place, from: { room: 163, map: 16 }, to: { room: 164, map: 16 } })
+    pilot.acted(skill: 'attack', outcome: { stopped_by: :done, target: { slot: 2, type: 9, cell: [3, 4] }, from: { room: 163, map: 16 }, to: { room: 163, map: 16 } })
+    assert_nil pilot.fight_choice(state: state(frame: 200), entities: [foe(3, 5, type: 28, kind: 'unknown', slot: 6)])
+  end
+
   def test_the_fight_goes_back_to_the_model_on_another_stop_low_health_or_its_caps
     near = [foe(3, 5)]
     %i[damage no_path no_kill out_of_reach].each { |stop| assert_nil fought(stop:).fight_choice(state: state(frame: 200), entities: near), stop }
@@ -178,7 +191,7 @@ class AutopilotTest < Minitest::Test
     pilot = fought
     Koholint::Autopilot::FIGHT_LIMIT.times do |i|
       refute_nil pilot.fight_choice(state: state(frame: 200 + i), entities: near)
-      pilot.acted(skill: 'attack', outcome: { stopped_by: :done, target: { slot: 3, type: 9, cell: [3, 5] }, from: { room: 163, map: 16 } })
+      pilot.acted(skill: 'attack', outcome: { stopped_by: :done, target: { slot: 9, type: 9, cell: [3, 6] }, from: { room: 163, map: 16 } })
     end
     assert_nil pilot.fight_choice(state: state(frame: 300), entities: near)
   end

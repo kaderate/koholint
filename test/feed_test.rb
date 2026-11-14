@@ -468,6 +468,18 @@ class FeedTest < Minitest::Test
     end
   end
 
+  def test_autopilot_explores_and_chained_attacks_are_not_objective_attempts
+    with_dir do |dir, trace|
+      trace.emit(:objective, frame: 1, id: 'o1', status: 'started', predicate: { kind: 'new_place' }, title: 'Explore')
+      ['j', 'autopilot: explore again (1/6)', 'autopilot: keep fighting, type 9 at (3,5) (1/8)'].each_with_index do |why, i|
+        trace.emit(:decision, frame: 2 + i * 2, decision_point: 'choose_skill', input: {}, options: [], choice: {},
+                              justification: why, confidence: 1.0, agent: 'delegated', latency_ms: 0, cost_usd: 0.0)
+        trace.emit(:action, frame: 3 + i * 2, skill: 'walk', params: {}, result: {})
+      end
+      assert_equal 1, Koholint::Viewer::Feed.for(dir, FOLLOWER)[:status][:objective_attempts]
+    end
+  end
+
   def test_an_archived_run_is_read_from_the_gzipped_trace
     with_dir do |dir, trace|
       decision(trace, 2)
