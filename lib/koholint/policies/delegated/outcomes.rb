@@ -2,6 +2,8 @@ module Koholint
   module Policies
     class Delegated
       module Outcomes
+        FLOOR_SHARE = 0.1
+
         private
 
         def note_damage(state)
@@ -102,12 +104,38 @@ module Koholint
         def feed_triggers(choice, outcome, state)
           clearing = Triggers.clearing(skill: choice[:skill], params: choice[:params], result: outcome)
           @triggers.clear(**clearing) if clearing
+          @contact = nil
           return unless Triggers.scripted?(skill: choice[:skill], params: choice[:params], result: outcome)
 
           cell = Triggers.cell_of(outcome)
+          note_contact(place_of(outcome, :to, state), cell, outcome[:trigger_input]&.first)
           @triggers.record(place: place_of(outcome, :to, state), cell:, skill: choice[:skill], direction: Triggers.direction_of(choice[:skill], choice[:params]),
                             input: outcome[:trigger_input]&.first)
           cell && @triggers.count(place_of(outcome, :to, state), cell)
+        end
+
+        # The thing in the cell Link pressed toward when the game opened a text: a catalogued npc on it, else its object, unless Link has
+        # stood on that object here (floor). The room object table holds an id in every cell.
+        def note_contact(place, cell, input)
+          delta = Navigation::Planner::DELTAS[input&.to_sym] if input
+          return unless cell && delta
+
+          row = cell[0] + delta[0]
+          col = cell[1] + delta[1]
+          return unless row.between?(0, Geometry::ROWS - 1) && col.between?(0, Geometry::COLS - 1)
+
+          person = entities_now.find { |entity| entity[:cell] == [row, col] && entity[:kind].to_s == 'npc' }
+          objects = @room_objects_reader&.call
+          object = objects&.dig(row, col)
+          thing = person ? { entity: person[:type] } : ({ object: } if object && !floor?(objects, object, place, cell))
+          @contact = { row:, col:, **thing } if thing
+        end
+
+        # Ground is an id Link has stood on here, or one that fills a large share of the room (a ground kind not walked yet).
+        def floor?(objects, object, place, cell)
+          return true if (@explore_log.walked(place) | [cell]).any? { |r, c| objects.dig(r, c) == object }
+
+          objects.flatten.count(object) >= objects.flatten.size * FLOOR_SHARE
         end
 
         def feed_talk_log(choice, outcome, state)

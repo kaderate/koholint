@@ -20,6 +20,37 @@ class LeadsTest < Minitest::Test
     assert_equal [{ id: 'lead-1', place: [1, 2], source: { row: 3, col: 4 }, quote: 'the key IS in the north cave', claim: 'a claim', importance: 'high' }], accepted
   end
 
+  def test_a_contact_text_is_one_normal_lead_per_thing_and_text_and_survives_a_resume
+    leads = Koholint::Leads.new
+    heavy = "Oh là... C'est bien trop lourd!"
+    first = leads.contact({ row: 3, col: 3, object: 32 }, text: heavy, place: [69, 0])
+    assert_equal ['normal', '69-0', { row: 3, col: 3, object: 32 }, { row: 3, col: 3 }], first.values_at(:importance, :where, :contact, :source)
+    assert_equal 'Contact with object 32 at (3,3) opened this text', first[:claim]
+    assert_nil leads.contact({ row: 6, col: 7, object: 32 }, text: heavy, place: [100, 0])
+    assert_nil leads.contact({ row: 6, col: 7, object: 32 }, text: "Oh là... C'est bien trop lourd! Tu n'y arriveras jamais", place: [100, 0])
+    assert leads.contact({ row: 1, col: 2, entity: 81 }, text: heavy, place: [81, 0])
+    assert_equal({ row: 1, col: 2, entity: 81 }, leads.all.last[:source])
+    assert_nil leads.contact({ row: 1, col: 2 }, text: heavy, place: [81, 0])
+    assert_nil leads.contact({ row: 1, col: 2, object: 5 }, text: 'Hm', place: [81, 0])
+    events = leads.all.map { |lead| JSON.parse(JSON.generate(lead.merge(type: 'lead'))) }
+    restored = Koholint::Leads.from_events(events).all
+    assert_equal leads.all.map { |lead| lead[:contact] }, restored.map { |lead| lead[:contact] }
+    assert_equal JSON.parse(JSON.generate(leads.all)), JSON.parse(JSON.generate(restored))
+  end
+
+  def test_a_contact_text_a_model_lead_already_quoted_in_that_place_adds_nothing
+    leads = Koholint::Leads.new
+    leads.absorb([lead('the key is in the north cave')], transcription: TEXT, place: [1, 2], source: nil)
+    assert_nil leads.contact({ row: 1, col: 2, object: 32 }, text: TEXT, place: [1, 2])
+    assert leads.contact({ row: 1, col: 2, object: 32 }, text: TEXT, place: [5, 0])
+  end
+
+  def test_contact_leads_are_capped_per_place
+    leads = Koholint::Leads.new
+    7.times { |i| leads.contact({ row: 1, col: i, object: 40 + i }, text: "a text number #{i}", place: [5, 0]) }
+    assert_equal Koholint::Leads::LIMIT, leads.all.size
+  end
+
   def test_a_quote_may_match_the_stitched_text_or_the_raw_pages
     pages = ['the key is in', 'key is in the north cave']
     texts = [pages.join(' '), Koholint::Dialogues.text(pages)]

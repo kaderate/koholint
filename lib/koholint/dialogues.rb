@@ -57,7 +57,8 @@ module Koholint
 
     def items(inventory, item_a, item_b) = [*Array(inventory), item_a, item_b].map(&:to_i).reject(&:zero?).uniq.sort
 
-    def leads_count(leads) = leads.count { |lead| STAMP_LEADS.include?((lead[:importance] || lead['importance']).to_s) }
+    # A lead from a text opened on contact says nothing new a person could answer, so it does not reopen people.
+    def leads_count(leads) = leads.count { |lead| STAMP_LEADS.include?((lead[:importance] || lead['importance']).to_s) && !(lead[:contact] || lead['contact']) }
 
     def stamp_of(state, leads) = stamp(milestone: state['milestone'], items: items(state['inventory'], state['item_a'], state['item_b']), leads: leads_count(leads))
 

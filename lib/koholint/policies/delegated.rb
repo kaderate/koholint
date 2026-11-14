@@ -112,6 +112,7 @@ module Koholint
       def prepare(context)
         @entities_reader = context[:entities] if context[:entities]
         @objects_reader = context[:objects] if context[:objects]
+        @room_objects_reader = context[:room_objects] if context[:room_objects]
         offer_learned(context[:room_objects], context[:held]) if @composites.any? && context[:room_objects]
       end
 
@@ -381,7 +382,7 @@ module Koholint
         elsif decision_point.name == :choose_skill && @sequence
           @pages_read = @sequence[:pages].size
           @images = Vision::DialogueShot.sheets(@sequence[:pages], per_sheet: SHEET_PAGES)
-          @read_at = @sequence.slice(:start, :place, :source).merge(conversation: (Vision::DialogueShot.signature(@sequence[:rows]) unless state.dialog_open?))
+          @read_at = @sequence.slice(:start, :place, :source, :contact).merge(conversation: (Vision::DialogueShot.signature(@sequence[:rows]) unless state.dialog_open?))
           @sequence = nil
           @page = @pages_read
           @objectives.touch(frame: state.frame)

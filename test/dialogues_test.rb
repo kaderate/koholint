@@ -126,6 +126,7 @@ class DialoguesTest < Minitest::Test
     assert_equal ['shield', [4], 0], base
     assert_equal base, Koholint::Dialogues.stamp_of(state.merge('room_id' => 9), [{ 'importance' => 'low' }, { importance: 'tip' }])
     assert_equal ['shield', [4], 1], Koholint::Dialogues.stamp_of(state, [{ importance: 'high' }])
+    assert_equal ['shield', [4], 1], Koholint::Dialogues.stamp_of(state, [{ importance: 'high' }, { importance: 'normal', contact: { row: 3, col: 3, object: 32 } }, { 'importance' => 'normal', 'contact' => {} }])
     assert_equal ['shield', [2, 4], 0], Koholint::Dialogues.stamp_of(state.merge('item_a' => 2), [])
   end
 end
