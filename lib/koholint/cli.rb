@@ -30,7 +30,7 @@ module Koholint
   module CLI
     USAGE = 'usage: koholint run|resume <run_dir>|fork <run_dir> --at-frame N|branch <run_dir> --at FRAME|CHECKPOINT|verify <run_dir>|summary <run_dir>|screens <run_dir>|watch <run_dir>|' \
             'archive|star <run_dir> WHY|prune-heavy|census boot|<run_dir> FRAME...|entities <run_dir> FRAME...|objects <run_dir> FRAME...|doors <run_dir> FRAME...|sword <run_dir> FRAME...|ready <run_dir>|npcs|' \
-            'ab-plan <run_dir> --at-frame N|ab-report PREFIX|learn <run_dir> [--limit N --object ID]|capability list|publish ID WHY|retire ID WHY ' \
+            'ab-plan <run_dir> --at-frame N|ab-report PREFIX|check-leads <run_dir>...|learn <run_dir> [--limit N --object ID]|capability list|publish ID WHY|retire ID WHY ' \
             '[--frames N --minutes N --steps N --dollars X --root DIR --runs-root DIR --tag NAME --realtime --grid --port N --host H --from live|start|DIR ' \
             '--speed X --agent --autopilot on|off --capabilities on|off --model M --max-dollars X --claude-command PATH --keep-viewer --commit --full --keep N --yes --arms A,B --forks N --crawl N]'.freeze
 
@@ -117,6 +117,9 @@ module Koholint
       when 'ab-report'
         out.print AB.markdown(AB.report(prefix: args.first || raise(OptionParser::MissingArgument, 'prefix'), root: options.fetch(:root, 'runs')))
         0
+      when 'check-leads'
+        require 'koholint/lead_check'
+        LeadCheck.check(args.empty? ? raise(OptionParser::MissingArgument, 'run_dir') : args, out:)
       when 'learn'
         require 'koholint/learn'
         Learn.learn(parent_run(run_dir(args)), limit: options.fetch(:limit, Learn::LIMIT), object: options[:object], root: options.fetch(:root, Learn::ROOT), out:)

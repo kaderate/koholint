@@ -8,7 +8,7 @@ module Koholint
   module Summary
     STALL_FRAMES = 3600
     HP_PER_HEART = Perception::HP_PER_HEART.to_f
-    DIAGNOSTIC_NOTABLE_KINDS = %w[damage death grid_overlay_stuck lead_rejected not_ready_wait revisit stuck unknown_mode].freeze
+    DIAGNOSTIC_NOTABLE_KINDS = %w[damage death grid_overlay_stuck lead_leak lead_rejected not_ready_wait revisit stuck unknown_mode].freeze
     TERMINAL = %w[achieved abandoned failed].freeze
     DETERMINISTIC_AGENTS = %w[start_game walk_and_talk engine learner].freeze
     FILE = 'summary.json'.freeze

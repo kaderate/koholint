@@ -27,6 +27,19 @@ module Koholint
       raise Invalid, "#{entry['name'] || entry.inspect}: missing #{missing.join(', ')}" unless missing.empty?
       raise Invalid, "#{entry['name']}: unknown confidence #{entry['confidence']}" unless CONFIDENCES.include?(entry['confidence'])
       raise Invalid, "#{entry['name']}: verified needs verified_count >= 2" if entry['confidence'] == 'verified' && entry['verified_count'] < 2
+      return unless entry.key?('aliases') && !(entry['aliases'].is_a?(Array) && entry['aliases'].all? { |name| name.is_a?(String) && !name.strip.empty? })
+
+      raise Invalid, "#{entry['name']}: aliases must be a list of names"
+    end
+
+    # Every name an item goes by: its catalogue name and its aliases (the game's own words, plurals, short forms).
+    def names(entry) = [entry['name'], *Array(entry['aliases'])].map(&:downcase)
+
+    # Item ids a state shows held: A, B, the inventory slots, and the items whose milestone it has (older traces lack the slots).
+    def held_ids(state)
+      state = state.to_h.transform_keys(&:to_s)
+      ids = [state['item_a'], state['item_b'], *Array(state['inventory']).first(SLOTS)].map(&:to_i).reject(&:zero?)
+      ids | catalogue.values.select { |item| item['milestone'] && item['milestone'] == state['milestone'].to_s }.map { |item| item['id'] }
     end
 
     def name(id)

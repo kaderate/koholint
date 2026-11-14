@@ -16,7 +16,7 @@ class LeadsTest < Minitest::Test
     leads = Koholint::Leads.new
     accepted, rejected = absorb(leads, [lead('the key IS in the north   cave'), lead('the key is in the south cave'), lead('  ')])
     assert_equal 2, rejected
-    assert_equal [[], 2], absorb(Koholint::Leads.new, [lead('Hello'), lead('x' * 301)])
+    assert_equal [[], 2, []], absorb(Koholint::Leads.new, [lead('Hello'), lead('x' * 301)])
     assert_equal [{ id: 'lead-1', place: [1, 2], source: { row: 3, col: 4 }, quote: 'the key IS in the north cave', claim: 'a claim', importance: 'high' }], accepted
   end
 
@@ -51,6 +51,38 @@ class LeadsTest < Minitest::Test
     assert_equal Koholint::Leads::LIMIT, leads.all.size
   end
 
+  def test_a_claim_naming_an_item_neither_quoted_nor_held_is_dropped_as_leaked
+    leads = Koholint::Leads.new
+    leads.note_held([1])
+    accepted, rejected, leaked = leads.absorb([lead('the key is in the north cave', claim: 'use the Hookshot there'), lead('north cave', 'normal', claim: 'the sword opens it')],
+                                              transcription: TEXT, place: [1, 2], source: nil)
+    assert_equal [['north cave'], 0], [accepted.map { |l| l[:quote] }, rejected]
+    assert_equal [{ quote: 'the key is in the north cave', claim: 'use the Hookshot there', items: ['hookshot'] }], leaked
+    assert_equal ['north cave'], leads.all.map { |l| l[:quote] }
+  end
+
+  def test_texts_read_earlier_and_items_held_earlier_count_like_the_offline_check
+    events = [{ 'type' => 'perception', 'frame' => 10, 'state' => { 'item_a' => 2, 'inventory' => [2] } },
+              { 'type' => 'perception', 'frame' => 20, 'state' => { 'item_a' => 0, 'inventory' => [0] } },
+              { 'type' => 'dialogue', 'frame' => 30, 'text' => "Rapporte-moi l'arc, petit!" }]
+    leads = Koholint::Leads.from_events(events)
+    raw = [lead('north cave', claim: 'bombs open the cave'), lead('the key is in the', claim: 'he wants the bow back'), lead('Shops sell', claim: 'the shovel digs here')]
+    accepted, _, leaked = leads.absorb(raw, transcription: TEXT, place: [1, 2], source: nil)
+    assert_equal [2, [['shovel']]], [accepted.size, leaked.map { |l| l[:items] }]
+    assert_empty Koholint::LeadCheck.leaks(events + [{ 'type' => 'lead', 'claim' => 'he wants the bow back', 'quote' => 'x' }])
+    live = Koholint::Leads.new
+    live.note_read("Rapporte-moi l'arc, petit!")
+    assert_equal 1, live.absorb([lead('north cave', claim: 'he wants the bow back')], transcription: TEXT, place: [1, 2], source: nil).first.size
+  end
+
+  def test_the_whole_transcription_aliases_and_earlier_quotes_count_as_read
+    leads = Koholint::Leads.new
+    leads.absorb([lead('Une épée attend sur la plage')], transcription: 'Une épée attend sur la plage', place: [1, 2], source: nil)
+    accepted, _, leaked = leads.absorb([lead('north cave', claim: 'buy a bomb first'), lead('the key is in the', claim: 'the sword opens the north cave')],
+                                       transcription: TEXT, place: [1, 2], source: nil)
+    assert_equal [2, []], [accepted.size, leaked]
+  end
+
   def test_a_quote_may_match_the_stitched_text_or_the_raw_pages
     pages = ['the key is in', 'key is in the north cave']
     texts = [pages.join(' '), Koholint::Dialogues.text(pages)]
@@ -61,8 +93,8 @@ class LeadsTest < Minitest::Test
   def test_bad_importance_missing_claims_and_garbage_are_rejected_and_long_claims_truncated
     leads = Koholint::Leads.new
     raw = [lead('Hello, Link', 'urgent'), { 'quote' => 'Hello, Link' }, 'Hello, Link', lead('Hello, Link', claim: "\n ")]
-    assert_equal [[], 4], absorb(leads, raw)
-    assert_equal [[], 0], absorb(leads, 'not a list')
+    assert_equal [[], 4, []], absorb(leads, raw)
+    assert_equal [[], 0, []], absorb(leads, 'not a list')
     accepted, = absorb(leads, [lead('Hello, Link', claim: 'x' * 200)])
     assert_equal 160, accepted.first[:claim].size
   end
@@ -79,7 +111,7 @@ class LeadsTest < Minitest::Test
     quotes = ['Hello, Link', 'hello,link', 'The key is', 'in the north', 'north cave', 'Shops sell', 'sell bombs']
     accepted, = absorb(leads, quotes.map { |q| lead(q) })
     assert_equal ['Hello, Link', 'The key is', 'in the north', 'north cave'], accepted.map { |l| l[:quote] }
-    assert_equal [[], 0], absorb(leads, [lead('HELLO,  LINK')])
+    assert_equal [[], 0, []], absorb(leads, [lead('HELLO,  LINK')])
     assert_equal 'lead-5', absorb(leads, [lead('sell bombs', 'low')]).first.first[:id]
   end
 
@@ -103,7 +135,7 @@ class LeadsTest < Minitest::Test
       assert leads.known?('lead-1')
       refute leads.known?('lead-2')
       assert_equal 'lead-2', absorb(leads, [lead('north cave')]).first.first[:id]
-      assert_equal [[], 0], absorb(leads, [lead('hello, link')])
+      assert_equal [[], 0, []], absorb(leads, [lead('hello, link')])
       Koholint::Leads.write_world(dir)
       world = JSON.parse(File.read(File.join(dir, 'world.json')))
       assert_equal 'second', world['goal']

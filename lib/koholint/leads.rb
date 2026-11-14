@@ -1,4 +1,5 @@
 require 'json'
+require 'koholint/lead_check'
 require 'koholint/ledger'
 require 'koholint/objectives'
 require 'koholint/place_card'
@@ -27,6 +28,8 @@ module Koholint
       events.each do |event|
         case Ledger.pick(event, :type).to_s
         when 'lead' then leads.restore(event)
+        when 'dialogue' then leads.note_read(Ledger.pick(event, :text))
+        when 'perception' then leads.note_held(Items.held_ids(Ledger.pick(event, :state) || {}))
         when 'place_name' then leads.name_place(Ledger.pick(event, :place), Ledger.pick(event, :name))
         when 'goal' then leads.change_goal(Ledger.pick(event, :text), frame: Ledger.pick(event, :frame), objectives: done)
         when 'objective'
@@ -60,7 +63,13 @@ module Koholint
       @goal = nil
       @names = {}
       @attempts = {}
+      @read = []
+      @held = Set.new
     end
+
+    def note_read(text) = (@read << text.to_s unless text.to_s.strip.empty?)
+
+    def note_held(ids) = @held.merge(ids)
 
     # A finished objective that followed a lead (its because, or a lead candidate's target) is evidence about that lead.
     def note_objective(done)
@@ -121,9 +130,11 @@ module Koholint
       @names.find { |_, name| self.class.normalize(name) == self.class.normalize(where) }&.first
     end
 
+    # A lead naming an item no text of the run has named and Link never held is general knowledge of the game: dropped and returned as leaked.
     def absorb(raw, transcription:, place:, source:)
       haystacks = Array(transcription).map { |text| self.class.compact(text) }
       accepted = []
+      leaked = []
       rejected = 0
       (raw.is_a?(Array) ? raw.first(LIMIT) : []).each do |entry|
         lead = entry.is_a?(Hash) ? entry.transform_keys(&:to_s) : {}
@@ -136,13 +147,19 @@ module Koholint
         end
         next if @all.any? { |known| self.class.compact(known[:quote]) == key }
 
+        named = LeadCheck.named(claim:, where: lead['where'], texts: [*Array(transcription), *@read, *@all.map { |known| known[:quote] }], held: @held)
+        if named.any?
+          leaked << { quote: self.class.clean(quote), claim: self.class.clean(claim, CLAIM_MAX), items: named }
+          next
+        end
+
         added = { id: "lead-#{@all.size + 1}", place:, source:, quote: self.class.clean(quote), claim: self.class.clean(claim, CLAIM_MAX), importance: }
         where = self.class.clean(lead['where'], WHERE_MAX)
         added[:where] = where unless where.empty?
         @all << added
         accepted << added
       end
-      [accepted, rejected]
+      [accepted, rejected, leaked]
     end
 
     # A text the game opened while Link pressed toward something: one lead per thing and text, a few per place.
