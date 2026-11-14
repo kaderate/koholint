@@ -111,9 +111,18 @@ module Koholint
             confidence: 1.0, agent: 'delegated', latency_ms: 0, cost_usd: 0.0, fallback: false, prompt: nil, image: nil }
         end
 
+        # Each wait is followed by a 2-pixel step, so a hold that ends unseen (the healing scene of 83/0 ends about 50 frames after its
+        # last lock) hands Link back after one wait instead of the whole window.
         def hemmed_wait
           @waiting = true
+          if @hemmed[:probe]
+            @hemmed[:probe] = false
+            direction = HEMMED_PROBES[@hemmed[:waits] % HEMMED_PROBES.size]
+            return { choice: { skill: 'step', params: { direction:, pixels: HEMMED_PROBE_PIXELS } }, justification: "hemmed-in probe: a #{HEMMED_PROBE_PIXELS}-pixel step #{direction} to see whether Link is free again",
+                     confidence: 1.0, agent: 'delegated', latency_ms: 0, cost_usd: 0.0, fallback: false, prompt: nil, image: nil }
+          end
           @hemmed[:waits] += 1
+          @hemmed[:probe] = @hemmed[:waits] < HEMMED_WAIT_LIMIT
           @locks.clear if @hemmed[:waits] >= HEMMED_WAIT_LIMIT
           { choice: HEMMED_WAIT, justification: 'deterministic hemmed-in wait: blocked in several directions without movement at the same position',
             confidence: 1.0, agent: 'delegated', latency_ms: 0, cost_usd: 0.0, fallback: false, prompt: nil, image: nil }

@@ -163,13 +163,13 @@ class DelegatedPolicyTest < Minitest::Test
     p = policy(client)
     hemmed(p)
     calls = client.calls.size
-    2.times do
+    [{ skill: 'wait', params: { frames: 120 } }, { skill: 'step', params: { direction: 'right', pixels: 2 } }, { skill: 'wait', params: { frames: 120 } }].each do |expected|
       point, result = decide(p)
       assert_equal :choose_skill, point.name
-      assert_equal({ skill: 'wait', params: { frames: 120 } }, result[:choice])
+      assert_equal expected, result[:choice]
       assert_equal ['delegated', false, 0.0], result.values_at(:agent, :fallback, :cost_usd)
-      assert_match(/deterministic/, result[:justification])
-      p.after_action(choice: result[:choice], outcome: { stopped_by: 'done', moved_cells: 0 }, state:, frame: 300)
+      assert_match(/deterministic|probe/, result[:justification])
+      p.after_action(choice: result[:choice], outcome: { stopped_by: 'blocked', moved_cells: 0, moved_px: 0 }, state:, frame: 300)
       p.observe(state, frame: 300)
     end
     assert_equal calls, client.calls.size
@@ -180,8 +180,30 @@ class DelegatedPolicyTest < Minitest::Test
     client = ScriptedClient.new(objective: objective(kind: 'reach_place', place: [1, 2]), skill: walk)
     p = policy(client)
     hemmed(p)
-    15.times { assert_equal 'delegated', decide(p).last[:agent] }
+    choices = (2 * Koholint::Policies::Delegated::HEMMED_WAIT_LIMIT - 1).times.map do
+      result = decide(p).last
+      assert_equal 'delegated', result[:agent]
+      result[:choice][:skill]
+    end
+    assert_equal Koholint::Policies::Delegated::HEMMED_WAIT_LIMIT, choices.count('wait')
     assert_equal 'claude', decide(p).last[:agent]
+  end
+
+  # 83/0 of fork 7fe9: the healing scene held Link about 50 frames past its last lock, then the latch waited 1800 frames with Link free.
+  def test_a_hemmed_in_probe_that_moves_link_hands_him_back_to_the_model
+    client = ScriptedClient.new(objective: objective(kind: 'reach_place', place: [1, 2]), skill: [walk, walk])
+    p = policy(client)
+    hemmed(p)
+    calls = client.calls.size
+    wait = decide(p).last
+    p.after_action(choice: wait[:choice], outcome: { stopped_by: 'done', moved_cells: 0 }, state:, frame: 300)
+    probe = decide(p).last
+    assert_equal 'step', probe[:choice][:skill]
+    moved = state(x: 70)
+    p.after_action(choice: probe[:choice], outcome: { stopped_by: 'done', moved_cells: 0, moved_px: 2 }, state: moved, frame: 310)
+    p.observe(moved, frame: 310)
+    assert_equal 'claude', p.decide(p.decision_point_for(moved), moved, { grid: })[:agent]
+    assert_equal calls + 1, client.calls.size
   end
 
   def test_a_new_objective_clears_the_hemmed_latch
@@ -250,7 +272,7 @@ class DelegatedPolicyTest < Minitest::Test
       result = decide(p).last
       break unless result[:agent] == 'delegated'
 
-      waits += 1
+      waits += 1 if result[:choice][:skill] == 'wait'
       flunk 'waits never end' if waits > 100
       p.after_action(choice: result[:choice], outcome: { stopped_by: 'done', moved_cells: 0 }, state:, frame: 300)
     end
