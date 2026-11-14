@@ -775,15 +775,15 @@ class DelegatedPolicyTest < Minitest::Test
     decide(p)
     calls = client.calls.size
     limit = Koholint::Policies::Delegated::LOCKED_WAIT_LIMIT_FRAMES
-    (100..(100 + limit)).step(20) do |frame|
+    (100...(100 + limit)).step(20) do |frame|
       held = state(frame:, **LOCKED)
       p.observe(held, frame:)
       advance(p, decide_with_shot(p, held), held, frame + 1)
       p.observe(state(frame: frame + 1), frame: frame + 1)
     end
     assert_equal calls, client.calls.size
-    capped = state(frame: 120 + limit, **LOCKED)
-    p.observe(capped, frame: 120 + limit)
+    capped = state(frame: 100 + limit, **LOCKED)
+    p.observe(capped, frame: 100 + limit)
     result = decide_with_shot(p, capped)
     assert_equal calls + 1, client.calls.size
     assert_equal ['lock_cap'], Array(result[:notables]).map { |note| note[:kind] }
