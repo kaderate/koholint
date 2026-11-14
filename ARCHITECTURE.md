@@ -200,7 +200,10 @@ also right after a sheet reading; and the explore autopilot, `autopilot.rb`: aft
 `new_place`, `known_place` (not counted in the 6-explore chain; a third return to the same place goes back to the
 model), `budget` or `untried_object`, the policy issues the next `explore` with no direction itself (agent `delegated`, cost 0,
 `decision` event with `autopilot: true`), after the revisit, the hemmed wait (flow-63: each 120-frame wait is followed by a 2-pixel
-`step` probe, and a probe that moves Link ends the latch) and pending dialogue pages; the model is called again
+`step` probe, and a probe that moves Link ends the latch) and pending dialogue pages (flow-65: after an
+`attack` that stopped `done` or `target_gone`, it strikes the nearest `enemy`, or unidentified type already struck in the place,
+within 2 cells the same way, until none is left, health is below 2 hearts or a heart below the last call, an attack stops
+otherwise, or 8 attacks or 900 frames have passed since the model's last call); the model is called again
 on any other stop or action, a new lead or goal from the last call, a phase other than `playing`, health lower than at the
 last call, an objective that changed or whose kind is not `new_place`, `leave_place` or `new_text` (unless it has a target), and after 6 autopilot
 explores or 2400 frames since the last call. An objective with a `target` (picked from the candidate menu) is followed from the first

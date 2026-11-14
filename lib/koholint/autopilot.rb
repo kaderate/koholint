@@ -7,6 +7,12 @@ module Koholint
     RETURNS = 3
     EXPLORING = %w[new_place leave_place new_text].freeze
     CHOICE = { skill: 'explore', params: {} }.freeze
+    FIGHT_LIMIT = 8
+    FIGHT_FRAMES = 900
+    FIGHT_REACH = 2
+    FIGHT_FLOOR = 16
+    FIGHT_DROP = 8
+    FIGHT_ON = %w[done target_gone].freeze
 
     attr_reader :chain, :chain_limit, :chain_frames
 
@@ -17,6 +23,8 @@ module Koholint
       @since = @stop = nil
       @acted = false
       @returns = Hash.new(0)
+      @fight = 0
+      @struck = Hash.new { |hash, place| hash[place] = [] }
     end
 
     def model_called(state:, objective:, news: false)
@@ -28,12 +36,18 @@ module Koholint
       @stop = nil
       @acted = false
       @returns = Hash.new(0)
+      @fight = 0
+      @attack_stop = nil
     end
 
     def adopt(objective) = @objective = objective&.dig(:id)
 
     def acted(skill:, outcome:)
       @acted = true
+      @attack_stop = skill.to_s == 'attack' && outcome.is_a?(Hash) ? outcome[:stopped_by].to_s : nil unless skill.to_s == 'wait'
+      struck = outcome[:target] if skill.to_s == 'attack'
+      place = outcome[:from] if struck
+      @struck[[place[:room], place[:map]]] |= [struck[:type]] if struck.is_a?(Hash) && place.is_a?(Hash)
       @stop = skill.to_s == 'explore' && outcome.is_a?(Hash) ? outcome[:stopped_by].to_s : nil
       to = outcome[:to] if @stop == 'known_place'
       @returns[[to[:room], to[:map]]] += 1 if to.is_a?(Hash) && @returns
@@ -66,6 +80,24 @@ module Koholint
       what = follow ? "follow the objective target with #{follow[:skill]}" : 'explore again'
       { choice: follow || CHOICE, justification: "autopilot: #{what} (#{@chain}/#{@chain_limit})", confidence: 1.0, agent: 'delegated',
         latency_ms: 0, cost_usd: 0.0, fallback: false, autopilot: true, prompt: nil, image: nil }
+    end
+
+    # After an attack that killed or lost its target, strike the nearest other enemy (or a type struck here before) without a call.
+    def fight_choice(state:, entities:)
+      return unless @since && FIGHT_ON.include?(@attack_stop) && state.phase == :playing && state.cell
+      return if state.health < FIGHT_FLOOR || state.health < @hp - FIGHT_DROP
+      return if @fight >= FIGHT_LIMIT || state.frame - @since >= FIGHT_FRAMES
+
+      struck = @struck[[state.room_id, state.map_id]]
+      row, col = state.cell
+      target = Array(entities).select { |entity| entity[:cell] && (entity[:kind].to_s == 'enemy' || (entity[:kind].to_s == 'unknown' && struck.include?(entity[:type]))) }
+                              .select { |entity| [(entity[:cell][0] - row).abs, (entity[:cell][1] - col).abs].max <= FIGHT_REACH }
+                              .min_by { |entity| [(entity[:cell][0] - row).abs + (entity[:cell][1] - col).abs, entity[:slot]] } or return
+      @fight += 1
+      @attack_stop = nil
+      { choice: { skill: 'attack', params: { row: target[:cell][0], col: target[:cell][1] } },
+        justification: "autopilot: keep fighting, type #{target[:type]} at (#{target[:cell].join(',')}) (#{@fight}/#{FIGHT_LIMIT})", confidence: 1.0,
+        agent: 'delegated', latency_ms: 0, cost_usd: 0.0, fallback: false, autopilot: true, prompt: nil, image: nil }
     end
 
     def objective_hold(state:, last:)

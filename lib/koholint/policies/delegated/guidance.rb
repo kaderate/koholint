@@ -66,6 +66,9 @@ module Koholint
         def autopilot_choice(decision_point, state, context)
           return unless @autopilot && decision_point.name == :choose_skill && !@sequence && !@reading && !hemmed?(state)
 
+          fight = @autopilot.fight_choice(state:, entities: entities_now)
+          return fight.tap { @autopilot_acting = true } if fight
+
           follow = follow_choice(state)
           result = @autopilot.next_choice(state:, objective: @objectives.current, follow: follow&.dig(:choice)) or return
           context[:aim] = follow[:aim] if follow&.dig(:aim)
