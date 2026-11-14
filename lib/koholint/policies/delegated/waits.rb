@@ -118,7 +118,7 @@ module Koholint
           if @hemmed[:probe]
             @hemmed[:probe] = false
             direction = HEMMED_PROBES[@hemmed[:waits] % HEMMED_PROBES.size]
-            return { choice: { skill: 'step', params: { direction:, pixels: HEMMED_PROBE_PIXELS } }, justification: "hemmed-in probe: a #{HEMMED_PROBE_PIXELS}-pixel step #{direction} to see whether Link is free again",
+            return { choice: { skill: 'step', params: { direction:, pixels: HEMMED_PROBE_PIXELS } }, justification: "deterministic hemmed-in probe: a #{HEMMED_PROBE_PIXELS}-pixel step #{direction} to see whether Link is free again",
                      confidence: 1.0, agent: 'delegated', latency_ms: 0, cost_usd: 0.0, fallback: false, prompt: nil, image: nil }
           end
           @hemmed[:waits] += 1

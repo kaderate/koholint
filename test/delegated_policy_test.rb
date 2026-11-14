@@ -1,4 +1,5 @@
 require_relative 'support/delegated_helpers'
+require 'koholint/viewer/feed'
 
 class DelegatedPolicyTest < Minitest::Test
   include DelegatedHelpers
@@ -204,6 +205,19 @@ class DelegatedPolicyTest < Minitest::Test
     p.observe(moved, frame: 310)
     assert_equal 'claude', p.decide(p.decision_point_for(moved), moved, { grid: })[:agent]
     assert_equal calls + 1, client.calls.size
+  end
+
+  def test_hemmed_in_probes_rotate_through_the_four_directions_and_read_as_automatic
+    client = ScriptedClient.new(objective: objective(kind: 'reach_place', place: [1, 2]), skill: walk)
+    p = policy(client)
+    hemmed(p)
+    probes = 8.times.filter_map do
+      result = decide(p).last
+      p.after_action(choice: result[:choice], outcome: { stopped_by: 'blocked', moved_cells: 0, moved_px: 0 }, state:, frame: 300)
+      result if result[:choice][:skill] == 'step'
+    end
+    assert_equal %w[right down left up], probes.map { |r| r[:choice][:params][:direction] }
+    assert(probes.all? { |r| Koholint::Viewer::Feed::AUTOMATIC.any? { |text| r[:justification].start_with?(text) } })
   end
 
   def test_a_new_objective_clears_the_hemmed_latch
