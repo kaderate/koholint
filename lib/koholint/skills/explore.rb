@@ -101,6 +101,7 @@ module Koholint
           merged[:clears] = @clearing.uses if @clearing&.uses&.any?
           merged[:survey] = @survey.merge(pending: pending?) if @survey
           merged[:route] = @route if @route
+          merged[:aimed_at] = @aim[:place] if @aim[:place] && @aim[:place] != @place
           merged[:unreachable] = @unreachable if @unreachable
           merged[:dead_end] = true if @dead_end
           merged[:cause] = @fail_cause if @stopped_by == :blocked && @fail_cause
@@ -434,6 +435,7 @@ module Koholint
         def frontier_kind(cell, direction)
           ahead = neighbour(cell, direction) or return nil
           return nil if @doors.include?(ahead) || (direction == :up && @doors.include?(cell))
+          return nil if direction == :up && [cell, ahead].any? { |at| @log&.door_edge?(@place, at) }
 
           :frontier if !@walls.include?(ahead) && (@pushable.include?(ahead) || (!@known.static_sprite(*ahead) && UNKNOWN.include?(@known.passable(*ahead, direction))))
         end

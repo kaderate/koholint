@@ -15,7 +15,7 @@ module Koholint
       named = ->(where) { leads.name_of(where) }
       people = people_here(place, entities, talk_log, stamp)
       leaving = exits(place, grid, explore_log) + doors(place, signs, explore_log, link) + places(place, hops, explore_log, named) +
-                people_away(place, hops, cards, talk_log, named) + signs_away(place, hops, cards, talk_log, named) + lead_places(place, hops, leads, named)
+                people_away(place, hops, cards, talk_log, named, stamp) + signs_away(place, hops, cards, talk_log, named) + lead_places(place, hops, leads, named)
       [(shelter(place, hops, named) if low_health)].compact + people + signs_here(place, signs, talk_log) + unidentified(place, grid, entities, talk_log, link) +
         warn(leaving, people)
     end
@@ -97,19 +97,21 @@ module Koholint
     end
 
     def places(place, hops, explore_log, named)
-      away(place, hops).select { |where| explore_log.untried?(where) }.first(PER_KIND).map do |where|
+      away(place, hops).select { |where| explore_log.untried?(where) }.sort_by.with_index { |where, i| [explore_log.work_rank(where), i] }.first(PER_KIND).map do |where|
         { id: "place-#{where.join('-')}", label: "go to #{describe(where, named)}, #{moves(hops[where])}: it has untried exits or doors",
           title: "Go to #{describe(where, named)}"[0, 80], predicate: { kind: 'reach_place', place: where }, target: { kind: 'place', place: where } }
       end
     end
 
-    def people_away(place, hops, cards, talk_log, named)
+    def people_away(place, hops, cards, talk_log, named, stamp = nil)
       away(place, hops).flat_map do |where|
         Array(cards.dig(where, :people)).uniq { |person| person[:type] }.filter_map do |person|
-          next unless AWAY_WORTH.include?(talk_log.last_status(place: where, entity: person[:type]))
+          stale = talk_log.stale?(place: where, entity: person[:type], stamp:)
+          next unless stale || AWAY_WORTH.include?(talk_log.last_status(place: where, entity: person[:type]))
 
           who = talk_log.name_of(where, person[:type]) || "person (type #{person[:type]})"
-          { id: "person-#{where.join('-')}-t#{person[:type]}", label: "talk to #{who} in #{describe(where, named)}, #{moves(hops[where])}, not exhausted",
+          why = stale ? 'Link holds other items than at the last talk' : 'not exhausted'
+          { id: "person-#{where.join('-')}-t#{person[:type]}", label: "talk to #{who} in #{describe(where, named)}, #{moves(hops[where])}, #{why}",
             title: "Go talk to #{who}"[0, 80], predicate: { kind: 'reach_place', place: where },
             target: { kind: 'person', place: where, type: person[:type], cell: person[:cell] } }
         end

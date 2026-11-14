@@ -1,6 +1,6 @@
 # Agent skills
 
-The skills, protocols and harness behaviours the agent works with. Versioned with the play flow (currently `flow-61`): update this page, not the README, when a flow changes. Layers and data flow are in [ARCHITECTURE.md](../ARCHITECTURE.md).
+The skills, protocols and harness behaviours the agent works with. Versioned with the play flow (currently `flow-62`): update this page, not the README, when a flow changes. Layers and data flow are in [ARCHITECTURE.md](../ARCHITECTURE.md).
 
 
 - Learned capabilities (`data/capabilities.json`, `bin/koholint capability list`): an `operational` entry is a composite of the skills below, offered in the skill schema and listed under "Learned skills" only while its trigger item is held (flow-49) and its object is on screen (today `sword_on_object_92 row col direction`: stand next to object 92, face it, use the sword, step into its cell). `explore` and `goto` also run it themselves when blocked facing such a cell, and the planner routes through those cells as a last resort. `learn` and `capability publish|retire` are offline commands.
@@ -9,7 +9,11 @@ The skills, protocols and harness behaviours the agent works with. Versioned wit
   (`notable` `not_ready_wait` for waits over 5 frames; the run stops with `not_ready_stuck` after 600 frames).
 - `explore [direction]` (relaunched by the autopilot after benign stops, see Running) explores by itself: it walks to the nearest
   untried border exit (a side never left from this place) or untried door (walking up into it), else toward the nearest
-  place it has taken an exit to that still has untried exits or doors (flow-55: or, if surveyed before the capability existed, a tile
+  place it has taken an exit to that still has untried exits or doors (flow-62: places never surveyed, skimmed or with an untried door
+  come first for their first 2 explores there that were not passing through toward another place, again after a new item or a
+  capability's first clear, then places with only cells a capability may clear, then untried sides, nearest first within each; a door already walked
+  through is never a frontier, even when it is no door object;
+  flow-55: or, if surveyed before the capability existed, a tile
   the capability has cleared elsewhere, listed with its source in the route's `clearable`; inferred from the trace when a run is forked or resumed, not during a live run's first visit), else to the nearest frontier (a known cell next to
   an unknown one) (`direction` prefers that side), steps out, re-plans, and returns to the model only at an event:
   `new_place`, `known_place` (a return to a place already seen), `dialogue`, `untried_object` (once per thing never talked to within 3 cells), `blocked`, `stalled` (3
@@ -58,7 +62,8 @@ The skills, protocols and harness behaviours the agent works with. Versioned wit
   transcription, earlier lead quotes) nor any item Link has ever held (`Items.held_ids`, cumulative) names is dropped (`LeadCheck.named`, the rule `check-leads` applies to traces) and recorded as a `lead_leak` notable, so it never reaches a prompt.
 - At `choose_objective` the context lists candidate objectives with ids (`candidates.rb`): untried exits by side (`exit-up`) and doors
   (`door-R-C`) of this place, people (`person-tT`, listed first) and unread signs (`sign-R-C`) here worth a visit, known places with untried exits
-  (`place-R-M`), people and unread signs of other known places (from their place cards) and places tied to a lead by its `where`
+  (`place-R-M`, in the routing order), people and unread signs of other known places (from their place cards; flow-62: a person exhausted
+  under other held items or another milestone is offered again, once) and places tied to a lead by its `where`
   (`lead-N`), nearest first by moves over exits explore took. The agent answers with `candidate` (or still a free title and predicate);
   the objective event carries `candidate` and its `target`, which the autopilot follows. While a person here is not
   exhausted, every candidate that leaves the place says `leaves unexhausted people here: ...`.
@@ -74,7 +79,7 @@ The skills, protocols and harness behaviours the agent works with. Versioned wit
   the next prompt's health line shows the hearts lost since the last model call. There is no low-health rule (flow-37); six fruitless results in one
   place without a new cell emit a `notable` `stuck` and a `STUCK` reset hint; a known place entered 4 times within 3600 frames
   with no new place emits a `notable` `stuck` (`loop: ...`) and a `LOOP` hint until a new place; the harness then explores toward
-  the nearest place with untried work or, when none is left, toward the reachable place entered least outside the loop.
+  the first-ranked place with untried work (flow-62 order) or, when none is left, toward the reachable place entered least outside the loop.
 - The context header lists the items on A and B and in the inventory slots (`data/items.json` names; a `?` marks a name
   not measured yet). `use_item item [button] [frames]` uses a held item (assigning it through the START menu to `button`,
   default B, when it is on no button); `guard frames [direction]` raises the shield (Link walks at full speed and turns

@@ -29,6 +29,19 @@ class CandidatesTest < Minitest::Test
     assert_empty(build(grid: SpriteGrid.new, entities:, talk_log:, link: [6, 5]).select { |c| c[:id].start_with?('examine') })
   end
 
+  def test_a_person_away_exhausted_before_link_held_other_items_is_offered_once
+    talk_log = Koholint::TalkLog.new
+    before = Koholint::Dialogues.stamp(milestone: :shield, items: [4], leads: 0)
+    2.times { talk_log.remember(place: [3, 0], cell: [2, 2], text: 'Bonjour, petit!', stamp: before, entity: 81) }
+    cards = { [3, 0] => { people: [{ type: 81, cell: [2, 2] }] } }
+    away = ->(stamp) { build(cards:, talk_log:, stamp:).select { |c| c[:id] == 'person-3-0-t81' } }
+    assert_empty away.(Koholint::Dialogues.stamp(milestone: :shield, items: [4], leads: 3)), 'new leads alone do not reopen an exhausted person'
+    after = Koholint::Dialogues.stamp(milestone: :sword, items: [1, 4], leads: 0)
+    assert_match(/Link holds other items than at the last talk/, away.(after).first[:label])
+    talk_log.remember(place: [3, 0], cell: [2, 2], text: 'Bonjour, petit!', stamp: after, entity: 81)
+    assert_empty away.(after)
+  end
+
   def log
     log = Koholint::ExploreLog.new
     log.absorb({ from: { room: 1, map: 0 }, exits: [{ row: 0, col: 5, direction: :up, outcome: :left, to: [3, 0] }] })
