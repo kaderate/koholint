@@ -26,6 +26,8 @@ The skills, protocols and harness behaviours the agent works with. Versioned wit
   skill with `scene`; the harness waits through it until Link is free, advances its dialogues (past the 40-page cap once) and,
   after any lock, waits as long as the lock (up to 30 frames) before asking the model; `wait frames until_free` ends
   early when Link is free. Unidentified things on screen are offered as `examine-ROW-COL`.
+- flow-57: `damage` means Link's health once the pending damage has drained (`pending_damage`, 0xDB94) fell: a hit stops a
+  skill on its own frame with its whole loss, and the drain that follows (one unit every 2 frames) stops nothing.
 - `attack row col` walks next to the enemy at or next to the cell, lines up within the measured sword reach, faces it
   and strikes with the sword's button until it dies (up to 6 strikes, walking up again after a knockback); it stops
   `done` (`killed`), `damage`, `refused` (no sword on A or B), `no_target`, `target_gone` (flow-53: also when a knockback puts it off the grid), `no_kill`, `out_of_reach` or
