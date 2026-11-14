@@ -145,6 +145,18 @@ class AttackTest < Minitest::Test
     assert(inputs.first(first_a).any? { |buttons| buttons.include?(:left) })
   end
 
+  # 66/0: a split enemy's pieces sit on and around Link, so every other cell next to the target is in reach of one of them.
+  def test_strikes_from_where_link_stands_when_he_is_already_next_to_the_enemy
+    result, = fight([4, 6], [enemy(4, 6), enemy(3, 5, slot: 4)], from: [4, 5])
+    assert_equal [{ row: 4, col: 5 }, true], result.values_at(:standing_cell, :killed)
+  end
+
+  def test_targets_the_thing_on_the_named_cell_over_a_known_enemy_a_cell_away
+    unknown = enemy(4, 6, slot: 1, type: 28).merge(kind: :unknown)
+    result, = fight([4, 6], [unknown, enemy(5, 7, slot: 2)])
+    assert_equal 1, result[:target][:slot]
+  end
+
   def test_prefers_a_standing_cell_outside_another_enemy_s_reach
     other = enemy(2, 6, slot: 4)
     result, = fight([4, 6], [enemy(4, 6), other], from: [3, 2])
