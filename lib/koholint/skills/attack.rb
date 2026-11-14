@@ -51,11 +51,13 @@ module Koholint
 
         def hard_cap = HARD_CAP
 
-        # An unidentified thing the agent names is a target too: new places bring types no census has seen yet.
+        # An unidentified thing the agent names is a target too: new places bring types no census has seen yet. The nearest to the
+        # named cell wins, an enemy only on a tie, so a known enemy a cell away never replaces the thing on the cell itself.
         def enemy_near(cell)
-          seen = Array(@entities&.call).select { |entity| entity[:cell] }
-          enemies = seen.select { |entity| entity[:kind].to_s == 'enemy' }
-          (Entities.near(enemies, cell) || Entities.near(seen.select { |entity| Entities.creature?(entity) }, cell))&.slice(:slot, :type, :x, :y, :cell, :status, :health, :contact)
+          targets = Array(@entities&.call).select { |entity| entity[:cell] && (entity[:kind].to_s == 'enemy' || Entities.creature?(entity)) }
+          targets.select { |entity| (entity[:cell][0] - cell[0]).abs <= 1 && (entity[:cell][1] - cell[1]).abs <= 1 }
+                 .min_by { |entity| [(entity[:cell][0] - cell[0]).abs + (entity[:cell][1] - cell[1]).abs, entity[:kind].to_s == 'enemy' ? 0 : 1, entity[:slot]] }
+                 &.slice(:slot, :type, :x, :y, :cell, :status, :health, :contact)
         end
 
         def danger_of(context)
@@ -68,6 +70,7 @@ module Koholint
 
         def approach(from)
           return nil unless @enemy && from && @planner
+          return beside(from) if (from[0] - @enemy[:cell][0]).abs + (from[1] - @enemy[:cell][1]).abs <= 1
 
           zones = Array(@danger&.call)
           options = Navigation::Planner::DELTAS.values.filter_map do |dr, dc|
@@ -81,6 +84,13 @@ module Koholint
           @initial_length = path ? path.size - 1 : 0
           @cause = 'no reachable cell next to the enemy' unless path
           path
+        end
+
+        # Already on or next to the enemy's cell: strike from here, since a cluster that hems Link in leaves no other cell to reach.
+        def beside(from)
+          @target = from
+          @initial_length = 0
+          [from]
         end
 
         def input_for(state)

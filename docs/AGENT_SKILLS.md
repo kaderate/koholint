@@ -1,6 +1,6 @@
 # Agent skills
 
-The skills, protocols and harness behaviours the agent works with. Versioned with the play flow (currently `flow-60`): update this page, not the README, when a flow changes. Layers and data flow are in [ARCHITECTURE.md](../ARCHITECTURE.md).
+The skills, protocols and harness behaviours the agent works with. Versioned with the play flow (currently `flow-61`): update this page, not the README, when a flow changes. Layers and data flow are in [ARCHITECTURE.md](../ARCHITECTURE.md).
 
 
 - Learned capabilities (`data/capabilities.json`, `bin/koholint capability list`): an `operational` entry is a composite of the skills below, offered in the skill schema and listed under "Learned skills" only while its trigger item is held (flow-49) and its object is on screen (today `sword_on_object_92 row col direction`: stand next to object 92, face it, use the sword, step into its cell). `explore` and `goto` also run it themselves when blocked facing such a cell, and the planner routes through those cells as a last resort. `learn` and `capability publish|retire` are offline commands.
@@ -34,7 +34,9 @@ The skills, protocols and harness behaviours the agent works with. Versioned wit
 - `attack row col` walks next to the enemy at or next to the cell, lines up within the measured sword reach, faces it
   and strikes with the sword's button until it dies (up to 6 strikes, walking up again after a knockback); it stops
   `done` (`killed`), `damage`, `refused` (no sword on A or B), `no_target`, `target_gone` (flow-53: also when a knockback puts it off the grid), `no_kill`, `out_of_reach` or
-  `frame_cap`, and reports `strikes` and `hits`.
+  `frame_cap`, and reports `strikes` and `hits`. flow-61: its target is the thing nearest the cell (an enemy only on a tie),
+  and when Link already stands on or next to the target's cell he strikes from there instead of walking to another cell
+  next to it, which the pieces of a split enemy can all block.
 - A ledger counts blocked edges per place; an edge blocked twice is marked doubtful in the context, and an objective
   that keeps failing is abandoned as `unreachable`.
 - Dialogue pages are advanced automatically (one `decision` with agent `delegated` and cost 0 per page) and read once
