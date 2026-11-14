@@ -83,7 +83,7 @@ module Koholint
           lines << "Link offset from cell centre (positive = right of / below the centre): dx=#{dx}, dy=#{dy}"
         end
         lost = ", #{hearts(hp_lost)} lost since your last decision" if hp_lost.positive?
-        lines << "Health: #{hearts(state.hp)} of #{hearts(state.max_hp)} hearts#{lost}#{' (Link died; the harness chose continue)' if died}"
+        lines << "Health: #{hearts(state.health)} of #{hearts(state.max_hp)} hearts#{lost}#{' (Link died; the harness chose continue)' if died}"
         lines.concat(alerts)
         lines << items_line(state)
         known = link && triggers ? triggers.forbidden(place, link) : []

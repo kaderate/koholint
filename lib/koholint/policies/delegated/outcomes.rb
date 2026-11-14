@@ -5,7 +5,7 @@ module Koholint
         private
 
         def note_damage(state)
-          hp = state.hp.to_i
+          hp = state.health
           if @last_hp && hp < @last_hp && !state.loading?
             @hurt_at = state.frame
             @hp_lost += @last_hp - hp

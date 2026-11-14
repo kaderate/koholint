@@ -21,6 +21,14 @@ class PerceptionTest < Minitest::Test
     assert_equal :none, state.milestone
   end
 
+  def test_reads_the_pending_damage_into_health
+    addresses = Koholint::Addresses.load
+    ram = Hash.new(0).merge(addresses.fetch(:hp) => 24, addresses.fetch(:max_hearts) => 3, addresses.fetch(:pending_damage) => 4)
+    emulator = Struct.new(:frame) { define_method(:read) { |addr| ram[addr] } }.new(21068)
+    state = Koholint::Perception.read(emulator)
+    assert_equal [24, 4, 20], [state.hp, state.pending_damage, state.health]
+  end
+
   def test_milestone_maps_the_shield_level
     assert_equal :none, Koholint::Perception.milestone_for(0)
     assert_equal :shield, Koholint::Perception.milestone_for(1)

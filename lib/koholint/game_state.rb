@@ -14,7 +14,7 @@ module Koholint
   GameState = Struct.new(:frame, :room_id, :map_id, :x, :y, :direction, :hp, :max_hp, :milestone,
                          :game_mode, :game_submode, :name_length, :dialog_state, :motion_blocked, :scene_state,
                          :link_motion_state, :game_over_stage, :inventory_cursor, :menu_option, :item_a, :item_b,
-                         :room_transition, :link_airborne, :link_z, :link_knockback, :inventory, :shield_raised, :link_frozen,
+                         :room_transition, :link_airborne, :link_z, :link_knockback, :inventory, :shield_raised, :link_frozen, :pending_damage,
                          keyword_init: true) do
     # Link's sprites cover x - 8...x + 8 and y - 16...y; nil when his center is outside the 8x10 grid.
     def self.cell_at(x, y) = Geometry.cell_for(x, y)
@@ -22,6 +22,9 @@ module Koholint
     def cell = self.class.cell_at(x, y)
 
     def controllable? = hp.to_i.positive? && x.to_i.positive?
+
+    # Health once the pending damage has drained: the game lowers hp by one unit every 2 frames after a hit (data/addresses.json, pending_damage).
+    def health = hp.to_i - pending_damage.to_i
 
     def low_health? = max_hp.to_i.positive? && hp.to_i.positive? && hp.to_i * 3 <= max_hp.to_i
 

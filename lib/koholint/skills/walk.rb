@@ -28,7 +28,7 @@ module Koholint
         def input_for(state)
           track(state) if @frames.positive?
           return finish(:room_change) if room(state) != room(@start)
-          return finish(:damage) if state.hp.to_i < @start.hp.to_i
+          return finish(:damage) if state.health < @start.health
           return finish(:dialogue) if state.dialog_open? && !@start.dialog_open?
           return finish(:done) if moved_cells(state) >= @cells
           return finish(:blocked) if @still >= STILL_FRAMES

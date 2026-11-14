@@ -1018,6 +1018,18 @@ class DelegatedPolicyTest < Minitest::Test
     refute decide(p, over).last[:notables]&.any? { |note| note[:kind] == 'death' }
   end
 
+  def test_a_hit_and_its_drain_emit_one_damage_notable
+    client = ScriptedClient.new(objective: objective, default: walk)
+    p = policy(client)
+    p.observe(state, frame: 100)
+    notes = [[101, 24, 4], [103, 23, 3], [105, 22, 2], [107, 21, 1], [109, 20, 0]].flat_map do |frame, hp, pending|
+      p.observe(state(frame:, hp:, pending_damage: pending), frame:)
+      _point, result = decide(p, state(frame:, hp:, pending_damage: pending))
+      Array(result[:notables]).select { |note| note[:kind] == 'damage' }
+    end
+    assert_equal [{ kind: 'damage', detail: 'hp 24 -> 20' }], notes
+  end
+
   def test_hp_drops_emit_a_damage_notable_and_show_in_the_next_prompt
     client = ScriptedClient.new(objective: objective, default: walk)
     p = policy(client)
