@@ -97,7 +97,7 @@ module Koholint
     end
 
     def places(place, hops, explore_log, named)
-      away(place, hops).select { |where| explore_log.untried?(where) }.sort_by.with_index { |where, i| [explore_log.work_rank(where), i] }.first(PER_KIND).map do |where|
+      away(place, hops).select { |where| explore_log.untried?(where) }.first(PER_KIND).map do |where|
         { id: "place-#{where.join('-')}", label: "go to #{describe(where, named)}, #{moves(hops[where])}: it has untried exits or doors",
           title: "Go to #{describe(where, named)}"[0, 80], predicate: { kind: 'reach_place', place: where }, target: { kind: 'place', place: where } }
       end
