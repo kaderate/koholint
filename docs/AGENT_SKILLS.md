@@ -1,6 +1,6 @@
 # Agent skills
 
-The skills, protocols and harness behaviours the agent works with. Versioned with the play flow (currently `flow-63`): update this page, not the README, when a flow changes. Layers and data flow are in [ARCHITECTURE.md](../ARCHITECTURE.md).
+The skills, protocols and harness behaviours the agent works with. Versioned with the play flow (currently `flow-65`): update this page, not the README, when a flow changes. Layers and data flow are in [ARCHITECTURE.md](../ARCHITECTURE.md).
 
 
 - Learned capabilities (`data/capabilities.json`, `bin/koholint capability list`): an `operational` entry is a composite of the skills below, offered in the skill schema and listed under "Learned skills" only while its trigger item is held (flow-49) and its object is on screen (today `sword_on_object_92 row col direction`: stand next to object 92, face it, use the sword, step into its cell). `explore` and `goto` also run it themselves when blocked facing such a cell, and the planner routes through those cells as a last resort. `learn` and `capability publish|retire` are offline commands.
@@ -43,7 +43,12 @@ The skills, protocols and harness behaviours the agent works with. Versioned wit
   `done` (`killed`), `damage`, `refused` (no sword on A or B), `no_target`, `target_gone` (flow-53: also when a knockback puts it off the grid), `no_kill`, `out_of_reach` or
   `frame_cap`, and reports `strikes` and `hits`. flow-61: its target is the thing nearest the cell (an enemy only on a tie),
   and when Link already stands on or next to the target's cell he strikes from there instead of walking to another cell
-  next to it, which the pieces of a split enemy can all block.
+  next to it, which the pieces of a split enemy can all block. flow-65: after an attack that stops `done` or `target_gone`,
+  the harness attacks the nearest other `enemy` within 2 cells itself, or an unidentified type already struck in this
+  visit, never the slot just struck (it stays listed while it dies), with no model call. It hands back to the model when
+  no target is left, health is below 2 hearts or a heart below its level at the last call, an attack stops any other
+  way (a room change is one: `room_change` ends the chain), or after 8 attacks or 900 frames since that call (checked
+  before each attack, so the last one may run past it). The viewer counts no autopilot decision as an objective attempt.
 - A ledger counts blocked edges per place; an edge blocked twice is marked doubtful in the context, and an objective
   that keeps failing is abandoned as `unreachable`.
 - Dialogue pages are advanced automatically (one `decision` with agent `delegated` and cost 0 per page) and read once

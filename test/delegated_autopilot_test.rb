@@ -386,6 +386,24 @@ class DelegatedAutopilotTest < Minitest::Test
     refute_equal 'talk_to', p.decide(p.decision_point_for(state), state, { grid:, entities: -> { [] } })[:choice][:skill]
   end
 
+  # 66/0: each strike on the pieces of a split enemy cost a call; after a kill the harness strikes the next one in reach.
+  def test_after_the_model_s_attack_kills_the_harness_strikes_the_next_enemy_in_reach_for_free
+    attack = ok('skill' => 'attack', 'params' => { 'row' => 3, 'col' => 5 })
+    client = ScriptedClient.new(objective: new_place, skill: attack, default: explore)
+    p = autopiloted(client)
+    foes = [{ slot: 4, type: 9, x: 56, y: 76, cell: [4, 3], kind: :enemy, contact: 9 }]
+    ctx = { grid:, entities: -> { foes } }
+    first = p.decide(p.decision_point_for(state), state, ctx)
+    first = p.decide(p.decision_point_for(state), state, ctx) unless first[:choice][:skill] == 'attack'
+    killed = { skill: 'attack', params: { row: 3, col: 5 }, stopped_by: :done, killed: true, moved_cells: 0, hp_delta: 0, target: { slot: 2, type: 9, cell: [3, 5] },
+               from: { room: 163, map: 16, row: 3, col: 4 }, to: { room: 163, map: 16, row: 3, col: 4 } }
+    p.after_action(choice: first[:choice], outcome: killed, state: state(frame: 160), frame: 160)
+    calls = client.calls.size
+    chained = p.decide(p.decision_point_for(state(frame: 160)), state(frame: 160), ctx)
+    assert_equal [{ skill: 'attack', params: { row: 4, col: 3 } }, 'delegated', true], chained.values_at(:choice, :agent, :autopilot)
+    assert_equal calls, client.calls.size
+  end
+
   def test_a_wait_or_guard_next_to_a_hostile_creature_becomes_explore
     near = [{ slot: 2, type: 9, x: 60, y: 60, cell: [3, 3], kind: :enemy, contact: 9 }]
     far = [{ slot: 2, type: 9, x: 150, y: 130, cell: [7, 9], kind: :enemy, contact: 9 }]
