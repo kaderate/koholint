@@ -86,11 +86,11 @@ module Koholint
         def locked_waiting?(state)
           track_locked(state)
           return false unless Modes::HELD.include?(state.phase)
-          return true if locked_frames(state) < LOCKED_WAIT_LIMIT_FRAMES
+          return true if state.frame - @scene_since < LOCKED_WAIT_LIMIT_FRAMES
 
-          unless @lock_capped == @locked_since
-            @lock_capped = @locked_since
-            @notes << { kind: 'lock_cap', detail: "#{state.mode&.name || state.phase} held Link for #{locked_frames(state)} frames: the model decides from now on" }
+          unless @lock_capped == @scene_since
+            @lock_capped = @scene_since
+            @notes << { kind: 'lock_cap', detail: "#{state.mode&.name || state.phase} held Link for #{state.frame - @scene_since} frames: the model decides from now on" }
           end
           false
         end

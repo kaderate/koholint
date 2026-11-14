@@ -769,6 +769,26 @@ class DelegatedPolicyTest < Minitest::Test
     assert_equal calls, client.calls.size
   end
 
+  def test_a_scene_that_flickers_past_the_wait_cap_is_handed_to_the_model
+    client = ScriptedClient.new(objective: objective, skill: [walk, walk])
+    p = policy(client)
+    decide(p)
+    calls = client.calls.size
+    limit = Koholint::Policies::Delegated::LOCKED_WAIT_LIMIT_FRAMES
+    (100..(100 + limit)).step(20) do |frame|
+      held = state(frame:, **LOCKED)
+      p.observe(held, frame:)
+      advance(p, decide_with_shot(p, held), held, frame + 1)
+      p.observe(state(frame: frame + 1), frame: frame + 1)
+    end
+    assert_equal calls, client.calls.size
+    capped = state(frame: 120 + limit, **LOCKED)
+    p.observe(capped, frame: 120 + limit)
+    result = decide_with_shot(p, capped)
+    assert_equal calls + 1, client.calls.size
+    assert_equal ['lock_cap'], Array(result[:notables]).map { |note| note[:kind] }
+  end
+
   def test_a_lock_past_the_wait_cap_is_noted_once_and_handed_to_the_model
     client = ScriptedClient.new(objective: objective, skill: [walk, walk])
     p = policy(client)
