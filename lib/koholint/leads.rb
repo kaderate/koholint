@@ -145,16 +145,18 @@ module Koholint
       [accepted, rejected]
     end
 
-    # A text the game opens when Link walks into something shuts the way and names its own condition: one lead per thing and text.
+    # A text the game opened while Link pressed toward something: one lead per thing and text, a few per place.
     def contact(contact, text:, place:)
       quote = self.class.clean(text, QUOTE_MAX)
       thing = contact.slice(:object, :entity)
+      key = self.class.compact(quote)
       return if self.class.normalize(quote).length < QUOTE_MIN || thing.empty?
-      return if @all.any? { |known| known[:contact]&.slice(:object, :entity) == thing && self.class.compact(known[:quote]) == self.class.compact(quote) }
+      return if @all.count { |known| known[:contact] && known[:place] == place } >= LIMIT
+      return if @all.any? { |known| known[:contact]&.slice(:object, :entity) == thing && (key.include?(self.class.compact(known[:quote])) || self.class.compact(known[:quote]).include?(key)) }
 
       what = contact[:entity] ? "person #{contact[:entity]}" : "object #{contact[:object]}"
-      claim = "Walking into #{what} at (#{contact[:row]},#{contact[:col]}) shows this text and does not let Link through: the text says what it needs"
-      lead = { id: "lead-#{@all.size + 1}", place:, source: nil, quote:, claim:, importance: 'high', where: place.join('-'), contact: }
+      claim = "Contact with #{what} at (#{contact[:row]},#{contact[:col]}) opened this text"
+      lead = { id: "lead-#{@all.size + 1}", place:, source: contact.slice(:row, :col, :entity), quote:, claim:, importance: 'normal', where: place.join('-'), contact: }
       @all << lead
       lead
     end

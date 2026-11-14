@@ -106,14 +106,15 @@ module Koholint
           return unless Triggers.scripted?(skill: choice[:skill], params: choice[:params], result: outcome)
 
           cell = Triggers.cell_of(outcome)
-          note_contact(cell, outcome[:trigger_input]&.first)
+          note_contact(place_of(outcome, :to, state), cell, outcome[:trigger_input]&.first)
           @triggers.record(place: place_of(outcome, :to, state), cell:, skill: choice[:skill], direction: Triggers.direction_of(choice[:skill], choice[:params]),
                             input: outcome[:trigger_input]&.first)
           cell && @triggers.count(place_of(outcome, :to, state), cell)
         end
 
-        # What fills the cell Link pressed into when the game opened a text is the thing that answered: a person on it, else its object.
-        def note_contact(cell, input)
+        # The thing in the cell Link pressed toward when the game opened a text: a catalogued npc on it, else its object, unless Link has
+        # stood on that object here (floor). The room object table holds an id in every cell.
+        def note_contact(place, cell, input)
           delta = Navigation::Planner::DELTAS[input&.to_sym] if input
           return unless cell && delta
 
@@ -122,8 +123,10 @@ module Koholint
           return unless row.between?(0, Geometry::ROWS - 1) && col.between?(0, Geometry::COLS - 1)
 
           person = entities_now.find { |entity| entity[:cell] == [row, col] && entity[:kind].to_s == 'npc' }
-          object = @room_objects_reader&.call&.dig(row, col)
-          thing = person ? { entity: person[:type] } : ({ object: } if object)
+          objects = @room_objects_reader&.call
+          object = objects&.dig(row, col)
+          floor = objects ? (@explore_log.walked(place) | [cell]).map { |r, c| objects.dig(r, c) } : []
+          thing = person ? { entity: person[:type] } : ({ object: } if object && !floor.include?(object))
           @contact = { row:, col:, **thing } if thing
         end
 

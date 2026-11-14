@@ -44,9 +44,11 @@ The skills, protocols and harness behaviours the agent works with. Versioned wit
   an objective can cite the lead behind it (`because`). A lead may carry `where` (a place id such as `161-0` or a name the agent gave).
   A lead is `open` until an objective follows it, `tested` once one is achieved and `refuted` after 2 that failed (a loop, stall,
   unreachable target or restart does not count); the context shows the status with the last 3 of those objectives and lists open leads first.
-  flow-58: a text the game opens when Link walks into something (the edge it bars) also becomes a `high` lead on its own, whatever the agent
-  extracts: its quote is the text read, its `contact` names the cell pressed into and what fills it (a person's type, else the object id), its `where` is the
-  place, and its claim says the thing does not let Link through and the text says what it needs. There is one such lead per thing and text.
+  flow-58: a text the game opens while Link presses toward something (the edge it bars) also becomes a `normal` lead on its own, whatever the agent
+  extracts: its quote is the text read, its `source` and `contact` name the cell pressed toward and what is in it (a catalogued npc's type, else the
+  object id, never an id Link has stood on in that place), its `where` is the place, and its claim says only that contact with that thing opened the text.
+  There is one such lead per thing and text (a text overlapping an earlier one about the same thing is dropped), at most 5 per place, and they never
+  change the dialogue stamp, so they do not reopen people.
 - At `choose_objective` the context lists candidate objectives with ids (`candidates.rb`): untried exits by side (`exit-up`) and doors
   (`door-R-C`) of this place, people (`person-tT`, listed first) and unread signs (`sign-R-C`) here worth a visit, known places with untried exits
   (`place-R-M`), people and unread signs of other known places (from their place cards) and places tied to a lead by its `where`
