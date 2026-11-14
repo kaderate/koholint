@@ -70,10 +70,12 @@ module Koholint
           if Modes::HELD.include?(state.phase)
             unless @locked_since
               @locked_since = state.frame
+              @scene_since = state.frame unless @released_at && state.frame - @released_at < SETTLE_FRAMES
               @objectives.touch(frame: state.frame)
             end
           elsif @locked_since && !state.loading?
-            @settle_until = state.frame + [locked_frames(state), SETTLE_FRAMES].min if state.phase == :playing && locked_frames(state).positive?
+            @settle_until = state.frame + [state.frame - @scene_since, SETTLE_FRAMES].min if state.phase == :playing && locked_frames(state).positive?
+            @released_at = state.frame
             @locked_since = nil
             @objectives.touch(frame: state.frame)
           end
@@ -84,11 +86,11 @@ module Koholint
         def locked_waiting?(state)
           track_locked(state)
           return false unless Modes::HELD.include?(state.phase)
-          return true if locked_frames(state) < LOCKED_WAIT_LIMIT_FRAMES
+          return true if state.frame - @scene_since < LOCKED_WAIT_LIMIT_FRAMES
 
-          unless @lock_capped == @locked_since
-            @lock_capped = @locked_since
-            @notes << { kind: 'lock_cap', detail: "#{state.mode&.name || state.phase} held Link for #{locked_frames(state)} frames: the model decides from now on" }
+          unless @lock_capped == @scene_since
+            @lock_capped = @scene_since
+            @notes << { kind: 'lock_cap', detail: "#{state.mode&.name || state.phase} held Link for #{state.frame - @scene_since} frames: the model decides from now on" }
           end
           false
         end
@@ -99,13 +101,13 @@ module Koholint
             fallback: false, prompt: nil, image: nil }
         end
 
-        # Scenes release Link for a few frames between two locks (3 in the sword scene of 242/0, 1 after the owl of 128/0), so a lock is trusted over only after a wait as long as itself, up to SETTLE_FRAMES.
+        # Scenes release Link for a few frames between two locks (3 in the sword scene of 242/0, 1 after the owl of 128/0, 1 to 12 all through the healing scene of 83/0), so locks less than SETTLE_FRAMES apart are one scene and a release is trusted only after a wait as long as the scene so far, up to SETTLE_FRAMES.
         def settling?(state) = !!@settle_until && state.phase == :playing && state.frame < @settle_until
 
         def settle_wait(state)
           @locked_wait = true
           frames = @settle_until - state.frame
-          { choice: { skill: 'wait', params: { frames: } }, justification: "locked: Link was just released, waiting #{frames} frames in case the scene goes on",
+          { choice: { skill: 'wait', params: { frames:, until_held: true } }, justification: "locked: Link was just released, waiting #{frames} frames in case the scene goes on",
             confidence: 1.0, agent: 'delegated', latency_ms: 0, cost_usd: 0.0, fallback: false, prompt: nil, image: nil }
         end
 

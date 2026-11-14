@@ -1,6 +1,6 @@
 # Agent skills
 
-The skills, protocols and harness behaviours the agent works with. Versioned with the play flow (currently `flow-59`): update this page, not the README, when a flow changes. Layers and data flow are in [ARCHITECTURE.md](../ARCHITECTURE.md).
+The skills, protocols and harness behaviours the agent works with. Versioned with the play flow (currently `flow-60`): update this page, not the README, when a flow changes. Layers and data flow are in [ARCHITECTURE.md](../ARCHITECTURE.md).
 
 
 - Learned capabilities (`data/capabilities.json`, `bin/koholint capability list`): an `operational` entry is a composite of the skills below, offered in the skill schema and listed under "Learned skills" only while its trigger item is held (flow-49) and its object is on screen (today `sword_on_object_92 row col direction`: stand next to object 92, face it, use the sword, step into its cell). `explore` and `goto` also run it themselves when blocked facing such a cell, and the planner routes through those cells as a last resort. `learn` and `capability publish|retire` are offline commands.
@@ -25,7 +25,10 @@ The skills, protocols and harness behaviours the agent works with. Versioned wit
 - A scripted scene (Link held by `link_frozen`, e.g. a character arriving to speak, or something Link touches) stops any
   skill with `scene`; the harness waits through it until Link is free, advances its dialogues (past the 40-page cap once) and,
   after any lock, waits as long as the lock (up to 30 frames) before asking the model; `wait frames until_free` ends
-  early when Link is free. Unidentified things on screen are offered as `examine-ROW-COL`.
+  early when Link is free. Unidentified things on screen are offered as `examine-ROW-COL`. flow-60: locks less than 30
+  frames apart are one scene, so each release waits as long as the scene so far, up to 30 frames. The harness's settle wait
+  (`wait frames until_held`) ends when Link is held again, and Link is not ready while health is still being added
+  (`pending_heal`, reason `healing`): together these wait out the flickering hold of a healing scene.
 - flow-57: `damage` means Link's health once the pending damage has drained (`pending_damage`, 0xDB94) fell: a hit stops a
   skill on its own frame with its whole loss, and the drain that follows (one unit every 2 frames) stops nothing.
 - `attack row col` walks next to the enemy at or next to the cell, lines up within the measured sword reach, faces it

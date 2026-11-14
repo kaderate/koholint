@@ -72,6 +72,16 @@ class SkillsTest < Minitest::Test
     assert_equal :done, execution.result(state)[:stopped_by]
   end
 
+  def test_a_wait_until_held_ends_the_frame_a_scene_holds_link_again
+    free = Koholint::GameState.new(frame: 0, room_id: 1, map_id: 0, x: 60, y: 60, dialog_state: 0, game_mode: 0x0B, game_submode: 7, motion_blocked: 0)
+    execution = registry.start('wait', free, { frames: 30, until_held: true })
+    assert_equal [], execution.next_input(free)
+    assert_equal [], execution.next_input(free)
+    assert_nil execution.next_input(free.dup.tap { |s| s.motion_blocked = 2 })
+    assert_equal :held, execution.result(free)[:stopped_by]
+    assert_raises(ArgumentError) { registry.validate('wait', { frames: 5, until_held: 'yes' }) }
+  end
+
   def test_a_wait_until_free_ends_the_frame_link_is_released
     locked = Koholint::GameState.new(frame: 0, room_id: 1, map_id: 0, x: 88, y: 80, hp: 24, dialog_state: 0, game_mode: 0x0B, game_submode: 7,
                                      milestone: :none, motion_blocked: 2)

@@ -7,7 +7,7 @@ module Koholint
     # The BG tilemap is final 2 frames after the signals clear (readiness census of run 20261024-184627-b97e).
     STABLE_FRAMES = 2
     GATED_PHASES = %i[playing loading].freeze
-    REASONS = { room_transition: 'transition', link_airborne: 'airborne', link_z: 'airborne', link_knockback: 'knockback',
+    REASONS = { room_transition: 'transition', link_airborne: 'airborne', link_z: 'airborne', link_knockback: 'knockback', pending_heal: 'healing',
                 link_motion_state: 'forced' }.freeze
 
     def self.gated?(state) = GATED_PHASES.include?(state.phase(booted: true))
