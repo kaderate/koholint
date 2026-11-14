@@ -101,6 +101,7 @@ module Koholint
           merged[:clears] = @clearing.uses if @clearing&.uses&.any?
           merged[:survey] = @survey.merge(pending: pending?) if @survey
           merged[:route] = @route if @route
+          merged[:aimed_at] = @aim[:place] if @aim[:place] && @aim[:place] != @place
           merged[:unreachable] = @unreachable if @unreachable
           merged[:dead_end] = true if @dead_end
           merged[:cause] = @fail_cause if @stopped_by == :blocked && @fail_cause

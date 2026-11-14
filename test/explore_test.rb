@@ -285,6 +285,37 @@ class ExploreTest < Minitest::Test
     assert_equal 1, inferring_log.work_rank([3, 0])
   end
 
+  def test_the_first_tries_count_only_explores_of_the_place_and_come_back_with_a_new_item_or_a_first_clear
+    door = { from: { room: 4, map: 0 }, survey: { sides: { left: [{ row: 3, col: 0 }] }, doors: [{ row: 2, col: 4 }] } }
+    log = Koholint::ExploreLog.new
+    log.note_held([4])
+    2.times { log.absorb(door.merge(aimed_at: [9, 0])) }
+    assert_equal 0, log.work_rank([4, 0]), 'explores passing through toward another place leave the tries'
+    2.times { log.absorb(door.merge(aimed_at: [4, 0])) }
+    assert_equal 2, log.work_rank([4, 0])
+    log.note_held([4])
+    assert_equal 2, log.work_rank([4, 0]), 'items already held change nothing'
+    log.note_held([1, 4])
+    assert_equal 0, log.work_rank([4, 0])
+    2.times { log.absorb(door) }
+    log.note({ from: { room: 160, map: 0 }, clears: [{ target: { row: 3, col: 8 }, look: 'bush', effect: true }] })
+    assert_equal 0, log.work_rank([4, 0]), "a capability's first clear gives the tries back"
+    unsurveyed = Koholint::ExploreLog.new
+    2.times { unsurveyed.absorb({ from: { room: 5, map: 0 } }) }
+    assert_equal 2, unsurveyed.work_rank([5, 0]), 'a place whose explores carry no survey loses the lead too'
+  end
+
+  def test_the_tries_and_door_edges_are_rebuilt_from_the_trace
+    explore = ->(frame) { { 'type' => 'action', 'frame' => frame, 'skill' => 'explore', 'result' => { 'from' => { 'room' => 4, 'map' => 0 }, 'survey' => { 'sides' => {}, 'doors' => [{ 'row' => 2, 'col' => 4 }] } } } }
+    walk = { 'type' => 'action', 'frame' => 3, 'skill' => 'walk', 'result' => { 'skill' => 'walk', 'from' => { 'room' => 98, 'map' => 0, 'row' => 3, 'col' => 7 }, 'to' => { 'room' => 189, 'map' => 10, 'row' => 7, 'col' => 5 },
+                                                                         'exit' => { 'row' => 3, 'col' => 7, 'direction' => 'up', 'walk_in' => true } } }
+    log = Koholint::ExploreLog.from_events([explore.(1), explore.(2), walk])
+    assert_equal 2, log.work_rank([4, 0])
+    assert log.door_edge?([98, 0], [2, 7]) || log.door_edge?([98, 0], [3, 7]), 'a walk through a door that is no door object records its edge'
+    held = { 'type' => 'perception', 'frame' => 4, 'state' => { 'item_a' => 1 } }
+    assert_equal 0, Koholint::ExploreLog.from_events([explore.(1), explore.(2), held]).work_rank([4, 0])
+  end
+
   def test_a_door_walked_through_that_is_no_door_object_is_no_frontier
     rows = with(CLOSED, [1, 5], '?')
     result, = explore(rows, limit: 3)
