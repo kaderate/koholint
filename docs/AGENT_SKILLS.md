@@ -6,7 +6,8 @@ The skills, protocols and harness behaviours the agent works with. Versioned wit
 - Learned capabilities (`data/capabilities.json`, `bin/koholint capability list`): an `operational` entry is a composite of the skills below, offered in the skill schema and listed under "Learned skills" only while its trigger item is held (flow-49) and its object is on screen (today `sword_on_object_92 row col direction`: stand next to object 92, face it, use the sword, step into its cell). `explore` and `goto` also run it themselves when blocked facing such a cell, and the planner routes through those cells as a last resort. `learn` and `capability publish|retire` are offline commands.
 - Between decisions the engine waits, with no input, until Link is ready (no screen scroll, door walk, jump or
   knockback, then 2 settled frames): the screen is never mapped and the model never called mid-scroll or mid-jump
-  (`notable` `not_ready_wait` for waits over 5 frames; the run stops with `not_ready_stuck` after 600 frames).
+  (`notable` `not_ready_wait` for waits over 5 frames; the run stops with `not_ready_stuck` after 600 frames). flow-59:
+  nor while health is still being added (`pending_heal`, reason `healing`), which covers a healing scene that holds Link.
 - `explore [direction]` (relaunched by the autopilot after benign stops, see Running) explores by itself: it walks to the nearest
   untried border exit (a side never left from this place) or untried door (walking up into it), else toward the nearest
   place it has taken an exit to that still has untried exits or doors (flow-55: or, if surveyed before the capability existed, a tile

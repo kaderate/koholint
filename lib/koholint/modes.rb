@@ -8,7 +8,7 @@ module Koholint
 
     DEFAULT_PATH = File.expand_path('../../data/modes.json', __dir__)
     TUPLE_FIELDS = %i[game_mode game_submode dialog_state motion_blocked scene_state link_motion_state game_over_stage link_frozen].freeze
-    SIGNAL_FIELDS = %i[room_transition link_airborne link_z link_knockback].freeze
+    SIGNAL_FIELDS = %i[room_transition link_airborne link_z link_knockback pending_heal].freeze
     FIELDS = (TUPLE_FIELDS + SIGNAL_FIELDS).freeze
     KINDS = %w[play dialogue menu map cutscene save game_over transition title].freeze
     PHASES = %w[boot loading playing locked dialogue menu map save game_over cutscene].freeze

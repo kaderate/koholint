@@ -15,7 +15,7 @@ class ReadinessTest < Minitest::Test
 
   def test_each_signal_blocks_with_its_reason
     { { room_transition: 4 } => 'transition', { link_airborne: 1 } => 'airborne', { link_z: 12 } => 'airborne',
-      { link_knockback: 9 } => 'knockback', { link_motion_state: 3 } => 'forced', { link_motion_state: 6 } => 'forced', { game_submode: 2 } => 'loading' }.each do |fields, reason|
+      { link_knockback: 9 } => 'knockback', { pending_heal: 3 } => 'healing', { link_motion_state: 3 } => 'forced', { link_motion_state: 6 } => 'forced', { game_submode: 2 } => 'loading' }.each do |fields, reason|
       readiness = Koholint::Readiness.new
       readiness.observe(play(1))
       assert_equal reason, readiness.reason(play(2, **fields)), fields.inspect
@@ -30,6 +30,16 @@ class ReadinessTest < Minitest::Test
     assert_equal 'settling', readiness.reason(play(5))
     assert readiness.ready?(play(6))
     assert_equal 'settling', readiness.reason(play(9))
+  end
+
+  # 83/0 in fork a8f3: at full health the healing scene sets pending_heal to 4 and 0 on alternate frames for about 240 frames
+  # while it holds Link; no decision may fall on one of the 0 frames.
+  def test_a_heal_that_alternates_with_zero_never_reads_ready_until_it_stops
+    readiness = Koholint::Readiness.new
+    reasons = (1..20).map { |frame| readiness.reason(play(frame, pending_heal: frame.odd? ? 4 : 0)) }
+    assert_empty reasons.compact.reject { |reason| %w[healing settling].include?(reason) }
+    refute_includes reasons, nil
+    assert readiness.ready?(play(21))
   end
 
   def test_screens_outside_play_and_loading_are_not_gated

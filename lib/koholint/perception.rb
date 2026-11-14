@@ -33,7 +33,8 @@ module Koholint
                     item_a: buttons[0], item_b: buttons[1], inventory:, shield_raised: read_byte.(:shield_raised),
                     room_transition: read_byte.(:room_transition), link_airborne: read_byte.(:link_airborne),
                     link_z: read_byte.(:link_z), link_knockback: read_byte.(:link_knockback),
-                    link_frozen: read_byte.(:link_frozen), pending_damage: read_byte.(:pending_damage))
+                    link_frozen: read_byte.(:link_frozen), pending_damage: read_byte.(:pending_damage),
+                    pending_heal: read_byte.(:pending_heal))
     end
   end
 end

@@ -73,7 +73,11 @@ by a RAM write in the copy only) and diffs RAM while moving cursors; reports go 
 **Readiness gate** — `readiness.rb`: in the `playing` and `loading` phases Link is ready when the `ready` signals of
 the `play` mode hold for 2 consecutive frames (`Readiness::STABLE_FRAMES`: the last scroll write lands one frame after
 `room_transition` clears; the census found the BG tile indices final by then after every scroll, door, jump and
-knockback of run `20261024-184627-b97e`). The engine feeds it every frame it steps; at the start of each iteration,
+knockback of run `20261024-184627-b97e`). flow-59: `pending_heal` (0xDB93, health still to add) is a `ready` signal too.
+After its dialogue, the healing scene of 83/0 holds Link for about 240 frames with no lock signal (`link_motion_blocked`
+flickers, mostly 0). Meanwhile the heal reads 4 and 0 on alternate frames, so the 2 settled frames are never met until it
+stops. Before, the model was asked on free-looking frames and every skill failed at once, and the blocked walks latched the
+hemmed-in wait for 1800 frames after Link was free again. The engine feeds it every frame it steps; at the start of each iteration,
 before the perception event, the grid builder and the policy, it steps frames with no input (journalled, so replay,
 verify and resume are unchanged; resume primes it with the frame before) until ready, records the wait on the
 `perception` event (`not_ready_frames`) and as a diagnostic `notable` `not_ready_wait` `{frames, reason}` when over 5
