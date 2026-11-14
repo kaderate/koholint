@@ -1,5 +1,4 @@
 require 'koholint/geometry'
-require 'koholint/items'
 require 'koholint/ledger'
 require 'koholint/navigation/planner'
 
@@ -12,7 +11,6 @@ module Koholint
       log = new
       events.each do |event|
         log.screen(event['place'], event['grid']) if event['type'] == 'screen'
-        log.note_held(Items.held_ids(event['state'] || {})) if event['type'] == 'perception'
         next unless Ledger.pick(event, :type).to_s == 'action'
 
         result = Ledger.pick(event, :result)
@@ -36,8 +34,6 @@ module Koholint
       @assumed = []
       @doubted = {}
       @visits = Hash.new(0)
-      @explores = Hash.new(0)
-      @held = []
       @failed = Hash.new { |hash, key| hash[key] = [] }
       @screens = {}
       @looks = {}
@@ -54,8 +50,6 @@ module Koholint
 
       place = Ledger.place_of(Ledger.pick(result, :from)) or return
       know(place)
-      aimed = Ledger.pick(result, :aimed_at)
-      @explores[place] += 1 if aimed.nil? || Array(aimed) == place
       survey = Ledger.pick(result, :survey)
       keep(place, parse_survey(survey).merge(provisional: provisional?(result))) if survey.is_a?(Hash)
       @explored_since_clear << place if (@looks.any? { |_, record| record[:wins].positive? } || Ledger.pick(result, :clears)) && !@explored_since_clear.include?(place)
@@ -127,7 +121,6 @@ module Koholint
 
         record = @looks[look] ||= { wins: 0, losses: 0, first: nil }
         if Ledger.pick(use, :effect)
-          @explores.clear if record[:wins].zero?
           record[:wins] += 1
           record[:first] ||= { place:, cell: }
         else
@@ -214,28 +207,9 @@ module Koholint
         survey[:doors].any? { |cell| !door_tried?(place, cell) }
     end
 
-    # Where routes go first, measured by new places per dollar: a place never surveyed or with an untried door, then cells only a clear
-    # opens, then untried sides; nil when the place has no work. That lead lasts FIRST_TRIES explores of the place's own work (transit
-    # toward another place does not count), since something may bar the way to it (object 32 before 69/0's door); a new item or a
-    # capability's first clear may open it, so either gives the tries back.
-    FIRST_TRIES = 2
-
-    def work_rank(place)
-      return unless untried?(place)
-
-      survey = @surveys[place]
-      return 0 if @explores[place] < FIRST_TRIES && (survey.nil? || survey[:provisional] || survey[:doors].any? { |cell| !door_tried?(place, cell) })
-
-      inferred_clearable(place).any? ? 1 : 2
-    end
-
-    def note_held(ids)
-      @explores.clear if (ids - @held).any?
-      @held |= ids
-    end
-
-    def route(from, goal: nil, avoid: [])
-      hops = path(from, goal:, avoid:) or return nil
+    # skip: places not to aim at (a loop's own places), still crossed on the way.
+    def route(from, goal: nil, avoid: [], skip: [])
+      hops = path(from, goal:, avoid:, skip:) or return nil
       { goal: hops.last[:to], next: hops.first[:to], via: hops.first[:via] }
     end
 
@@ -246,17 +220,12 @@ module Koholint
       nil
     end
 
-    def path(from, goal: nil, avoid: [])
+    def path(from, goal: nil, avoid: [], skip: [])
       seen = { from => nil }
       queue = [from]
-      best = nil
       until queue.empty?
         place = queue.shift
-        return hops_to(seen, place) if goal && place == goal && place != from
-
-        rank = (work_rank(place) unless goal || place == from)
-        best = [rank, place] if rank && (best.nil? || rank < best[0])
-        break if best&.first&.zero?
+        return hops_to(seen, place) if place != from && (goal ? place == goal : untried?(place) && !skip.include?(place))
 
         @edges.fetch(place, {}).each do |key, to|
           next if seen.key?(to) || pocket?(to, key) || (place == from && avoid.include?(key))
@@ -265,7 +234,7 @@ module Koholint
           queue << to
         end
       end
-      best && hops_to(seen, best[1])
+      nil
     end
 
     # The cell an exit lands on in the next place; a call that finds nothing to do there while some place still has work, or

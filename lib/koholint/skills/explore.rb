@@ -101,7 +101,6 @@ module Koholint
           merged[:clears] = @clearing.uses if @clearing&.uses&.any?
           merged[:survey] = @survey.merge(pending: pending?) if @survey
           merged[:route] = @route if @route
-          merged[:aimed_at] = @aim[:place] if @aim[:place] && @aim[:place] != @place
           merged[:unreachable] = @unreachable if @unreachable
           merged[:dead_end] = true if @dead_end
           merged[:cause] = @fail_cause if @stopped_by == :blocked && @fail_cause
@@ -373,7 +372,7 @@ module Koholint
           while (hop = @log&.route(@place, goal: (@aim[:place] if @aim[:place] != @place), avoid:))
             first ||= hop
             via = hop[:via]
-            found = if via.is_a?(Array) then doors(path_to) { |door| door == via }
+            found = if via.is_a?(Array) then doors(path_to, @doors | [via]) { |door| door == via }
                     else gather(from, path_to) { |cell, direction| :exit if direction == via && neighbour(cell, direction).nil? }
                     end
             if found.any?
@@ -406,8 +405,8 @@ module Koholint
           end
         end
 
-        def doors(path_to)
-          @doors.filter_map do |door|
+        def doors(path_to, cells = @doors)
+          cells.filter_map do |door|
             next unless yield(door)
 
             below = [door[0] + 1, door[1]]
