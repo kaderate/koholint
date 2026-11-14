@@ -55,6 +55,8 @@ module Koholint
       LOCKED_WAIT_LIMIT_FRAMES = 900
       SETTLE_FRAMES = 30
       HEMMED_WAIT_LIMIT = 1800 / HEMMED_WAIT[:params][:frames]
+      HEMMED_PROBES = %w[up right down left].freeze
+      HEMMED_PROBE_PIXELS = 2
       SCREEN_SKILLS = { menu: %w[menu_move menu_assign close_menu press wait], map: %w[close_map press wait], save: %w[choose_option press wait],
                         game_over: %w[choose_option press wait], unknown: %w[press wait] }.freeze
       SCREEN_ONLY = %w[close_menu close_map menu_move menu_assign choose_option].freeze

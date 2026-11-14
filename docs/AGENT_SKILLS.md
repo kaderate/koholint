@@ -1,6 +1,6 @@
 # Agent skills
 
-The skills, protocols and harness behaviours the agent works with. Versioned with the play flow (currently `flow-62`): update this page, not the README, when a flow changes. Layers and data flow are in [ARCHITECTURE.md](../ARCHITECTURE.md).
+The skills, protocols and harness behaviours the agent works with. Versioned with the play flow (currently `flow-63`): update this page, not the README, when a flow changes. Layers and data flow are in [ARCHITECTURE.md](../ARCHITECTURE.md).
 
 
 - Learned capabilities (`data/capabilities.json`, `bin/koholint capability list`): an `operational` entry is a composite of the skills below, offered in the skill schema and listed under "Learned skills" only while its trigger item is held (flow-49) and its object is on screen (today `sword_on_object_92 row col direction`: stand next to object 92, face it, use the sword, step into its cell). `explore` and `goto` also run it themselves when blocked facing such a cell, and the planner routes through those cells as a last resort. `learn` and `capability publish|retire` are offline commands.
@@ -33,6 +33,9 @@ The skills, protocols and harness behaviours the agent works with. Versioned wit
   frames apart are one scene, so each release waits as long as the scene so far, up to 30 frames. The harness's settle wait
   (`wait frames until_held`) ends when Link is held again, and Link is not ready while health is still being added
   (`pending_heal`, reason `healing`): together these wait out the flickering hold of a healing scene.
+- When Link is hemmed in (blocked with no movement in 4 directions at the same position), the harness waits 120 frames at
+  a time with no model call, up to 1800 frames. flow-63: after each wait it steps 2 pixels (up, right, down, left in turn),
+  so a hold that ends unseen hands Link back to the model after one wait.
 - flow-57: `damage` means Link's health once the pending damage has drained (`pending_damage`, 0xDB94) fell: a hit stops a
   skill on its own frame with its whole loss, and the drain that follows (one unit every 2 frames) stops nothing.
 - `attack row col` walks next to the enemy at or next to the cell, lines up within the measured sword reach, faces it
