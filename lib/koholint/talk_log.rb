@@ -177,6 +177,12 @@ module Koholint
       talks.empty? ? :never : assess(talks, talks.last[:stamp])[:status]
     end
 
+    # Items or milestone changed since the last talk (new leads do not count): the person may say something new, until Link talks again.
+    def stale?(place:, entity:, stamp:)
+      last = talks_with(place, entity).last
+      !!(last && stamp && last[:stamp] && Array(last[:stamp]).first(2) != Array(stamp).first(2))
+    end
+
     def sign_read?(place:, cell:) = @texts.any? { |talk| talk[:place] == place && talk[:cell] == cell && !talk[:entity] }
 
     def sign_status(place:, cell:)

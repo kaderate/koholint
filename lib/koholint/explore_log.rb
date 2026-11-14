@@ -34,6 +34,7 @@ module Koholint
       @assumed = []
       @doubted = {}
       @visits = Hash.new(0)
+      @explores = Hash.new(0)
       @failed = Hash.new { |hash, key| hash[key] = [] }
       @screens = {}
       @looks = {}
@@ -50,6 +51,7 @@ module Koholint
 
       place = Ledger.place_of(Ledger.pick(result, :from)) or return
       know(place)
+      @explores[place] += 1
       survey = Ledger.pick(result, :survey)
       keep(place, parse_survey(survey).merge(provisional: provisional?(result))) if survey.is_a?(Hash)
       @explored_since_clear << place if (@looks.any? { |_, record| record[:wins].positive? } || Ledger.pick(result, :clears)) && !@explored_since_clear.include?(place)
@@ -191,6 +193,9 @@ module Koholint
 
     def door_tried?(place, cell) = tried?(place, [cell[0] + 1, cell[1]], :up)
 
+    # A door Link has walked through, recognised or not as a door object (98/0's way into 189/10 is not one).
+    def door_edge?(place, cell) = @edges.fetch(place, {}).key?(cell)
+
     def untried?(place)
       surveyed_untried?(place) || inferred_clearable(place).any?
     end
@@ -202,6 +207,21 @@ module Koholint
 
       survey[:sides].any? { |side, cells| !side_left?(place, side) && cells.any? { |cell| !tried?(place, cell, side) } } ||
         survey[:doors].any? { |cell| !door_tried?(place, cell) }
+    end
+
+    # Where routes go first, measured by new places per dollar: a place never surveyed or with an untried door, then cells only a clear
+    # opens, then untried sides; nil when the place has no work. A door or a skimmed survey keeps the lead for FIRST_TRIES explores
+    # there, since something may bar the way to it (object 32 before 69/0's door).
+    FIRST_TRIES = 2
+
+    def work_rank(place)
+      return unless untried?(place)
+
+      survey = @surveys[place]
+      return 0 if survey.nil?
+      return 0 if @explores[place] < FIRST_TRIES && (survey[:provisional] || survey[:doors].any? { |cell| !door_tried?(place, cell) })
+
+      inferred_clearable(place).any? ? 1 : 2
     end
 
     def route(from, goal: nil, avoid: [])
@@ -219,9 +239,14 @@ module Koholint
     def path(from, goal: nil, avoid: [])
       seen = { from => nil }
       queue = [from]
+      best = nil
       until queue.empty?
         place = queue.shift
-        return hops_to(seen, place) if place != from && (goal ? place == goal : untried?(place))
+        return hops_to(seen, place) if goal && place == goal && place != from
+
+        rank = work_rank(place) if !goal && place != from
+        best = [rank, place] if rank && (best.nil? || rank < best[0])
+        break if best&.first&.zero?
 
         @edges.fetch(place, {}).each do |key, to|
           next if seen.key?(to) || pocket?(to, key) || (place == from && avoid.include?(key))
@@ -230,7 +255,7 @@ module Koholint
           queue << to
         end
       end
-      nil
+      best && hops_to(seen, best[1])
     end
 
     # The cell an exit lands on in the next place; a call that finds nothing to do there while some place still has work, or

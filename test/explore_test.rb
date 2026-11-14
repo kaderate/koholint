@@ -265,6 +265,36 @@ class ExploreTest < Minitest::Test
     assert_equal [:door, 3, 2], result[:target].values_at(:kind, :row, :col)
   end
 
+  def test_routes_go_to_untried_doors_and_unsurveyed_places_first_then_clearable_cells_then_untried_sides
+    log = Koholint::ExploreLog.new
+    log.absorb({ from: { room: 1, map: 0 }, exits: [{ row: 0, col: 5, direction: :up, outcome: :left, to: [2, 0] }, { row: 7, col: 5, direction: :down, outcome: :left, to: [4, 0] }] })
+    log.absorb({ from: { room: 2, map: 0 }, survey: { sides: { up: [{ row: 0, col: 5 }] }, doors: [{ row: 2, col: 2 }] },
+                 exits: [{ row: 3, col: 2, direction: :up, outcome: :left, to: [5, 0], kind: :door }] })
+    door_at_four = { from: { room: 4, map: 0 }, survey: { sides: {}, doors: [{ row: 2, col: 4 }] }, exits: [{ row: 3, col: 4, direction: :up, outcome: :blocked }] }
+    log.absorb(door_at_four.merge(exits: []))
+    assert_equal [2, 0, 0], [[2, 0], [4, 0], [5, 0]].map { |place| log.work_rank(place) }
+    assert_equal({ goal: [4, 0], next: [4, 0], via: :down }, log.route([1, 0]), 'an untried door beats a nearer-in-order untried side')
+    2.times { log.absorb(door_at_four) }
+    assert_equal({ goal: [5, 0], next: [2, 0], via: :up }, log.route([1, 0]), 'an interior never surveyed beats an untried side one hop nearer')
+    log.absorb({ from: { room: 5, map: 0 }, survey: { sides: {}, doors: [] } })
+    assert_equal [2, 0], log.route([1, 0])[:goal]
+    barred = Koholint::ExploreLog.new
+    barred.absorb({ from: { room: 1, map: 0 }, exits: [{ row: 7, col: 5, direction: :down, outcome: :left, to: [4, 0] }] })
+    unreached = door_at_four.merge(exits: [], survey: { sides: { left: [{ row: 3, col: 0 }] }, doors: [{ row: 2, col: 4 }] })
+    assert_equal [0, 2, 2], 3.times.map { barred.absorb(unreached).then { barred.work_rank([4, 0]) } }, 'a door two explores there could not reach ranks as an untried side'
+    assert_equal 1, inferring_log.work_rank([3, 0])
+  end
+
+  def test_a_door_walked_through_that_is_no_door_object_is_no_frontier
+    rows = with(CLOSED, [1, 5], '?')
+    result, = explore(rows, limit: 3)
+    assert_equal({ kind: :frontier, row: 2, col: 5, direction: :up }, result[:target])
+    log = Koholint::ExploreLog.new
+    log.absorb({ from: { room: 1, map: 0 }, exits: [{ row: 3, col: 5, direction: :up, outcome: :left, to: [189, 10], kind: :door }] })
+    result, = explore(rows, explore_log: log, limit: 3)
+    refute_equal({ kind: :frontier, row: 2, col: 5, direction: :up }, result[:target])
+  end
+
   def test_least_visited_is_the_reachable_place_entered_least_nearest_first_outside_the_loop
     log = Koholint::ExploreLog.new
     log.absorb({ from: { room: 1, map: 0 }, exits: [{ row: 0, col: 5, direction: :up, outcome: :left, to: [2, 0] }, { row: 7, col: 5, direction: :down, outcome: :left, to: [4, 0] }] })
