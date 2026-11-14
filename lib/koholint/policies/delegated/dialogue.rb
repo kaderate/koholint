@@ -64,6 +64,7 @@ module Koholint
 
           text = Dialogues.text(pages)
           @objectives.note_text(text)
+          @leads.note_read(text)
           source = @images || @reading ? @read_at[:source] : @talk_source
           place = @images || @reading ? @read_at[:place] : [state.room_id, state.map_id]
           conversation = @read_at[:conversation] if @images || @reading
@@ -87,9 +88,9 @@ module Koholint
           place = @read_at && read ? @read_at[:place] : [state.room_id, state.map_id]
           source = @images ? @read_at[:source] : @talk_source
           texts = pages.map { |page| page[:text] }
-          leads, rejected = output.key?('leads') ? @leads.absorb(output['leads'], transcription: [texts.join(' '), Dialogues.text(texts)], place:, source:) : [[], 0]
+          leads, rejected, leaked = output.key?('leads') ? @leads.absorb(output['leads'], transcription: [texts.join(' '), Dialogues.text(texts)], place:, source:) : [[], 0, []]
           found = contact && @leads.contact(contact, text: Dialogues.text(texts), place:)
-          notes.merge(leads: found ? leads + [found] : leads, leads_rejected: rejected)
+          notes.merge(leads: found ? leads + [found] : leads, leads_rejected: rejected, **(leaked.any? ? { leads_leaked: leaked } : {}))
         end
 
         def clean(text, cap: TRANSCRIPTION_LIMIT) = text.gsub(/[^\P{Cntrl}\n]/, '').strip.then { |t| cap ? t[0, cap] : t }

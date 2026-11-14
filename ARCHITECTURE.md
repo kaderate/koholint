@@ -254,6 +254,11 @@ cell the explore log walked in that place or fills at least 10% of the room's ce
 `Leads#contact`: a `normal` lead with the text as quote, the place as `where`, the cell as `source` and `contact` (`row`, `col`, `object` or `entity`), claiming
 only that contact opened the text; one per thing and text (a quote overlapping one about the same thing, or any lead's quote in that place, model leads
 included, counts once), `LIMIT` per place, restored from its `lead` event like the others; its `where` is its own place, so it never becomes a goto candidate. `Dialogues.leads_count` leaves contact leads out, so they never change the stamp that reopens people.
+flow-59: `lead_check.rb` holds the walkthrough rule on leads: a claim or `where`
+naming a catalogued item (under its name or an `aliases` entry of `data/items.json`) that the text read does not name and that Link does not hold
+(`Items.held_ids`: A, B, inventory, milestone) is general knowledge, not something read. `Leads#absorb` drops such a lead at runtime with the same inputs as the offline
+check: every text the run has read (`note_read`, from the policy and from `dialogue` events on resume), the current transcription and earlier lead quotes,
+and the items ever held (`note_held`, cumulative, so a used-up item still counts); the engine traces a `lead_leak` notable and `koholint check-leads` reports them in traces.
 
 **Agents** (`agents/`) — `context.rb` renders state for the model (grid map, neighbours, entities and objects on screen, people's names,
 goal, leads — every `high` one, `normal` ones of the current place, never `low` ones —, recent results, plan), `prompts.rb` holds the system prompts, `claude_cli.rb` calls `claude -p` with a JSON
