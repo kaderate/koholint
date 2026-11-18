@@ -90,6 +90,15 @@ class ExploreTest < Minitest::Test
     refute_includes result[:crossed], [4, 6, :right]
   end
 
+  def test_a_frontier_reached_only_past_a_hole_is_not_a_target
+    rows = with(CLOSED, [1, 6], '#', [2, 6], '#', [4, 6], '#', [5, 6], '#', [6, 6], '#', [5, 8], '?')
+    plain, = explore(rows, limit: 400)
+    assert_equal :frontier, plain[:target]&.dig(:kind), plain.inspect
+    holed, = explore(rows, grid: HoledMapGrid.new(rows, [[3, 6]]), limit: 400)
+    assert_nil holed[:target], holed.inspect
+    assert_equal :no_frontier, holed[:stopped_by]
+  end
+
   def test_a_blocked_step_into_the_unknown_is_a_blocked_edge_and_the_next_frontier_is_tried
     rows = with(CLOSED, [4, 7], '?', [1, 5], '?')
     result, = explore(rows, truth: with(CLOSED, [4, 7], '#'))

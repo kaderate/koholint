@@ -27,16 +27,16 @@ module Koholint
         @avoided << [cell, direction]
       end
 
-      def path(from:, to:, mode: @mode, doubt: true, forbid: true)
+      def path(from:, to:, mode: @mode, doubt: true, forbid: true, cross_margin: true)
         margin = @grid.respond_to?(:hole_margin) ? @grid.hole_margin : []
         zones = Array(@danger&.call)
         kept = Array(@contact&.call)
         pushable = Array(@pushable&.call)
-        [([zones, margin] if zones.any?), [kept, margin], ([kept, []] if margin.any?)].compact.each do |danger, beside|
+        [([zones, margin] if zones.any?), [kept, margin], ([kept, []] if margin.any? && cross_margin)].compact.each do |danger, beside|
           route = search(from:, to:, mode:, doubt:, forbid:, zones: danger, margin: beside)
           return route if route
         end
-        search(from:, to:, mode:, doubt:, forbid:, zones: kept, push: pushable) if pushable.any?
+        search(from:, to:, mode:, doubt:, forbid:, zones: kept, margin: cross_margin ? [] : margin, push: pushable) if pushable.any?
       end
 
       def search(from:, to:, mode:, doubt:, forbid:, zones:, margin: [], push: [])

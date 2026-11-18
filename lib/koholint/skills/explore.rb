@@ -326,10 +326,12 @@ module Koholint
         def candidates(from)
           paths = {}
           path_to = ->(cell) { paths.fetch(cell) { paths[cell] = @planner.path(from:, to: cell) } }
-          clear = clearable(from, path_to)
+          safe = {}
+          safe_to = ->(cell) { safe.fetch(cell) { safe[cell] = @planner.path(from:, to: cell, cross_margin: false) } }
+          clear = clearable(from, safe_to)
           return order(clear) if clear.any?
 
-          frontier = gather(from, path_to) { |cell, direction| frontier_kind(cell, direction) }
+          frontier = gather(from, safe_to) { |cell, direction| frontier_kind(cell, direction) }
           return order(frontier) if frontier.any? && opened?
 
           if @aim[:place] && @aim[:place] != @place
@@ -356,8 +358,9 @@ module Koholint
           return false unless @planner && @cell
 
           path_to = ->(cell) { @planner.path(from: @cell, to: cell) }
-          untried(@cell, path_to).any? || clearable(@cell, path_to).any? ||
-            ((opened? || untried(@cell, nil).any?) && gather(@cell, path_to) { |cell, direction| frontier_kind(cell, direction) }.any?)
+          safe_to = ->(cell) { @planner.path(from: @cell, to: cell, cross_margin: false) }
+          untried(@cell, path_to).any? || clearable(@cell, safe_to).any? ||
+            ((opened? || untried(@cell, nil).any?) && gather(@cell, safe_to) { |cell, direction| frontier_kind(cell, direction) }.any?)
         end
 
         # A cleared object opens cells no survey has seen, so the frontiers behind it count as work here.

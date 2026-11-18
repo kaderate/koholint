@@ -158,6 +158,14 @@ class PlannerTest < Minitest::Test
     assert_nil holed([[2, 2]], walls).path(from: [3, 1], to: hole)
   end
 
+  def test_a_route_that_must_cross_the_margin_is_refused_without_its_last_tier
+    walls = [[3, 2], [0, 2], [1, 2], [4, 2], [5, 2], [6, 2], [7, 2]]
+    planner = holed([[2, 2], [3, 1], [3, 3], [4, 2]], walls)
+    assert_nil planner.path(from: [2, 1], to: [2, 3], cross_margin: false)
+    assert planner.path(from: [2, 1], to: [2, 3])
+    assert_equal [[2, 1], [1, 1], [0, 1]], planner.path(from: [2, 1], to: [0, 1], cross_margin: false)
+  end
+
   def test_an_exit_cell_beside_a_hole_is_reached_without_crossing_the_margin_on_the_way
     margin = [[4, 3], [5, 2], [5, 4], [6, 3], [0, 5]]
     path = holed(margin, [[5, 3]]).path(from: [0, 3], to: [0, 5])
