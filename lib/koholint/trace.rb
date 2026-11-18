@@ -26,10 +26,11 @@ module Koholint
       goal: %i[text],
       place_card: %i[place people enemies signs objects exits],
       place_name: %i[place name],
-      item_gained: %i[item name place held]
+      item_gained: %i[item name place held],
+      puzzle: %i[id kind place way expected observed frames]
     }.freeze
     SPEAKER_MAX = 40
-    ALLOWED = { dialogue: { source: %w[agent] }, lead: { importance: %w[high normal low tip] } }.freeze
+    ALLOWED = { dialogue: { source: %w[agent] }, lead: { importance: %w[high normal low tip] }, puzzle: { kind: %w[unexpected_arrival refuted contradiction] } }.freeze
     LABEL = ->(max) { ->(v) { v.is_a?(String) && v.length.between?(1, max) && !v.match?(/[[:cntrl:]]/) } }
     OPTIONAL = { perception: { not_ready_frames: ->(v) { v.is_a?(Integer) && v.positive? } },
                  decision: { prompt_sha: ->(v) { v.is_a?(String) && v.match?(/\A\h{64}\z/) }, image: ->(v) { [true, false].include?(v) },

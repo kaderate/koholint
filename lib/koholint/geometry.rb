@@ -40,6 +40,23 @@ module Koholint
       end
     end
 
+    SIDE_STEPS = { up: [-1, 0], down: [1, 0], left: [0, -1], right: [0, 1] }.freeze
+
+    # The screen next to a place across a side, where the measured map layout applies; a hypothesis to compare a first crossing with, never a route.
+    def neighbour(place, side)
+      layout = @neighbour ||= fact(:overworld_neighbour)
+      room, map = place
+      step = SIDE_STEPS[side.to_s.to_sym]
+      return nil unless step && layout['maps'].include?(map)
+
+      dr, dc = step
+
+      width = layout['width']
+      row = (room / width) + dr
+      col = (room % width) + dc
+      [(row * width) + col, map] if row.between?(0, width - 1) && col.between?(0, width - 1)
+    end
+
     def fact(name, path = DEFAULT_PATH)
       JSON.parse(File.read(path)).fetch(name.to_s).fetch('value')
     end
