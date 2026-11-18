@@ -178,6 +178,9 @@ class DelegatedAutopilotTest < Minitest::Test
     p.decide(p.decision_point_for(back), back, { grid: })
     assert_includes client.calls.last[:prompt], 'PUZZLE (observed, not explained): leaving 81-0 by the up side led to 99-0 (landing row 7, col 3), not to 65-0, ' \
                                                 'the screen next to it on the map, 1 time since frame 75199.'
+    again = state(frame: 75600, room_id: 81, map_id: 0)
+    p.decide(p.decision_point_for(again), again, { grid: })
+    refute_includes client.calls.last[:prompt], 'PUZZLE', 'stated once per visit'
   end
 
   def test_the_exit_bench_applies_only_in_the_context_it_measured

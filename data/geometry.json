@@ -20,8 +20,8 @@
   },
   "overworld_neighbour": {
     "value": { "maps": [0], "width": 16 },
-    "verified_count": 2,
-    "provenance": "crossing census 2026-11-18 (~/.capy/work/item1/crossings.rb over the 550 local run directories, room changes between consecutive play-mode perceptions): of 38,549 room changes inside map 0, 36,147 land in room +-1 or +-16 by the side Link left (row = room / 16, column = room % 16); every other one is a respawn after Continue (choose_option) or the top of 81/0 landing in 99/0. Independent checks: the 21b0 and post65 run lineages. Interiors and other maps are not measured."
+    "verified_count": 1,
+    "provenance": "one crossing census 2026-11-18, not in the repository: over the 550 local run directories, every pair of consecutive perception events in play mode (game_mode 11) whose room_id changed inside map 0 was taken as a crossing, with the last action's skill; of 38,549 such changes (forks share prefixes, so they are not independent), 36,147 land in room +-1 or +-16 (row = room / 16, column = room % 16), and the other 2,402 are respawns after Continue (skill choose_option) or the top of 81/0 landing in 99/0 (141). Used only as the hypothesis a first crossing is compared with, never as a route. Interiors and other maps are not measured."
   },
   "shield_range": {
     "value": { "cells": 3 },

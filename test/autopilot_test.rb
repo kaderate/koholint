@@ -177,6 +177,59 @@ class AutopilotTest < Minitest::Test
     assert_equal({ row: 4, col: 6 }, fought.fight_choice(state: state(frame: 200), entities: [corpse, foe(4, 6, slot: 7)])[:choice][:params])
   end
 
+  def threat(x, y, type: 27) = { slot: 3, type:, kind: 'enemy', x:, y:, contact: 11, cell: [((y - 8) / 16), x / 16] }
+
+  def test_at_one_heart_with_an_enemy_in_touch_the_pilot_steps_away_before_the_model
+    pilot = primed
+    result = pilot.disengage_choice(state: state(frame: 200, hp: 8, x: 68, y: 60), entities: [threat(70, 64)])
+    assert_equal({ skill: 'walk', params: { direction: 'up', cells: 1 } }, result[:choice])
+    assert_equal [0.0, 'delegated', true], result.values_at(:cost_usd, :agent, :autopilot)
+    assert_equal 'left', pilot.disengage_choice(state: state(frame: 210, hp: 4, x: 68, y: 60), entities: [threat(74, 60)])[:choice][:params][:direction]
+  end
+
+  def test_a_disengage_step_into_a_wall_is_not_tried_again_before_the_next_model_call
+    pilot = primed
+    link = state(frame: 200, hp: 8, x: 68, y: 60)
+    assert_equal 'up', pilot.disengage_choice(state: link, entities: [threat(70, 64)])[:choice][:params][:direction]
+    pilot.acted(skill: 'walk', outcome: { stopped_by: :blocked, params: { direction: :up, cells: 1 } })
+    assert_equal 'left', pilot.disengage_choice(state: link, entities: [threat(70, 64)])[:choice][:params][:direction]
+    pilot.model_called(state: link, objective: objective)
+    assert_equal 'up', pilot.disengage_choice(state: link, entities: [threat(70, 64)])[:choice][:params][:direction]
+  end
+
+  class HoledGrid
+    def initialize(holes) = @holes = holes
+    def hole?(row, col) = @holes.include?([row, col])
+    def hole_margin = @holes.flat_map { |row, col| [[row - 1, col], [row + 1, col], [row, col - 1], [row, col + 1]] } - @holes
+  end
+
+  def test_a_disengage_step_never_lands_on_a_hole_or_beside_one
+    link = state(frame: 200, hp: 8, x: 68, y: 60)
+    assert_equal 'left', primed.disengage_choice(state: link, entities: [threat(70, 64)], grid: HoledGrid.new([[1, 4]]))[:choice][:params][:direction]
+    assert_equal 'left', primed.disengage_choice(state: link, entities: [threat(70, 64)], grid: HoledGrid.new([[2, 4]]))[:choice][:params][:direction]
+  end
+
+  def test_a_walk_refused_at_once_for_danger_counts_as_walled
+    pilot = primed
+    link = state(frame: 200, hp: 8, x: 68, y: 60)
+    pilot.acted(skill: 'walk', outcome: { stopped_by: :danger, frames: 0, params: { direction: :up, cells: 1 } })
+    assert_equal 'left', pilot.disengage_choice(state: link, entities: [threat(70, 64)])[:choice][:params][:direction]
+    other = primed
+    other.acted(skill: 'walk', outcome: { stopped_by: :danger, frames: 9, params: { direction: :up, cells: 1 } })
+    assert_equal 'up', other.disengage_choice(state: link, entities: [threat(70, 64)])[:choice][:params][:direction]
+  end
+
+  def test_no_disengage_above_one_heart_away_from_enemies_boxed_in_or_past_its_limit
+    assert_nil primed.disengage_choice(state: state(frame: 200, hp: 9, x: 68, y: 60), entities: [threat(70, 64)])
+    assert_nil primed.disengage_choice(state: state(frame: 200, hp: 8, x: 68, y: 60), entities: [threat(68, 100)])
+    assert_nil primed.disengage_choice(state: state(frame: 200, hp: 8, x: 68, y: 60), entities: [threat(68, 64, type: 28).merge(kind: 'creature')])
+    boxed = [threat(76, 60), threat(60, 60), threat(68, 52), threat(68, 68)]
+    assert_nil primed.disengage_choice(state: state(frame: 200, hp: 8, x: 68, y: 60), entities: boxed)
+    pilot = primed
+    Koholint::Autopilot::DISENGAGE_LIMIT.times { refute_nil pilot.disengage_choice(state: state(frame: 200, hp: 8, x: 68, y: 60), entities: [threat(70, 64)]) }
+    assert_nil pilot.disengage_choice(state: state(frame: 200, hp: 8, x: 68, y: 60), entities: [threat(70, 64)])
+  end
+
   def test_the_types_struck_are_forgotten_once_link_leaves_the_place
     pilot = fought(type: 28)
     pilot.acted(skill: 'explore', outcome: { stopped_by: :known_place, from: { room: 163, map: 16 }, to: { room: 164, map: 16 } })

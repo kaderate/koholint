@@ -511,6 +511,32 @@ class ExploreTest < Minitest::Test
     refute log.contradicted?([6, 1], :up), 'an assumption is no observation'
   end
 
+  def test_a_way_back_assumed_from_another_map_predicts_nothing
+    log = Koholint::ExploreLog.new
+    log.absorb({ from: { room: 178, map: 18 }, exits: [{ row: 7, col: 4, direction: :down, outcome: :left, to: [161, 0] }] })
+    assert_equal [178, 18], log.route([161, 0], goal: [178, 18])[:next], 'the way back is still routed'
+    log.absorb({ from: { room: 161, map: 0 }, exits: [{ row: 0, col: 2, direction: :up, outcome: :left, to: [145, 0] }] })
+    assert_empty log.new_puzzles
+    log.absorb({ from: { room: 5, map: 0 }, exits: [{ row: 0, col: 4, direction: :up, outcome: :left, to: [165, 16] }] })
+    log.absorb({ from: { room: 165, map: 16 }, exits: [{ row: 7, col: 4, direction: :down, outcome: :left, to: [166, 16] }] })
+    assert_empty log.new_puzzles
+  end
+
+  def test_a_way_with_two_destinations_routes_to_the_one_seen_most
+    log = Koholint::ExploreLog.new
+    [[6, 1], [6, 1], [7, 1]].each_with_index { |to, n| log.absorb({ from: { room: 5, map: 1 }, exits: [{ row: 3, col: 9, direction: :right, outcome: :left, to: }] }, frame: n) }
+    assert_equal [['contradiction', { to: [6, 1], source: 'observed' }]], log.new_puzzles.map { |p| p.values_at(:kind, :expected) }
+    assert_equal [6, 1], log.route([5, 1], goal: [6, 1])[:next]
+    assert_nil log.route([5, 1], goal: [7, 1])
+  end
+
+  def test_a_fork_between_a_crossing_and_its_puzzle_event_still_emits_the_puzzle
+    crossing = { 'type' => 'action', 'frame' => 75199, 'skill' => 'explore', 'result' => { 'from' => { 'room' => 81, 'map' => 0 },
+                                                                                        'exits' => [{ 'row' => 0, 'col' => 3, 'direction' => 'up', 'outcome' => 'left', 'to' => [99, 0] }] } }
+    log = Koholint::ExploreLog.from_events([crossing])
+    assert_equal ['unexpected_arrival-81-0-up'], log.new_puzzles(place: [99, 0], cell: [7, 3]).map { |p| p[:id] }
+  end
+
   def test_a_rebuilt_log_emits_no_puzzle_again_and_keeps_the_traced_landing
     crossing = { 'type' => 'action', 'frame' => 75199, 'skill' => 'explore', 'result' => { 'from' => { 'room' => 81, 'map' => 0 },
                                                                                         'exits' => [{ 'row' => 0, 'col' => 3, 'direction' => 'up', 'outcome' => 'left', 'to' => [99, 0] }] } }
@@ -778,6 +804,34 @@ class ExploreTest < Minitest::Test
     again, = explore(rows, truth: CLOSED, explore_log: log)
     assert_equal :stalled, again[:stopped_by]
     assert_empty again[:walls] & result[:walls]
+  end
+
+  def test_a_stationary_enemy_cell_link_walked_into_is_no_frontier_again
+    cells = [[4, 4], [4, 5]]
+    rows = with(CLOSED, *cells.flat_map { |cell| [cell, '#'] })
+    entities = -> { cells.map { |cell| { kind: 'enemy', moves: false, cell: } } }
+    result, = explore(rows, truth: CLOSED, held: [Koholint::Items::SHIELD], entities:)
+    assert_equal :no_frontier, result[:stopped_by]
+    assert_equal [[4, 5, :left]], result[:crossed]
+    assert_operator result[:frames], :<, 20
+  end
+
+  def test_an_uncleared_capability_target_cell_link_walked_into_is_no_frontier_again
+    cells = [[4, 4], [4, 5]]
+    rows = with(CLOSED, *cells.flat_map { |cell| [cell, '#'] })
+    clearing = Struct.new(:cells) do
+      def uses = []
+      def active? = false
+      def start(*) = nil
+    end.new(cells.to_h { |cell| [cell, :skill] })
+    original = Koholint::Skills::Clearing.method(:of)
+    Koholint::Skills::Clearing.define_singleton_method(:of) { |_context| clearing }
+    result, = explore(rows, truth: CLOSED)
+    assert_equal :no_frontier, result[:stopped_by]
+    assert_equal [[4, 5, :left]], result[:crossed]
+    assert_operator result[:frames], :<, 20
+  ensure
+    Koholint::Skills::Clearing.define_singleton_method(:of, original) if original
   end
 
   def test_a_new_cell_between_wall_probes_resets_the_stall

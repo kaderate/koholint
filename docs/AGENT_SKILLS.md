@@ -1,6 +1,6 @@
 # Agent skills
 
-The skills, protocols and harness behaviours the agent works with. Versioned with the play flow (currently `flow-73`): update this page, not the README, when a flow changes. Layers and data flow are in [ARCHITECTURE.md](../ARCHITECTURE.md).
+The skills, protocols and harness behaviours the agent works with. Versioned with the play flow (currently `flow-74`): update this page, not the README, when a flow changes. Layers and data flow are in [ARCHITECTURE.md](../ARCHITECTURE.md).
 
 
 - Learned capabilities (`data/capabilities.json`, `bin/koholint capability list`): an `operational` entry is a composite of the skills below, offered in the skill schema and listed under "Learned skills" only while its trigger item is held (flow-49) and its object is on screen (today `sword_on_object_92 row col direction`: stand next to object 92, face it, use the sword, step into its cell). `explore` and `goto` also run it themselves when blocked facing such a cell, and the planner routes through those cells as a last resort. `learn` and `capability publish|retire` are offline commands.
@@ -12,7 +12,7 @@ The skills, protocols and harness behaviours the agent works with. Versioned wit
   place it has taken an exit to that still has untried exits or doors (flow-67: the cells beside a learned hole, a look Link fell
   through more often than he walked onto it, are no frontier and are crossed by explore or goto only when no other route
   exists, though a goal there is still reached (flow-70: never on the way to a frontier, neither when explore picks it
-  nor on the leg that walks there, so a frontier only reachable past a hole is left unexplored); flow-66: a door already walked through is never a frontier,
+  nor on the leg that walks there, so a frontier only reachable past a hole is left unexplored); flow-72: a cell Link already walked into is never a frontier, even one explore treats as pushable (the cell of an uncleared capability target or of a still enemy), so explore no longer steps back and forth across it; flow-66: a door already walked through is never a frontier,
   even when it is no door object, and routes go through it like a door object;
   flow-55: or, if surveyed before the capability existed, a tile
   the capability has cleared elsewhere, listed with its source in the route's `clearable`; inferred from the trace when a run is forked or resumed, not during a live run's first visit), else to the nearest frontier (a known cell next to
@@ -21,7 +21,8 @@ The skills, protocols and harness behaviours the agent works with. Versioned wit
   attempts in a row walked no new cell), `no_frontier` (with the exits already tried), `locked`, `damage` or `budget` (600 frames).
   flow-68: at one heart or less the autopilot hands every decision to the model; walk, goto and explore keep out of every
   enemy contact zone grown by a cell (the extra ring only as a last resort, the contact zone never, a goal inside one still
-  reached), and from inside one Link may take any step that does not bring him closer to an enemy; walk stops `danger`
+  reached), and from inside one Link may take any step that does not head toward an enemy within a cell of its touch
+  (flow-73: judged from where he stands, not from his cell's centre); walk stops `danger`
   otherwise, and goto's `no_path` cause names the contact zones. What it walked, the walls it found, the
   exits it tried and the things it offered are kept per place and rebuilt from the trace on resume. flow-56: a dialogue the game opens by
   itself while Link stands flush against his cell's edge during a leg or step (a rock too heavy to push) bars that edge for the rest of
@@ -44,7 +45,9 @@ The skills, protocols and harness behaviours the agent works with. Versioned wit
 - flow-57: `damage` means Link's health once the pending damage has drained (`pending_damage`, 0xDB94) fell: a hit stops a
   skill on its own frame with its whole loss, and the drain that follows (one unit every 2 frames) stops nothing.
 - `attack row col` walks next to the enemy at or next to the cell, lines up within the measured sword reach, faces it
-  and strikes with the sword's button until it dies (up to 6 strikes, walking up again after a knockback); it stops
+  and strikes with the sword's button until it dies (up to 6 strikes, walking up again after a knockback; flow-73: never
+  from inside the enemy's touch, its `contact_px` or 9 px when unmeasured, plus 2, and when backing off is walled it lines
+  up on the other axis); it stops
   `done` (`killed`), `damage`, `refused` (no sword on A or B), `no_target`, `target_gone` (flow-53: also when a knockback puts it off the grid), `no_kill`, `out_of_reach` or
   `frame_cap`, and reports `strikes` and `hits`. flow-61: its target is the thing nearest the cell (an enemy only on a tie),
   and when Link already stands on or next to the target's cell he strikes from there instead of walking to another cell
@@ -95,11 +98,11 @@ The skills, protocols and harness behaviours the agent works with. Versioned wit
   place without a new cell emit a `notable` `stuck` and a `STUCK` reset hint; a known place entered 4 times within 3600 frames
   with no new place emits a `notable` `stuck` (`loop: ...`) and a `LOOP` hint until a new place; the harness then explores toward
   the nearest place with untried work outside the loop (flow-66: the loop's places are not aimed at, only crossed) or, when none is left, toward the reachable place entered least outside the loop.
-- flow-73: the explore log keeps every destination seen through a way (a side or a door) and compares the first crossing of a way with
+- flow-74: the explore log keeps every destination seen through a way (a side or a door) and compares the first crossing of a way with
   the way back it assumed, else the screen next to it on the overworld map (16 rooms wide, measured). A crossing that lands elsewhere is a
   `puzzle` event (`unexpected_arrival`, `refuted`) and assumes no way back; a second destination through the same way is a `contradiction`,
-  routed through only when nothing else reaches the goal. The header shows the last two puzzles of the place as `PUZZLE (observed, not explained): ...`
-  lines, and `summary.json` counts them per place and kind. Nothing resolves a puzzle yet.
+  routed through (to its most observed destination) only when nothing else reaches the goal; a way back assumed from another map predicts nothing.
+  The header shows the last two puzzles of the place once per visit as `PUZZLE (observed, not explained): ...` lines, and `summary.json` counts them per place and kind. Nothing resolves a puzzle yet.
 - The context header lists the items on A and B and in the inventory slots (`data/items.json` names; a `?` marks a name
   not measured yet). `use_item item [button] [frames]` uses a held item (assigning it through the START menu to `button`,
   default B, when it is on no button); `guard frames [direction]` raises the shield (Link walks at full speed and turns

@@ -95,7 +95,17 @@ module Koholint
 
       def contact_of(context) = low_health? && context[:entities] ? -> { Entities.danger_cells(Array(context[:entities].call)) } : nil
 
-      def closeness_of(context) = context[:entities] && ->(cell) { Entities.threat_distance(Array(context[:entities].call), cell) }
+      # A step heads away when no enemy within a cell of its touch lies ahead of it, measured from where Link stands when the step starts in his cell.
+      def away_of(context)
+        context[:entities] && lambda do |cell, target|
+          x, y = cell == @last.cell ? [@last.x, @last.y] : Geometry.center_of(*cell)
+          dr = target[0] - cell[0]
+          dc = target[1] - cell[1]
+          Navigation::Threat.of(Array(context[:entities].call)).none? do |threat|
+            Navigation::Threat.distance(threat, x, y) <= threat[:reach] + Geometry::CELL && ((threat[:x] - x) * dc) + ((threat[:y] - y) * dr) > 0
+          end
+        end
+      end
 
       def trigger_input
         return nil unless @stopped_by == :dialogue && !@start.dialog_open?

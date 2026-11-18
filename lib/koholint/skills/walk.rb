@@ -15,7 +15,7 @@ module Koholint
           @direction = direction
           @cells = cells
           @danger = low_health? ? danger_of(context) : nil
-          @closeness = closeness_of(context)
+          @away = away_of(context)
           @position = [@start.x, @start.y]
           @still = 0
         end
@@ -47,7 +47,7 @@ module Koholint
           dr, dc = Navigation::Planner::DELTAS.fetch(@direction)
           ahead = [state.cell[0] + dr, state.cell[1] + dc]
           zones = Array(@danger.call)
-          zones.include?(ahead) && !(zones.include?(state.cell) && @closeness.call(ahead) >= @closeness.call(state.cell))
+          zones.include?(ahead) && !(zones.include?(state.cell) && @away.call(state.cell, ahead))
         end
 
         def track(state)
