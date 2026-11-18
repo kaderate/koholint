@@ -2,7 +2,11 @@ require 'koholint/config'
 
 module Koholint
   VERSION = '2.0.0'
+<<<<<<< HEAD
   FLOW_VERSION = 'flow-72'
+=======
+  FLOW_VERSION = 'flow-70'
+>>>>>>> origin/main
 
   class Error < StandardError; end
 
