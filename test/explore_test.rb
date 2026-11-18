@@ -90,6 +90,27 @@ class ExploreTest < Minitest::Test
     refute_includes result[:crossed], [4, 6, :right]
   end
 
+  def test_a_leg_to_a_frontier_never_plans_across_the_margin_from_any_cell
+    rows = with(CLOSED, [1, 6], '#', [2, 6], '#', [4, 6], '#', [5, 6], '#', [6, 6], '#')
+    planner = Koholint::Navigation::Planner.new(grid: HoledMapGrid.new(rows, [[3, 6]]), ledger: nil, place: PLACE, mode: :free_only)
+    [[4, 5], [3, 5]].each do |cell|
+      x, y = Koholint::Geometry.center_of(*cell)
+      leg = ->(cross_margin) { Koholint::Skills::Explore::Leg.new(skill: 'goto', params: { row: 5, col: 8 }, state: state(x:, y:), target: [5, 8], planner:, cross_margin:) }
+      assert_equal 0, leg.(false).result[:path_length], cell.inspect
+      assert leg.(false).result[:cause], cell.inspect
+      assert_operator leg.(true).result[:path_length], :>, 0, cell.inspect
+    end
+  end
+
+  def test_a_frontier_reached_only_past_a_hole_is_not_a_target
+    rows = with(CLOSED, [1, 6], '#', [2, 6], '#', [4, 6], '#', [5, 6], '#', [6, 6], '#', [5, 8], '?')
+    plain, = explore(rows, limit: 400)
+    assert_equal :frontier, plain[:target]&.dig(:kind), plain.inspect
+    holed, = explore(rows, grid: HoledMapGrid.new(rows, [[3, 6]]), limit: 400)
+    assert_nil holed[:target], holed.inspect
+    assert_equal :no_frontier, holed[:stopped_by]
+  end
+
   def test_a_blocked_step_into_the_unknown_is_a_blocked_edge_and_the_next_frontier_is_tried
     rows = with(CLOSED, [4, 7], '?', [1, 5], '?')
     result, = explore(rows, truth: with(CLOSED, [4, 7], '#'))
