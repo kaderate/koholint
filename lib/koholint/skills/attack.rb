@@ -30,7 +30,7 @@ module Koholint
           @swing = nil
           @lineup = 0
           @approaches = 0
-          @flipped = false
+          @axis = nil
           @backoff = 0
           super(target: nil, context:, **rest)
         end
@@ -132,7 +132,7 @@ module Koholint
         def lineup(state)
           dx = @enemy[:x] - state.x.to_i
           dy = @enemy[:y] - state.y.to_i
-          horizontal = (dx.abs >= dy.abs) != @flipped
+          horizontal = @axis ? @axis == :horizontal : dx.abs >= dy.abs
           facing = horizontal ? (dx.positive? ? :right : :left) : (dy.positive? ? :down : :up)
           along = horizontal ? dx.abs : dy.abs
           cross = horizontal ? dy : dx
@@ -144,17 +144,20 @@ module Koholint
           return begin_swing unless move
           return finish(:out_of_reach) if (@lineup += 1) > LINEUP_FRAMES
 
-          note_backoff(state, along < closest && move == OPPOSITE.fetch(facing))
+          note_backoff(state, along < closest && move == OPPOSITE.fetch(facing), horizontal)
           @facing = move
           [move]
         end
 
         # Backing off into a wall leaves Link in contact: line up on the other axis instead.
-        def note_backoff(state, backing)
+        def note_backoff(state, backing, horizontal)
           position = [state.x, state.y]
           @backoff = backing && position == @backoff_at ? @backoff + 1 : 0
           @backoff_at = position
-          @flipped = true if @backoff >= BACKOFF_STILL
+          return if @backoff < BACKOFF_STILL
+
+          @axis = horizontal ? :vertical : :horizontal
+          @backoff = 0
         end
 
         def far?(state) = [(@enemy[:x] - state.x.to_i).abs, (@enemy[:y] - state.y.to_i).abs].max > FAR
@@ -167,6 +170,7 @@ module Koholint
           restart(state, path)
           @phase = :walk
           @lineup = 0
+          @axis = nil
           input_for(state)
         end
 

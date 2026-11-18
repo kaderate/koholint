@@ -22,8 +22,8 @@ class AttackTest < Minitest::Test
   end
 
   # Link moves 1 px per direction frame; an A press lands a hit when he faces the enemy within 24 px along and 8 px across.
-  def fight(target, enemies, from: [4, 2], sword: 1, immune: false, knockback: 0, hurt_at: nil, cap: nil, limit: 1000)
-    x, y = Koholint::Geometry.center_of(*from)
+  def fight(target, enemies, from: [4, 2], sword: 1, immune: false, knockback: 0, hurt_at: nil, cap: nil, limit: 1000, ceiling: nil, at: nil)
+    x, y = at || Koholint::Geometry.center_of(*from)
     hp = 24
     reader = -> { enemies.map { |e| e.merge(cell: Koholint::Geometry.cell_for(e[:x], e[:y])) } }
     execution = registry.start('attack', state(x:, y:, sword:), { row: target[0], col: target[1] }, { grid: FakeGrid.new, entities: reader })
@@ -35,7 +35,7 @@ class AttackTest < Minitest::Test
       buttons = execution.next_input(state(x:, y:, sword:, hp:)) or break
       inputs << buttons
       direction = (buttons & VECTORS.keys).first
-      if direction
+      if direction && !(ceiling && direction == :up && y <= ceiling)
         facing = direction
         x += VECTORS[direction][0]
         y += VECTORS[direction][1]
@@ -152,6 +152,17 @@ class AttackTest < Minitest::Test
     assert result[:killed]
     lefts = inputs.first(inputs.index([:a])).count { |buttons| buttons.include?(:left) }
     assert_operator 16 - 6 + lefts, :>=, Koholint::Navigation::Threat::DEFAULT_REACH + Koholint::Skills::Attack::CONTACT_SLACK
+  end
+
+  # 66/0 (run 20261118-155549-c9c4, frame 87840): a wall above Link and the enemy 2 px right and 4 px below him.
+  def test_a_back_off_into_a_wall_lines_up_on_the_other_axis
+    foe = enemy(4, 5).merge(x: 90, y: 84)
+    result, inputs = fight([4, 5], [foe], at: [88, 80], ceiling: 80)
+    assert result[:killed]
+    first_a = inputs.index([:a])
+    ups = inputs.first(first_a).index { |buttons| buttons.include?(:up) }
+    refute_nil ups
+    assert(inputs[ups...first_a].any? { |buttons| buttons.include?(:left) })
   end
 
   # 66/0: a split enemy's pieces sit on and around Link, so every other cell next to the target is in reach of one of them.

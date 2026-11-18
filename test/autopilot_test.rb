@@ -197,6 +197,28 @@ class AutopilotTest < Minitest::Test
     assert_equal 'up', pilot.disengage_choice(state: link, entities: [threat(70, 64)])[:choice][:params][:direction]
   end
 
+  class HoledGrid
+    def initialize(holes) = @holes = holes
+    def hole?(row, col) = @holes.include?([row, col])
+    def hole_margin = @holes.flat_map { |row, col| [[row - 1, col], [row + 1, col], [row, col - 1], [row, col + 1]] } - @holes
+  end
+
+  def test_a_disengage_step_never_lands_on_a_hole_or_beside_one
+    link = state(frame: 200, hp: 8, x: 68, y: 60)
+    assert_equal 'left', primed.disengage_choice(state: link, entities: [threat(70, 64)], grid: HoledGrid.new([[1, 4]]))[:choice][:params][:direction]
+    assert_equal 'left', primed.disengage_choice(state: link, entities: [threat(70, 64)], grid: HoledGrid.new([[2, 4]]))[:choice][:params][:direction]
+  end
+
+  def test_a_walk_refused_at_once_for_danger_counts_as_walled
+    pilot = primed
+    link = state(frame: 200, hp: 8, x: 68, y: 60)
+    pilot.acted(skill: 'walk', outcome: { stopped_by: :danger, frames: 0, params: { direction: :up, cells: 1 } })
+    assert_equal 'left', pilot.disengage_choice(state: link, entities: [threat(70, 64)])[:choice][:params][:direction]
+    other = primed
+    other.acted(skill: 'walk', outcome: { stopped_by: :danger, frames: 9, params: { direction: :up, cells: 1 } })
+    assert_equal 'up', other.disengage_choice(state: link, entities: [threat(70, 64)])[:choice][:params][:direction]
+  end
+
   def test_no_disengage_above_one_heart_away_from_enemies_boxed_in_or_past_its_limit
     assert_nil primed.disengage_choice(state: state(frame: 200, hp: 9, x: 68, y: 60), entities: [threat(70, 64)])
     assert_nil primed.disengage_choice(state: state(frame: 200, hp: 8, x: 68, y: 60), entities: [threat(68, 100)])
