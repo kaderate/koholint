@@ -1,6 +1,6 @@
 # Agent skills
 
-The skills, protocols and harness behaviours the agent works with. Versioned with the play flow (currently `flow-72`): update this page, not the README, when a flow changes. Layers and data flow are in [ARCHITECTURE.md](../ARCHITECTURE.md).
+The skills, protocols and harness behaviours the agent works with. Versioned with the play flow (currently `flow-73`): update this page, not the README, when a flow changes. Layers and data flow are in [ARCHITECTURE.md](../ARCHITECTURE.md).
 
 
 - Learned capabilities (`data/capabilities.json`, `bin/koholint capability list`): an `operational` entry is a composite of the skills below, offered in the skill schema and listed under "Learned skills" only while its trigger item is held (flow-49) and its object is on screen (today `sword_on_object_92 row col direction`: stand next to object 92, face it, use the sword, step into its cell). `explore` and `goto` also run it themselves when blocked facing such a cell, and the planner routes through those cells as a last resort. `learn` and `capability publish|retire` are offline commands.
@@ -21,7 +21,8 @@ The skills, protocols and harness behaviours the agent works with. Versioned wit
   attempts in a row walked no new cell), `no_frontier` (with the exits already tried), `locked`, `damage` or `budget` (600 frames).
   flow-68: at one heart or less the autopilot hands every decision to the model; walk, goto and explore keep out of every
   enemy contact zone grown by a cell (the extra ring only as a last resort, the contact zone never, a goal inside one still
-  reached), and from inside one Link may take any step that does not bring him closer to an enemy; walk stops `danger`
+  reached), and from inside one Link may take any step that does not head toward an enemy within a cell of its touch
+  (flow-73: judged from where he stands, not from his cell's centre); walk stops `danger`
   otherwise, and goto's `no_path` cause names the contact zones. What it walked, the walls it found, the
   exits it tried and the things it offered are kept per place and rebuilt from the trace on resume. flow-56: a dialogue the game opens by
   itself while Link stands flush against his cell's edge during a leg or step (a rock too heavy to push) bars that edge for the rest of
@@ -44,7 +45,9 @@ The skills, protocols and harness behaviours the agent works with. Versioned wit
 - flow-57: `damage` means Link's health once the pending damage has drained (`pending_damage`, 0xDB94) fell: a hit stops a
   skill on its own frame with its whole loss, and the drain that follows (one unit every 2 frames) stops nothing.
 - `attack row col` walks next to the enemy at or next to the cell, lines up within the measured sword reach, faces it
-  and strikes with the sword's button until it dies (up to 6 strikes, walking up again after a knockback); it stops
+  and strikes with the sword's button until it dies (up to 6 strikes, walking up again after a knockback; flow-73: never
+  from inside the enemy's touch, its `contact_px` or 9 px when unmeasured, plus 2, and when backing off is walled it lines
+  up on the other axis); it stops
   `done` (`killed`), `damage`, `refused` (no sword on A or B), `no_target`, `target_gone` (flow-53: also when a knockback puts it off the grid), `no_kill`, `out_of_reach` or
   `frame_cap`, and reports `strikes` and `hits`. flow-61: its target is the thing nearest the cell (an enemy only on a tie),
   and when Link already stands on or next to the target's cell he strikes from there instead of walking to another cell

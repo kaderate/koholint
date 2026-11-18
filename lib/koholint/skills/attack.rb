@@ -1,5 +1,6 @@
 require 'koholint/entities'
 require 'koholint/items'
+require 'koholint/navigation/threat'
 require 'koholint/skills/goto'
 
 module Koholint
@@ -15,6 +16,7 @@ module Koholint
       HARD_CAP = 900
       FAR = 2 * Geometry::CELL
       CONTACT_SLACK = 2
+      BACKOFF_STILL = 4
       OPPOSITE = { up: :down, down: :up, left: :right, right: :left }.freeze
 
       class Run < Goto::Run
@@ -28,6 +30,8 @@ module Koholint
           @swing = nil
           @lineup = 0
           @approaches = 0
+          @flipped = false
+          @backoff = 0
           super(target: nil, context:, **rest)
         end
 
@@ -128,7 +132,7 @@ module Koholint
         def lineup(state)
           dx = @enemy[:x] - state.x.to_i
           dy = @enemy[:y] - state.y.to_i
-          horizontal = dx.abs >= dy.abs
+          horizontal = (dx.abs >= dy.abs) != @flipped
           facing = horizontal ? (dx.positive? ? :right : :left) : (dy.positive? ? :down : :up)
           along = horizontal ? dx.abs : dy.abs
           cross = horizontal ? dy : dx
@@ -140,8 +144,17 @@ module Koholint
           return begin_swing unless move
           return finish(:out_of_reach) if (@lineup += 1) > LINEUP_FRAMES
 
+          note_backoff(state, along < closest && move == OPPOSITE.fetch(facing))
           @facing = move
           [move]
+        end
+
+        # Backing off into a wall leaves Link in contact: line up on the other axis instead.
+        def note_backoff(state, backing)
+          position = [state.x, state.y]
+          @backoff = backing && position == @backoff_at ? @backoff + 1 : 0
+          @backoff_at = position
+          @flipped = true if @backoff >= BACKOFF_STILL
         end
 
         def far?(state) = [(@enemy[:x] - state.x.to_i).abs, (@enemy[:y] - state.y.to_i).abs].max > FAR
@@ -157,7 +170,7 @@ module Koholint
           input_for(state)
         end
 
-        def closest = @enemy[:contact].to_i + CONTACT_SLACK
+        def closest = (@enemy[:contact] || Navigation::Threat::DEFAULT_REACH) + CONTACT_SLACK
 
         def begin_swing
           @lineup = 0

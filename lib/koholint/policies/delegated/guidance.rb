@@ -66,6 +66,9 @@ module Koholint
         def autopilot_choice(decision_point, state, context)
           return unless @autopilot && decision_point.name == :choose_skill && !@sequence && !@reading && !hemmed?(state)
 
+          disengage = @autopilot.disengage_choice(state:, entities: entities_now)
+          return disengage.tap { @autopilot_acting = true } if disengage
+
           fight = @autopilot.fight_choice(state:, entities: entities_now)
           return fight.tap { @autopilot_acting = true } if fight
 

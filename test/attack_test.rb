@@ -145,6 +145,15 @@ class AttackTest < Minitest::Test
     assert(inputs.first(first_a).any? { |buttons| buttons.include?(:left) })
   end
 
+  def test_an_enemy_with_no_measured_contact_is_struck_from_outside_the_default_reach
+    near = enemy(4, 6).except(:contact)
+    near[:x] -= 6
+    result, inputs = fight([4, 6], [near], from: [4, 5])
+    assert result[:killed]
+    lefts = inputs.first(inputs.index([:a])).count { |buttons| buttons.include?(:left) }
+    assert_operator 16 - 6 + lefts, :>=, Koholint::Navigation::Threat::DEFAULT_REACH + Koholint::Skills::Attack::CONTACT_SLACK
+  end
+
   # 66/0: a split enemy's pieces sit on and around Link, so every other cell next to the target is in reach of one of them.
   def test_strikes_from_where_link_stands_when_he_is_already_next_to_the_enemy
     result, = fight([4, 6], [enemy(4, 6), enemy(3, 5, slot: 4)], from: [4, 5])
