@@ -31,6 +31,8 @@ module Koholint
           belief != :no && @walked.include?([row, col]) ? :yes : belief
         end
 
+        def hole_margin = @grid.respond_to?(:hole_margin) ? @grid.hole_margin : []
+
         def known?(cell) = !static_sprite(*cell) && (@walked.include?(cell) || DIRECTIONS.any? { |d| @grid.passable(*cell, d) == :yes })
       end
 
@@ -435,6 +437,7 @@ module Koholint
           ahead = neighbour(cell, direction) or return nil
           return nil if @doors.include?(ahead) || (direction == :up && @doors.include?(cell))
           return nil if direction == :up && [cell, ahead].any? { |at| @log&.door_edge?(@place, at) }
+          return nil if @known.hole_margin.include?(ahead)
 
           :frontier if !@walls.include?(ahead) && (@pushable.include?(ahead) || (!@known.static_sprite(*ahead) && UNKNOWN.include?(@known.passable(*ahead, direction))))
         end

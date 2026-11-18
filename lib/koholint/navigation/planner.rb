@@ -26,10 +26,11 @@ module Koholint
       end
 
       def path(from:, to:, mode: @mode, doubt: true, forbid: true)
-        zones = Array(@danger&.call)
+        margin = @grid.respond_to?(:hole_margin) ? @grid.hole_margin : []
+        zones = Array(@danger&.call) | margin
         pushable = Array(@pushable&.call)
-        (zones.any? && search(from:, to:, mode:, doubt:, forbid:, zones:)) || search(from:, to:, mode:, doubt:, forbid:, zones: []) ||
-          (search(from:, to:, mode:, doubt:, forbid:, zones: [], push: pushable) if pushable.any?)
+        (zones.any? && search(from:, to:, mode:, doubt:, forbid:, zones:)) || search(from:, to:, mode:, doubt:, forbid:, zones: margin) ||
+          (search(from:, to:, mode:, doubt:, forbid:, zones: margin, push: pushable) if pushable.any?)
       end
 
       def search(from:, to:, mode:, doubt:, forbid:, zones:, push: [])

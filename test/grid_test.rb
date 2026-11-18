@@ -52,4 +52,46 @@ class GridTest < Minitest::Test
     refute_equal :yes, grid.passable(2, 4, :down)
     refute_equal :yes, grid.passable(3, 4, :down)
   end
+
+  def holed(beliefs)
+    cells = Array.new(8) { Array.new(10) { 'floor' } }
+    cells[5][6] = cells[6][6] = 'hole'
+    Koholint::Vision::Grid.new(cells:, static_sprites: [], beliefs:, capabilities: Koholint::Vision::Capabilities.new)
+  end
+
+  def fall(beliefs, frame)
+    Koholint::Vision::Beliefs::DIRECTIONS.each do |direction|
+      beliefs.record(appearance: 'hole', action: :walk, direction:, result: :no, method: 'fall',
+                     context: Koholint::Vision::Capabilities.new, frame:, source: 'fall')
+    end
+  end
+
+  def walk(beliefs, frame)
+    beliefs.record(appearance: 'hole', action: :walk, direction: :up, result: :yes, method: 'walk',
+                   context: Koholint::Vision::Capabilities.new, frame:, source: 'walk')
+  end
+
+  def test_a_look_link_fell_through_is_a_hole_with_a_margin_around_it
+    beliefs = Koholint::Vision::Beliefs.new
+    grid = holed(beliefs)
+    refute grid.hole?(5, 6)
+    assert_empty grid.hole_margin
+    fall(beliefs, 10)
+    assert grid.hole?(5, 6)
+    assert grid.hole?(6, 6)
+    refute grid.hole?(4, 6)
+    assert_equal [[4, 6], [5, 5], [5, 7], [6, 5], [6, 7], [7, 6]].sort, grid.hole_margin.sort
+  end
+
+  def test_a_hole_look_later_walked_safely_is_unlearned
+    beliefs = Koholint::Vision::Beliefs.new
+    grid = holed(beliefs)
+    fall(beliefs, 10)
+    fall(beliefs, 20)
+    walk(beliefs, 30)
+    assert grid.hole?(5, 6)
+    walk(beliefs, 40)
+    refute grid.hole?(5, 6)
+    assert_empty grid.hole_margin
+  end
 end
