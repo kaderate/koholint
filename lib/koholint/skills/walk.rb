@@ -1,3 +1,4 @@
+require 'koholint/navigation/planner'
 require 'koholint/skills/execution'
 
 module Koholint
@@ -9,10 +10,11 @@ module Koholint
       FRAMES_PER_CELL = 90
 
       class Run < Execution
-        def initialize(direction:, cells:, **rest)
+        def initialize(direction:, cells:, context: {}, **rest)
           super(**rest)
           @direction = direction
           @cells = cells
+          @danger = low_health? ? danger_of(context) : nil
           @position = [@start.x, @start.y]
           @still = 0
         end
@@ -31,10 +33,18 @@ module Koholint
           return finish(:damage) if state.health < @start.health
           return finish(:dialogue) if state.dialog_open? && !@start.dialog_open?
           return finish(:done) if moved_cells(state) >= @cells
+          return finish(:danger) if danger_ahead?(state)
           return finish(:blocked) if @still >= STILL_FRAMES
           return finish(:frame_cap) if @frames >= FRAMES_PER_CELL * @cells
 
           [@direction]
+        end
+
+        def danger_ahead?(state)
+          return false unless @danger && state.cell
+
+          dr, dc = Navigation::Planner::DELTAS.fetch(@direction)
+          Array(@danger.call).include?([state.cell[0] + dr, state.cell[1] + dc])
         end
 
         def track(state)
@@ -62,9 +72,9 @@ module Koholint
         { direction:, cells: params[:cells] }
       end
 
-      def start(state, params, _context = {})
+      def start(state, params, context = {})
         params = normalize(params)
-        Run.new(skill: name, params:, state:, direction: params[:direction], cells: params[:cells])
+        Run.new(skill: name, params:, state:, direction: params[:direction], cells: params[:cells], context:)
       end
     end
   end

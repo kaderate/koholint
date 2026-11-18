@@ -10,8 +10,9 @@ module Koholint
         DELTAS.find { |_, (dr, dc)| [from[0] + dr, from[1] + dc] == to }&.first
       end
 
-      def initialize(grid:, ledger:, place:, triggers: nil, mode: :explore, danger: nil, pushable: nil)
+      def initialize(grid:, ledger:, place:, triggers: nil, mode: :explore, danger: nil, pushable: nil, hard_danger: false)
         @danger = danger
+        @hard_danger = hard_danger
         @pushable = pushable
         @mode = mode
         @triggers = triggers
@@ -28,12 +29,13 @@ module Koholint
       def path(from:, to:, mode: @mode, doubt: true, forbid: true)
         margin = @grid.respond_to?(:hole_margin) ? @grid.hole_margin : []
         zones = Array(@danger&.call)
+        kept = @hard_danger ? zones : []
         pushable = Array(@pushable&.call)
-        [([zones, margin] if zones.any?), [[], margin], ([[], []] if margin.any?)].compact.each do |danger, beside|
+        [([zones, margin] if zones.any?), [kept, margin], ([kept, []] if margin.any?)].compact.each do |danger, beside|
           route = search(from:, to:, mode:, doubt:, forbid:, zones: danger, margin: beside)
           return route if route
         end
-        search(from:, to:, mode:, doubt:, forbid:, zones: [], push: pushable) if pushable.any?
+        search(from:, to:, mode:, doubt:, forbid:, zones: kept, push: pushable) if pushable.any?
       end
 
       def search(from:, to:, mode:, doubt:, forbid:, zones:, margin: [], push: [])

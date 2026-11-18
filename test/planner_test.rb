@@ -168,6 +168,15 @@ class PlannerTest < Minitest::Test
     assert_empty route[0..-2] & margin
   end
 
+  def test_hard_danger_zones_are_never_crossed
+    boxed = [[1, 2], [2, 2], [3, 2]]
+    walls = [[0, 2], [4, 2], [5, 2], [6, 2], [7, 2]]
+    hard = Planner.new(grid: FakeGrid.new(walls:), ledger: Koholint::Ledger.new, place: PLACE, danger: -> { boxed }, hard_danger: true)
+    assert_nil hard.path(from: [2, 1], to: [2, 3])
+    open = Planner.new(grid: FakeGrid.new, ledger: Koholint::Ledger.new, place: PLACE, danger: -> { boxed }, hard_danger: true)
+    refute_includes open.path(from: [2, 1], to: [2, 3]), [2, 2]
+  end
+
   def test_a_cell_held_by_a_sprite_is_a_last_resort_route_when_it_is_pushable
     sprite = FakeGrid.new(walls: [[0, 2], [1, 2], [3, 2], [4, 2], [5, 2], [6, 2], [7, 2]], sprites: [[2, 2]])
     assert_nil Planner.new(grid: sprite, ledger: Koholint::Ledger.new, place: PLACE).path(from: [2, 1], to: [2, 3])
