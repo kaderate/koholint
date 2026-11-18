@@ -45,6 +45,20 @@ class LeadsTest < Minitest::Test
     assert leads.contact({ row: 1, col: 2, object: 32 }, text: TEXT, place: [5, 0])
   end
 
+  def test_a_lead_names_the_region_of_places_given_a_name_its_quote_or_where_shares_a_word_with
+    leads = Koholint::Leads.new
+    leads.name_place([144, 0], 'Forêt Enchantée')
+    leads.name_place([225, 0], 'Urchin beach warning')
+    owl = "Vas-y avec la Clé cachée dans la Forêt."
+    leads.absorb([lead('Clé cachée dans la Forêt', claim: 'a key is hidden in the forest'), lead('cachée dans la Forêt', 'low', claim: 'the forest again')], transcription: owl, place: [128, 0], source: nil)
+    key, chatter = leads.all
+    assert_equal [[[144, 0]], [[144, 0]]], [leads.region_for(key), leads.region_for(chatter)]
+    assert_equal [[3, 0]], leads.region_for({ quote: 'x', where: '3-0' })
+    assert_empty leads.region_for({ quote: owl, where: '128-0', contact: { row: 1, col: 1, object: 32 } })
+    assert_empty leads.region_for({ quote: 'Bonjour, voyageur!' })
+    assert_equal [[144, 0]], leads.focus, 'only open high and normal leads set the focus'
+  end
+
   def test_contact_leads_are_capped_per_place
     leads = Koholint::Leads.new
     7.times { |i| leads.contact({ row: 1, col: i, object: 40 + i }, text: "a text number #{i}", place: [5, 0]) }

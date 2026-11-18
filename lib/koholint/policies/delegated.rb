@@ -146,6 +146,7 @@ module Koholint
       def decide(decision_point, state, context)
         @asked = false
         @leads.note_held(Items.held_ids(state))
+        @explore_log.focus = @leads.focus
         result = decide_with(decision_point, state, context)
         @autopilot&.model_called(state:, objective: @objectives.current, news: !Array(result[:leads]).empty? || !result[:goal].nil?) if @asked
         notes = @revisit.notes + @notes

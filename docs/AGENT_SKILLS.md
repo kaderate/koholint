@@ -1,6 +1,6 @@
 # Agent skills
 
-The skills, protocols and harness behaviours the agent works with. Versioned with the play flow (currently `flow-66`): update this page, not the README, when a flow changes. Layers and data flow are in [ARCHITECTURE.md](../ARCHITECTURE.md).
+The skills, protocols and harness behaviours the agent works with. Versioned with the play flow (currently `flow-68`): update this page, not the README, when a flow changes. Layers and data flow are in [ARCHITECTURE.md](../ARCHITECTURE.md).
 
 
 - Learned capabilities (`data/capabilities.json`, `bin/koholint capability list`): an `operational` entry is a composite of the skills below, offered in the skill schema and listed under "Learned skills" only while its trigger item is held (flow-49) and its object is on screen (today `sword_on_object_92 row col direction`: stand next to object 92, face it, use the sword, step into its cell). `explore` and `goto` also run it themselves when blocked facing such a cell, and the planner routes through those cells as a last resort. `learn` and `capability publish|retire` are offline commands.
@@ -10,7 +10,8 @@ The skills, protocols and harness behaviours the agent works with. Versioned wit
 - `explore [direction]` (relaunched by the autopilot after benign stops, see Running) explores by itself: it walks to the nearest
   untried border exit (a side never left from this place) or untried door (walking up into it), else toward the nearest
   place it has taken an exit to that still has untried exits or doors (flow-66: a door already walked through is never a frontier,
-  even when it is no door object, and routes go through it like a door object;
+  even when it is no door object, and routes go through it like a door object; flow-68: an untried place in the region an open
+  high or normal lead names, by place id or by a place name sharing a word with its `where` or quote, comes before any other;
   flow-55: or, if surveyed before the capability existed, a tile
   the capability has cleared elsewhere, listed with its source in the route's `clearable`; inferred from the trace when a run is forked or resumed, not during a live run's first visit), else to the nearest frontier (a known cell next to
   an unknown one) (`direction` prefers that side), steps out, re-plans, and returns to the model only at an event:
@@ -70,7 +71,7 @@ The skills, protocols and harness behaviours the agent works with. Versioned wit
   (`door-R-C`) of this place, people (`person-tT`, listed first) and unread signs (`sign-R-C`) here worth a visit, known places with untried exits
   (`place-R-M`), people and unread signs of other known places (from their place cards; flow-62: a person exhausted
   under other held items or another milestone is offered again, once) and places tied to a lead by its `where`
-  (`lead-N`), nearest first by moves over exits explore took. The agent answers with `candidate` (or still a free title and predicate);
+  (`lead-N`; flow-68: or the nearest untried place of its region), nearest first by moves over exits explore took. The agent answers with `candidate` (or still a free title and predicate);
   the objective event carries `candidate` and its `target`, which the autopilot follows. While a person here is not
   exhausted, every candidate that leaves the place says `leaves unexhausted people here: ...`.
 - The agent may name the current place (`place_name`, any call): a `place_name` trace event, shown in the context header,

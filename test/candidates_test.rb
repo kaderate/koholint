@@ -42,6 +42,15 @@ class CandidatesTest < Minitest::Test
     assert_empty away.(after)
   end
 
+  def test_a_lead_without_where_offers_the_nearest_untried_place_of_its_region
+    leads = Koholint::Leads.new
+    leads.name_place([4, 0], 'Forêt Enchantée')
+    leads.absorb([{ 'quote' => 'cachée dans la Forêt', 'claim' => 'a key is hidden in the forest', 'importance' => 'high' }], transcription: 'Une Clé cachée dans la Forêt.', place: [1, 0], source: nil)
+    found = build(leads:).find { |c| c[:id] == 'lead-1' }
+    assert_equal({ kind: 'lead', place: [4, 0], lead: 'lead-1' }, found[:target])
+    assert_match(/Forêt Enchantée \(4-0\)/, found[:label])
+  end
+
   def log
     log = Koholint::ExploreLog.new
     log.absorb({ from: { room: 1, map: 0 }, exits: [{ row: 0, col: 5, direction: :up, outcome: :left, to: [3, 0] }] })

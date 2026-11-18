@@ -120,6 +120,25 @@ module Koholint
 
     def name_of(place) = @names[place]
 
+    REGION_WORD = /[[:alpha:]]{5,}/
+    FOCUS_IMPORTANCE = %w[high normal].freeze
+
+    def self.words(text) = normalize(text).scan(REGION_WORD)
+
+    # The places a lead points to: its where as a place id, else the places whose given name shares a word with its where or quote
+    # (the quote is the game's text, and the model seldom fills where: « la Forêt » is the place named « Forêt Enchantée »).
+    def region_for(lead)
+      return [] if lead[:contact]
+
+      found = lead[:where].to_s.strip.match(PLACE_ID)
+      return [[found[1].to_i, found[2].to_i]] if found
+
+      words = self.class.words("#{lead[:where]} #{lead[:quote]}")
+      @names.select { |_, name| self.class.words(name).intersect?(words) }.keys
+    end
+
+    def focus = @all.select { |lead| FOCUS_IMPORTANCE.include?(lead[:importance].to_s) && status(lead)[:status] == 'open' }.flat_map { |lead| region_for(lead) }.uniq
+
     def place_for(lead)
       where = lead[:where].to_s.strip
       return if where.empty?

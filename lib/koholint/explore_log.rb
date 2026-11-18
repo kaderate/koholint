@@ -36,10 +36,13 @@ module Koholint
       @visits = Hash.new(0)
       @failed = Hash.new { |hash, key| hash[key] = [] }
       @screens = {}
+      @focus = []
       @looks = {}
       @explored_since_clear = []
       @stood = Hash.new { |hash, key| hash[key] = [] }
     end
+
+    attr_writer :focus
 
     def screen(place, grid)
       @screens[place] = grid if place.is_a?(Array) && grid.is_a?(Array)
@@ -207,7 +210,8 @@ module Koholint
         survey[:doors].any? { |cell| !door_tried?(place, cell) }
     end
 
-    # skip: places not to aim at (a loop's own places), still crossed on the way.
+    # skip: places not to aim at (a loop's own places), still crossed on the way. Without a goal, the nearest untried place of the
+    # focus (the region open leads name) comes first, then the nearest untried place.
     def route(from, goal: nil, avoid: [], skip: [])
       hops = path(from, goal:, avoid:, skip:) or return nil
       { goal: hops.last[:to], next: hops.first[:to], via: hops.first[:via] }
@@ -223,9 +227,14 @@ module Koholint
     def path(from, goal: nil, avoid: [], skip: [])
       seen = { from => nil }
       queue = [from]
+      fallback = nil
       until queue.empty?
         place = queue.shift
-        return hops_to(seen, place) if place != from && (goal ? place == goal : untried?(place) && !skip.include?(place))
+        if place != from && (goal ? place == goal : untried?(place) && !skip.include?(place))
+          return hops_to(seen, place) if goal || @focus.empty? || @focus.include?(place)
+
+          fallback ||= place
+        end
 
         @edges.fetch(place, {}).each do |key, to|
           next if seen.key?(to) || pocket?(to, key) || (place == from && avoid.include?(key))
@@ -234,7 +243,7 @@ module Koholint
           queue << to
         end
       end
-      nil
+      fallback && hops_to(seen, fallback)
     end
 
     # The cell an exit lands on in the next place; a call that finds nothing to do there while some place still has work, or

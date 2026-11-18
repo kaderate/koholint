@@ -15,7 +15,7 @@ module Koholint
       named = ->(where) { leads.name_of(where) }
       people = people_here(place, entities, talk_log, stamp)
       leaving = exits(place, grid, explore_log) + doors(place, signs, explore_log, link) + places(place, hops, explore_log, named) +
-                people_away(place, hops, cards, talk_log, named, stamp) + signs_away(place, hops, cards, talk_log, named) + lead_places(place, hops, leads, named)
+                people_away(place, hops, cards, talk_log, named, stamp) + signs_away(place, hops, cards, talk_log, named) + lead_places(place, hops, leads, named, explore_log)
       [(shelter(place, hops, named) if low_health)].compact + people + signs_here(place, signs, talk_log) + unidentified(place, grid, entities, talk_log, link) +
         warn(leaving, people)
     end
@@ -130,9 +130,9 @@ module Koholint
       end.first(PER_KIND)
     end
 
-    def lead_places(place, hops, leads, named)
+    def lead_places(place, hops, leads, named, explore_log)
       leads.all.reverse.filter_map do |lead|
-        where = leads.place_for(lead)
+        where = leads.place_for(lead) || leads.region_for(lead).select { |at| hops[at] && explore_log.untried?(at) }.min_by { |at| hops[at] }
         next unless where && where != place && !leads.settled?(lead)
 
         route = hops[where] ? moves(hops[where]) : 'no known route'
