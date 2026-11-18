@@ -73,6 +73,23 @@ class ExploreTest < Minitest::Test
     refute result[:place_changed]
   end
 
+  class HoledMapGrid < MapGrid
+    def initialize(rows, margin)
+      super(rows)
+      @margin = margin
+    end
+
+    def hole_margin = @margin
+  end
+
+  def test_a_step_into_a_cell_beside_a_hole_is_no_frontier
+    rows = with(CLOSED, [4, 7], '?')
+    result, = explore(rows, grid: HoledMapGrid.new(rows, [[4, 7]]))
+    assert_equal :no_frontier, result[:stopped_by]
+    assert_nil result[:target]
+    refute_includes result[:crossed], [4, 6, :right]
+  end
+
   def test_a_blocked_step_into_the_unknown_is_a_blocked_edge_and_the_next_frontier_is_tried
     rows = with(CLOSED, [4, 7], '?', [1, 5], '?')
     result, = explore(rows, truth: with(CLOSED, [4, 7], '#'))

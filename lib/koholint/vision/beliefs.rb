@@ -46,6 +46,13 @@ module Koholint
 
       def evidence_for(appearance, action) = @evidence.fetch([appearance, action], []).dup
 
+      # A fall records all four directions on one frame, so falls and safe walks are both counted in frames.
+      def hole?(appearance)
+        entries = @evidence.fetch([appearance, :walk], [])
+        falls = entries.filter_map { |entry| entry[:frame] if entry[:method] == 'fall' }.uniq.size
+        falls.positive? && falls > entries.filter_map { |entry| entry[:frame] if entry[:result] == :yes }.uniq.size
+      end
+
       def query(appearance:, action:, context:, direction: nil)
         raise ArgumentError, "context must be a Capabilities, got #{context.inspect}" unless context.is_a?(Capabilities)
 

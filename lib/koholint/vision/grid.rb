@@ -35,22 +35,22 @@ module Koholint
         @beliefs.query(appearance: static_sprite(row, col) || appearance(row, col), action: :walk, direction:, context: @capabilities)
       end
 
-      # A look Link fell through more often than he walked onto it; each fall records four directions on one frame.
-      def hole?(row, col)
-        evidence = @beliefs.evidence_for(appearance(row, col), :walk)
-        falls = evidence.select { |entry| entry[:method] == 'fall' }.map { |entry| entry[:frame] }.uniq.size
-        falls > evidence.count { |entry| entry[:result] == :yes }
-      end
+      def hole?(row, col) = holes.include?([row, col])
 
       # A hole pulls Link in from the cell beside it when his sprite overlaps its edge.
       def hole_margin
-        cells = ROWS.times.to_a.product(COLS.times.to_a)
-        holes = cells.select { |row, col| hole?(row, col) }
-        holes.flat_map { |row, col| [[row - 1, col], [row + 1, col], [row, col - 1], [row, col + 1]] }
-             .select { |row, col| row.between?(0, ROWS - 1) && col.between?(0, COLS - 1) }.uniq - holes
+        @hole_margin ||= holes.flat_map { |row, col| [[row - 1, col], [row + 1, col], [row, col - 1], [row, col + 1]] }
+                              .select { |row, col| row.between?(0, ROWS - 1) && col.between?(0, COLS - 1) }.uniq - holes
       end
 
       private
+
+      def holes
+        @holes ||= begin
+          looks = @cells.flatten.uniq.select { |look| @beliefs.hole?(look) }
+          ROWS.times.to_a.product(COLS.times.to_a).select { |row, col| looks.include?(@cells[row][col]) }
+        end
+      end
 
       def check(row, col)
         raise ArgumentError, "cell out of range: #{row}, #{col}" unless row.between?(0, ROWS - 1) && col.between?(0, COLS - 1)

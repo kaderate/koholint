@@ -143,13 +143,29 @@ class PlannerTest < Minitest::Test
     def hole_margin = @margin
   end
 
-  def test_cells_beside_a_hole_are_never_routed_through_nor_reached
-    margin = [[1, 2], [2, 2], [3, 2]]
-    open = Planner.new(grid: HoledGrid.new(margin:), ledger: Koholint::Ledger.new, place: PLACE)
-    refute_includes open.path(from: [2, 1], to: [2, 3]), [2, 2]
-    assert_nil open.path(from: [2, 1], to: [2, 2])
-    walled = Planner.new(grid: HoledGrid.new(margin:, walls: [[0, 2], [4, 2], [5, 2], [6, 2], [7, 2]]), ledger: Koholint::Ledger.new, place: PLACE)
-    assert_nil walled.path(from: [2, 1], to: [2, 3])
+  def holed(margin, walls) = Planner.new(grid: HoledGrid.new(margin:, walls:), ledger: Koholint::Ledger.new, place: PLACE)
+
+  def test_cells_beside_a_hole_are_routed_around_when_another_way_exists
+    path = holed([[1, 2], [2, 2], [3, 2]], [[4, 3]]).path(from: [2, 1], to: [2, 3])
+    refute_includes path, [2, 2]
+    refute_includes path, [1, 2]
+  end
+
+  def test_a_one_wide_passage_beside_a_hole_is_a_last_resort_route_and_the_hole_stays_blocked
+    hole = [3, 2]
+    walls = [hole, [0, 2], [1, 2], [4, 2], [5, 2], [6, 2], [7, 2]]
+    assert_equal [[2, 1], [2, 2], [2, 3]], holed([[2, 2], [3, 1], [3, 3], [4, 2]], walls).path(from: [2, 1], to: [2, 3])
+    assert_nil holed([[2, 2]], walls).path(from: [3, 1], to: hole)
+  end
+
+  def test_an_exit_cell_beside_a_hole_is_reached_without_crossing_the_margin_on_the_way
+    margin = [[4, 3], [5, 2], [5, 4], [6, 3], [0, 5]]
+    path = holed(margin, [[5, 3]]).path(from: [0, 3], to: [0, 5])
+    assert_equal [0, 5], path.last
+    assert_equal [[0, 3], [0, 4], [0, 5]], path
+    route = holed(margin, [[5, 3]]).path(from: [3, 1], to: [5, 4])
+    assert_equal [5, 4], route.last
+    assert_empty route[0..-2] & margin
   end
 
   def test_a_cell_held_by_a_sprite_is_a_last_resort_route_when_it_is_pushable

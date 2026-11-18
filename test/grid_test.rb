@@ -73,10 +73,10 @@ class GridTest < Minitest::Test
 
   def test_a_look_link_fell_through_is_a_hole_with_a_margin_around_it
     beliefs = Koholint::Vision::Beliefs.new
-    grid = holed(beliefs)
-    refute grid.hole?(5, 6)
-    assert_empty grid.hole_margin
+    refute holed(beliefs).hole?(5, 6)
+    assert_empty holed(beliefs).hole_margin
     fall(beliefs, 10)
+    grid = holed(beliefs)
     assert grid.hole?(5, 6)
     assert grid.hole?(6, 6)
     refute grid.hole?(4, 6)
@@ -85,13 +85,12 @@ class GridTest < Minitest::Test
 
   def test_a_hole_look_later_walked_safely_is_unlearned
     beliefs = Koholint::Vision::Beliefs.new
-    grid = holed(beliefs)
     fall(beliefs, 10)
     fall(beliefs, 20)
     walk(beliefs, 30)
-    assert grid.hole?(5, 6)
+    assert holed(beliefs).hole?(5, 6)
     walk(beliefs, 40)
-    refute grid.hole?(5, 6)
-    assert_empty grid.hole_margin
+    refute holed(beliefs).hole?(5, 6)
+    assert_empty holed(beliefs).hole_margin
   end
 end

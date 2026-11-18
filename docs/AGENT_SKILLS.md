@@ -9,8 +9,9 @@ The skills, protocols and harness behaviours the agent works with. Versioned wit
   (`notable` `not_ready_wait` for waits over 5 frames; the run stops with `not_ready_stuck` after 600 frames).
 - `explore [direction]` (relaunched by the autopilot after benign stops, see Running) explores by itself: it walks to the nearest
   untried border exit (a side never left from this place) or untried door (walking up into it), else toward the nearest
-  place it has taken an exit to that still has untried exits or doors (flow-67: a cell beside a learned hole, a look Link fell
-  through more often than he walked onto it, is never walked to nor through, by explore or goto; flow-66: a door already walked through is never a frontier,
+  place it has taken an exit to that still has untried exits or doors (flow-67: the cells beside a learned hole, a look Link fell
+  through more often than he walked onto it, are no frontier and are crossed by explore or goto only when no other route
+  exists, though a goal there is still reached; flow-66: a door already walked through is never a frontier,
   even when it is no door object, and routes go through it like a door object;
   flow-55: or, if surveyed before the capability existed, a tile
   the capability has cleared elsewhere, listed with its source in the route's `clearable`; inferred from the trace when a run is forked or resumed, not during a live run's first visit), else to the nearest frontier (a known cell next to
