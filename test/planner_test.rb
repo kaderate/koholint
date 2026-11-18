@@ -187,8 +187,8 @@ class PlannerTest < Minitest::Test
   end
 
   def guarded(danger, contact, walls: [], enemies: [])
-    closeness = ->(cell) { enemies.map { |enemy| [(enemy[0] - cell[0]).abs, (enemy[1] - cell[1]).abs].max }.min || 99 }
-    Planner.new(grid: FakeGrid.new(walls:), ledger: Koholint::Ledger.new, place: PLACE, danger: -> { danger }, contact: -> { contact }, closeness:)
+    away = ->(cell, target) { enemies.none? { |enemy| ((enemy[0] - cell[0]) * (target[0] - cell[0])) + ((enemy[1] - cell[1]) * (target[1] - cell[1])) > 0 } }
+    Planner.new(grid: FakeGrid.new(walls:), ledger: Koholint::Ledger.new, place: PLACE, danger: -> { danger }, contact: -> { contact }, away:)
   end
 
   def box(rows, cols) = rows.to_a.product(cols.to_a)
@@ -200,7 +200,7 @@ class PlannerTest < Minitest::Test
     refute_includes guarded([[1, 2], [2, 2], [3, 2]], [[1, 2], [2, 2], [3, 2]]).path(from: [2, 1], to: [2, 3]), [2, 2]
   end
 
-  def test_link_inside_a_zone_walks_out_without_getting_closer
+  def test_link_inside_a_zone_walks_out_without_heading_toward_an_enemy
     zone = box(2..6, 6..9)
     path = guarded(zone, zone, enemies: [[4, 8]]).path(from: [4, 7], to: [4, 2])
     assert_equal [[4, 7], [4, 6], [4, 5], [4, 4], [4, 3], [4, 2]], path

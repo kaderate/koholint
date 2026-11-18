@@ -125,7 +125,7 @@ class SkillsTest < Minitest::Test
     assert_equal [[:left]], drive(away, [state(hp: 8)])
   end
 
-  def test_at_one_heart_walk_leaves_a_zone_it_stands_in_but_never_steps_closer
+  def test_at_one_heart_walk_leaves_a_zone_it_stands_in_but_never_heads_toward_an_enemy
     enemy = [{ kind: 'enemy', type: 9, slot: 1, x: 136, y: 80, contact: 8, cell: [4, 8] }]
     context = { entities: -> { enemy } }
     inside = state(x: 120, hp: 8)
@@ -134,6 +134,17 @@ class SkillsTest < Minitest::Test
     closer = registry.start('walk', inside, { direction: :right, cells: 1 }, context)
     assert_empty drive(closer, [inside])
     assert_equal :danger, closer.result[:stopped_by]
+  end
+
+  def test_at_one_heart_an_enemy_in_links_own_cell_blocks_the_walk_that_heads_through_it
+    enemy = [{ kind: 'enemy', type: 27, slot: 3, x: 118, y: 46, contact: 8, cell: [2, 7] }]
+    context = { entities: -> { enemy } }
+    link = state(x: 116, y: 42, hp: 8)
+    down = registry.start('walk', link, { direction: :down, cells: 2 }, context)
+    assert_empty drive(down, [link])
+    assert_equal :danger, down.result[:stopped_by]
+    up = registry.start('walk', link, { direction: :up, cells: 1 }, context)
+    assert_equal [[:up]], drive(up, [link])
   end
 
   def test_walk_blocked_after_eight_still_frames
