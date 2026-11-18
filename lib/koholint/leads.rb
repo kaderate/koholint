@@ -28,7 +28,7 @@ module Koholint
       events.each do |event|
         case Ledger.pick(event, :type).to_s
         when 'lead' then leads.restore(event)
-        when 'dialogue' then leads.note_read(Ledger.pick(event, :text))
+        when 'dialogue' then leads.note_read(Ledger.pick(event, :text), place: Ledger.pick(event, :place))
         when 'perception' then leads.note_held(Items.held_ids(Ledger.pick(event, :state) || {}))
         when 'place_name' then leads.name_place(Ledger.pick(event, :place), Ledger.pick(event, :name))
         when 'goal' then leads.change_goal(Ledger.pick(event, :text), frame: Ledger.pick(event, :frame), objectives: done)
@@ -64,10 +64,29 @@ module Koholint
       @names = {}
       @attempts = {}
       @read = []
+      @read_at = Hash.new { |hash, key| hash[key] = [] }
       @held = Set.new
     end
 
-    def note_read(text) = (@read << text.to_s unless text.to_s.strip.empty?)
+    def note_read(text, place: nil)
+      return if text.to_s.strip.empty?
+
+      @read << text.to_s
+      @read_at[place] << text.to_s if place
+    end
+
+    WORD = /[[:alpha:]]{4,}/
+
+    # The places a lead's quote points to by a word it shares with a place name you gave: places named with it and places where a text using it was read.
+    def region(lead)
+      words = ->(text) { self.class.normalize(text).scan(WORD) }
+      shared = words.(lead[:quote]) & @names.values.flat_map(&words)
+      return [] if shared.empty?
+
+      named = @names.select { |_, name| words.(name).intersect?(shared) }.keys
+      read = @read_at.select { |_, texts| texts.any? { |text| words.(text).intersect?(shared) } }.keys
+      (named + read).uniq
+    end
 
     def note_held(ids) = @held.merge(ids)
 

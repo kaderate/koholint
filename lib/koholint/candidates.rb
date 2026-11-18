@@ -14,7 +14,7 @@ module Koholint
       hops = explore_log.hops(place)
       named = ->(where) { leads.name_of(where) }
       people = people_here(place, entities, talk_log, stamp)
-      leaving = exits(place, grid, explore_log) + doors(place, signs, explore_log, link) + places(place, hops, explore_log, named) +
+      leaving = puzzles(place, hops, explore_log, leads, named) + exits(place, grid, explore_log) + doors(place, signs, explore_log, link) + places(place, hops, explore_log, named) +
                 people_away(place, hops, cards, talk_log, named, stamp) + signs_away(place, hops, cards, talk_log, named) + lead_places(place, hops, leads, named)
       [(shelter(place, hops, named) if low_health)].compact + people + signs_here(place, signs, talk_log) + unidentified(place, grid, entities, talk_log, link) +
         warn(leaving, people)
@@ -139,6 +139,20 @@ module Koholint
         { id: lead[:id], label: "go to #{describe(where, named)} (#{lead[:importance]} lead: #{lead[:claim]}), #{route}",
           title: "Go to #{describe(where, named)}"[0, 80], predicate: { kind: 'reach_place', place: where }, target: { kind: 'lead', place: where, lead: lead[:id] } }
       end.first(PER_KIND)
+    end
+
+    # A place with a world-model puzzle that an open lead's words point to, offered first only until the exit bench has measured it in the current context.
+    def puzzles(place, hops, explore_log, leads, named)
+      open = leads.all.reject { |lead| leads.settled?(lead) }
+      hops.keys.sort_by { |where| [hops[where], where] }.filter_map do |where|
+        next if explore_log.puzzles(where).empty? || explore_log.bench_of(where)
+
+        lead = open.find { |candidate| leads.region(candidate).include?(where) } or next
+        here = where == place
+        { id: "puzzle-#{where.join('-')}", label: "investigate #{here ? 'this place' : describe(where, named)}#{here ? '' : ", #{moves(hops[where])}"}: a way out of it led where the map " \
+                                                      "does not predict, and #{lead[:id]} « #{lead[:quote]} » points there; try its ways no crossing has measured",
+          title: "Investigate #{describe(where, named)}"[0, 80], predicate: { kind: 'new_place' }, target: { kind: 'place', place: where } }
+      end.first(1)
     end
 
     def away(place, hops) = hops.reject { |where, _| where == place }.sort_by { |where, count| [count, where] }.map(&:first)

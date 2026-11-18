@@ -1,0 +1,383 @@
+{
+  "edges": [
+    {
+      "place": [
+        81,
+        0
+      ],
+      "way": "up",
+      "context": {
+        "milestone": "sword",
+        "held": [
+          1,
+          4
+        ]
+      },
+      "trials": [
+        {
+          "run": "20261118-233932-72e1",
+          "parent": "20261118-142325-20ea",
+          "frame": 73800,
+          "visit": 73299,
+          "to": [
+            99,
+            0
+          ],
+          "landing": [
+            7,
+            5
+          ]
+        },
+        {
+          "run": "20261118-234111-2e8a",
+          "parent": "20261118-142325-20ea",
+          "frame": 95400,
+          "visit": 93925,
+          "to": [
+            99,
+            0
+          ],
+          "landing": [
+            7,
+            5
+          ]
+        }
+      ],
+      "refutes": [
+        {
+          "to": [
+            65,
+            0
+          ],
+          "source": "neighbour"
+        }
+      ],
+      "to": [
+        99,
+        0
+      ],
+      "verified_count": 2,
+      "status": "verified"
+    },
+    {
+      "place": [
+        99,
+        0
+      ],
+      "way": "down",
+      "context": {
+        "milestone": "sword",
+        "held": [
+          1,
+          4
+        ]
+      },
+      "trials": [
+        {
+          "run": "20261118-233932-72e1",
+          "parent": "20261118-142325-20ea",
+          "frame": 73800,
+          "visit": 73299,
+          "to": [
+            115,
+            0
+          ],
+          "landing": [
+            0,
+            5
+          ],
+          "from_landing": [
+            7,
+            5
+          ]
+        },
+        {
+          "run": "20261118-234111-2e8a",
+          "parent": "20261118-142325-20ea",
+          "frame": 95400,
+          "visit": 93925,
+          "to": [
+            115,
+            0
+          ],
+          "landing": [
+            0,
+            5
+          ],
+          "from_landing": [
+            7,
+            5
+          ]
+        }
+      ],
+      "refutes": [
+        {
+          "to": [
+            81,
+            0
+          ],
+          "source": "reverse"
+        }
+      ],
+      "to": [
+        115,
+        0
+      ],
+      "verified_count": 2,
+      "status": "verified"
+    },
+    {
+      "place": [
+        81,
+        0
+      ],
+      "way": "down",
+      "context": {
+        "milestone": "sword",
+        "held": [
+          1,
+          4
+        ]
+      },
+      "trials": [
+        {
+          "run": "20261118-233944-015b",
+          "parent": "20261118-142325-20ea",
+          "frame": 73800,
+          "visit": 73299,
+          "to": [
+            97,
+            0
+          ],
+          "landing": [
+            0,
+            6
+          ]
+        },
+        {
+          "run": "20261118-234137-e870",
+          "parent": "20261118-142325-20ea",
+          "frame": 95400,
+          "visit": 93925,
+          "to": [
+            97,
+            0
+          ],
+          "landing": [
+            0,
+            6
+          ]
+        }
+      ],
+      "refutes": [],
+      "to": [
+        97,
+        0
+      ],
+      "verified_count": 2,
+      "status": "verified"
+    },
+    {
+      "place": [
+        97,
+        0
+      ],
+      "way": "up",
+      "context": {
+        "milestone": "sword",
+        "held": [
+          1,
+          4
+        ]
+      },
+      "trials": [
+        {
+          "run": "20261118-233944-015b",
+          "parent": "20261118-142325-20ea",
+          "frame": 73800,
+          "visit": 73299,
+          "to": [
+            81,
+            0
+          ],
+          "landing": [
+            7,
+            6
+          ],
+          "from_landing": [
+            0,
+            6
+          ]
+        },
+        {
+          "run": "20261118-234137-e870",
+          "parent": "20261118-142325-20ea",
+          "frame": 95400,
+          "visit": 93925,
+          "to": [
+            81,
+            0
+          ],
+          "landing": [
+            7,
+            6
+          ],
+          "from_landing": [
+            0,
+            6
+          ]
+        }
+      ],
+      "refutes": [],
+      "to": [
+        81,
+        0
+      ],
+      "verified_count": 2,
+      "status": "verified"
+    },
+    {
+      "place": [
+        81,
+        0
+      ],
+      "way": "left",
+      "context": {
+        "milestone": "sword",
+        "held": [
+          1,
+          4
+        ]
+      },
+      "trials": [
+        {
+          "run": "20261118-233954-86ba",
+          "parent": "20261118-142325-20ea",
+          "frame": 73800,
+          "visit": 73299,
+          "to": null,
+          "outcome": "unreached"
+        },
+        {
+          "run": "20261118-234201-ab58",
+          "parent": "20261118-142325-20ea",
+          "frame": 95400,
+          "visit": 93925,
+          "to": null,
+          "outcome": "unreached"
+        }
+      ],
+      "refutes": [],
+      "verified_count": 0,
+      "status": "unreached"
+    },
+    {
+      "place": [
+        81,
+        0
+      ],
+      "way": "right",
+      "context": {
+        "milestone": "sword",
+        "held": [
+          1,
+          4
+        ]
+      },
+      "trials": [
+        {
+          "run": "20261118-234034-5e37",
+          "parent": "20261118-142325-20ea",
+          "frame": 73800,
+          "visit": 73299,
+          "to": null,
+          "outcome": "unreached"
+        },
+        {
+          "run": "20261118-234246-cd91",
+          "parent": "20261118-142325-20ea",
+          "frame": 95400,
+          "visit": 93925,
+          "to": null,
+          "outcome": "unreached"
+        }
+      ],
+      "refutes": [],
+      "verified_count": 0,
+      "status": "unreached"
+    }
+  ],
+  "benches": [
+    {
+      "place": [
+        81,
+        0
+      ],
+      "context": {
+        "milestone": "sword",
+        "held": [
+          1,
+          4
+        ]
+      },
+      "runs": [
+        {
+          "parent": "20261118-142325-20ea",
+          "frame": 73800
+        },
+        {
+          "parent": "20261118-142325-20ea",
+          "frame": 95400
+        }
+      ],
+      "ways": {
+        "up": [
+          99,
+          0
+        ],
+        "down": [
+          97,
+          0
+        ],
+        "left": "unreached",
+        "right": "unreached"
+      },
+      "new_places": [],
+      "status": "depends_on_context",
+      "hypotheses": [
+        {
+          "type": "dialogue",
+          "frame": 73376,
+          "text": "J'suis un raton-laveur espiègle.\n\nlaveur espiègle. Et j'aime pas du tout c'qu'est poudreux..."
+        },
+        {
+          "type": "lead",
+          "id": "lead-21",
+          "frame": 73694,
+          "quote": "J'suis un raton-laveur espiègle."
+        },
+        {
+          "type": "dialogue",
+          "frame": 73697,
+          "text": "J'suis un raton-laveur espiègle.\n\nlaveur espiègle. Et j'aime pas du tout c'qu'est poudreux..."
+        },
+        {
+          "type": "dialogue",
+          "frame": 74971,
+          "text": "Hé hé! Tu vas te perdre dans la Forêt. Hi hi! Bien fait!!"
+        },
+        {
+          "type": "lead",
+          "id": "lead-22",
+          "frame": 75169,
+          "quote": "Tu vas te perdre dans"
+        },
+        {
+          "type": "dialogue",
+          "frame": 95317,
+          "text": "J'suis un raton-laveur espiègle.\n\nlaveur espiègle. Et j'aime pas du tout c'qu'est poudreux..."
+        }
+      ]
+    }
+  ]
+}

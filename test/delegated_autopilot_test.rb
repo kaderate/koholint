@@ -180,6 +180,21 @@ class DelegatedAutopilotTest < Minitest::Test
                                                 'the screen next to it on the map, 1 time since frame 75199.'
   end
 
+  def test_the_exit_bench_applies_only_in_the_context_it_measured
+    sword = { 'milestone' => 'none', 'held' => [] }
+    exits = { 'edges' => [], 'benches' => [{ 'place' => [81, 0], 'context' => sword, 'ways' => { 'up' => [99, 0] }, 'new_places' => [], 'status' => 'depends_on_context' }] }
+    log = Koholint::ExploreLog.new
+    @objectives = Koholint::Objectives.new(trace: trace)
+    p = Koholint::Policies::Delegated.new(client: ScriptedClient.new(objective: new_place, default: explore), registry: Koholint::Skills::Registry.default, objectives: @objectives,
+                                          manual: '', explore_log: log, exits:)
+    now = state(room_id: 81, map_id: 0)
+    p.decide(p.decision_point_for(now), now, { grid: })
+    assert_equal 'depends_on_context', log.bench_of([81, 0])['status']
+    held = state(room_id: 81, map_id: 0, item_a: 1)
+    p.decide(p.decision_point_for(held), held, { grid: })
+    assert_nil log.bench_of([81, 0]), 'an item gained since the bench is another context'
+  end
+
   def test_a_detected_loop_drops_the_objective_and_explores_toward_the_nearest_untried_place_once
     log = Koholint::ExploreLog.new
     log.absorb({ from: { room: 163, map: 16 }, exits: [{ row: 3, col: 0, direction: :left, outcome: :left, to: [164, 16] }, { row: 0, col: 5, direction: :up, outcome: :left, to: [165, 16] }],

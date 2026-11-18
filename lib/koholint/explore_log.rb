@@ -47,7 +47,15 @@ module Koholint
       @puzzles = {}
       @pending = []
       @frame = nil
+      @bench = { edges: {}, benches: {} }
     end
+
+    # The exit bench's verified edges and measured places for the current context (Exits.for_context); they fill ways this run never crossed.
+    def use_bench(found)
+      @bench = found
+    end
+
+    def bench_of(place) = @bench[:benches][place]
 
     def screen(place, grid)
       @screens[place] = grid if place.is_a?(Array) && grid.is_a?(Array)
@@ -252,12 +260,12 @@ module Koholint
 
     def surveyed?(place) = @surveys.key?(place) && !@surveys[place][:provisional]
 
-    def side_left?(place, direction) = @edges.fetch(place, {}).key?(direction.to_sym)
+    def side_left?(place, direction) = ways(place).key?(direction.to_sym)
 
     def door_tried?(place, cell) = tried?(place, [cell[0] + 1, cell[1]], :up)
 
     # A door Link has walked through, recognised or not as a door object (98/0's way into 189/10 is not one).
-    def door_edge?(place, cell) = @edges.fetch(place, {}).key?(cell)
+    def door_edge?(place, cell) = ways(place).key?(cell)
 
     def untried?(place)
       surveyed_untried?(place) || inferred_clearable(place).any?
@@ -303,7 +311,7 @@ module Koholint
         place = queue.shift
         return hops_to(seen, place) if place != from && (goal ? place == goal : untried?(place) && !skip.include?(place))
 
-        @edges.fetch(place, {}).each do |key, to|
+        ways(place).each do |key, to|
           next if seen.key?(to) || pocket?(to, key) || (place == from && avoid.include?(key)) || beyond?(tier, place, key)
 
           seen[to] = [place, key]
@@ -314,6 +322,12 @@ module Koholint
     end
 
     def beyond?(tier, place, key) = tier == :consistent && contradicted?(place, key)
+
+    # A bench edge replaces an assumed way back, never a way the run crossed.
+    def ways(place)
+      benched = @bench[:edges].filter_map { |(where, key), to| [key, to] if where == place && !@observed.key?([place, key]) }.to_h
+      @edges.fetch(place, {}).merge(benched) { |key, own, bench| @observed.key?([place, key]) ? own : bench }
+    end
 
     # The cell an exit lands on in the next place; a call that finds nothing to do there while some place still has work, or
     # whose route has no reachable exit on two visits (an enemy may block it once), shows the landing is a closed pocket: routes must not
@@ -374,7 +388,7 @@ module Koholint
       queue = [from]
       until queue.empty?
         place = queue.shift
-        @edges.fetch(place, {}).each do |key, to|
+        ways(place).each do |key, to|
           next if found.key?(to) || pocket?(to, key)
 
           found[to] = found[place] + 1

@@ -30,7 +30,7 @@ module Koholint
   module CLI
     USAGE = 'usage: koholint run|resume <run_dir>|fork <run_dir> --at-frame N|branch <run_dir> --at FRAME|CHECKPOINT|verify <run_dir>|summary <run_dir>|screens <run_dir>|watch <run_dir>|' \
             'archive|star <run_dir> WHY|prune-heavy|census boot|<run_dir> FRAME...|entities <run_dir> FRAME...|objects <run_dir> FRAME...|doors <run_dir> FRAME...|sword <run_dir> FRAME...|ready <run_dir>|npcs|' \
-            'ab-plan <run_dir> --at-frame N|ab-report PREFIX|check-leads <run_dir>...|learn <run_dir> [--limit N --object ID]|capability list|publish ID WHY|retire ID WHY ' \
+            'ab-plan <run_dir> --at-frame N|ab-report PREFIX|check-leads <run_dir>...|learn <run_dir> [--limit N --object ID]|bench exits <run_dir> [--place R/M --at-frame N]|capability list|publish ID WHY|retire ID WHY ' \
             '[--frames N --minutes N --steps N --dollars X --root DIR --runs-root DIR --tag NAME --realtime --grid --port N --host H --from live|start|DIR ' \
             '--speed X --agent --autopilot on|off --capabilities on|off --model M --max-dollars X --claude-command PATH --keep-viewer --commit --full --keep N --yes --arms A,B --forks N --crawl N]'.freeze
 
@@ -68,6 +68,7 @@ module Koholint
         o.on('--port N', Integer) { |v| options[:port] = v }
         o.on('--host H') { |v| options[:host] = v }
         o.on('--from MODE') { |v| options[:from] = v }
+        o.on('--place R/M') { |v| options[:place] = v }
         o.on('--commit') { options[:commit] = true }
         o.on('--full') { options[:full] = true }
         o.on('--yes') { options[:yes] = true }
@@ -124,6 +125,12 @@ module Koholint
         require 'koholint/learn'
         Learn.learn(parent_run(run_dir(args)), limit: options.fetch(:limit, Learn::LIMIT), object: options[:object], root: options.fetch(:root, Learn::ROOT), out:)
       when 'capability' then capability(args, out)
+      when 'bench'
+        raise OptionParser::InvalidArgument, "bench #{args.first}" unless args.shift == 'exits'
+
+        require 'koholint/bench'
+        place = options[:place]&.split('/')&.map(&:to_i)
+        Bench.exits(parent_run(run_dir(args)), place:, at: options[:at_frame], root: options.fetch(:root, Bench::ROOT), out:)
       when 'npcs'
         require 'koholint/npc_catalogue'
         out.print NpcCatalogue.markdown(options.fetch(:root, 'runs'))
@@ -325,7 +332,7 @@ module Koholint
         learned = run.manifest['capabilities'] == false ? [] : Capabilities.operational.map { |entry| Skills::Composite.new(entry) }
         delegated = Policies::Delegated.new(client:, autopilot:, registry: Skills::Registry.default(extra: learned), objectives: objectives_for(run, events), ledger: ledger_for(run, events),
                                             triggers: Triggers.from_events(events), talk_log: TalkLog.from_events(events), explore_log: ExploreLog.from_events(events), leads: Leads.from_events(events), manual:, on_step: budget.method(:step_done), budget:, cards: PlaceCard.latest(events), loop_watch: LoopWatch.from_events(events), zero_watch: ZeroWatch.from_events(events),
-                                            on_activity: run.method(:write_activity))
+                                            exits: (Exits.load unless run.manifest['capabilities'] == false), on_activity: run.method(:write_activity))
         Policies::StartGame.new(delegated, ready: ->(state) { %i[playing dialogue].include?(state.phase) }, probe:, played: GameState.played?(events))
       end
     end

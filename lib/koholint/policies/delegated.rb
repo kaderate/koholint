@@ -72,7 +72,8 @@ module Koholint
       AUTO_OBJECTIVE = { title: 'Explore the nearest untried exits (picked by the harness)', predicate: { kind: 'new_place' } }.freeze
 
       def initialize(client:, registry:, objectives:, manual: '', on_step: nil, on_activity: nil, ledger: nil, triggers: nil, talk_log: nil, leads: nil, explore_log: nil, revisit: nil,
-                     budget: nil, autopilot: nil, cards: {}, loop_watch: nil, zero_watch: nil)
+                     budget: nil, autopilot: nil, cards: {}, loop_watch: nil, zero_watch: nil, exits: nil)
+        @exits = exits
         @cards = cards.dup
         @loop_watch = loop_watch || LoopWatch.new
         @zero_watch = zero_watch || ZeroWatch.new
@@ -146,6 +147,7 @@ module Koholint
       def decide(decision_point, state, context)
         @asked = false
         @leads.note_held(Items.held_ids(state))
+        @explore_log.use_bench(Exits.for_context(@exits, Exits.context(state))) if @exits
         result = decide_with(decision_point, state, context)
         @autopilot&.model_called(state:, objective: @objectives.current, news: !Array(result[:leads]).empty? || !result[:goal].nil?) if @asked
         notes = @revisit.notes + @notes
