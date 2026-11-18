@@ -526,13 +526,31 @@ class ExploreTest < Minitest::Test
     log = Koholint::ExploreLog.new
     log.absorb({ from: { room: 208, map: 0 }, exits: [{ row: 0, col: 9, direction: :up, outcome: :left, to: [192, 0] }, { row: 5, col: 9, direction: :right, outcome: :left, to: [209, 0] }],
                  survey: { sides: {}, doors: [], pending: false } })
+    log.absorb({ from: { room: 193, map: 0 }, exits: [{ row: 3, col: 0, direction: :left, outcome: :left, to: [192, 0] }] })
     log.absorb({ from: { room: 192, map: 0 }, exits: [{ row: 0, col: 5, direction: :up, outcome: :left, to: [176, 0] }], survey: { sides: {}, doors: [], pending: false } })
     log.absorb({ from: { room: 209, map: 0 }, exits: [{ row: 2, col: 9, direction: :right, outcome: :left, to: [210, 0] }], survey: { sides: {}, doors: [], pending: false } })
     log.absorb({ from: { room: 210, map: 0 }, survey: { sides: { up: [{ row: 0, col: 3 }] }, doors: [], pending: true } })
     log.absorb({ from: { room: 176, map: 0 }, survey: { sides: { up: [{ row: 0, col: 3 }] }, doors: [], pending: true } })
     assert_equal [192, 0], log.route([208, 0])[:next]
     log.absorb({ from: { room: 192, map: 0, row: 7, col: 9 }, stopped_by: :no_frontier, cells_walked: 0 })
+    assert_equal [192, 0], log.route([208, 0])[:next], 'one idle stop (an enemy in the way) is not a pocket yet'
+    log.note({ from: { room: 208, map: 0 }, to: { room: 192, map: 0 } })
+    log.absorb({ from: { room: 192, map: 0, row: 7, col: 9 }, stopped_by: :no_frontier, cells_walked: 0 })
     assert_equal [209, 0], log.route([208, 0])[:next]
+    refute log.hops([208, 0]).key?([192, 0]), 'hops reach no further than routes do'
+  end
+
+  def test_a_landing_link_walked_out_of_by_another_side_never_becomes_a_pocket
+    log = Koholint::ExploreLog.new
+    log.absorb({ from: { room: 128, map: 0 }, exits: [{ row: 7, col: 6, direction: :down, outcome: :left, to: [144, 0] }] })
+    log.absorb({ from: { room: 144, map: 0 }, exits: [{ row: 7, col: 4, direction: :down, outcome: :left, to: [160, 0] }] })
+    log.absorb({ from: { room: 160, map: 0 }, survey: { sides: { up: [{ row: 0, col: 3 }] }, doors: [], pending: true } })
+    2.times do
+      log.note({ from: { room: 128, map: 0 }, to: { room: 144, map: 0 } })
+      log.absorb({ from: { room: 144, map: 0, row: 0, col: 6 }, stopped_by: :no_frontier, cells_walked: 0, dead_end: true })
+    end
+    assert_equal({ goal: [160, 0], next: [144, 0], via: :down }, log.route([128, 0], goal: [160, 0]))
+    assert_equal 2, log.hops([128, 0])[[160, 0]]
   end
 
   def test_a_closed_known_place_is_no_frontier_after_one_idle_frame

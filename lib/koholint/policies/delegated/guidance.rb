@@ -83,7 +83,7 @@ module Koholint
           when 'exit' then { choice: { skill: 'explore', params: { direction: target[:direction] } } } if here
           when 'door' then { choice: EXPLORE, aim: { door: target[:cell] } } if here
           when 'person', 'sign', 'examine'
-            return (@objectives.current.dig(:predicate, :kind).to_s == 'reach_place' ? { choice: EXPLORE, aim: { place: target[:place] } } : nil) unless here
+            return ({ choice: EXPLORE, aim: { place: target[:place] } } if target[:kind] == 'sign' || @objectives.current.dig(:predicate, :kind).to_s == 'reach_place') unless here
 
             cell = target[:kind] == 'person' ? entities_now.find { |entity| entity[:type] == target[:type] && entity[:cell] }&.dig(:cell) : target[:cell]
             { choice: { skill: 'talk_to', params: { row: cell[0], col: cell[1] } } } if cell

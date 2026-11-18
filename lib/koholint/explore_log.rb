@@ -39,6 +39,8 @@ module Koholint
       @looks = {}
       @explored_since_clear = []
       @stood = Hash.new { |hash, key| hash[key] = [] }
+      @entered = {}
+      @through = []
     end
 
     def screen(place, grid)
@@ -87,6 +89,7 @@ module Koholint
       return unless left && to.is_a?(Array) && to.size == 2 && to.all?(Integer)
 
       observe_edge(place, edge_key(exit, cell, direction.to_sym), to)
+      crossed(place, edge_key(exit, cell, direction.to_sym), to, door: Ledger.pick(exit, :kind).to_s == 'door' || Ledger.pick(exit, :walk_in))
       know(to)
       return if Ledger.pick(exit, :kind).to_s == 'door' || Ledger.pick(exit, :walk_in)
 
@@ -164,6 +167,7 @@ module Koholint
       return take_exit(from, ExploreLog.door_exit(cell, ahead, @surveys.dig(from, :doors) || [], to)) if ahead && ahead[0].between?(0, Geometry::ROWS - 1) && ahead[1].between?(0, Geometry::COLS - 1)
 
       observe_edge(from, direction, @edges[from].fetch(direction, to))
+      crossed(from, direction, to, door: exit && Ledger.pick(exit, :walk_in))
       # A door walk (a house left by its bottom edge) loads the next place instead of scrolling: it says nothing of the side Link arrives by.
       assume_edge(to, OPPOSITE.fetch(direction), from) unless exit && Ledger.pick(exit, :walk_in)
     end
@@ -255,15 +259,22 @@ module Koholint
       from = Ledger.pick(result, :from)
       cell = [Ledger.pick(from, :row), Ledger.pick(from, :col)]
       side = landing_side(place, cell) or return
-      idle = Ledger.pick(result, :stopped_by).to_s == 'no_frontier' && Ledger.pick(result, :cells_walked).to_i.zero?
-      return @pockets[[place, cell]] ||= side if idle && route(place)
+      return if @through.include?([place, side])
 
-      @pockets[[place, cell]] ||= side if Ledger.pick(result, :dead_end) && again?(@suspects, [place, cell], place)
+      idle = Ledger.pick(result, :stopped_by).to_s == 'no_frontier' && Ledger.pick(result, :cells_walked).to_i.zero?
+      @pockets[[place, cell]] ||= side if ((idle && route(place)) || Ledger.pick(result, :dead_end)) && again?(@suspects, [place, cell], place)
     end
 
     def pocket_side(place, cell) = @pockets[[place, cell]] || (landing_side(place, cell) if @suspects.key?([place, cell]))
 
-    def pocket?(to, key) = key.is_a?(Symbol) && OPPOSITE.key?(key) && @pockets.key?([to, @arrivals[[to, OPPOSITE.fetch(key)]]])
+    def pocket?(to, key) = key.is_a?(Symbol) && OPPOSITE.key?(key) && !@through.include?([to, OPPOSITE.fetch(key)]) && @pockets.key?([to, @arrivals[[to, OPPOSITE.fetch(key)]]])
+
+    # Leaving a place by another way than the side Link came in by proves that landing leads on: it is never a pocket.
+    def crossed(place, way, to, door: false)
+      came = @entered[place]
+      @through << [place, came] if came && came != way && !@through.include?([place, came])
+      @entered[to] = (OPPOSITE[way] unless door)
+    end
 
     def landing_side(place, cell) = @arrivals.find { |(where, _), arrival| where == place && arrival == cell }&.dig(0, 1)
 
@@ -289,8 +300,8 @@ module Koholint
       queue = [from]
       until queue.empty?
         place = queue.shift
-        @edges.fetch(place, {}).each_value do |to|
-          next if found.key?(to)
+        @edges.fetch(place, {}).each do |key, to|
+          next if found.key?(to) || pocket?(to, key)
 
           found[to] = found[place] + 1
           queue << to

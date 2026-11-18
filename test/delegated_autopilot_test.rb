@@ -333,6 +333,14 @@ class DelegatedAutopilotTest < Minitest::Test
     assert_nil p.send(:follow_choice, state(room_id: 9))
   end
 
+  def test_a_sign_of_another_place_is_walked_to_and_read_before_its_objective_ends
+    p = autopiloted(ScriptedClient.new(objective: []))
+    here = [state.room_id, state.map_id]
+    @objectives.start(frame: 10, title: 'Go read the sign', predicate: { kind: 'new_text' }, target: { kind: 'sign', place: here, cell: [4, 8] })
+    assert_equal({ choice: { skill: 'explore', params: {} }, aim: { place: here } }, p.send(:follow_choice, state(room_id: 9)))
+    assert_equal({ choice: { skill: 'talk_to', params: { row: 4, col: 8 } } }, p.send(:follow_choice, state))
+  end
+
   def test_a_place_name_is_noted_once_and_shown_in_the_next_prompt
     client = ScriptedClient.new(objective: ok('title' => 'go', 'predicate' => { 'kind' => 'new_place' }, 'place_name' => " Tarin's\nhouse "), default: explore)
     p = autopiloted(client, autopilot: nil)
