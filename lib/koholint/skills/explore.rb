@@ -71,6 +71,8 @@ module Koholint
           @known = grid && Known.new(grid, @walked)
           @planner = @known && Navigation::Planner.new(grid: @known, ledger: @ledger, place: @place, triggers: context[:triggers], mode: :free_only, danger: danger_of(context), pushable: pushable_of(context), contact: contact_of(context), away: away_of(context))
           @pushable = Array(pushable_of(context)&.call)
+          @danger = danger_of(context)
+          @away = away_of(context)
           @clearing = Clearing.of(context)
           @objects = grid ? TalkLog.objects(grid) : []
           @doors = Array(context[:objects]&.call).select { |object| object[:kind].to_s == 'door' && object[:cell][0] < Geometry::ROWS - 1 }.map { |object| object[:cell] }
@@ -138,6 +140,7 @@ module Koholint
           enter(state)
           return finish(:untried_object) if @untried.any?
           return finish(:budget) if @frames >= BUDGET_FRAMES
+          return finish(:danger) if danger_ahead?(state)
 
           loop do
             buttons = if @leg then lead(state)
@@ -175,6 +178,15 @@ module Koholint
         def harmed
           fail_step(*@target.values_at(:cell, :direction)) if @target && (@leg || @outward)
           finish(:damage)
+        end
+
+        # The planner routes around enemy contact zones when it can; when no such route exists Link stops before walking into one.
+        def danger_ahead?(state)
+          return false unless @danger && (@leg || @outward) && @heading && state.cell
+
+          ahead = neighbour(state.cell, @heading) or return false
+          zones = Array(@danger.call)
+          zones.include?(ahead) && !(zones.include?(state.cell) && @away.call(state.cell, ahead))
         end
 
         def heading(buttons)

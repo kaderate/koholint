@@ -22,7 +22,7 @@ module Koholint
       class Run < Goto::Run
         def initialize(cell:, context:, **rest)
           @entities = context[:entities]
-          @enemy = enemy_near(cell)
+          @enemy = touching(rest[:state]) || enemy_near(cell)
           @phase = :walk
           @strikes = 0
           @hits = 0
@@ -62,6 +62,17 @@ module Koholint
           targets.select { |entity| (entity[:cell][0] - cell[0]).abs <= 1 && (entity[:cell][1] - cell[1]).abs <= 1 }
                  .min_by { |entity| [(entity[:cell][0] - cell[0]).abs + (entity[:cell][1] - cell[1]).abs, entity[:kind].to_s == 'enemy' ? 0 : 1, entity[:slot]] }
                  &.slice(:slot, :type, :x, :y, :cell, :status, :health, :contact)
+        end
+
+        # An enemy already inside its touch of Link is the one hurting him, whichever cell the agent named.
+        def touching(state)
+          return nil unless state&.x && state.y
+
+          Array(@entities&.call).select { |entity| entity[:kind].to_s == 'enemy' && entity[:cell] && entity[:x] && entity[:y] }
+                                .map { |entity| [Navigation::Threat.distance({ x: entity[:x], y: entity[:y] }, state.x, state.y), entity] }
+                                .select { |distance, entity| distance <= (entity[:contact] || Navigation::Threat::DEFAULT_REACH) + CONTACT_SLACK }
+                                .min_by { |distance, entity| [distance, entity[:slot]] }
+                                &.last&.slice(:slot, :type, :x, :y, :cell, :status, :health, :contact)
         end
 
         def danger_of(context)

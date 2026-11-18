@@ -15,7 +15,7 @@ module Koholint
     FIGHT_REACH = 2
     FIGHT_FLOOR = 16
     FIGHT_DROP = 8
-    FIGHT_ON = %w[done target_gone].freeze
+    FIGHT_AFTER = { 'attack' => %w[done target_gone], 'explore' => %w[danger] }.freeze
     DISENGAGE_LIMIT = 3
     STEP = { up: [0, -1], down: [0, 1], left: [-1, 0], right: [1, 0] }.freeze
 
@@ -42,7 +42,7 @@ module Koholint
       @acted = false
       @returns = Hash.new(0)
       @fight = 0
-      @attack_stop = nil
+      @fight_stop = false
       @disengaged = 0
       @walled = []
     end
@@ -51,7 +51,7 @@ module Koholint
 
     def acted(skill:, outcome:)
       @acted = true
-      @attack_stop = skill.to_s == 'attack' && outcome.is_a?(Hash) ? outcome[:stopped_by].to_s : nil unless skill.to_s == 'wait'
+      @fight_stop = outcome.is_a?(Hash) && FIGHT_AFTER.fetch(skill.to_s, []).include?(outcome[:stopped_by].to_s) unless skill.to_s == 'wait'
       note_struck(skill, outcome) if outcome.is_a?(Hash)
       @walled |= [outcome[:params][:direction].to_s] if skill.to_s == 'walk' && outcome.is_a?(Hash) && outcome[:params].is_a?(Hash) && walled?(outcome)
       @stop = skill.to_s == 'explore' && outcome.is_a?(Hash) ? outcome[:stopped_by].to_s : nil
@@ -88,9 +88,9 @@ module Koholint
         latency_ms: 0, cost_usd: 0.0, fallback: false, autopilot: true, prompt: nil, image: nil }
     end
 
-    # After an attack that killed or lost its target, strike the nearest other enemy (or a type struck here before) without a call.
+    # After an attack that killed or lost its target, or an explore stopped short of an enemy's touch, strike the nearest other enemy (or a type struck here before) without a call.
     def fight_choice(state:, entities:)
-      return unless @since && FIGHT_ON.include?(@attack_stop) && state.phase == :playing && state.cell
+      return unless @since && @fight_stop && state.phase == :playing && state.cell
       return if state.health < FIGHT_FLOOR || state.health < @hp - FIGHT_DROP
       return if @fight >= FIGHT_LIMIT || state.frame - @since >= FIGHT_FRAMES
 
@@ -102,7 +102,7 @@ module Koholint
                               .select { |entity| [(entity[:cell][0] - row).abs, (entity[:cell][1] - col).abs].max <= FIGHT_REACH }
                               .min_by { |entity| [(entity[:cell][0] - row).abs + (entity[:cell][1] - col).abs, entity[:slot]] } or return
       @fight += 1
-      @attack_stop = nil
+      @fight_stop = false
       { choice: { skill: 'attack', params: { row: target[:cell][0], col: target[:cell][1] } },
         justification: "autopilot: keep fighting, type #{target[:type]} at (#{target[:cell].join(',')}) (#{@fight}/#{FIGHT_LIMIT})", confidence: 1.0,
         agent: 'delegated', latency_ms: 0, cost_usd: 0.0, fallback: false, autopilot: true, prompt: nil, image: nil }
