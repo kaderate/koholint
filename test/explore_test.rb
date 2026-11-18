@@ -745,6 +745,24 @@ class ExploreTest < Minitest::Test
     assert_operator result[:frames], :<, 20
   end
 
+  def test_an_uncleared_capability_target_cell_link_walked_into_is_no_frontier_again
+    cells = [[4, 4], [4, 5]]
+    rows = with(CLOSED, *cells.flat_map { |cell| [cell, '#'] })
+    clearing = Struct.new(:cells) do
+      def uses = []
+      def active? = false
+      def start(*) = nil
+    end.new(cells.to_h { |cell| [cell, :skill] })
+    original = Koholint::Skills::Clearing.method(:of)
+    Koholint::Skills::Clearing.define_singleton_method(:of) { |_context| clearing }
+    result, = explore(rows, truth: CLOSED)
+    assert_equal :no_frontier, result[:stopped_by]
+    assert_equal [[4, 5, :left]], result[:crossed]
+    assert_operator result[:frames], :<, 20
+  ensure
+    Koholint::Skills::Clearing.define_singleton_method(:of, original) if original
+  end
+
   def test_a_new_cell_between_wall_probes_resets_the_stall
     rows = with(CLOSED.map { |line| line.tr('#', '?') }, [4, 7], '?')
     log = Koholint::ExploreLog.new
