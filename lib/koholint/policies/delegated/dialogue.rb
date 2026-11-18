@@ -71,6 +71,7 @@ module Koholint
           first = [transcription].flatten(1).compact.first
           @talk_log.store_pages(conversation, pages) if conversation && @images
           @talk_log.remember(place:, cell: [source[:row], source[:col]], text:, stamp: stamp(state), entity: source[:entity], conversation:, speaker: first[:speaker]) if source
+          @objectives.note_sign_read(place:, cell: [source[:row], source[:col]]) if source && !source[:entity]
           @revisit.read if @images || @reading
         end
 

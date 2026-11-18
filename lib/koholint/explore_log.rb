@@ -40,6 +40,7 @@ module Koholint
       @explored_since_clear = []
       @stood = Hash.new { |hash, key| hash[key] = [] }
       @entered = {}
+      @at = nil
       @through = []
     end
 
@@ -101,6 +102,8 @@ module Koholint
       %i[from to].each { |end_| (place = Ledger.place_of(Ledger.pick(result, end_))) && know(place) }
       from = Ledger.place_of(Ledger.pick(result, :from))
       to = Ledger.place_of(Ledger.pick(result, :to))
+      @entered.delete(from) if from && @at && from != @at
+      @at = to || from
       @visits[to] += 1 if from && to && from != to
       note_crossing(result)
       note_looks(from, result) if from

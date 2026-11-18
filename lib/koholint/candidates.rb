@@ -125,7 +125,7 @@ module Koholint
           next unless cell.is_a?(Array) && talk_log.sign_status(place: where, cell:) != :read
 
           { id: "sign-#{where.join('-')}-#{cell.join('-')}", label: "read the sign at (#{cell.join(',')}) in #{describe(where, named)}, #{moves(hops[where])}, not read yet",
-            title: "Go read the sign in #{describe(where, named)}"[0, 80], predicate: { kind: 'new_text' }, target: { kind: 'sign', place: where, cell: } }
+            title: "Go read the sign in #{describe(where, named)}"[0, 80], predicate: { kind: 'new_text' }, target: { kind: 'sign', place: where, cell:, remote: true } }
         end
       end.first(PER_KIND)
     end

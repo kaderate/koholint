@@ -336,9 +336,12 @@ class DelegatedAutopilotTest < Minitest::Test
   def test_a_sign_of_another_place_is_walked_to_and_read_before_its_objective_ends
     p = autopiloted(ScriptedClient.new(objective: []))
     here = [state.room_id, state.map_id]
-    @objectives.start(frame: 10, title: 'Go read the sign', predicate: { kind: 'new_text' }, target: { kind: 'sign', place: here, cell: [4, 8] })
+    @objectives.start(frame: 10, title: 'Go read the sign', predicate: { kind: 'new_text' }, target: { kind: 'sign', place: here, cell: [4, 8], remote: true })
     assert_equal({ choice: { skill: 'explore', params: {} }, aim: { place: here } }, p.send(:follow_choice, state(room_id: 9)))
     assert_equal({ choice: { skill: 'talk_to', params: { row: 4, col: 8 } } }, p.send(:follow_choice, state))
+    @objectives.abandon(frame: 20, reason: 'test')
+    @objectives.start(frame: 20, title: 'Read the sign', predicate: { kind: 'new_text' }, target: { kind: 'sign', place: here, cell: [4, 8] })
+    assert_nil p.send(:follow_choice, state(room_id: 9)), 'a sign of the place Link left is not routed back to'
   end
 
   def test_a_place_name_is_noted_once_and_shown_in_the_next_prompt

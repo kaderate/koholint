@@ -73,7 +73,8 @@ The skills, protocols and harness behaviours the agent works with. Versioned wit
   (`place-R-M`), people and unread signs of other known places (from their place cards; flow-62: a person exhausted
   under other held items or another milestone is offered again, once) and places tied to a lead by its `where`
   (`lead-N`), nearest first by moves over exits explore took (flow-69: never through a pocket, so a place routes cannot reach
-  is not offered; a sign elsewhere is a `new_text` objective the autopilot walks to and reads, not done on arrival). The agent answers with `candidate` (or still a free title and predicate);
+  is not offered; a sign elsewhere is a `new_text` objective the autopilot walks to and reads, done only when that sign's text is read, not on arrival or on
+  another text met on the way). The agent answers with `candidate` (or still a free title and predicate);
   the objective event carries `candidate` and its `target`, which the autopilot follows. While a person here is not
   exhausted, every candidate that leaves the place says `leaves unexhausted people here: ...`.
 - The agent may name the current place (`place_name`, any call): a `place_name` trace event, shown in the context header,

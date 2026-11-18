@@ -540,6 +540,21 @@ class ExploreTest < Minitest::Test
     refute log.hops([208, 0]).key?([192, 0]), 'hops reach no further than routes do'
   end
 
+  def test_a_place_entered_without_a_crossing_forgets_the_side_link_last_came_in_by
+    log = Koholint::ExploreLog.new
+    log.absorb({ from: { room: 128, map: 0 }, exits: [{ row: 7, col: 6, direction: :down, outcome: :left, to: [144, 0] }] })
+    log.note({ from: { room: 128, map: 0 }, to: { room: 144, map: 0 } })
+    log.note({ from: { room: 101, map: 0 }, to: { room: 101, map: 0 } })
+    log.note({ from: { room: 144, map: 0 }, to: { room: 160, map: 0 } })
+    log.absorb({ from: { room: 144, map: 0 }, exits: [{ row: 7, col: 4, direction: :down, outcome: :left, to: [160, 0] }] })
+    log.absorb({ from: { room: 160, map: 0 }, survey: { sides: { up: [{ row: 0, col: 3 }] }, doors: [], pending: true } })
+    2.times do
+      log.note({ from: { room: 128, map: 0 }, to: { room: 144, map: 0 } })
+      log.absorb({ from: { room: 144, map: 0, row: 0, col: 6 }, stopped_by: :no_frontier, cells_walked: 0, dead_end: true })
+    end
+    assert_nil log.route([128, 0], goal: [160, 0]), 'leaving 144 after a respawn there says nothing of its top landing'
+  end
+
   def test_a_landing_link_walked_out_of_by_another_side_never_becomes_a_pocket
     log = Koholint::ExploreLog.new
     log.absorb({ from: { room: 128, map: 0 }, exits: [{ row: 7, col: 6, direction: :down, outcome: :left, to: [144, 0] }] })
