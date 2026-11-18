@@ -11,7 +11,8 @@ The skills, protocols and harness behaviours the agent works with. Versioned wit
   untried border exit (a side never left from this place) or untried door (walking up into it), else toward the nearest
   place it has taken an exit to that still has untried exits or doors (flow-67: the cells beside a learned hole, a look Link fell
   through more often than he walked onto it, are no frontier and are crossed by explore or goto only when no other route
-  exists, though a goal there is still reached (flow-70: never on the way to a frontier); flow-66: a door already walked through is never a frontier,
+  exists, though a goal there is still reached (flow-70: never on the way to a frontier, neither when explore picks it
+  nor on the leg that walks there, so a frontier only reachable past a hole is left unexplored); flow-66: a door already walked through is never a frontier,
   even when it is no door object, and routes go through it like a door object;
   flow-55: or, if surveyed before the capability existed, a tile
   the capability has cleared elsewhere, listed with its source in the route's `clearable`; inferred from the trace when a run is forked or resumed, not during a live run's first visit), else to the nearest frontier (a known cell next to

@@ -166,6 +166,16 @@ class PlannerTest < Minitest::Test
     assert_equal [[2, 1], [1, 1], [0, 1]], planner.path(from: [2, 1], to: [0, 1], cross_margin: false)
   end
 
+  def test_the_pushable_fallback_keeps_the_margin_when_it_may_not_be_crossed
+    walls = [[0, 2], [1, 2], [3, 2], [4, 2], [6, 2], [7, 2]]
+    grid = HoledGrid.new(margin: [[2, 2]], walls:, sprites: [[5, 2]])
+    planner = Planner.new(grid:, ledger: Koholint::Ledger.new, place: PLACE, pushable: -> { [[5, 2]] })
+    assert_includes planner.path(from: [2, 1], to: [2, 3]), [2, 2]
+    path = planner.path(from: [2, 1], to: [2, 3], cross_margin: false)
+    assert_includes path, [5, 2]
+    refute_includes path, [2, 2]
+  end
+
   def test_an_exit_cell_beside_a_hole_is_reached_without_crossing_the_margin_on_the_way
     margin = [[4, 3], [5, 2], [5, 4], [6, 3], [0, 5]]
     path = holed(margin, [[5, 3]]).path(from: [0, 3], to: [0, 5])

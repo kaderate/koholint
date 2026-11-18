@@ -37,13 +37,16 @@ module Koholint
       end
 
       class Leg < Goto::Run
-        def initialize(planner:, clearing: nil, **rest)
+        def initialize(planner:, clearing: nil, cross_margin: true, **rest)
           @shared = planner
           @shared_clearing = clearing
+          @cross_margin = cross_margin
           super(context: {}, **rest)
         end
 
         private
+
+        def cross_margin? = @cross_margin
 
         def planner_for(_context) = @shared
 
@@ -247,7 +250,8 @@ module Koholint
             outward_from(state)
           else
             row, col = @target[:cell]
-            @leg = Leg.new(skill: 'goto', params: { row:, col: }, state:, target: @target[:cell], planner: @planner, clearing: @clearing)
+            @leg = Leg.new(skill: 'goto', params: { row:, col: }, state:, target: @target[:cell], planner: @planner, clearing: @clearing,
+                           cross_margin: @target[:kind] != :frontier)
             @leg.triggers = @triggers
           end
           nil

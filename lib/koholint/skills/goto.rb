@@ -56,6 +56,8 @@ module Koholint
           Navigation::Planner.new(grid:, ledger: context[:ledger], place: [@start.room_id, @start.map_id], triggers: context[:triggers], danger: danger_of(context), pushable: pushable_of(context), contact: contact_of(context), closeness: closeness_of(context))
         end
 
+        def cross_margin? = true
+
         def initial_plan = plan(@start.cell)
 
         def restart(state, path)
@@ -70,7 +72,7 @@ module Koholint
         end
 
         def plan(cell)
-          path = cell && @planner&.path(from: cell, to: @target)
+          path = cell && @planner&.path(from: cell, to: @target, cross_margin: cross_margin?)
           @cause = path ? nil : why_not(cell)
           @initial_length ||= path ? path.size - 1 : 0
           path
@@ -145,7 +147,7 @@ module Koholint
           return nil unless @planner && cell && @heading && @replans < REPLANS
 
           @planner.avoid(cell, @heading)
-          path = @planner.path(from: cell, to: @target) or return nil
+          path = @planner.path(from: cell, to: @target, cross_margin: cross_margin?) or return nil
           @replans += 1
           @avoided << { row: cell[0], col: cell[1], direction: @heading }
           restart(state, path)
