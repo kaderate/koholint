@@ -1,6 +1,6 @@
 # Agent skills
 
-The skills, protocols and harness behaviours the agent works with. Versioned with the play flow (currently `flow-73`): update this page, not the README, when a flow changes. Layers and data flow are in [ARCHITECTURE.md](../ARCHITECTURE.md).
+The skills, protocols and harness behaviours the agent works with. Versioned with the play flow (currently `flow-74`): update this page, not the README, when a flow changes. Layers and data flow are in [ARCHITECTURE.md](../ARCHITECTURE.md).
 
 
 - Learned capabilities (`data/capabilities.json`, `bin/koholint capability list`): an `operational` entry is a composite of the skills below, offered in the skill schema and listed under "Learned skills" only while its trigger item is held (flow-49) and its object is on screen (today `sword_on_object_92 row col direction`: stand next to object 92, face it, use the sword, step into its cell). `explore` and `goto` also run it themselves when blocked facing such a cell, and the planner routes through those cells as a last resort. `learn` and `capability publish|retire` are offline commands.
@@ -12,7 +12,7 @@ The skills, protocols and harness behaviours the agent works with. Versioned wit
   place it has taken an exit to that still has untried exits or doors (flow-67: the cells beside a learned hole, a look Link fell
   through more often than he walked onto it, are no frontier and are crossed by explore or goto only when no other route
   exists, though a goal there is still reached (flow-70: never on the way to a frontier, neither when explore picks it
-  nor on the leg that walks there, so a frontier only reachable past a hole is left unexplored); flow-66: a door already walked through is never a frontier,
+  nor on the leg that walks there, so a frontier only reachable past a hole is left unexplored); flow-72: a cell Link already walked into is never a frontier, even one explore treats as pushable (the cell of an uncleared capability target or of a still enemy), so explore no longer steps back and forth across it; flow-66: a door already walked through is never a frontier,
   even when it is no door object, and routes go through it like a door object;
   flow-55: or, if surveyed before the capability existed, a tile
   the capability has cleared elsewhere, listed with its source in the route's `clearable`; inferred from the trace when a run is forked or resumed, not during a live run's first visit), else to the nearest frontier (a known cell next to
@@ -95,7 +95,7 @@ The skills, protocols and harness behaviours the agent works with. Versioned wit
   place without a new cell emit a `notable` `stuck` and a `STUCK` reset hint; a known place entered 4 times within 3600 frames
   with no new place emits a `notable` `stuck` (`loop: ...`) and a `LOOP` hint until a new place; the harness then explores toward
   the nearest place with untried work outside the loop (flow-66: the loop's places are not aimed at, only crossed) or, when none is left, toward the reachable place entered least outside the loop.
-- flow-73: the explore log keeps every destination seen through a way (a side or a door) and compares the first crossing of a way with
+- flow-74: the explore log keeps every destination seen through a way (a side or a door) and compares the first crossing of a way with
   the way back it assumed, else the screen next to it on the overworld map (16 rooms wide, measured). A crossing that lands elsewhere is a
   `puzzle` event (`unexpected_arrival`, `refuted`) and assumes no way back; a second destination through the same way is a `contradiction`,
   routed through only when nothing else reaches the goal. The header shows the last two puzzles of the place as `PUZZLE (observed, not explained): ...`
