@@ -10,10 +10,10 @@ module Koholint
         DELTAS.find { |_, (dr, dc)| [from[0] + dr, from[1] + dc] == to }&.first
       end
 
-      def initialize(grid:, ledger:, place:, triggers: nil, mode: :explore, danger: nil, pushable: nil, contact: nil, closeness: nil)
+      def initialize(grid:, ledger:, place:, triggers: nil, mode: :explore, danger: nil, pushable: nil, contact: nil, away: nil)
         @danger = danger
         @contact = contact
-        @closeness = closeness
+        @away = away
         @pushable = pushable
         @mode = mode
         @triggers = triggers
@@ -100,8 +100,8 @@ module Koholint
 
       private
 
-      # Inside a zone Link may still move, as long as no step takes him closer to an enemy.
-      def away?(cell, target, zones) = @closeness && zones.include?(cell) && @closeness.call(target) >= @closeness.call(cell)
+      # Inside a zone Link may still move, as long as no step heads toward an enemy.
+      def away?(cell, target, zones) = @away && zones.include?(cell) && @away.call(cell, target)
 
       def inside?(cell) = cell.is_a?(Array) && cell[0].between?(0, Geometry::ROWS - 1) && cell[1].between?(0, Geometry::COLS - 1)
 

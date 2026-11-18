@@ -1,3 +1,4 @@
+require 'koholint/navigation/threat'
 require 'koholint/perception'
 
 module Koholint
@@ -15,6 +16,8 @@ module Koholint
     FIGHT_FLOOR = 16
     FIGHT_DROP = 8
     FIGHT_ON = %w[done target_gone].freeze
+    DISENGAGE_LIMIT = 3
+    STEP = { up: [0, -1], down: [0, 1], left: [-1, 0], right: [1, 0] }.freeze
 
     attr_reader :chain, :chain_limit, :chain_frames
 
@@ -40,6 +43,8 @@ module Koholint
       @returns = Hash.new(0)
       @fight = 0
       @attack_stop = nil
+      @disengaged = 0
+      @walled = []
     end
 
     def adopt(objective) = @objective = objective&.dig(:id)
@@ -48,6 +53,7 @@ module Koholint
       @acted = true
       @attack_stop = skill.to_s == 'attack' && outcome.is_a?(Hash) ? outcome[:stopped_by].to_s : nil unless skill.to_s == 'wait'
       note_struck(skill, outcome) if outcome.is_a?(Hash)
+      @walled |= [outcome[:params][:direction].to_s] if skill.to_s == 'walk' && outcome.is_a?(Hash) && outcome[:params].is_a?(Hash) && walled?(outcome)
       @stop = skill.to_s == 'explore' && outcome.is_a?(Hash) ? outcome[:stopped_by].to_s : nil
       to = outcome[:to] if @stop == 'known_place'
       @returns[[to[:room], to[:map]]] += 1 if to.is_a?(Hash) && @returns
@@ -102,6 +108,23 @@ module Koholint
         agent: 'delegated', latency_ms: 0, cost_usd: 0.0, fallback: false, autopilot: true, prompt: nil, image: nil }
     end
 
+    # At one heart or less with an enemy within a cell of its touch, step away from every such enemy before the model decides.
+    def disengage_choice(state:, entities:, grid: nil)
+      return unless @since && state.phase == :playing && state.x && state.cell && state.health <= Perception::HP_PER_HEART && @disengaged < DISENGAGE_LIMIT
+
+      near = Navigation::Threat.of(Array(entities)).select { |threat| Navigation::Threat.distance(threat, state.x, state.y) <= threat[:reach] + Geometry::CELL }
+      return if near.empty?
+
+      holes = grid.respond_to?(:hole_margin) ? grid.hole_margin + Geometry::ROWS.times.to_a.product(Geometry::COLS.times.to_a).select { |cell| grid.hole?(*cell) } : []
+      direction = STEP.reject { |name, (dx, dy)| Array(@walled).include?(name.to_s) || holes.include?([state.cell[0] + dy, state.cell[1] + dx]) || near.any? { |threat| ((threat[:x] - state.x) * dx) + ((threat[:y] - state.y) * dy) > 0 } }
+                      .max_by { |_, (dx, dy)| near.map { |threat| Navigation::Threat.distance(threat, state.x + (dx * Geometry::CELL), state.y + (dy * Geometry::CELL)) }.min }
+                      &.first or return
+      @disengaged += 1
+      { choice: { skill: 'walk', params: { direction: direction.to_s, cells: 1 } },
+        justification: "autopilot: disengage at #{state.health} hp, step #{direction} away from #{near.map { |threat| threat[:type] }.join(', ')} (#{@disengaged}/#{DISENGAGE_LIMIT})",
+        confidence: 1.0, agent: 'delegated', latency_ms: 0, cost_usd: 0.0, fallback: false, autopilot: true, prompt: nil, image: nil }
+    end
+
     def objective_hold(state:, last:)
       return 'no model call yet' unless @since
       return "last stop #{@stop || 'not an explore'}" unless ARRIVED.include?(@stop)
@@ -135,6 +158,8 @@ module Koholint
       to = outcome[:to]
       @struck = { place: nil, types: [] } if to.is_a?(Hash) && @struck[:place] && [to[:room], to[:map]] != @struck[:place]
     end
+
+    def walled?(outcome) = outcome[:stopped_by].to_s == 'blocked' || (outcome[:stopped_by].to_s == 'danger' && outcome[:frames].to_i.zero?)
 
     def cap_hold(state)
       return 'chain cap' if @chain >= @chain_limit
