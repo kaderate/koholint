@@ -182,6 +182,9 @@ module Koholint
       assume_edge(to, OPPOSITE.fetch(direction), from) unless (exit && Ledger.pick(exit, :walk_in)) || surprised
     end
 
+    # A tie goes to the latest destination.
+    def self.most_observed(seen) = seen.keys.each_with_index.max_by { |to, index| [seen[to][:count], index] }.first
+
     # The way back across an edge Link crossed once is assumed until he crosses it; explores that find no exit for it on two visits drop it (a ledge jumped down).
     # Every destination seen through a way is kept: a second one is a contradiction, and a first one other than its hypothesis is a puzzle; both return its kind.
     def observe_edge(place, key, to)
@@ -190,20 +193,22 @@ module Koholint
                expected = hypothesis(place, key)
                (@assumed.include?([place, key]) ? 'refuted' : 'unexpected_arrival') if expected && expected[:to] != to
              elsif !seen.key?(to)
-               expected = { to: seen.max_by { |_, record| record[:count] }.first, source: 'observed' }
+               expected = { to: ExploreLog.most_observed(seen), source: 'observed' }
                'contradiction'
              end
       record = seen[to] ||= { count: 0, frames: [] }
       record[:count] += 1
       record[:frames] << @frame if @frame
-      @edges[place][key] = to
+      @edges[place][key] = ExploreLog.most_observed(seen)
       @assumed.delete([place, key])
       kind ? raise_puzzle(kind, place, key, expected, to) : repeat_puzzle(place, key, to)
       kind
     end
 
+    # A way back assumed from another map is still routed, but a door lands on its own cell, so it predicts nothing.
     def hypothesis(place, key)
-      return { to: @edges[place][key], source: 'reverse' } if @assumed.include?([place, key])
+      to = @edges[place][key]
+      return { to:, source: 'reverse' } if @assumed.include?([place, key]) && to[1] == place[1]
 
       to = key.is_a?(Symbol) && Geometry.neighbour(place, key)
       { to:, source: 'neighbour' } if to
@@ -229,11 +234,14 @@ module Koholint
       fresh
     end
 
-    # A rebuilt log has already traced its puzzles: it keeps their landings and emits none again.
+    # A rebuilt log keeps the landings of the puzzles already traced and emits only those a fork cut off before their event.
     def resumed(events)
       events.each { |event| (puzzle = @puzzles[event['id']]) && puzzle[:observed][:landing] ||= event.dig('observed', 'landing') }
-      @pending = []
+      traced = events.map { |event| event['id'] }
+      @pending.reject! { |puzzle| traced.include?(puzzle[:id]) }
     end
+
+    def visits(place) = @visits[place]
 
     def puzzles(place = nil) = @puzzles.values.select { |puzzle| place.nil? || puzzle[:place] == place }
 

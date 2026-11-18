@@ -101,8 +101,8 @@ The skills, protocols and harness behaviours the agent works with. Versioned wit
 - flow-74: the explore log keeps every destination seen through a way (a side or a door) and compares the first crossing of a way with
   the way back it assumed, else the screen next to it on the overworld map (16 rooms wide, measured). A crossing that lands elsewhere is a
   `puzzle` event (`unexpected_arrival`, `refuted`) and assumes no way back; a second destination through the same way is a `contradiction`,
-  routed through only when nothing else reaches the goal. The header shows the last two puzzles of the place as `PUZZLE (observed, not explained): ...`
-  lines, and `summary.json` counts them per place and kind. Nothing resolves a puzzle yet.
+  routed through (to its most observed destination) only when nothing else reaches the goal; a way back assumed from another map predicts nothing.
+  The header shows the last two puzzles of the place once per visit as `PUZZLE (observed, not explained): ...` lines, and `summary.json` counts them per place and kind. Nothing resolves a puzzle yet.
 - The context header lists the items on A and B and in the inventory slots (`data/items.json` names; a `?` marks a name
   not measured yet). `use_item item [button] [frames]` uses a held item (assigning it through the START menu to `button`,
   default B, when it is on no button); `guard frames [direction]` raises the shield (Link walks at full speed and turns

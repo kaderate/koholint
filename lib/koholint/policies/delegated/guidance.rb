@@ -60,7 +60,13 @@ module Koholint
             lines << "STUCK: #{STUCK_AT} results in a row here found no frontier, no path or were blocked, without reaching a new cell. The grid may be wrong: " \
                      'try the cells marked doubtful, step onto stairs or narrow gaps from the cell centre, and read the grid against the screen image.'
           end
-          lines.concat(@explore_log.puzzles(place).last(PUZZLE_LINES).map { |puzzle| puzzle_line(puzzle) })
+          lines.concat(fresh_puzzles(place).map { |puzzle| puzzle_line(puzzle) })
+        end
+
+        # Each puzzle is stated once per visit of its place, not in every prompt.
+        def fresh_puzzles(place)
+          @puzzles_shown ||= Set.new
+          @explore_log.puzzles(place).last(PUZZLE_LINES).select { |puzzle| @puzzles_shown.add?([puzzle[:id], @explore_log.visits(place)]) }
         end
 
         PUZZLE_LINES = 2
