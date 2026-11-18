@@ -20,6 +20,12 @@ class CheckpointsTest < Minitest::Test
     assert_equal ['20261111-194737-9ba1', 60_404, 'flow-37'], point.values_at('run', 'frame', 'flow')
   end
 
+  def test_the_catalogue_loads_the_respawn_checkpoint_with_its_note
+    point = Koholint::Checkpoints.load.fetch('respawn-101-full-health')
+    assert_equal ['20261114-093702-a0dc', 84_853, 'flow-65'], point.values_at('run', 'frame', 'flow')
+    assert_includes point['note'], 'death'
+  end
+
   def test_bad_entries_are_refused
     bad = [POINT.except('source'), POINT.merge('extra' => 1), POINT.merge('name' => 'Sword Obtained'), POINT.merge('run' => '9ba1'),
            POINT.merge('frame' => -1), POINT.merge('frame' => '60404'), POINT.merge('flow' => '37'), POINT.merge('source' => ' '), 'sword']

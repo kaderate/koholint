@@ -26,13 +26,17 @@ module Koholint
       end
 
       def path(from:, to:, mode: @mode, doubt: true, forbid: true)
+        margin = @grid.respond_to?(:hole_margin) ? @grid.hole_margin : []
         zones = Array(@danger&.call)
         pushable = Array(@pushable&.call)
-        (zones.any? && search(from:, to:, mode:, doubt:, forbid:, zones:)) || search(from:, to:, mode:, doubt:, forbid:, zones: []) ||
-          (search(from:, to:, mode:, doubt:, forbid:, zones: [], push: pushable) if pushable.any?)
+        [([zones, margin] if zones.any?), [[], margin], ([[], []] if margin.any?)].compact.each do |danger, beside|
+          route = search(from:, to:, mode:, doubt:, forbid:, zones: danger, margin: beside)
+          return route if route
+        end
+        search(from:, to:, mode:, doubt:, forbid:, zones: [], push: pushable) if pushable.any?
       end
 
-      def search(from:, to:, mode:, doubt:, forbid:, zones:, push: [])
+      def search(from:, to:, mode:, doubt:, forbid:, zones:, margin: [], push: [])
         return nil unless inside?(from) && inside?(to)
         return [from] if from == to
 
@@ -47,7 +51,7 @@ module Koholint
 
           DELTAS.each_key do |direction|
             target = step(cell, direction)
-            next unless target && !zones.include?(target) && walkable?(cell, target, direction, allowed, doubt, forbid, push)
+            next unless target && !zones.include?(target) && (target == to || !margin.include?(target)) && walkable?(cell, target, direction, allowed, doubt, forbid, push)
 
             cost = [steps + 1, turns + (heading && heading != direction ? 1 : 0)]
             key = [target, direction]
