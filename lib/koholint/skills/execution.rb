@@ -93,6 +93,10 @@ module Koholint
         context[:entities] && -> { Entities.danger_cells(Array(context[:entities].call), margin:) }
       end
 
+      def contact_of(context) = low_health? && context[:entities] ? -> { Entities.danger_cells(Array(context[:entities].call)) } : nil
+
+      def closeness_of(context) = context[:entities] && ->(cell) { Entities.threat_distance(Array(context[:entities].call), cell) }
+
       def trigger_input
         return nil unless @stopped_by == :dialogue && !@start.dialog_open?
 

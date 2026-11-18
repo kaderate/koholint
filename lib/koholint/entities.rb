@@ -92,6 +92,11 @@ module Koholint
 
     def danger_cells(entities, margin: DANGER_MARGIN) = Navigation::Threat.zone(Navigation::Threat.of(entities), margin:)
 
+    def threat_distance(entities, cell)
+      x, y = Geometry.center_of(*cell)
+      Navigation::Threat.of(entities).map { |threat| Navigation::Threat.distance(threat, x, y) }.min || Float::INFINITY
+    end
+
     def creature?(entity) = NOT_PEOPLE.include?(entity[:kind].to_s)
 
     def near(entities, cell, within: 1)

@@ -168,13 +168,40 @@ class PlannerTest < Minitest::Test
     assert_empty route[0..-2] & margin
   end
 
-  def test_hard_danger_zones_are_never_crossed
-    boxed = [[1, 2], [2, 2], [3, 2]]
+  def guarded(danger, contact, walls: [], enemies: [])
+    closeness = ->(cell) { enemies.map { |enemy| [(enemy[0] - cell[0]).abs, (enemy[1] - cell[1]).abs].max }.min || 99 }
+    Planner.new(grid: FakeGrid.new(walls:), ledger: Koholint::Ledger.new, place: PLACE, danger: -> { danger }, contact: -> { contact }, closeness:)
+  end
+
+  def box(rows, cols) = rows.to_a.product(cols.to_a)
+
+  def test_contact_zones_are_never_crossed_but_the_ring_around_them_is_a_last_resort
     walls = [[0, 2], [4, 2], [5, 2], [6, 2], [7, 2]]
-    hard = Planner.new(grid: FakeGrid.new(walls:), ledger: Koholint::Ledger.new, place: PLACE, danger: -> { boxed }, hard_danger: true)
-    assert_nil hard.path(from: [2, 1], to: [2, 3])
-    open = Planner.new(grid: FakeGrid.new, ledger: Koholint::Ledger.new, place: PLACE, danger: -> { boxed }, hard_danger: true)
-    refute_includes open.path(from: [2, 1], to: [2, 3]), [2, 2]
+    assert_nil guarded([[1, 2], [2, 2], [3, 2]], [[1, 2], [2, 2], [3, 2]], walls:).path(from: [2, 1], to: [2, 3])
+    assert_equal [[2, 1], [2, 2], [2, 3]], guarded([[1, 2], [2, 2], [3, 2]], [[1, 2], [3, 2]], walls:).path(from: [2, 1], to: [2, 3])
+    refute_includes guarded([[1, 2], [2, 2], [3, 2]], [[1, 2], [2, 2], [3, 2]]).path(from: [2, 1], to: [2, 3]), [2, 2]
+  end
+
+  def test_link_inside_a_zone_walks_out_without_getting_closer
+    zone = box(2..6, 6..9)
+    path = guarded(zone, zone, enemies: [[4, 8]]).path(from: [4, 7], to: [4, 2])
+    assert_equal [[4, 7], [4, 6], [4, 5], [4, 4], [4, 3], [4, 2]], path
+    assert_nil guarded(zone, zone, enemies: [[4, 8]]).path(from: [4, 6], to: [4, 9])
+  end
+
+  def test_many_overlapping_enemies_leave_only_the_gap_between_their_contact_zones
+    enemies = [[0, 5], [4, 5], [7, 5]]
+    planner = guarded(box(0..7, 4..6), box(0..7, 4..6) - box(2..2, 4..6), enemies:)
+    path = planner.path(from: [2, 1], to: [2, 8])
+    assert_equal [2, 8], path.last
+    assert_empty path & (box(0..7, 4..6) - box(2..2, 4..6))
+    sealed = guarded(box(0..7, 4..6), box(0..7, 4..6), enemies:)
+    assert_nil sealed.path(from: [2, 1], to: [2, 8])
+    assert_match(/no route outside the enemy contact zones at one heart or less: .*\(2,5\)/, sealed.why_not(from: [2, 1], to: [2, 8]))
+  end
+
+  def test_a_goal_inside_a_zone_is_still_reached
+    assert_equal [[2, 0], [2, 1], [2, 2]], guarded([[2, 2]], [[2, 2]], enemies: [[2, 3]]).path(from: [2, 0], to: [2, 2])
   end
 
   def test_a_cell_held_by_a_sprite_is_a_last_resort_route_when_it_is_pushable

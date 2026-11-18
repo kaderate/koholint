@@ -18,8 +18,10 @@ The skills, protocols and harness behaviours the agent works with. Versioned wit
   an unknown one) (`direction` prefers that side), steps out, re-plans, and returns to the model only at an event:
   `new_place`, `known_place` (a return to a place already seen), `dialogue`, `untried_object` (once per thing never talked to within 3 cells), `blocked`, `stalled` (3
   attempts in a row walked no new cell), `no_frontier` (with the exits already tried), `locked`, `damage` or `budget` (600 frames).
-  flow-68: at one heart or less the autopilot hands every decision to the model, and walk (which then stops `danger` before
-  stepping into one), goto and explore treat every enemy contact zone, grown by a cell, as a wall. What it walked, the walls it found, the
+  flow-68: at one heart or less the autopilot hands every decision to the model; walk, goto and explore keep out of every
+  enemy contact zone grown by a cell (the extra ring only as a last resort, the contact zone never, a goal inside one still
+  reached), and from inside one Link may take any step that does not bring him closer to an enemy; walk stops `danger`
+  otherwise, and goto's `no_path` cause names the contact zones. What it walked, the walls it found, the
   exits it tried and the things it offered are kept per place and rebuilt from the trace on resume. flow-56: a dialogue the game opens by
   itself while Link stands flush against his cell's edge during a leg or step (a rock too heavy to push) bars that edge for the rest of
   the call (in `blocked_edges`), so the place's `pending` work leaves out what lies only behind it; elsewhere it bars nothing.
