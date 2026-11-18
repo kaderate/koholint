@@ -270,7 +270,10 @@ class ExploreTest < Minitest::Test
     log.absorb({ from: { room: 1, map: 0 }, exits: [{ row: 0, col: 5, direction: :up, outcome: :left, to: [2, 0] }, { row: 7, col: 5, direction: :down, outcome: :left, to: [3, 0] }] })
     log.absorb({ from: { room: 3, map: 0 }, survey: { sides: {}, doors: [] }, exits: [{ row: 7, col: 5, direction: :down, outcome: :left, to: [4, 0] }] })
     assert_equal [2, 0], log.route([1, 0])[:goal]
-    log.focus = [[4, 0]]
+    log.focus = [[4, 0], [9, 0]]
+    assert_equal [2, 0], log.route([1, 0])[:goal], 'a place never visited does not enter the focus'
+    log.absorb({ from: { room: 4, map: 0 }, exits: [] })
+    log.focus = [[4, 0], [9, 0]]
     assert_equal({ goal: [4, 0], next: [3, 0], via: :down }, log.route([1, 0]))
     log.focus = [[3, 0]]
     assert_equal [2, 0], log.route([1, 0])[:goal], 'a focus place with no untried work leaves the nearest untried place'

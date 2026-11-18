@@ -48,15 +48,29 @@ class LeadsTest < Minitest::Test
   def test_a_lead_names_the_region_of_places_given_a_name_its_quote_or_where_shares_a_word_with
     leads = Koholint::Leads.new
     leads.name_place([144, 0], 'Forêt Enchantée')
-    leads.name_place([225, 0], 'Urchin beach warning')
+    leads.name_place([225, 0], 'Plage des oursins')
     owl = "Vas-y avec la Clé cachée dans la Forêt."
     leads.absorb([lead('Clé cachée dans la Forêt', claim: 'a key is hidden in the forest'), lead('cachée dans la Forêt', 'low', claim: 'the forest again')], transcription: owl, place: [128, 0], source: nil)
     key, chatter = leads.all
     assert_equal [[[144, 0]], [[144, 0]]], [leads.region_for(key), leads.region_for(chatter)]
+    assert_equal [[225, 0]], leads.region_for({ quote: 'Attention aux oursins!' })
     assert_equal [[3, 0]], leads.region_for({ quote: 'x', where: '3-0' })
     assert_empty leads.region_for({ quote: owl, where: '128-0', contact: { row: 1, col: 1, object: 32 } })
     assert_empty leads.region_for({ quote: 'Bonjour, voyageur!' })
     assert_equal [[144, 0]], leads.focus, 'only open high and normal leads set the focus'
+  end
+
+  def test_region_names_match_without_accents_and_in_the_plural_but_not_on_generic_or_common_words
+    leads = Koholint::Leads.new
+    leads.name_place([144, 0], 'Foret Enchantee')
+    leads.name_place([96, 0], 'Forêts du nord')
+    assert_equal [[144, 0], [96, 0]], leads.region_for({ quote: 'Clé cachée dans la Forêt.' })
+    leads.name_place([163, 16], 'Maison de Marine')
+    leads.name_place([161, 14], 'Maison de Tarin')
+    assert_equal [[163, 16]], leads.region_for({ quote: 'Va voir Marine à la maison' }), 'maison names a kind of place'
+    leads.name_place([112, 0], 'Grande forêt')
+    leads.name_place([128, 0], 'Forêt du hibou')
+    assert_empty leads.region_for({ quote: 'Clé cachée dans la Forêt.' }), 'a word shared by more than 3 names points nowhere'
   end
 
   def test_contact_leads_are_capped_per_place

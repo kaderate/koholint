@@ -28,6 +28,7 @@ module Koholint
       @edges = Hash.new { |hash, key| hash[key] = {} }
       @surveys = {}
       @known = []
+      @been = []
       @arrivals = {}
       @pockets = {}
       @suspects = {}
@@ -42,7 +43,10 @@ module Koholint
       @stood = Hash.new { |hash, key| hash[key] = [] }
     end
 
-    attr_writer :focus
+    # Only places Link has stood in: a wrong place id in a lead must not pull him across the map; path reaches only reachable ones.
+    def focus=(places)
+      @focus = places & @been
+    end
 
     def screen(place, grid)
       @screens[place] = grid if place.is_a?(Array) && grid.is_a?(Array)
@@ -53,6 +57,7 @@ module Koholint
 
       place = Ledger.place_of(Ledger.pick(result, :from)) or return
       know(place)
+      @been |= [place]
       survey = Ledger.pick(result, :survey)
       keep(place, parse_survey(survey).merge(provisional: provisional?(result))) if survey.is_a?(Hash)
       @explored_since_clear << place if (@looks.any? { |_, record| record[:wins].positive? } || Ledger.pick(result, :clears)) && !@explored_since_clear.include?(place)
@@ -102,6 +107,7 @@ module Koholint
       from = Ledger.place_of(Ledger.pick(result, :from))
       to = Ledger.place_of(Ledger.pick(result, :to))
       @visits[to] += 1 if from && to && from != to
+      @been |= [from, to].compact
       note_crossing(result)
       note_looks(from, result) if from
       note_stood(from, result) if from

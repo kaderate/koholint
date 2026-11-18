@@ -11,7 +11,8 @@ The skills, protocols and harness behaviours the agent works with. Versioned wit
   untried border exit (a side never left from this place) or untried door (walking up into it), else toward the nearest
   place it has taken an exit to that still has untried exits or doors (flow-66: a door already walked through is never a frontier,
   even when it is no door object, and routes go through it like a door object; flow-68: an untried place in the region an open
-  high or normal lead names, by place id or by a place name sharing a word with its `where` or quote, comes before any other;
+  high or normal lead names, by place id or by a place name sharing a stem (accents folded, plurals met) with its `where` or quote,
+  among places Link has been to, comes before any other; generic place words and stems shared by more than 3 names point nowhere;
   flow-55: or, if surveyed before the capability existed, a tile
   the capability has cleared elsewhere, listed with its source in the route's `clearable`; inferred from the trace when a run is forked or resumed, not during a live run's first visit), else to the nearest frontier (a known cell next to
   an unknown one) (`direction` prefers that side), steps out, re-plans, and returns to the model only at an event:
