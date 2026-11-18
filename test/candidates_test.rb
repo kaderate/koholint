@@ -109,7 +109,7 @@ class CandidatesTest < Minitest::Test
     by_id = found.to_h { |candidate| [candidate[:id], candidate] }
     assert_equal({ kind: 'person', place: [3, 0], type: 70, cell: [1, 1] }, by_id['person-3-0-t70'][:target])
     assert_match(/in Beach \(3-0\), 1 move away/, by_id['person-3-0-t70'][:label])
-    assert_equal({ kind: 'reach_place', place: [3, 0] }, by_id['sign-3-0-2-2'][:predicate])
+    assert_equal({ kind: 'new_text' }, by_id['sign-3-0-2-2'][:predicate], 'reaching the place does not read the sign')
     assert_equal({ kind: 'lead', place: [3, 0], lead: 'lead-1' }, by_id['lead-1'][:target])
     assert_match(/no known route/, by_id['lead-2'][:label])
     refute by_id.key?('place-3-0')

@@ -236,6 +236,18 @@ class ObjectivesTest < Minitest::Test
     assert_nil @objectives.update(state(frame: 4), frame: 4)
   end
 
+  def test_a_sign_objective_ends_on_that_signs_text_only_even_when_the_text_is_known
+    @objectives.note_text('Attention au plancher')
+    @objectives.start(frame: 1, title: 'Go read the sign', predicate: { kind: 'new_text' }, target: { kind: 'sign', place: [101, 0], cell: [4, 8], remote: true })
+    assert @objectives.note_text('Un villageois parle')
+    assert_nil @objectives.update(state(frame: 2), frame: 2), 'another text met on the way'
+    @objectives.note_sign_read(place: [101, 0], cell: [4, 7])
+    assert_nil @objectives.update(state(frame: 3), frame: 3), 'another sign'
+    refute @objectives.note_text('Attention au plancher')
+    @objectives.note_sign_read(place: [101, 0], cell: [4, 8])
+    assert_equal :achieved, @objectives.update(state(frame: 4), frame: 4)
+  end
+
   def test_read_texts_are_rebuilt_from_dialogue_events_on_resume
     @trace.emit(:dialogue, frame: 5, place: [1, 2], text: 'Pour sauvegard', source: 'agent', page: 1)
     @trace.emit(:dialogue, frame: 5, place: [1, 2], text: 'sauvegarder, appuyez', source: 'agent', page: 2)

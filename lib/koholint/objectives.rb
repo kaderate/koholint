@@ -79,6 +79,7 @@ module Koholint
       @seen_alive = false
       @dialogue_seen = false
       @new_text = false
+      @sign_read = false
       @repeat = 0
       @last_key = nil
       @last_state_part = nil
@@ -97,6 +98,12 @@ module Koholint
       @texts << key
       @new_text = true if @current
       true
+    end
+
+    # A sign objective ends on that sign's text, read again or not, never on another text met on the way.
+    def note_sign_read(place:, cell:)
+      target = @current&.dig(:target) or return
+      @sign_read = true if target[:kind].to_s == 'sign' && target[:place] == place && target[:cell] == cell
     end
 
     def finished = @counter - (@current ? 1 : 0)
@@ -202,7 +209,7 @@ module Koholint
       when 'reach_cell' then place == target && cell == [predicate[:row], predicate[:col]]
       when 'dialogue_closed' then @dialogue_seen && !state.dialog_open?
       when 'new_place' then first_visit
-      when 'new_text' then @new_text
+      when 'new_text' then @current.dig(:target, :kind).to_s == 'sign' ? @sign_read : @new_text
       end
     end
 
