@@ -1,6 +1,6 @@
 # Agent skills
 
-The skills, protocols and harness behaviours the agent works with. Versioned with the play flow (currently `flow-69`): update this page, not the README, when a flow changes. Layers and data flow are in [ARCHITECTURE.md](../ARCHITECTURE.md).
+The skills, protocols and harness behaviours the agent works with. Versioned with the play flow (currently `flow-72`): update this page, not the README, when a flow changes. Layers and data flow are in [ARCHITECTURE.md](../ARCHITECTURE.md).
 
 
 - Learned capabilities (`data/capabilities.json`, `bin/koholint capability list`): an `operational` entry is a composite of the skills below, offered in the skill schema and listed under "Learned skills" only while its trigger item is held (flow-49) and its object is on screen (today `sword_on_object_92 row col direction`: stand next to object 92, face it, use the sword, step into its cell). `explore` and `goto` also run it themselves when blocked facing such a cell, and the planner routes through those cells as a last resort. `learn` and `capability publish|retire` are offline commands.
@@ -11,7 +11,7 @@ The skills, protocols and harness behaviours the agent works with. Versioned wit
   untried border exit (a side never left from this place) or untried door (walking up into it), else toward the nearest
   place it has taken an exit to that still has untried exits or doors (flow-67: the cells beside a learned hole, a look Link fell
   through more often than he walked onto it, are no frontier and are crossed by explore or goto only when no other route
-  exists, though a goal there is still reached; flow-66: a door already walked through is never a frontier,
+  exists, though a goal there is still reached; flow-72: a cell Link already walked into is never a frontier, even one explore treats as pushable (a cleared object's or a still enemy's cell), so explore no longer steps back and forth across it; flow-66: a door already walked through is never a frontier,
   even when it is no door object, and routes go through it like a door object;
   flow-55: or, if surveyed before the capability existed, a tile
   the capability has cleared elsewhere, listed with its source in the route's `clearable`; inferred from the trace when a run is forked or resumed, not during a live run's first visit), else to the nearest frontier (a known cell next to
