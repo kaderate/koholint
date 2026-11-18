@@ -444,7 +444,7 @@ module Koholint
           ahead = neighbour(cell, direction) or return nil
           return nil if @doors.include?(ahead) || (direction == :up && @doors.include?(cell))
           return nil if direction == :up && [cell, ahead].any? { |at| @log&.door_edge?(@place, at) }
-          return nil if [cell, ahead].any? { |at| @known.hole_margin.include?(at) }
+          return nil if @walked.include?(ahead) || [cell, ahead].any? { |at| @known.hole_margin.include?(at) }
 
           :frontier if !@walls.include?(ahead) && (@pushable.include?(ahead) || (!@known.static_sprite(*ahead) && UNKNOWN.include?(@known.passable(*ahead, direction))))
         end
