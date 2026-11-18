@@ -102,12 +102,12 @@ class DelegatedAutopilotTest < Minitest::Test
     result
   end
 
-  def test_at_one_heart_of_six_the_autopilot_keeps_going_and_no_shelter_is_offered
+  def test_at_half_a_heart_every_decision_goes_to_the_model_and_no_shelter_is_offered
     client = ScriptedClient.new(objective: new_place, default: explore)
     p = autopiloted(client)
     p.instance_variable_get(:@explore_log).absorb({ from: { room: 1, map: 0 }, exits: [{ row: 7, col: 5, direction: :up, outcome: :left, to: [166, 16] }] })
     results = (0..3).map { |i| lap(p, state(frame: 100 + (i * 300), room_id: 1, map_id: 0, hp: 4), :known_place, to: { room: 1, map: 0, row: 3, col: 4 }) }
-    assert(results.any? { |r| r[:autopilot] })
+    assert(results.none? { |r| r[:autopilot] })
     refute_includes client.calls.map { |c| c[:prompt] }.join, 'LOW HEALTH'
   end
 

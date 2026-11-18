@@ -66,7 +66,7 @@ module Koholint
           @fresh = @log && !@log.surveyed?(@place)
           grid = context[:grid]
           @known = grid && Known.new(grid, @walked)
-          @planner = @known && Navigation::Planner.new(grid: @known, ledger: @ledger, place: @place, triggers: context[:triggers], mode: :free_only, danger: danger_of(context), pushable: pushable_of(context))
+          @planner = @known && Navigation::Planner.new(grid: @known, ledger: @ledger, place: @place, triggers: context[:triggers], mode: :free_only, danger: danger_of(context), pushable: pushable_of(context), contact: contact_of(context), closeness: closeness_of(context))
           @pushable = Array(pushable_of(context)&.call)
           @clearing = Clearing.of(context)
           @objects = grid ? TalkLog.objects(grid) : []

@@ -1,3 +1,5 @@
+require 'koholint/perception'
+
 module Koholint
   class Autopilot
     CHAIN_LIMIT = 6
@@ -115,6 +117,7 @@ module Koholint
       return 'explore loop' if @returns.values.max.to_i >= RETURNS
       return "phase #{state.phase}" unless state.phase == :playing
       return 'hp dropped' if state.health < @hp
+      return 'low health' if state.health <= Perception::HP_PER_HEART
 
       nil
     end

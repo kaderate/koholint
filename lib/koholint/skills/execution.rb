@@ -1,6 +1,7 @@
 require 'koholint/entities'
 require 'koholint/geometry'
 require 'koholint/items'
+require 'koholint/perception'
 require 'koholint/skills/clearing'
 
 module Koholint
@@ -84,7 +85,17 @@ module Koholint
         -> { Array(urchins&.call) | clearing.cells.keys }
       end
 
-      def danger_of(context) = context[:entities] && -> { Entities.danger_cells(Array(context[:entities].call)) }
+      # At one heart or less, every enemy contact zone grows by a cell and is never crossed.
+      def low_health? = @start.health.to_i <= Perception::HP_PER_HEART
+
+      def danger_of(context)
+        margin = Entities::DANGER_MARGIN + (low_health? ? Geometry::CELL : 0)
+        context[:entities] && -> { Entities.danger_cells(Array(context[:entities].call), margin:) }
+      end
+
+      def contact_of(context) = low_health? && context[:entities] ? -> { Entities.danger_cells(Array(context[:entities].call)) } : nil
+
+      def closeness_of(context) = context[:entities] && ->(cell) { Entities.threat_distance(Array(context[:entities].call), cell) }
 
       def trigger_input
         return nil unless @stopped_by == :dialogue && !@start.dialog_open?

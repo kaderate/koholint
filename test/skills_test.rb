@@ -113,6 +113,29 @@ class SkillsTest < Minitest::Test
     assert_equal 9, result[:frames] - 3
   end
 
+  def test_at_one_heart_walk_stops_before_a_cell_one_beyond_an_enemy_contact_zone
+    enemy = [{ kind: 'enemy', type: 9, slot: 1, x: 136, y: 80, contact: 8, cell: [4, 8] }]
+    context = { entities: -> { enemy } }
+    low = registry.start('walk', state(hp: 8), { direction: :right, cells: 2 }, context)
+    assert_empty drive(low, [state(hp: 8)])
+    assert_equal :danger, low.result[:stopped_by]
+    full = registry.start('walk', state, { direction: :right, cells: 2 }, context)
+    assert_equal [[:right]], drive(full, [state])
+    away = registry.start('walk', state(hp: 8), { direction: :left, cells: 1 }, context)
+    assert_equal [[:left]], drive(away, [state(hp: 8)])
+  end
+
+  def test_at_one_heart_walk_leaves_a_zone_it_stands_in_but_never_steps_closer
+    enemy = [{ kind: 'enemy', type: 9, slot: 1, x: 136, y: 80, contact: 8, cell: [4, 8] }]
+    context = { entities: -> { enemy } }
+    inside = state(x: 120, hp: 8)
+    away = registry.start('walk', inside, { direction: :left, cells: 2 }, context)
+    assert_equal [[:left]], drive(away, [inside])
+    closer = registry.start('walk', inside, { direction: :right, cells: 1 }, context)
+    assert_empty drive(closer, [inside])
+    assert_equal :danger, closer.result[:stopped_by]
+  end
+
   def test_walk_blocked_after_eight_still_frames
     execution = registry.start('walk', state, { direction: :right, cells: 2 })
     inputs = drive(execution, Array.new(40) { state })

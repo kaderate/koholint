@@ -74,11 +74,14 @@ class AutopilotTest < Minitest::Test
     %w[new_place leave_place new_text].each { |kind| assert_nil primed.hold_reason(state: state, objective: objective(kind)), kind }
   end
 
-  def test_low_health_and_a_creature_near_no_longer_hold_the_autopilot
-    low = primed(stop: :known_place)
-    low.model_called(state: state(hp: 4), objective: objective)
-    low.acted(skill: 'explore', outcome: { stopped_by: :known_place })
-    assert_nil low.hold_reason(state: state(hp: 4), objective: objective)
+  def test_one_heart_or_less_holds_the_autopilot_and_a_creature_near_does_not
+    [[8, 'low health'], [4, 'low health'], [9, nil]].each do |hp, reason|
+      low = primed(stop: :known_place)
+      low.model_called(state: state(hp:), objective: objective)
+      low.acted(skill: 'explore', outcome: { stopped_by: :known_place })
+      hold = low.hold_reason(state: state(hp:), objective: objective)
+      reason ? assert_equal(reason, hold, "hp #{hp}") : assert_nil(hold, "hp #{hp}")
+    end
     assert_nil primed.hold_reason(state: state, objective: objective, danger: true)
   end
 
