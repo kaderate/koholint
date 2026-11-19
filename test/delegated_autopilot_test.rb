@@ -225,6 +225,23 @@ class DelegatedAutopilotTest < Minitest::Test
     assert_includes held.calls.last[:prompt], 'puzzle-81-0', 'a new item is a new context'
   end
 
+  def test_a_place_with_an_open_puzzle_quotes_every_text_read_there_in_full
+    client = ScriptedClient.new(objective: new_place, default: explore)
+    log = Koholint::ExploreLog.from_events(puzzle_crossings)
+    p = puzzled_policy(client, log)
+    p.instance_variable_get(:@leads).note_read("J'suis un raton-laveur espiègle.\n\nEt j'aime pas du tout c'qu'est poudreux...", place: [81, 0])
+    here = state(room_id: 81, map_id: 0)
+    p.decide(p.decision_point_for(here), here, { grid: OpenGrid.new })
+    assert_includes client.calls.last[:prompt], "TEXT READ HERE (quoted in full while a puzzle here is open): « J'suis un raton-laveur espiègle. Et j'aime pas du tout c'qu'est poudreux... »"
+    assert_includes client.calls.last[:prompt], '« Hé hé! Tu vas te perdre dans la Forêt. »'
+    away = state(room_id: 97, map_id: 0, frame: 300)
+    p.observe(away, frame: away.frame)
+    p.decide(p.decision_point_for(away), away, { grid: OpenGrid.new })
+    refute_includes client.calls.last[:prompt], 'TEXT READ HERE', 'a place without a puzzle quotes nothing'
+    log.use_bench({ edges: {}, status: {}, benches: { [81, 0] => { 'status' => 'depends_on_context', 'ways' => {}, 'new_places' => [] } } })
+    assert_empty p.send(:puzzle_texts, [81, 0]), 'nor one a conclusive bench measured'
+  end
+
   def test_the_exit_bench_applies_only_in_the_context_it_measured
     sword = { 'milestone' => 'none', 'held' => [] }
     exits = { 'edges' => [], 'benches' => [{ 'place' => [81, 0], 'context' => sword, 'ways' => { 'up' => [99, 0] }, 'new_places' => [], 'status' => 'depends_on_context' }] }

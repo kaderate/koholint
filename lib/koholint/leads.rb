@@ -1,4 +1,5 @@
 require 'json'
+require 'koholint/dialogues'
 require 'koholint/lead_check'
 require 'koholint/ledger'
 require 'koholint/objectives'
@@ -25,10 +26,17 @@ module Koholint
       leads = new
       done = 0
       started = {}
+      pages = []
+      read = lambda do
+        leads.note_read(Dialogues.text(pages.map { |page| Ledger.pick(page, :text) }), place: Ledger.pick(pages.first, :place)) unless pages.empty?
+        pages.clear
+      end
       events.each do |event|
+        same = Ledger.pick(event, :type).to_s == 'dialogue' && pages.any? && %i[frame place].all? { |key| Ledger.pick(event, key) == Ledger.pick(pages.first, key) }
+        read.() unless same
         case Ledger.pick(event, :type).to_s
         when 'lead' then leads.restore(event)
-        when 'dialogue' then leads.note_read(Ledger.pick(event, :text), place: Ledger.pick(event, :place))
+        when 'dialogue' then pages << event
         when 'perception' then leads.note_held(Items.held_ids(Ledger.pick(event, :state) || {}))
         when 'place_name' then leads.name_place(Ledger.pick(event, :place), Ledger.pick(event, :name))
         when 'goal' then leads.change_goal(Ledger.pick(event, :text), frame: Ledger.pick(event, :frame), objectives: done)
@@ -41,6 +49,7 @@ module Koholint
           leads.note_objective(started.fetch(id, {}).merge(event))
         end
       end
+      read.()
       leads
     end
 
@@ -88,6 +97,12 @@ module Koholint
       named = @names.select { |_, name| words.(name).intersect?(shared) }.keys
       read = @read_at.select { |_, texts| texts.any? { |text| words.(text).intersect?(shared) } }.keys
       (named + read).uniq
+    end
+
+    # Every text read in a place, each once: a text another one contains (a reread cut short) is dropped.
+    def texts_at(place)
+      texts = @read_at.fetch(place, []).uniq { |text| Dialogues.key(text) }
+      texts.reject { |text| texts.any? { |other| other != text && Dialogues.key(other).include?(Dialogues.key(text)) } }
     end
 
     def note_held(ids) = @held.merge(ids)

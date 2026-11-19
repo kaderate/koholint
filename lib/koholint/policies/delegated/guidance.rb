@@ -61,6 +61,14 @@ module Koholint
                      'try the cells marked doubtful, step onto stairs or narrow gaps from the cell centre, and read the grid against the screen image.'
           end
           lines.concat(fresh_puzzles(place).map { |puzzle| puzzle_line(puzzle) })
+          lines.concat(puzzle_texts(place))
+        end
+
+        # While a puzzle here is open, what was read here is quoted whole: a lead keeps one sentence, and a low one is never shown again.
+        def puzzle_texts(place)
+          return [] if @explore_log.puzzles(place).empty? || @explore_log.bench_concluded?(place)
+
+          @leads.texts_at(place).map { |text| "TEXT READ HERE (quoted in full while a puzzle here is open): « #{text.gsub(/\s+/, ' ').strip} »" }
         end
 
         # Each puzzle is stated once per visit of its place, not in every prompt.
