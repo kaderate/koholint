@@ -15,12 +15,16 @@ High-level architecture: `ARCHITECTURE.md` (update it in the same commit as any 
 - The ROM and the game manual are never committed (`$KOHOLINT_ROM`, `manual/`).
 - CI runs the whole suite with the ROM on every pull request (`rom` shards) and the ROM-free set (`rake test:ci`); locally, `rake test:fast` and targeted files, no full `rake test` before a merge.
 - Only the engine writes a run's `trace.jsonl` and `save/`. A run resumes only with the same
-  `flow_version`, ROM hash and capabilities digest (the operational entries of `data/capabilities.json`). A change to the
-  play flow in code means a new `flow_version`; publishing or retiring a capability changes the digest, never `flow_version`.
+  `flow_version`, ROM hash, capabilities digest (the operational entries of `data/capabilities.json`) and exits digest (the
+  measured edges and benches of `data/exits.json`). A change to the play flow in code means a new `flow_version`; publishing or
+  retiring a capability, or running the exit bench, changes a digest, never `flow_version`.
 - A rule a script can check is a validator, not a paragraph.
 - Game facts live in typed data with provenance (`data/addresses.json`, a run's `world.json`),
   never in prose. `verified` needs `verified_count >= 2` from independent checks. `data/capabilities.json` follows the same
-  rule: every entry carries its trigger, trials and history, and `validated` needs successes in 2 independent places.
+  rule: every entry carries its trigger, trials and history, and `validated` needs successes in 2 independent places; so does
+  `data/exits.json`, whose edges carry their context and trials, and `verified` needs agreeing trials from 2 root lineages
+  (distinct from-boot ancestors); trials from one lineage stay `observed`. Measured edges, observed or verified, fill only ways a
+  run never crossed, are labelled with their status in the prompt, and join the exits digest.
 - How to play is public knowledge and may be used freely, in code, data and prompts: controls, menus, map, save and game-over screens, dialogue, interactions with people, signs and objects, item use, general mechanics. Where to go and what to do next (routes, solutions, item locations, the order of the game) is a walkthrough and stays out: it is observed or read from in-game texts. Anything measurable is measured; a value taken from general knowledge enters data files as a hypothesis with its source and is verified by a probe.
 - What remains to do lives in `ROADMAP.md` (only what is left; delete items as they land, git is the history).
 - Runs are committed only as the light bundle written by `bin/koholint archive`; prompts, keyframes and saves stay local.

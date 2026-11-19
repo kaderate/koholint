@@ -64,9 +64,9 @@ module Koholint
 
           text = Dialogues.text(pages)
           @objectives.note_text(text)
-          @leads.note_read(text)
           source = @images || @reading ? @read_at[:source] : @talk_source
           place = @images || @reading ? @read_at[:place] : [state.room_id, state.map_id]
+          @leads.note_read(text, place:)
           conversation = @read_at[:conversation] if @images || @reading
           first = [transcription].flatten(1).compact.first
           @talk_log.store_pages(conversation, pages) if conversation && @images

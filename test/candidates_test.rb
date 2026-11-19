@@ -53,6 +53,30 @@ class CandidatesTest < Minitest::Test
     Koholint::Candidates.build(place: HERE, grid: OpenGrid.new, explore_log: log, talk_log: Koholint::TalkLog.new, leads: Koholint::Leads.new, **over)
   end
 
+  # 81/0 in the 21b0 lineage: its top led to 99/0, the raccoon there spoke of the forest, and the owl's key is hidden in the forest.
+  def test_a_puzzle_place_an_open_lead_points_to_comes_first_until_offered_or_benched_conclusively
+    puzzled = Koholint::ExploreLog.new
+    puzzled.absorb({ from: { room: 97, map: 0 }, exits: [{ row: 0, col: 6, direction: :up, outcome: :left, to: [81, 0] }] })
+    puzzled.absorb({ from: { room: 81, map: 0 }, exits: [{ row: 0, col: 3, direction: :up, outcome: :left, to: [99, 0] }] })
+    leads = Koholint::Leads.new
+    leads.name_place([144, 0], 'Forêt Enchantée')
+    leads.restore({ 'id' => 'lead-20', 'place' => [128, 0], 'quote' => 'Vas-y avec la Clé cachée dans la Forêt.', 'claim' => 'a key', 'importance' => 'high' })
+    first = -> { Koholint::Candidates.build(place: [97, 0], grid: OpenGrid.new, explore_log: puzzled, talk_log: Koholint::TalkLog.new, leads:).first }
+    refute_equal 'puzzle-81-0', first.()[:id], 'no text ties 81/0 to the lead yet'
+    leads.note_read('Hé hé! Tu vas te perdre dans la Forêt.', place: [81, 0])
+    assert_equal [[144, 0], [81, 0]], leads.region(leads.all.first)
+    puzzle = first.()
+    assert_equal ['puzzle-81-0', { kind: 'new_place' }, { kind: 'place', place: [81, 0] }], puzzle.values_at(:id, :predicate, :target)
+    assert_match(/lead-20 « Vas-y avec la Clé cachée dans la Forêt. » points there/, puzzle[:label])
+    puzzled.use_bench({ edges: {}, status: {}, benches: { [81, 0] => { 'status' => 'incomplete' } } })
+    assert_equal 'puzzle-81-0', first.()[:id], 'a bench with a way never reached concludes nothing'
+    puzzled.use_bench({ edges: {}, status: {}, benches: { [81, 0] => { 'status' => 'depends_on_context' } } })
+    refute_equal 'puzzle-81-0', first.()[:id], 'a conclusive bench in this context ends it'
+    puzzled.use_bench({ edges: {}, status: {}, benches: {} })
+    puzzled.offer_puzzle([81, 0])
+    refute_equal 'puzzle-81-0', first.()[:id], 'and so does one offer in this run and context'
+  end
+
   def test_exits_skip_sides_already_left_and_doors_people_and_signs_of_this_place_are_listed
     entities = [{ type: 62, kind: 'npc', cell: [2, 3] }, { type: 62, kind: 'npc', cell: [2, 6] }, { type: 9, kind: 'enemy', cell: [4, 4] },
                 { type: 110, kind: 'creature', cell: [1, 1] }, { type: 47, kind: 'unknown', cell: [6, 6] }]

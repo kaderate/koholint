@@ -183,6 +183,63 @@ class DelegatedAutopilotTest < Minitest::Test
     refute_includes client.calls.last[:prompt], 'PUZZLE', 'stated once per visit'
   end
 
+  def puzzled_policy(client, explore_log)
+    leads = Koholint::Leads.new
+    leads.name_place([144, 0], 'Forêt Enchantée')
+    leads.restore({ 'id' => 'lead-20', 'place' => [128, 0], 'quote' => 'Vas-y avec la Clé cachée dans la Forêt.', 'claim' => 'a key', 'importance' => 'high' })
+    leads.note_read('Hé hé! Tu vas te perdre dans la Forêt.', place: [81, 0])
+    @objectives = Koholint::Objectives.new(trace: trace)
+    Koholint::Policies::Delegated.new(client:, registry: Koholint::Skills::Registry.default, objectives: @objectives, manual: '', explore_log:, leads:)
+  end
+
+  def puzzle_crossings
+    [{ 'type' => 'action', 'frame' => 10, 'skill' => 'explore', 'result' => { 'from' => { 'room' => 97, 'map' => 0 }, 'exits' => [{ 'row' => 0, 'col' => 6, 'direction' => 'up', 'outcome' => 'left', 'to' => [81, 0] }] } },
+     { 'type' => 'action', 'frame' => 20, 'skill' => 'explore', 'result' => { 'from' => { 'room' => 81, 'map' => 0 }, 'exits' => [{ 'row' => 0, 'col' => 3, 'direction' => 'up', 'outcome' => 'left', 'to' => [99, 0] }] } },
+     { 'type' => 'action', 'frame' => 30, 'skill' => 'explore', 'result' => { 'from' => { 'room' => 98, 'map' => 0 }, 'exits' => [{ 'row' => 3, 'col' => 0, 'direction' => 'left', 'outcome' => 'left', 'to' => [97, 0] }] } }]
+  end
+
+  def test_the_puzzle_objective_is_offered_once_per_run_and_context_even_on_resume
+    leave = ->(room) { ok('title' => 'leave', 'predicate' => { 'kind' => 'leave_place', 'place' => [room, 0] }) }
+    client = ScriptedClient.new(objective: [leave.(97), leave.(98)], default: explore)
+    log = Koholint::ExploreLog.from_events(puzzle_crossings)
+    p = puzzled_policy(client, log)
+    here = state(room_id: 97, map_id: 0)
+    first = p.decide(p.decision_point_for(here), here, { grid: OpenGrid.new })
+    assert_includes client.calls.last[:prompt], 'puzzle-81-0'
+    assert_equal [[81, 0]], first[:puzzles_offered]
+    there = state(room_id: 98, map_id: 0, frame: 200)
+    p.observe(there, frame: there.frame)
+    second = p.decide(p.decision_point_for(there), there, { grid: OpenGrid.new })
+    assert_includes client.calls.last[:system], 'choose the next objective', 'a second objective decision with no bench change'
+    refute_includes client.calls.last[:prompt], 'puzzle-81-0'
+    assert_nil second[:puzzles_offered]
+    decision = { 'type' => 'decision', 'frame' => 40, 'input' => JSON.parse(JSON.generate(here.to_h)), 'puzzles_offered' => [[81, 0]] }
+    resumed = ScriptedClient.new(objective: leave.(97), default: explore)
+    p = puzzled_policy(resumed, Koholint::ExploreLog.from_events(puzzle_crossings + [decision]))
+    p.decide(p.decision_point_for(here), here, { grid: OpenGrid.new })
+    refute_includes resumed.calls.last[:prompt], 'puzzle-81-0', 'the offer survives a resume'
+    held = ScriptedClient.new(objective: leave.(97), default: explore)
+    p = puzzled_policy(held, Koholint::ExploreLog.from_events(puzzle_crossings + [decision]))
+    sword = state(room_id: 97, map_id: 0, item_a: 1)
+    p.decide(p.decision_point_for(sword), sword, { grid: OpenGrid.new })
+    assert_includes held.calls.last[:prompt], 'puzzle-81-0', 'a new item is a new context'
+  end
+
+  def test_the_exit_bench_applies_only_in_the_context_it_measured
+    sword = { 'milestone' => 'none', 'held' => [] }
+    exits = { 'edges' => [], 'benches' => [{ 'place' => [81, 0], 'context' => sword, 'ways' => { 'up' => [99, 0] }, 'new_places' => [], 'status' => 'depends_on_context' }] }
+    log = Koholint::ExploreLog.new
+    @objectives = Koholint::Objectives.new(trace: trace)
+    p = Koholint::Policies::Delegated.new(client: ScriptedClient.new(objective: new_place, default: explore), registry: Koholint::Skills::Registry.default, objectives: @objectives,
+                                          manual: '', explore_log: log, exits:)
+    now = state(room_id: 81, map_id: 0)
+    p.decide(p.decision_point_for(now), now, { grid: })
+    assert_equal 'depends_on_context', log.bench_of([81, 0])['status']
+    held = state(room_id: 81, map_id: 0, item_a: 1)
+    p.decide(p.decision_point_for(held), held, { grid: })
+    assert_nil log.bench_of([81, 0]), 'an item gained since the bench is another context'
+  end
+
   def test_a_detected_loop_drops_the_objective_and_explores_toward_the_nearest_untried_place_once
     log = Koholint::ExploreLog.new
     log.absorb({ from: { room: 163, map: 16 }, exits: [{ row: 3, col: 0, direction: :left, outcome: :left, to: [164, 16] }, { row: 0, col: 5, direction: :up, outcome: :left, to: [165, 16] }],

@@ -1,3 +1,4 @@
+require 'koholint/exits'
 require 'koholint/geometry'
 require 'koholint/ledger'
 require 'koholint/navigation/planner'
@@ -11,6 +12,7 @@ module Koholint
       log = new
       events.each do |event|
         log.screen(event['place'], event['grid']) if event['type'] == 'screen'
+        Array(event['puzzles_offered']).each { |place| log.restore_offer(place, Exits.context(event['input'] || {})) } if event['type'] == 'decision'
         next unless Ledger.pick(event, :type).to_s == 'action'
 
         result = Ledger.pick(event, :result)
@@ -47,7 +49,33 @@ module Koholint
       @puzzles = {}
       @pending = []
       @frame = nil
+      @bench = { edges: {}, status: {}, benches: {} }
+      @context = nil
+      @puzzle_offers = Set.new
     end
+
+    # The exit bench's measured edges and benches for the current context (Exits.for_context); they fill ways this run never crossed.
+    def use_bench(found)
+      @bench = found
+    end
+
+    def bench_of(place) = @bench[:benches][place]
+
+    def bench_status(place, key) = @bench[:status]&.dig([place, key])
+
+    # A bench with a way never reached concludes nothing.
+    def bench_concluded?(place) = %w[leads_on depends_on_context].include?(bench_of(place)&.dig('status'))
+
+    # The milestone and items held now (Exits.context): a puzzle objective is offered once per place and context in a run.
+    def in_context(context)
+      @context = context
+    end
+
+    def offer_puzzle(place) = @puzzle_offers << [place, @context]
+
+    def puzzle_offered?(place) = @puzzle_offers.include?([place, @context])
+
+    def restore_offer(place, context) = @puzzle_offers << [place, context]
 
     def screen(place, grid)
       @screens[place] = grid if place.is_a?(Array) && grid.is_a?(Array)
@@ -260,12 +288,12 @@ module Koholint
 
     def surveyed?(place) = @surveys.key?(place) && !@surveys[place][:provisional]
 
-    def side_left?(place, direction) = @edges.fetch(place, {}).key?(direction.to_sym)
+    def side_left?(place, direction) = ways(place).key?(direction.to_sym)
 
     def door_tried?(place, cell) = tried?(place, [cell[0] + 1, cell[1]], :up)
 
     # A door Link has walked through, recognised or not as a door object (98/0's way into 189/10 is not one).
-    def door_edge?(place, cell) = @edges.fetch(place, {}).key?(cell)
+    def door_edge?(place, cell) = ways(place).key?(cell)
 
     def untried?(place)
       surveyed_untried?(place) || inferred_clearable(place).any?
@@ -311,7 +339,7 @@ module Koholint
         place = queue.shift
         return hops_to(seen, place) if place != from && (goal ? place == goal : untried?(place) && !skip.include?(place))
 
-        @edges.fetch(place, {}).each do |key, to|
+        ways(place).each do |key, to|
           next if seen.key?(to) || pocket?(to, key) || (place == from && avoid.include?(key)) || beyond?(tier, place, key)
 
           seen[to] = [place, key]
@@ -322,6 +350,12 @@ module Koholint
     end
 
     def beyond?(tier, place, key) = tier == :consistent && contradicted?(place, key)
+
+    # A bench edge replaces an assumed way back, never a way the run crossed.
+    def ways(place)
+      benched = @bench[:edges].filter_map { |(where, key), to| [key, to] if where == place && !@observed.key?([place, key]) }.to_h
+      @edges.fetch(place, {}).merge(benched) { |key, own, bench| @observed.key?([place, key]) ? own : bench }
+    end
 
     # The cell an exit lands on in the next place; a call that finds nothing to do there while some place still has work, or
     # whose route has no reachable exit on two visits (an enemy may block it once), shows the landing is a closed pocket: routes must not
@@ -382,7 +416,7 @@ module Koholint
       queue = [from]
       until queue.empty?
         place = queue.shift
-        @edges.fetch(place, {}).each do |key, to|
+        ways(place).each do |key, to|
           next if found.key?(to) || pocket?(to, key)
 
           found[to] = found[place] + 1

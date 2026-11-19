@@ -84,7 +84,20 @@ module Koholint
                  when 'refuted' then "the way back from #{puzzle[:place].join('-')} by #{way} was assumed to lead to #{expected}; it #{led}#{seen}."
                  else "leaving #{puzzle[:place].join('-')} by #{way} led to #{expected} before, and #{led}#{seen}."
                  end
-          "PUZZLE (observed, not explained): #{fact}"
+          bench = @explore_log.bench_of(puzzle[:place])
+          return "PUZZLE (observed, not explained): #{fact}" unless bench
+
+          reached = bench['ways'].select { |_, to| to.is_a?(Array) }.map do |way, to|
+            status = @explore_log.bench_status(puzzle[:place], Exits.way_key(way.match?(/\A\d+-\d+\z/) ? way.split('-').map(&:to_i) : way))
+            "#{way} to #{to.join('-')}#{status == 'observed' ? ' (one lineage)' : ''}"
+          end
+          unreached = bench['ways'].reject { |_, to| to.is_a?(Array) }.keys
+          outcome = case bench['status']
+                    when 'leads_on' then "leads on to #{bench['new_places'].map { |to| to.join('-') }.join(', ')}"
+                    when 'incomplete' then "ways not reached: #{unreached.join(', ')}, so it concludes nothing yet"
+                    else 'every way was reached and none leads to a place not seen yet, so the outcome depends on something else'
+                    end
+          "PUZZLE (observed, measured by the exit bench with Link's current items): #{fact} Bench: #{reached.join(', ')}; #{outcome}."
         end
 
         def autopilot_choice(decision_point, state, context)

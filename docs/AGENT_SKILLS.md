@@ -1,6 +1,6 @@
 # Agent skills
 
-The skills, protocols and harness behaviours the agent works with. Versioned with the play flow (currently `flow-74`): update this page, not the README, when a flow changes. Layers and data flow are in [ARCHITECTURE.md](../ARCHITECTURE.md).
+The skills, protocols and harness behaviours the agent works with. Versioned with the play flow (currently `flow-75`): update this page, not the README, when a flow changes. Layers and data flow are in [ARCHITECTURE.md](../ARCHITECTURE.md).
 
 
 - Learned capabilities (`data/capabilities.json`, `bin/koholint capability list`): an `operational` entry is a composite of the skills below, offered in the skill schema and listed under "Learned skills" only while its trigger item is held (flow-49) and its object is on screen (today `sword_on_object_92 row col direction`: stand next to object 92, face it, use the sword, step into its cell). `explore` and `goto` also run it themselves when blocked facing such a cell, and the planner routes through those cells as a last resort. `learn` and `capability publish|retire` are offline commands.
@@ -102,7 +102,12 @@ The skills, protocols and harness behaviours the agent works with. Versioned wit
   the way back it assumed, else the screen next to it on the overworld map (16 rooms wide, measured). A crossing that lands elsewhere is a
   `puzzle` event (`unexpected_arrival`, `refuted`) and assumes no way back; a second destination through the same way is a `contradiction`,
   routed through (to its most observed destination) only when nothing else reaches the goal; a way back assumed from another map predicts nothing.
-  The header shows the last two puzzles of the place once per visit as `PUZZLE (observed, not explained): ...` lines, and `summary.json` counts them per place and kind. Nothing resolves a puzzle yet.
+  The header shows the last two puzzles of the place once per visit as `PUZZLE (observed, not explained): ...` lines, and `summary.json` counts them per place and kind.
+- flow-75: the offline exit bench (`koholint bench exits`) measures each way of a puzzle place from its keyframes; in the same milestone and
+  held items, its edges fill the ways the run never crossed (`one lineage` marks an edge measured in a single run lineage), and the PUZZLE line
+  says what it reached, which ways it did not reach, and whether every way reached and none led somewhere new (then the outcome depends on the
+  context, with the leads read there). A `puzzle-R-M` candidate ("investigate ...") is offered first, at most once per run and context, while a
+  puzzle place has an open lead about it and no conclusive bench in the current context.
 - The context header lists the items on A and B and in the inventory slots (`data/items.json` names; a `?` marks a name
   not measured yet). `use_item item [button] [frames]` uses a held item (assigning it through the START menu to `button`,
   default B, when it is on no button); `guard frames [direction]` raises the shield (Link walks at full speed and turns
