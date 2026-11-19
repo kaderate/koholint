@@ -74,9 +74,9 @@ module Koholint
         when :approach then approach
         when :cross then { skill: 'walk', params: { direction: @direction.to_s, cells: CROSS_CELLS } }
         when :landed
-          return stop(:discarded) unless scrolled?(state.cell)
-
           @arrival = { to: place, landing: state.cell }
+          return finish_off_border unless scrolled?(state.cell)
+
           @phase = :back
           { skill: 'walk', params: { direction: OPPOSITE.fetch(@direction).to_s, cells: CROSS_CELLS } }
         else finish(place, state)
@@ -97,7 +97,14 @@ module Koholint
         stop(:left)
       end
 
-      # A side crossing scrolls Link onto the opposite border; landing anywhere else is a fall, a warp or a respawn.
+      # Landing off the opposite border (a fall, a warp) is still an arrival, but walking back from there says nothing of the reverse way.
+      def finish_off_border
+        @arrival[:off_border] = true
+        @outcome = :left
+        stop(:left)
+      end
+
+      # A side crossing scrolls Link onto the opposite border.
       def scrolled?(cell)
         return true if @door
         return false unless cell
@@ -166,7 +173,7 @@ module Koholint
 
       neighbour = Geometry.neighbour(place, way) unless way.is_a?(Array)
       refutes = { 'to' => neighbour, 'source' => 'neighbour' } if neighbour && neighbour != arrival[:to]
-      Exits.record(data, place:, way: key, context:, trial: source.merge('to' => arrival[:to], 'landing' => arrival[:landing]), refutes:)
+      Exits.record(data, place:, way: key, context:, trial: source.merge('to' => arrival[:to], 'landing' => arrival[:landing], 'off_border' => (true if arrival[:off_border])).compact, refutes:)
       back = trial[:back] or return
 
       reverse = way.is_a?(Array) ? 'down' : OPPOSITE.fetch(way).to_s

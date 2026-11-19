@@ -44,7 +44,7 @@ class BenchTest < Minitest::Test
     assert_equal [:left, [99, 0], nil], [t.outcome, t.arrival[:to], t.back]
   end
 
-  def test_damage_a_death_or_a_landing_off_the_opposite_border_discards_the_trial
+  def test_damage_discards_the_trial_and_a_landing_off_the_opposite_border_is_an_arrival_without_a_way_back
     hurt = trial
     step(hurt, at(81, 3, 4)) { at(81, 0, 4) }
     step(hurt, at(81, 0, 4, hp: 20))
@@ -52,8 +52,11 @@ class BenchTest < Minitest::Test
     fell = trial
     step(fell, at(81, 3, 4)) { at(81, 0, 4) }
     step(fell, at(81, 0, 4)) { at(99, 3, 3) }
-    step(fell, at(99, 3, 3))
-    assert_equal [:discarded, nil], [fell.outcome, fell.arrival]
+    assert_equal({ skill: 'wait', params: { frames: 1 } }, step(fell, at(99, 3, 3)), 'no walk back')
+    assert_equal [:left, { to: [99, 0], landing: [3, 3], off_border: true }, nil], [fell.outcome, fell.arrival, fell.back]
+    data = { 'edges' => [], 'benches' => [] }
+    Koholint::Bench.record(data, [81, 0], :up, CONTEXT, { frame: 1, visit: 1, lineage: 'boot' }, { outcome: :left, arrival: fell.arrival, back: nil, run: 'f' }, RUN)
+    assert_equal [1, true], [data['edges'].size, data['edges'].first['trials'].first['off_border']]
     door = trial(door: true)
     step(door, at(81, 3, 4)) { at(81, 4, 3) }
     step(door, at(81, 4, 3)) { at(99, 3, 3) }
@@ -88,10 +91,12 @@ class BenchTest < Minitest::Test
     assert_equal ['boot', 'up'], back['trials'].first.values_at('lineage', 'via')
     Koholint::Bench.record(data, [81, 0], :up, CONTEXT, start, trial.merge(back: nil, run: 'again'), RUN)
     assert_equal [1, 1], data['edges'].map { |edge| edge['trials'].size }, 'a rerun at the same frame adds nothing'
+    Koholint::Bench.record(data, [81, 0], [3, 3], CONTEXT, start, trial.merge(run: 'door'), RUN)
+    assert_equal [[99, 0], 'down', 2], data['edges'][1].values_at('place', 'way').push(data['edges'][1]['trials'].size), 'another way back into the same reverse edge at the same frame is its own trial'
     Koholint::Bench.record(data, [81, 0], :left, CONTEXT, start, { outcome: :unreached, run: 'child2' }, RUN)
     assert_equal 'unreached', data['edges'].last['status']
     Koholint::Bench.record(data, [81, 0], :right, CONTEXT, start, { outcome: :discarded, arrival: { to: [5, 0], landing: [3, 0] }, run: 'child3' }, RUN)
-    assert_equal 3, data['edges'].size, 'a discarded trial records nothing'
+    assert_equal 4, data['edges'].size, 'a discarded trial records nothing'
   end
 
   def test_a_bench_with_an_unreached_way_is_incomplete_and_only_every_way_reached_depends_on_context

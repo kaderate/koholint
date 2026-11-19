@@ -37,11 +37,11 @@ module Koholint
     def key_of(edge) = [edge['place'], edge['way'], edge['context']]
 
     # Adds one crossing to its edge and recounts it: two destinations make it contradicted, agreeing trials from two lineages verify it.
-    # A trial from the same parent and frame as a recorded one is a rerun and changes nothing.
+    # A trial from the same parent, frame and forward way as a recorded one is a rerun and changes nothing.
     def record(data, place:, way:, context:, trial:, refutes: nil)
       edge = data['edges'].find { |known| key_of(known) == [place, way, context] }
       edge ||= { 'place' => place, 'way' => way, 'context' => context, 'trials' => [], 'refutes' => [] }.tap { |fresh| data['edges'] << fresh }
-      return edge if edge['trials'].any? { |known| known.values_at('parent', 'frame') == trial.values_at('parent', 'frame') }
+      return edge if edge['trials'].any? { |known| known.values_at('parent', 'frame', 'via') == trial.values_at('parent', 'frame', 'via') }
 
       edge['trials'] << trial
       (edge['refutes'] << refutes).uniq! if refutes

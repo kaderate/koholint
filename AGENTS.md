@@ -22,8 +22,9 @@ High-level architecture: `ARCHITECTURE.md` (update it in the same commit as any 
 - Game facts live in typed data with provenance (`data/addresses.json`, a run's `world.json`),
   never in prose. `verified` needs `verified_count >= 2` from independent checks. `data/capabilities.json` follows the same
   rule: every entry carries its trigger, trials and history, and `validated` needs successes in 2 independent places; so does
-  `data/exits.json`, whose edges carry their context and trials, and `verified` needs agreeing trials from 2 run lineages
-  (distinct from-boot ancestors); trials from one lineage stay `observed`.
+  `data/exits.json`, whose edges carry their context and trials, and `verified` needs agreeing trials from 2 root lineages
+  (distinct from-boot ancestors); trials from one lineage stay `observed`. Measured edges, observed or verified, fill only ways a
+  run never crossed, are labelled with their status in the prompt, and join the exits digest.
 - How to play is public knowledge and may be used freely, in code, data and prompts: controls, menus, map, save and game-over screens, dialogue, interactions with people, signs and objects, item use, general mechanics. Where to go and what to do next (routes, solutions, item locations, the order of the game) is a walkthrough and stays out: it is observed or read from in-game texts. Anything measurable is measured; a value taken from general knowledge enters data files as a hypothesis with its source and is verified by a probe.
 - What remains to do lives in `ROADMAP.md` (only what is left; delete items as they land, git is the history).
 - Runs are committed only as the light bundle written by `bin/koholint archive`; prompts, keyframes and saves stay local.
