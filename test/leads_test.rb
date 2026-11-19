@@ -215,4 +215,25 @@ class LeadsTest < Minitest::Test
       assert_equal 'beach', world['leads'].first['where']
     end
   end
+
+  def test_a_resumed_log_keeps_each_text_read_in_a_place_whole_and_once
+    pages = ["J'suis un", "J'suis un raton-laveur espiègle.", "laveur espiègle. Et j'aime pas du tout", "Et j'aime pas du tout c'qu'est poudreux..."]
+    read = ->(frame) { pages.each_with_index.map { |text, n| { 'type' => 'dialogue', 'frame' => frame, 'place' => [81, 0], 'text' => text, 'page' => n + 1 } } }
+    leads = Koholint::Leads.from_events(read.(10) + [{ 'type' => 'perception', 'frame' => 15, 'state' => {} }] + read.(20) +
+                                        [{ 'type' => 'dialogue', 'frame' => 30, 'place' => [97, 0], 'text' => 'Elsewhere.', 'page' => 1 }])
+    texts = leads.texts_at([81, 0])
+    assert_equal 1, texts.size
+    assert_includes texts.first, "J'suis un raton-laveur espiègle."
+    assert_includes texts.first, "c'qu'est poudreux..."
+    assert_equal ['Elsewhere.'], leads.texts_at([97, 0])
+  end
+
+  def test_pages_read_one_by_one_give_the_same_texts_live_and_after_a_resume
+    pages = ["J'suis un raton-laveur espiègle. Et j'aime", "Et j'aime pas du tout", "pas du tout c'qu'est poudreux..."]
+    live = Koholint::Leads.new
+    pages.each { |text| live.note_read(text, place: [81, 0]) }
+    resumed = Koholint::Leads.from_events(pages.each_with_index.map { |text, n| { 'type' => 'dialogue', 'frame' => 10 + n, 'place' => [81, 0], 'text' => text, 'page' => 1 } })
+    assert_equal live.texts_at([81, 0]), resumed.texts_at([81, 0])
+    assert_equal ["J'suis un raton-laveur espiègle. Et j'aime pas du tout c'qu'est poudreux..."], live.texts_at([81, 0]), 'overlapping windows join into one text'
+  end
 end

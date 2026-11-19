@@ -44,7 +44,7 @@ module Koholint
           context[:aim] = aim if aim
         end
 
-        def alerts(state)
+        def alerts(state, objective: false)
           place = [state.room_id, state.map_id]
           lines = []
           if (loop = @loop_watch.hint)
@@ -61,6 +61,29 @@ module Koholint
                      'try the cells marked doubtful, step onto stairs or narrow gaps from the cell centre, and read the grid against the screen image.'
           end
           lines.concat(fresh_puzzles(place).map { |puzzle| puzzle_line(puzzle) })
+          lines.concat(puzzle_texts(place, objective:))
+        end
+
+        TEXTS_BUDGET = 2000
+        TEXT_PREFIX = 'TEXT READ HERE (quoted in full while a puzzle here is open): '
+
+        # While a puzzle here is open, what was read here is quoted whole (a lead keeps one sentence, and a low one is never shown again),
+        # newest first within a character budget, at every objective decision and at the first decision of each visit.
+        def puzzle_texts(place, objective: false)
+          return [] if @explore_log.puzzles(place).empty? || @explore_log.bench_concluded?(place)
+
+          @texts_shown ||= Set.new
+          first = @texts_shown.add?([place, @explore_log.visits(place)])
+          return [] unless objective || first
+
+          left = TEXTS_BUDGET
+          @leads.texts_at(place).reverse.map { |text| text.gsub(/\s+/, ' ').strip }.filter_map do |text|
+            next if left <= 0
+
+            shown = text.size > left ? "#{text[0, left]}... (cut)" : text
+            left -= text.size
+            "#{TEXT_PREFIX}« #{shown} »"
+          end
         end
 
         # Each puzzle is stated once per visit of its place, not in every prompt.

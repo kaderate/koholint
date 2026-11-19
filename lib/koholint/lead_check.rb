@@ -1,4 +1,5 @@
 require 'set'
+require 'koholint/dialogues'
 require 'koholint/items'
 require 'koholint/trace'
 
@@ -34,10 +35,36 @@ module Koholint
       end
     end
 
+    SENTENCE_WORDS = 3
+
+    # Every sentence of a text read (of 3 words or more) is quoted by a lead, dismissed by a low lead quoting it, or dropped; a quote
+    # cut inside a sentence does not cover it. Each sentence counts once per run.
+    def sentences(events)
+      quotes = events.select { |event| event['type'] == 'lead' }.map { |event| [Dialogues.key(event['quote']), event['importance'].to_s] }
+      texts = events.select { |event| event['type'] == 'dialogue' }.chunk_while { |a, b| a.values_at('frame', 'place') == b.values_at('frame', 'place') }
+      seen = Set.new
+      texts.each_with_object({ covered: 0, dismissed: 0, dropped: [] }) do |pages, found|
+        Dialogues.text(pages.map { |page| page['text'] }).gsub(/\s+/, ' ').split(/(?<=[.!?…])\s+/).each do |sentence|
+          key = Dialogues.key(sentence)
+          next if sentence.split.size < SENTENCE_WORDS || !seen.add?(key)
+
+          kinds = quotes.select { |quote, _| quote.include?(key) }.map(&:last)
+          next found[:covered] += 1 if kinds.any? { |kind| kind != 'low' }
+          next found[:dismissed] += 1 if kinds.any?
+
+          found[:dropped] << { frame: pages.first['frame'], place: pages.first['place'], sentence: sentence.strip }
+        end
+      end
+    end
+
     def check(dirs, out:)
       found = dirs.flat_map { |dir| leaks(Trace.read(File.join(dir, 'trace.jsonl'))).map { |leak| leak.merge(run: File.basename(dir)) } }
       found.each { |leak| out.puts "#{leak[:run]} #{leak[:id]} (#{Array(leak[:place]).join('-')}, frame #{leak[:frame]}): names #{leak[:items].join(', ')}: #{leak[:claim]}" }
       out.puts "#{found.size} lead(s) name an item absent from the text read and not held, in #{dirs.size} run(s)"
+      counts = dirs.map { |dir| sentences(Trace.read(File.join(dir, 'trace.jsonl'))).merge(run: File.basename(dir)) }
+      counts.each { |count| count[:dropped].each { |drop| out.puts "#{count[:run]} dropped (#{Array(drop[:place]).join('-')}, frame #{drop[:frame]}): #{drop[:sentence]}" } }
+      out.puts "sentences read: #{counts.sum { |count| count[:covered] }} quoted by a lead, #{counts.sum { |count| count[:dismissed] }} dismissed by a low lead, " \
+               "#{counts.sum { |count| count[:dropped].size }} dropped"
       found.empty? ? 0 : 1
     end
   end

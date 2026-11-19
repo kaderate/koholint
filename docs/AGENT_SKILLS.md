@@ -1,6 +1,6 @@
 # Agent skills
 
-The skills, protocols and harness behaviours the agent works with. Versioned with the play flow (currently `flow-75`): update this page, not the README, when a flow changes. Layers and data flow are in [ARCHITECTURE.md](../ARCHITECTURE.md).
+The skills, protocols and harness behaviours the agent works with. Versioned with the play flow (currently `flow-76`): update this page, not the README, when a flow changes. Layers and data flow are in [ARCHITECTURE.md](../ARCHITECTURE.md).
 
 
 - Learned capabilities (`data/capabilities.json`, `bin/koholint capability list`): an `operational` entry is a composite of the skills below, offered in the skill schema and listed under "Learned skills" only while its trigger item is held (flow-49) and its object is on screen (today `sword_on_object_92 row col direction`: stand next to object 92, face it, use the sword, step into its cell). `explore` and `goto` also run it themselves when blocked facing such a cell, and the planner routes through those cells as a last resort. `learn` and `capability publish|retire` are offline commands.
@@ -108,6 +108,10 @@ The skills, protocols and harness behaviours the agent works with. Versioned wit
   says what it reached, which ways it did not reach, and whether every way reached and none led somewhere new (then the outcome depends on the
   context, with the leads read there). A `puzzle-R-M` candidate ("investigate ...") is offered first, at most once per run and context, while a
   puzzle place has an open lead about it and no conclusive bench in the current context.
+- flow-76: while a place has an open puzzle (no conclusive bench in the current context), the header quotes every text read there in full,
+  each once, as `TEXT READ HERE (quoted in full while a puzzle here is open): « ... »`: a lead keeps one sentence, and a low lead is never shown again.
+  It appears at every objective decision there and at the first decision of each visit, newest texts first within 2,000 characters; a text cut
+  by that budget ends with `... (cut)`.
 - The context header lists the items on A and B and in the inventory slots (`data/items.json` names; a `?` marks a name
   not measured yet). `use_item item [button] [frames]` uses a held item (assigning it through the START menu to `button`,
   default B, when it is on no button); `guard frames [direction]` raises the shield (Link walks at full speed and turns

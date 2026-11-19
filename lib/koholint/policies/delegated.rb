@@ -390,7 +390,7 @@ module Koholint
                                        locked_frames: (locked_frames(state) if Modes::HELD.include?(state.phase)), goal: goal_line, leads: @leads.with_status, stamp: stamp(state),
                                        place_name: @leads.name_of([state.room_id, state.map_id]), candidates: (Candidates.lines(@candidates) if decision_point.name == :choose_objective),
                                        learned: (@learned if decision_point.name == :choose_skill),
-                                       resolve: @leads.method(:place_for), hp_lost: @hp_lost, died: @died, alerts: alerts(state), route: route_line(state))
+                                       resolve: @leads.method(:place_for), hp_lost: @hp_lost, died: @died, alerts: alerts(state, objective: decision_point.name == :choose_objective), route: route_line(state))
         @hp_lost = 0
         @died = false
         if @reading
