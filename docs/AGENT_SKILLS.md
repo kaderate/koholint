@@ -110,6 +110,8 @@ The skills, protocols and harness behaviours the agent works with. Versioned wit
   puzzle place has an open lead about it and no conclusive bench in the current context.
 - flow-76: while a place has an open puzzle (no conclusive bench in the current context), the header quotes every text read there in full,
   each once, as `TEXT READ HERE (quoted in full while a puzzle here is open): « ... »`: a lead keeps one sentence, and a low lead is never shown again.
+  It appears at every objective decision there and at the first decision of each visit, newest texts first within 2,000 characters; a text cut
+  by that budget ends with `... (cut)`.
 - The context header lists the items on A and B and in the inventory slots (`data/items.json` names; a `?` marks a name
   not measured yet). `use_item item [button] [frames]` uses a held item (assigning it through the START menu to `button`,
   default B, when it is on no button); `guard frames [direction]` raises the shield (Link walks at full speed and turns

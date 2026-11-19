@@ -227,4 +227,13 @@ class LeadsTest < Minitest::Test
     assert_includes texts.first, "c'qu'est poudreux..."
     assert_equal ['Elsewhere.'], leads.texts_at([97, 0])
   end
+
+  def test_pages_read_one_by_one_give_the_same_texts_live_and_after_a_resume
+    pages = ["J'suis un raton-laveur espiègle. Et j'aime", "Et j'aime pas du tout", "pas du tout c'qu'est poudreux..."]
+    live = Koholint::Leads.new
+    pages.each { |text| live.note_read(text, place: [81, 0]) }
+    resumed = Koholint::Leads.from_events(pages.each_with_index.map { |text, n| { 'type' => 'dialogue', 'frame' => 10 + n, 'place' => [81, 0], 'text' => text, 'page' => 1 } })
+    assert_equal live.texts_at([81, 0]), resumed.texts_at([81, 0])
+    assert_equal ["J'suis un raton-laveur espiègle. Et j'aime pas du tout c'qu'est poudreux..."], live.texts_at([81, 0]), 'overlapping windows join into one text'
+  end
 end

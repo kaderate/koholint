@@ -99,9 +99,14 @@ module Koholint
       (named + read).uniq
     end
 
-    # Every text read in a place, each once: a text another one contains (a reread cut short) is dropped.
+    # Every text read in a place, each once: pages read one by one are joined where one window overlaps the next, as the pages of
+    # one reading are, so live play and a resume give the same texts; a text another one contains (a reread cut short) is dropped.
     def texts_at(place)
-      texts = @read_at.fetch(place, []).uniq { |text| Dialogues.key(text) }
+      joined = @read_at.fetch(place, []).each_with_object([]) do |text, texts|
+        merged = texts.last && Dialogues.join(texts.last, text)
+        merged ? texts[-1] = merged : texts << text
+      end
+      texts = joined.uniq { |text| Dialogues.key(text) }
       texts.reject { |text| texts.any? { |other| other != text && Dialogues.key(other).include?(Dialogues.key(text)) } }
     end
 

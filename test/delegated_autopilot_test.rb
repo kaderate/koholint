@@ -234,12 +234,27 @@ class DelegatedAutopilotTest < Minitest::Test
     p.decide(p.decision_point_for(here), here, { grid: OpenGrid.new })
     assert_includes client.calls.last[:prompt], "TEXT READ HERE (quoted in full while a puzzle here is open): « J'suis un raton-laveur espiègle. Et j'aime pas du tout c'qu'est poudreux... »"
     assert_includes client.calls.last[:prompt], '« Hé hé! Tu vas te perdre dans la Forêt. »'
+    p.decide(p.decision_point_for(here), here, { grid: OpenGrid.new })
+    assert_includes client.calls.last[:system], 'skill'
+    refute_includes client.calls.last[:prompt], 'TEXT READ HERE', 'a skill decision later in the same visit repeats nothing'
     away = state(room_id: 97, map_id: 0, frame: 300)
     p.observe(away, frame: away.frame)
     p.decide(p.decision_point_for(away), away, { grid: OpenGrid.new })
     refute_includes client.calls.last[:prompt], 'TEXT READ HERE', 'a place without a puzzle quotes nothing'
     log.use_bench({ edges: {}, status: {}, benches: { [81, 0] => { 'status' => 'depends_on_context', 'ways' => {}, 'new_places' => [] } } })
-    assert_empty p.send(:puzzle_texts, [81, 0]), 'nor one a conclusive bench measured'
+    assert_empty p.send(:puzzle_texts, [81, 0], objective: true), 'nor one a conclusive bench measured'
+  end
+
+  def test_the_quoted_texts_keep_the_newest_within_a_character_budget_and_say_where_one_was_cut
+    client = ScriptedClient.new(objective: new_place, default: explore)
+    p = puzzled_policy(client, Koholint::ExploreLog.from_events(puzzle_crossings))
+    leads = p.instance_variable_get(:@leads)
+    %w[A B C].each { |letter| leads.note_read("#{letter} #{'mot ' * 300}fin.", place: [81, 0]) }
+    lines = p.send(:puzzle_texts, [81, 0], objective: true)
+    assert_equal ['« C', '« B'], lines.map { |line| line[/« ./] }, 'newest first, and the oldest no longer fits'
+    assert lines.last.end_with?('... (cut) »')
+    refute lines.first.include?('(cut)')
+    assert_operator lines.sum { |line| line.size - Koholint::Policies::Delegated::TEXT_PREFIX.size - 4 }, :<=, Koholint::Policies::Delegated::TEXTS_BUDGET + 20
   end
 
   def test_the_exit_bench_applies_only_in_the_context_it_measured
