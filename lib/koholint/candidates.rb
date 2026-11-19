@@ -141,11 +141,12 @@ module Koholint
       end.first(PER_KIND)
     end
 
-    # A place with a world-model puzzle that an open lead's words point to, offered first only until the exit bench has measured it in the current context.
+    # A place with a world-model puzzle that an open lead's words point to, offered first once per run and context, and not at all once
+    # a conclusive bench measured it in this context.
     def puzzles(place, hops, explore_log, leads, named)
       open = leads.all.reject { |lead| leads.settled?(lead) }
       hops.keys.sort_by { |where| [hops[where], where] }.filter_map do |where|
-        next if explore_log.puzzles(where).empty? || explore_log.bench_of(where)
+        next if explore_log.puzzles(where).empty? || explore_log.bench_concluded?(where) || explore_log.puzzle_offered?(where)
 
         lead = open.find { |candidate| leads.region(candidate).include?(where) } or next
         here = where == place

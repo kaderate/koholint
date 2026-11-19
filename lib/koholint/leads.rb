@@ -76,10 +76,12 @@ module Koholint
     end
 
     WORD = /[[:alpha:]]{4,}/
+    STOPWORDS = %w[dans pour avec mais plus tout tous toute elle elles nous vous sont cette ceci cela quoi alors bien encore aussi comme
+                   with from this that there their your have here what when where then they them].to_set.freeze
 
     # The places a lead's quote points to by a word it shares with a place name you gave: places named with it and places where a text using it was read.
     def region(lead)
-      words = ->(text) { self.class.normalize(text).scan(WORD) }
+      words = ->(text) { self.class.normalize(text).scan(WORD).reject { |word| STOPWORDS.include?(word) } }
       shared = words.(lead[:quote]) & @names.values.flat_map(&words)
       return [] if shared.empty?
 

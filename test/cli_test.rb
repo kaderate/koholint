@@ -101,6 +101,40 @@ class CliTest < Minitest::Test
     end
   end
 
+  def test_the_exits_switch_reaches_the_policy_apart_from_capabilities
+    skip_without_rom!
+    with_fake_claude do |dir|
+      factory = Koholint::CLI.policy_factory({ agent: true, claude_command: FAKE_CLAUDE }, Koholint::Budget.new)
+      off = Koholint::Run.create(root: dir, flow_version: Koholint::FLOW_VERSION, budget: {}, exits: false)
+      assert_nil factory.call(off).instance_variable_get(:@after).instance_variable_get(:@exits)
+      on = Koholint::Run.create(root: dir, flow_version: Koholint::FLOW_VERSION, budget: {}, capabilities: false)
+      assert_equal Koholint::Exits.load, factory.call(on).instance_variable_get(:@after).instance_variable_get(:@exits)
+      _code, out, = cli('fork', on.dir, '--at-frame', '0', '--exits', 'off', '--root', dir)
+      assert_equal false, JSON.parse(File.read(File.join(out[/run (\S+)/, 1], 'manifest.json')))['exits']
+    end
+  end
+
+  def test_bench_exits_passes_the_place_frame_and_root_to_the_bench
+    skip_without_rom!
+    require 'koholint/bench'
+    Dir.mktmpdir do |dir|
+      run = Koholint::Run.create(root: dir, flow_version: Koholint::FLOW_VERSION, budget: {})
+      seen = nil
+      original = Koholint::Bench.method(:exits)
+      Koholint::Bench.define_singleton_method(:exits) do |parent, **options|
+        seen = [parent.id, options.except(:out)]
+        0
+      end
+      begin
+        code, = cli('bench', 'exits', run.dir, '--place', '81/0', '--at-frame', '73800', '--root', dir)
+      ensure
+        Koholint::Bench.define_singleton_method(:exits, original)
+      end
+      assert_equal [0, [run.id, { place: [81, 0], at: 73_800, root: dir }]], [code, seen]
+      assert_equal 2, cli('bench', 'doors', run.dir)[0]
+    end
+  end
+
   def test_missing_rom_prints_one_line_error_and_exits_nonzero
     old = ENV['KOHOLINT_ROM']
     ENV['KOHOLINT_ROM'] = '/nope'

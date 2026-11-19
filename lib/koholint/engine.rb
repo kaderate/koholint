@@ -36,6 +36,7 @@ module Koholint
     def self.resume(run_path, budget:, policy: nil, policy_factory: nil, flow_version: Koholint::FLOW_VERSION, **options)
       run = Run.open(run_path, flow_version: flow_version)
       run.check_capabilities!
+      run.check_exits!
       run.lock!
       run.truncate_trace!(run.inputs.frames)
       run.truncate_prompts!(run.inputs.frames)
@@ -131,7 +132,7 @@ module Koholint
                                  choice: choice, justification: result[:justification], confidence: result[:confidence],
                                  agent: result[:agent], latency_ms: result[:latency_ms].to_i, cost_usd: result[:cost_usd].to_f, fallback: result[:fallback] || false,
                                  **seen, **(result[:plan] ? { plan: result[:plan] } : {}), **(result[:autopilot] ? { autopilot: true } : {}),
-                                 **(result[:engine_error] ? { engine_error: true } : {}))
+                                 **(result[:engine_error] ? { engine_error: true } : {}), **(result[:puzzles_offered] ? { puzzles_offered: result[:puzzles_offered] } : {}))
       if choice.key?(:skill)
         activity(:acting, "acting: #{choice[:skill]}", skill: choice[:skill], params: choice[:params])
         outcome = execute(choice, state, chosen.registry, context)

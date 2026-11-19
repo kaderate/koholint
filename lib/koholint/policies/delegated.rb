@@ -147,8 +147,11 @@ module Koholint
       def decide(decision_point, state, context)
         @asked = false
         @leads.note_held(Items.held_ids(state))
+        @explore_log.in_context(Exits.context(state))
         @explore_log.use_bench(Exits.for_context(@exits, Exits.context(state))) if @exits
+        @puzzles_offered = []
         result = decide_with(decision_point, state, context)
+        result = result.merge(puzzles_offered: @puzzles_offered) unless @puzzles_offered.empty?
         @autopilot&.model_called(state:, objective: @objectives.current, news: !Array(result[:leads]).empty? || !result[:goal].nil?) if @asked
         notes = @revisit.notes + @notes
         @notes = []
@@ -351,6 +354,13 @@ module Koholint
         end
         @candidates = Candidates.build(place:, grid: context[:grid], explore_log: @explore_log, talk_log: @talk_log, leads: @leads, cards: @cards,
                                        entities: @entities, signs:, stamp: stamp(state), link: state.cell, low_health: false)
+        @candidates.each { |candidate| offer_puzzle(candidate[:target][:place]) if candidate[:id].start_with?('puzzle-') }
+        @candidates
+      end
+
+      def offer_puzzle(place)
+        @explore_log.offer_puzzle(place)
+        (@puzzles_offered ||= []) << place
       end
 
       def satisfied?(predicate, state, place)

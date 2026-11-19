@@ -66,6 +66,8 @@ visited places from the trace; `fork` branches a run at a frame (the parent may 
 `--keep-viewer` keeps it serving after the stop until Ctrl-C (if it could not start, for example on a busy port, `branch` says so and still plays). A checkpoint is a name from `data/checkpoints.json` (`name`, `run`, `frame`, `flow`, `source`),
 checked against the run id and its flow, e.g. `bin/koholint branch runs/20261111-194737-9ba1 --at sword-obtained --frames 3000`.
 
+**Exit bench.** `bench exits <run_dir> [--place R/M --at-frame N] [--root DIR]` forks the run once per way (four sides plus the doors of the place card) and per visit (the last two, or `--at-frame`), each fork capped at 3000 frames, and writes `data/exits.json`; no model call. On 20ea at 81/0 it took 8 forks, 9,909 frames and 251 s on the Mac. `--exits on|off` on `fork`/`branch` sets whether the child loads the bench data (recorded as the `exits` digest in the manifest).
+
 ## Mode census
 
 `bin/koholint census <run_dir> FRAME...` replays the run's journal to each frame (states cached in `tmp/census/states/`)

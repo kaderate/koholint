@@ -27,8 +27,9 @@ module Koholint
     class ExitTrial
       attr_reader :arrival, :back, :outcome
 
-      def initialize(registry:, place:, stands:, direction:, budget:)
+      def initialize(registry:, place:, stands:, direction:, budget:, door: false)
         @place = place
+        @door = door
         @point = DecisionPoint.choose_skill(registry)
         @stands = stands.dup
         @direction = direction
@@ -40,11 +41,13 @@ module Koholint
       def decision_point_for(_state) = @point
 
       def decide(_decision_point, state, _context)
+        return answer(stop(:discarded)) if @health && (state.health < @health || state.phase(booted: true) == :game_over)
         return answer({ skill: 'advance_dialogue', params: {} }) if state.dialog_open?
         return answer({ skill: 'wait', params: { frames: SETTLE_FRAMES } }) unless state.phase(booted: true) == :playing
 
         place = [state.room_id, state.map_id]
         @origin ||= place
+        @health ||= state.health
         return answer(stop(:wrong_start)) unless @origin == @place
 
         answer(next_choice(place, state))
@@ -71,6 +74,8 @@ module Koholint
         when :approach then approach
         when :cross then { skill: 'walk', params: { direction: @direction.to_s, cells: CROSS_CELLS } }
         when :landed
+          return stop(:discarded) unless scrolled?(state.cell)
+
           @arrival = { to: place, landing: state.cell }
           @phase = :back
           { skill: 'walk', params: { direction: OPPOSITE.fetch(@direction).to_s, cells: CROSS_CELLS } }
@@ -85,10 +90,19 @@ module Koholint
         { skill: 'goto', params: { row: stand[0], col: stand[1] } }
       end
 
+      # A walk back that never leaves the arrival place measured nothing about the way back.
       def finish(place, state)
-        @back = { to: place, landing: state.cell }
+        @back = { to: place, landing: state.cell } unless place == @arrival[:to]
         @outcome = :left
         stop(:left)
+      end
+
+      # A side crossing scrolls Link onto the opposite border; landing anywhere else is a fall, a warp or a respawn.
+      def scrolled?(cell)
+        return true if @door
+        return false unless cell
+
+        { up: cell[0] == Geometry::ROWS - 1, down: cell[0].zero?, left: cell[1] == Geometry::COLS - 1, right: cell[1].zero? }.fetch(@direction)
       end
 
       def stop(outcome)
@@ -106,10 +120,11 @@ module Koholint
       data = Exits.load(path)
       places = place ? [place] : events.select { |event| event['type'] == 'puzzle' }.map { |event| event['place'] }.uniq
       out.puts 'no puzzle in this run' if places.empty?
+      lineage = lineage_root(run)
       places.each do |where|
-        starts = at ? [{ frame: at, visit: at }] : keyframes(events, where).last(VISITS)
+        starts = at ? [{ frame: at, visit: visit_at(events, where, at) }] : keyframes(events, where).last(VISITS)
         out.puts "#{where.join('-')}: no keyframe in this place" if starts.empty?
-        starts.each { |start| bench_place(run, events, data, where, start, root:, out:) }
+        starts.each { |start| bench_place(run, events, data, where, start.merge(lineage:), root:, out:) }
         Exits.write(data, path)
       end
       0
@@ -121,7 +136,7 @@ module Koholint
       link = Geometry.cell_for(state['x'], state['y']) || [3, 4]
       ways = SIDES.map { |side| [side, border(side, link)] } + doors(events, place, start[:frame]).map { |door| [door, [[door[0] + 1, door[1]]]] }
       results = ways.to_h do |way, stands|
-        trial = trial(run, start[:frame], place, way.is_a?(Array) ? :up : way, stands, root:)
+        trial = trial(run, start[:frame], place, way, stands, root:)
         record(data, place, way, context, start, trial, run)
         out.puts "  #{place.join('-')} #{way.inspect} from #{start[:frame]}: #{trial[:outcome]} #{trial.dig(:arrival, :to)&.join('-')} back #{trial.dig(:back, :to)&.join('-')} (#{trial[:run]})"
         [way.is_a?(Array) ? way.join('-') : way.to_s, trial.dig(:arrival, :to)]
@@ -129,17 +144,20 @@ module Koholint
       note_bench(data, events, place, context, start, results, run)
     end
 
-    def trial(run, frame, place, direction, stands, root:)
+    def trial(run, frame, place, way, stands, root:)
       budget = Budget.new(frames: TRIAL_FRAMES)
       child = run.fork(at_frame: frame, flow_version: FLOW_VERSION, root:, tag: 'bench-exit')
-      policy = ExitTrial.new(registry: Skills::Registry.default, place:, stands:, direction:, budget:)
+      door = way.is_a?(Array)
+      policy = ExitTrial.new(registry: Skills::Registry.default, place:, stands:, direction: door ? :up : way, budget:, door:)
       Engine.resume(child.dir, policy:, budget:, grid: true).run
       { outcome: policy.outcome, arrival: policy.arrival, back: policy.back, run: child.id }
     end
 
     def record(data, place, way, context, start, trial, run)
+      return if trial[:outcome] == :discarded
+
       key = way.is_a?(Array) ? way : way.to_s
-      source = { 'run' => trial[:run], 'parent' => run.id, 'frame' => start[:frame], 'visit' => start[:visit] }
+      source = { 'run' => trial[:run], 'parent' => run.id, 'lineage' => start[:lineage] || run.id, 'frame' => start[:frame], 'visit' => start[:visit] }
       arrival = trial[:arrival]
       unless arrival
         Exits.record(data, place:, way: key, context:, trial: source.merge('to' => nil, 'outcome' => trial[:outcome].to_s))
@@ -153,12 +171,13 @@ module Koholint
 
       reverse = way.is_a?(Array) ? 'down' : OPPOSITE.fetch(way).to_s
       refuted = { 'to' => place, 'source' => 'reverse' } if back[:to] != place
-      Exits.record(data, place: arrival[:to], way: reverse, context:, trial: source.merge('to' => back[:to], 'landing' => back[:landing], 'from_landing' => arrival[:landing]),
+      Exits.record(data, place: arrival[:to], way: reverse, context:, trial: source.merge('via' => key, 'to' => back[:to], 'landing' => back[:landing], 'from_landing' => arrival[:landing]),
                          refutes: refuted)
     end
 
-    # What the bench found for the place in this context: a way to a place the run never saw leads on; none means the outcome depends on context,
-    # and the texts read there are kept as hypotheses, by lead id or dialogue frame, without a guess.
+    # What the bench found for the place in this context: a way to a place the run never saw leads on; a way never reached leaves it incomplete;
+    # only every way reached and none new means the outcome depends on context. The texts read there are kept as hypotheses, by lead id or
+    # dialogue frame, without a guess.
     def note_bench(data, events, place, context, start, results, run)
       seen = Summary.visited_places(events)
       fresh = results.values.compact.uniq.reject { |to| seen.include?(to) }
@@ -170,9 +189,12 @@ module Koholint
       bench = data['benches'].find { |known| known['place'] == place && known['context'] == context }
       bench ||= { 'place' => place, 'context' => context, 'runs' => [] }.tap { |fresh_bench| data['benches'] << fresh_bench }
       bench['runs'] |= [{ 'parent' => run.id, 'frame' => start[:frame] }]
-      bench['ways'] = (bench['ways'] || {}).merge(results.transform_values { |to| to || 'unreached' })
+      bench['ways'] = (bench['ways'] || {}).merge(results.transform_values { |to| to || 'unreached' }) { |_, known, now| now == 'unreached' ? known : now }
       bench['new_places'] = ((bench['new_places'] || []) | fresh)
-      bench['status'] = bench['new_places'].empty? ? 'depends_on_context' : 'leads_on'
+      bench['status'] = if bench['new_places'].any? then 'leads_on'
+                        elsif bench['ways'].value?('unreached') then 'incomplete'
+                        else 'depends_on_context'
+                        end
       bench['hypotheses'] = bench['new_places'].empty? ? (Array(bench['hypotheses']) | hypotheses).sort_by { |hypothesis| hypothesis['frame'] } : []
     end
 
@@ -190,6 +212,31 @@ module Koholint
         end
       end
       found.values
+    end
+
+    # The first frame of the visit around a keyframe, so two keyframes of one visit are one visit.
+    def visit_at(events, place, frame)
+      visit = nil
+      events.each do |event|
+        break if event['frame'] > frame
+        next unless event['type'] == 'perception'
+
+        visit = [event.dig('state', 'room_id'), event.dig('state', 'map_id')] == place ? visit || event['frame'] : nil
+      end
+      visit || frame
+    end
+
+    # The oldest ancestor found beside the run or among the archived runs; the id of a parent found nowhere ends the chain.
+    def lineage_root(run, roots: [File.dirname(run.dir), File.join(Config::ROOT, 'runs')])
+      id = run.id
+      parent = run.manifest.dig('parent', 'id')
+      seen = Set[id]
+      while parent && seen.add?(parent)
+        id = parent
+        manifest = roots.map { |root| File.join(root, parent, 'manifest.json') }.find { |path| File.file?(path) } or break
+        parent = JSON.parse(File.read(manifest)).dig('parent', 'id')
+      end
+      id
     end
 
     def state_at(events, frame) = events.reverse_each.find { |event| event['type'] == 'perception' && event['frame'] <= frame }&.dig('state') || {}

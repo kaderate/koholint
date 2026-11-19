@@ -54,7 +54,7 @@ class CandidatesTest < Minitest::Test
   end
 
   # 81/0 in the 21b0 lineage: its top led to 99/0, the raccoon there spoke of the forest, and the owl's key is hidden in the forest.
-  def test_a_puzzle_place_an_open_lead_points_to_comes_first_until_the_bench_measured_it_in_this_context
+  def test_a_puzzle_place_an_open_lead_points_to_comes_first_until_offered_or_benched_conclusively
     puzzled = Koholint::ExploreLog.new
     puzzled.absorb({ from: { room: 97, map: 0 }, exits: [{ row: 0, col: 6, direction: :up, outcome: :left, to: [81, 0] }] })
     puzzled.absorb({ from: { room: 81, map: 0 }, exits: [{ row: 0, col: 3, direction: :up, outcome: :left, to: [99, 0] }] })
@@ -68,10 +68,13 @@ class CandidatesTest < Minitest::Test
     puzzle = first.()
     assert_equal ['puzzle-81-0', { kind: 'new_place' }, { kind: 'place', place: [81, 0] }], puzzle.values_at(:id, :predicate, :target)
     assert_match(/lead-20 « Vas-y avec la Clé cachée dans la Forêt. » points there/, puzzle[:label])
-    puzzled.use_bench({ edges: {}, benches: { [81, 0] => { 'status' => 'depends_on_context' } } })
-    refute_equal 'puzzle-81-0', first.()[:id], 'the bias ends once the bench measured the place'
-    puzzled.use_bench({ edges: {}, benches: {} })
-    assert_equal 'puzzle-81-0', first.()[:id], 'and comes back in a context the bench has not seen (a new item or milestone)'
+    puzzled.use_bench({ edges: {}, status: {}, benches: { [81, 0] => { 'status' => 'incomplete' } } })
+    assert_equal 'puzzle-81-0', first.()[:id], 'a bench with a way never reached concludes nothing'
+    puzzled.use_bench({ edges: {}, status: {}, benches: { [81, 0] => { 'status' => 'depends_on_context' } } })
+    refute_equal 'puzzle-81-0', first.()[:id], 'a conclusive bench in this context ends it'
+    puzzled.use_bench({ edges: {}, status: {}, benches: {} })
+    puzzled.offer_puzzle([81, 0])
+    refute_equal 'puzzle-81-0', first.()[:id], 'and so does one offer in this run and context'
   end
 
   def test_exits_skip_sides_already_left_and_doors_people_and_signs_of_this_place_are_listed

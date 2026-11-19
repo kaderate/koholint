@@ -1,3 +1,4 @@
+require 'koholint/exits'
 require 'koholint/geometry'
 require 'koholint/ledger'
 require 'koholint/navigation/planner'
@@ -11,6 +12,7 @@ module Koholint
       log = new
       events.each do |event|
         log.screen(event['place'], event['grid']) if event['type'] == 'screen'
+        Array(event['puzzles_offered']).each { |place| log.restore_offer(place, Exits.context(event['input'] || {})) } if event['type'] == 'decision'
         next unless Ledger.pick(event, :type).to_s == 'action'
 
         result = Ledger.pick(event, :result)
@@ -47,15 +49,33 @@ module Koholint
       @puzzles = {}
       @pending = []
       @frame = nil
-      @bench = { edges: {}, benches: {} }
+      @bench = { edges: {}, status: {}, benches: {} }
+      @context = nil
+      @puzzle_offers = Set.new
     end
 
-    # The exit bench's verified edges and measured places for the current context (Exits.for_context); they fill ways this run never crossed.
+    # The exit bench's measured edges and benches for the current context (Exits.for_context); they fill ways this run never crossed.
     def use_bench(found)
       @bench = found
     end
 
     def bench_of(place) = @bench[:benches][place]
+
+    def bench_status(place, key) = @bench[:status]&.dig([place, key])
+
+    # A bench with a way never reached concludes nothing.
+    def bench_concluded?(place) = %w[leads_on depends_on_context].include?(bench_of(place)&.dig('status'))
+
+    # The milestone and items held now (Exits.context): a puzzle objective is offered once per place and context in a run.
+    def in_context(context)
+      @context = context
+    end
+
+    def offer_puzzle(place) = @puzzle_offers << [place, @context]
+
+    def puzzle_offered?(place) = @puzzle_offers.include?([place, @context])
+
+    def restore_offer(place, context) = @puzzle_offers << [place, context]
 
     def screen(place, grid)
       @screens[place] = grid if place.is_a?(Array) && grid.is_a?(Array)

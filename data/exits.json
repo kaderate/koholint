@@ -15,8 +15,9 @@
       },
       "trials": [
         {
-          "run": "20261118-233932-72e1",
+          "run": "20261119-083116-fa1f",
           "parent": "20261118-142325-20ea",
+          "lineage": "20261112-103604-0c64",
           "frame": 73800,
           "visit": 73299,
           "to": [
@@ -29,8 +30,9 @@
           ]
         },
         {
-          "run": "20261118-234111-2e8a",
+          "run": "20261119-083301-79c9",
           "parent": "20261118-142325-20ea",
+          "lineage": "20261112-103604-0c64",
           "frame": 95400,
           "visit": 93925,
           "to": [
@@ -56,8 +58,8 @@
         99,
         0
       ],
-      "verified_count": 2,
-      "status": "verified"
+      "verified_count": 1,
+      "status": "observed"
     },
     {
       "place": [
@@ -74,10 +76,12 @@
       },
       "trials": [
         {
-          "run": "20261118-233932-72e1",
+          "run": "20261119-083116-fa1f",
           "parent": "20261118-142325-20ea",
+          "lineage": "20261112-103604-0c64",
           "frame": 73800,
           "visit": 73299,
+          "via": "up",
           "to": [
             115,
             0
@@ -92,10 +96,12 @@
           ]
         },
         {
-          "run": "20261118-234111-2e8a",
+          "run": "20261119-083301-79c9",
           "parent": "20261118-142325-20ea",
+          "lineage": "20261112-103604-0c64",
           "frame": 95400,
           "visit": 93925,
+          "via": "up",
           "to": [
             115,
             0
@@ -123,8 +129,8 @@
         115,
         0
       ],
-      "verified_count": 2,
-      "status": "verified"
+      "verified_count": 1,
+      "status": "observed"
     },
     {
       "place": [
@@ -141,8 +147,9 @@
       },
       "trials": [
         {
-          "run": "20261118-233944-015b",
+          "run": "20261119-083130-dff9",
           "parent": "20261118-142325-20ea",
+          "lineage": "20261112-103604-0c64",
           "frame": 73800,
           "visit": 73299,
           "to": [
@@ -155,8 +162,9 @@
           ]
         },
         {
-          "run": "20261118-234137-e870",
+          "run": "20261119-083328-7a5c",
           "parent": "20261118-142325-20ea",
+          "lineage": "20261112-103604-0c64",
           "frame": 95400,
           "visit": 93925,
           "to": [
@@ -174,8 +182,8 @@
         97,
         0
       ],
-      "verified_count": 2,
-      "status": "verified"
+      "verified_count": 1,
+      "status": "observed"
     },
     {
       "place": [
@@ -192,10 +200,12 @@
       },
       "trials": [
         {
-          "run": "20261118-233944-015b",
+          "run": "20261119-083130-dff9",
           "parent": "20261118-142325-20ea",
+          "lineage": "20261112-103604-0c64",
           "frame": 73800,
           "visit": 73299,
+          "via": "down",
           "to": [
             81,
             0
@@ -210,10 +220,12 @@
           ]
         },
         {
-          "run": "20261118-234137-e870",
+          "run": "20261119-083328-7a5c",
           "parent": "20261118-142325-20ea",
+          "lineage": "20261112-103604-0c64",
           "frame": 95400,
           "visit": 93925,
+          "via": "down",
           "to": [
             81,
             0
@@ -233,8 +245,8 @@
         81,
         0
       ],
-      "verified_count": 2,
-      "status": "verified"
+      "verified_count": 1,
+      "status": "observed"
     },
     {
       "place": [
@@ -251,16 +263,18 @@
       },
       "trials": [
         {
-          "run": "20261118-233954-86ba",
+          "run": "20261119-083140-6a4e",
           "parent": "20261118-142325-20ea",
+          "lineage": "20261112-103604-0c64",
           "frame": 73800,
           "visit": 73299,
           "to": null,
           "outcome": "unreached"
         },
         {
-          "run": "20261118-234201-ab58",
+          "run": "20261119-083352-b987",
           "parent": "20261118-142325-20ea",
+          "lineage": "20261112-103604-0c64",
           "frame": 95400,
           "visit": 93925,
           "to": null,
@@ -286,16 +300,18 @@
       },
       "trials": [
         {
-          "run": "20261118-234034-5e37",
+          "run": "20261119-083223-5a0e",
           "parent": "20261118-142325-20ea",
+          "lineage": "20261112-103604-0c64",
           "frame": 73800,
           "visit": 73299,
           "to": null,
           "outcome": "unreached"
         },
         {
-          "run": "20261118-234246-cd91",
+          "run": "20261119-083440-0e6a",
           "parent": "20261118-142325-20ea",
+          "lineage": "20261112-103604-0c64",
           "frame": 95400,
           "visit": 93925,
           "to": null,
@@ -343,7 +359,7 @@
         "right": "unreached"
       },
       "new_places": [],
-      "status": "depends_on_context",
+      "status": "incomplete",
       "hypotheses": [
         {
           "type": "dialogue",

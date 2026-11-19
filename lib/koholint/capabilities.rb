@@ -1,7 +1,6 @@
 require 'digest'
 require 'json'
 require 'koholint'
-require 'koholint/exits'
 
 module Koholint
   # Learned capabilities: compositions of existing skills with their trigger, trials and history (data/capabilities.json).
@@ -92,10 +91,7 @@ module Koholint
 
     def operational(entries = load) = entries.select { |entry| entry['status'] == 'operational' }
 
-    # Verified exit edges route play too, so they join the digest; with none it is the capabilities digest alone.
-    def digest(entries = operational, exits = Exits.digest_part)
-      Digest::SHA256.hexdigest(JSON.generate(entries.sort_by { |entry| entry['id'] }) + (exits.empty? ? '' : JSON.generate(exits)))
-    end
+    def digest(entries = operational) = Digest::SHA256.hexdigest(JSON.generate(entries.sort_by { |entry| entry['id'] }))
 
     def empty_digest = digest([])
 

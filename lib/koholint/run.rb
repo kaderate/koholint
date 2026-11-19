@@ -6,6 +6,7 @@ require 'securerandom'
 require 'koholint'
 require 'koholint/agents/prompts'
 require 'koholint/capabilities'
+require 'koholint/exits'
 require 'koholint/trace'
 require 'koholint/input_log'
 
@@ -14,10 +15,12 @@ module Koholint
     class VersionMismatch < Error; end
     class RomMismatch < Error; end
     class CapabilitiesMismatch < Error; end
+    class ExitsMismatch < Error; end
 
     attr_reader :dir, :manifest
 
-    def self.create(root: 'runs', flow_version:, budget:, parent: nil, seed: 0, rom_path: Koholint.rom_path, tag: nil, model: nil, autopilot: nil, capabilities: Capabilities.digest)
+    def self.create(root: 'runs', flow_version:, budget:, parent: nil, seed: 0, rom_path: Koholint.rom_path, tag: nil, model: nil, autopilot: nil, capabilities: Capabilities.digest,
+                    exits: Exits.digest)
       dir = unique_dir(root)
       FileUtils.mkdir_p(File.join(dir, 'save'))
       FileUtils.mkdir_p(File.join(dir, 'keyframes'))
@@ -28,7 +31,7 @@ module Koholint
       manifest = { 'flow_version' => flow_version, 'rom_sha256' => rom_hash(rom_path), 'seed' => seed,
                    'budget' => JSON.parse(JSON.generate(budget)), 'status' => 'created', 'parent' => parent,
                    'tag' => tag, 'harness_sha' => harness_sha, 'prompts_sha' => Agents::Prompts.digest, 'model' => model,
-                   'autopilot' => autopilot, 'capabilities' => capabilities }
+                   'autopilot' => autopilot, 'capabilities' => capabilities, 'exits' => exits }
       new(dir, manifest).tap(&:write_manifest)
     end
 
@@ -89,6 +92,7 @@ module Koholint
       inherited = { tag: manifest['tag'], model: manifest['model'], autopilot: manifest['autopilot'] }.merge(overrides.slice(:tag, :model, :autopilot))
       loads = overrides.fetch(:capabilities) { manifest['capabilities'] != false }
       inherited[:capabilities] = loads ? Capabilities.digest : false
+      inherited[:exits] = overrides.fetch(:exits) { manifest['exits'] != false } ? Exits.digest : false
       child = self.class.create(root:, flow_version:, budget: manifest['budget'], parent: { 'id' => id, 'frame' => at_frame }, seed: manifest['seed'],
                                 rom_path:, **inherited)
       journal = InputLog.new(File.join(child.dir, 'inputs.log'))
@@ -113,6 +117,17 @@ module Koholint
       raise CapabilitiesMismatch, "run #{id} was recorded with capabilities #{recorded}, current is #{current}; " \
                                   "fork it (koholint fork #{dir} --at-frame #{inputs.frames}) to continue with the current set"
     end
+
+    # A run resumes with the exit bench data it was recorded with; false (an A/B arm without it) or a run older than the key loads none.
+    def check_exits!(current = Exits.digest)
+      recorded = manifest.fetch('exits', false)
+      return if recorded == false || recorded == current
+
+      raise ExitsMismatch, "run #{id} was recorded with exits #{recorded}, current is #{current}; " \
+                           "fork it (koholint fork #{dir} --at-frame #{inputs.frames}) to continue with the current data"
+    end
+
+    def exits? = manifest.fetch('exits', false) != false
 
     def lock!
       return if @lock_file

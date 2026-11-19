@@ -104,9 +104,10 @@ The skills, protocols and harness behaviours the agent works with. Versioned wit
   routed through (to its most observed destination) only when nothing else reaches the goal; a way back assumed from another map predicts nothing.
   The header shows the last two puzzles of the place once per visit as `PUZZLE (observed, not explained): ...` lines, and `summary.json` counts them per place and kind.
 - flow-75: the offline exit bench (`koholint bench exits`) measures each way of a puzzle place from its keyframes; in the same milestone and
-  held items, its edges fill the ways the run never crossed, and the PUZZLE line says what it measured (or that it depends on the context, with
-  the leads read there). A `puzzle-R-M` candidate ("investigate ...") is offered first while a puzzle place with an open lead about it is unbenched
-  in the current context, and disappears once it is benched.
+  held items, its edges fill the ways the run never crossed (`one lineage` marks an edge measured in a single run lineage), and the PUZZLE line
+  says what it reached, which ways it did not reach, and whether every way reached and none led somewhere new (then the outcome depends on the
+  context, with the leads read there). A `puzzle-R-M` candidate ("investigate ...") is offered first, at most once per run and context, while a
+  puzzle place has an open lead about it and no conclusive bench in the current context.
 - The context header lists the items on A and B and in the inventory slots (`data/items.json` names; a `?` marks a name
   not measured yet). `use_item item [button] [frames]` uses a held item (assigning it through the START menu to `button`,
   default B, when it is on no button); `guard frames [direction]` raises the shield (Link walks at full speed and turns
