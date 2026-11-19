@@ -12,7 +12,7 @@ module Koholint
     TERMINAL = %w[achieved abandoned failed].freeze
     DETERMINISTIC_AGENTS = %w[start_game walk_and_talk engine learner].freeze
     FILE = 'summary.json'.freeze
-    VERSION = 8
+    VERSION = 9
     LEAD_TIERS = %w[high normal low tip].freeze
     MANIFEST_KEYS = %w[flow_version tag harness_sha prompts_sha model autopilot capabilities].freeze
 
@@ -62,8 +62,16 @@ module Koholint
         symptoms: symptoms(unexhausted), starred: File.exist?(File.join(dir, 'star.json')),
         cost_by_skill: cost_by_skill(calls), decisions_by_agent: events.select { |e| e['type'] == 'decision' }.map { |e| e['agent'] }.tally,
         usage: usage(events).merge(left_with_unexhausted_people: unexhausted.size),
-        capability_uses: capability_uses(events, since: manifest.dig('parent', 'frame').to_i)
+        capability_uses: capability_uses(events, since: manifest.dig('parent', 'frame').to_i),
+        puzzles: puzzles(events)
       }
+    end
+
+    # World-model breaks the exit graph raised (one per id), per place and kind; all stay open until a bench resolves them.
+    def puzzles(events)
+      raised = events.select { |event| event['type'] == 'puzzle' }.uniq { |event| event['id'] }
+      by_place = raised.group_by { |event| event['place'].join('-') }.transform_values { |list| list.map { |event| event['kind'] }.tally }
+      { open: raised.size, by_place: }
     end
 
     # Uses of learned capabilities per id@version, chosen or run by a moving skill (its clears), and how many changed the target cell's object id.

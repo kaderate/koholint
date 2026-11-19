@@ -162,6 +162,27 @@ class DelegatedAutopilotTest < Minitest::Test
     refute_includes client.calls.last[:prompt], 'LOOP'
   end
 
+  # 81/0 in the 21b0 lineage: its top led to 99/0 every time, never to 65/0 above it.
+  def test_a_crossing_that_lands_away_from_the_neighbour_screen_is_traced_once_and_shown_as_a_fact
+    client = ScriptedClient.new(objective: new_place, default: explore)
+    p = policy(client)
+    crossing = { skill: 'explore', params: {}, stopped_by: :new_place, from: { room: 81, map: 0, row: 1, col: 3 }, to: { room: 99, map: 0, row: 0, col: 3 },
+                 exits: [{ row: 0, col: 3, direction: :up, outcome: :left, to: [99, 0] }], blocked_edges: [], offered: [] }
+    p.after_action(choice: { skill: 'explore', params: {} }, outcome: crossing, state: state(frame: 75199, room_id: 99, map_id: 0), frame: 75199)
+    landed = state(frame: 75210, room_id: 99, map_id: 0, x: 56, y: 124)
+    puzzles = p.decide(p.decision_point_for(landed), landed, { grid: })[:puzzles]
+    assert_equal [{ id: 'unexpected_arrival-81-0-up', kind: 'unexpected_arrival', place: [81, 0], way: :up, expected: { to: [65, 0], source: 'neighbour' },
+                    observed: { to: [99, 0], landing: [7, 3] }, frames: [75199] }], puzzles
+    assert_nil p.decide(p.decision_point_for(landed), landed, { grid: })[:puzzles], 'traced once'
+    back = state(frame: 75400, room_id: 81, map_id: 0)
+    p.decide(p.decision_point_for(back), back, { grid: })
+    assert_includes client.calls.last[:prompt], 'PUZZLE (observed, not explained): leaving 81-0 by the up side led to 99-0 (landing row 7, col 3), not to 65-0, ' \
+                                                'the screen next to it on the map, 1 time since frame 75199.'
+    again = state(frame: 75600, room_id: 81, map_id: 0)
+    p.decide(p.decision_point_for(again), again, { grid: })
+    refute_includes client.calls.last[:prompt], 'PUZZLE', 'stated once per visit'
+  end
+
   def test_a_detected_loop_drops_the_objective_and_explores_toward_the_nearest_untried_place_once
     log = Koholint::ExploreLog.new
     log.absorb({ from: { room: 163, map: 16 }, exits: [{ row: 3, col: 0, direction: :left, outcome: :left, to: [164, 16] }, { row: 0, col: 5, direction: :up, outcome: :left, to: [165, 16] }],

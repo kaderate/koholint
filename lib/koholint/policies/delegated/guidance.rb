@@ -60,7 +60,31 @@ module Koholint
             lines << "STUCK: #{STUCK_AT} results in a row here found no frontier, no path or were blocked, without reaching a new cell. The grid may be wrong: " \
                      'try the cells marked doubtful, step onto stairs or narrow gaps from the cell centre, and read the grid against the screen image.'
           end
-          lines
+          lines.concat(fresh_puzzles(place).map { |puzzle| puzzle_line(puzzle) })
+        end
+
+        # Each puzzle is stated once per visit of its place, not in every prompt.
+        def fresh_puzzles(place)
+          @puzzles_shown ||= Set.new
+          @explore_log.puzzles(place).last(PUZZLE_LINES).select { |puzzle| @puzzles_shown.add?([puzzle[:id], @explore_log.visits(place)]) }
+        end
+
+        PUZZLE_LINES = 2
+
+        def puzzle_line(puzzle)
+          way = puzzle[:way].is_a?(Array) ? "the door above (#{puzzle[:way][0] + 1},#{puzzle[:way][1]})" : "the #{puzzle[:way]} side"
+          observed = puzzle[:observed]
+          landing = observed[:landing] ? " (landing row #{observed[:landing][0]}, col #{observed[:landing][1]})" : ''
+          led = "led to #{observed[:to].join('-')}#{landing}"
+          frames = puzzle[:frames]
+          seen = frames.empty? ? '' : ", #{frames.size} #{frames.size == 1 ? 'time' : 'times'} since frame #{frames.first}"
+          expected = puzzle[:expected][:to].join('-')
+          fact = case puzzle[:kind]
+                 when 'unexpected_arrival' then "leaving #{puzzle[:place].join('-')} by #{way} #{led}, not to #{expected}, the screen next to it on the map#{seen}."
+                 when 'refuted' then "the way back from #{puzzle[:place].join('-')} by #{way} was assumed to lead to #{expected}; it #{led}#{seen}."
+                 else "leaving #{puzzle[:place].join('-')} by #{way} led to #{expected} before, and #{led}#{seen}."
+                 end
+          "PUZZLE (observed, not explained): #{fact}"
         end
 
         def autopilot_choice(decision_point, state, context)

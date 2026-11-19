@@ -438,48 +438,119 @@ class ExploreTest < Minitest::Test
 
   def test_a_pocket_found_by_an_aimed_route_is_left_the_way_link_came_and_routed_around
     log = Koholint::ExploreLog.new
-    log.absorb({ from: { room: 2, map: 0 }, exits: [{ row: 0, col: 9, direction: :up, outcome: :left, to: [1, 0] }, { row: 3, col: 9, direction: :right, outcome: :left, to: [3, 0] }], survey: { sides: {}, doors: [] } })
-    log.absorb({ from: { room: 3, map: 0 }, exits: [{ row: 0, col: 4, direction: :up, outcome: :left, to: [4, 0] }], survey: { sides: {}, doors: [] } })
-    log.absorb({ from: { room: 4, map: 0 }, exits: [{ row: 3, col: 9, direction: :right, outcome: :left, to: [1, 0] }], survey: { sides: {}, doors: [] } })
-    log.absorb({ from: { room: 7, map: 0 }, exits: [{ row: 7, col: 0, direction: :left, outcome: :left, to: [1, 0] }], survey: { sides: {}, doors: [] } })
-    log.absorb({ from: { room: 5, map: 0 }, exits: [{ row: 7, col: 5, direction: :down, outcome: :left, to: [1, 0] }], survey: { sides: {}, doors: [] } })
-    assert_equal [1, 0], log.route([2, 0], goal: [5, 0])[:next]
-    stuck = { skill: 'explore', from: { room: 1, map: 0, row: 7, col: 9 }, stopped_by: 'no_frontier', cells_walked: 0, route: { goal: [5, 0], next: [5, 0] }, dead_end: true }
+    log.absorb({ from: { room: 2, map: 1 }, exits: [{ row: 0, col: 9, direction: :up, outcome: :left, to: [1, 0] }, { row: 3, col: 9, direction: :right, outcome: :left, to: [3, 1] }], survey: { sides: {}, doors: [] } })
+    log.absorb({ from: { room: 3, map: 1 }, exits: [{ row: 0, col: 4, direction: :up, outcome: :left, to: [4, 1] }], survey: { sides: {}, doors: [] } })
+    log.absorb({ from: { room: 4, map: 1 }, exits: [{ row: 3, col: 9, direction: :right, outcome: :left, to: [1, 0] }], survey: { sides: {}, doors: [] } })
+    log.absorb({ from: { room: 7, map: 1 }, exits: [{ row: 7, col: 0, direction: :left, outcome: :left, to: [1, 0] }], survey: { sides: {}, doors: [] } })
+    log.absorb({ from: { room: 5, map: 1 }, exits: [{ row: 7, col: 5, direction: :down, outcome: :left, to: [1, 0] }], survey: { sides: {}, doors: [] } })
+    assert_equal [1, 0], log.route([2, 1], goal: [5, 1])[:next]
+    stuck = { skill: 'explore', from: { room: 1, map: 0, row: 7, col: 9 }, stopped_by: 'no_frontier', cells_walked: 0, route: { goal: [5, 1], next: [5, 1] }, dead_end: true }
     2.times { log.absorb(stuck) }
     assert_includes %i[down right], log.pocket_side([1, 0], [7, 9])
-    assert_equal [1, 0], log.route([2, 0], goal: [5, 0])[:next], 'one visit blocked (an urchin, an enemy) is not a pocket yet'
-    log.note({ skill: 'walk', params: { direction: :up }, from: { room: 2, map: 0, row: 0, col: 9 }, to: { room: 1, map: 0, row: 7, col: 9 } })
+    assert_equal [1, 0], log.route([2, 1], goal: [5, 1])[:next], 'one visit blocked (an urchin, an enemy) is not a pocket yet'
+    log.note({ skill: 'walk', params: { direction: :up }, from: { room: 2, map: 1, row: 0, col: 9 }, to: { room: 1, map: 0, row: 7, col: 9 } })
     log.absorb(stuck.merge(stopped_by: 'known_place', cells_walked: 1))
-    assert_equal [[3, 0], [4, 0], [1, 0], [5, 0]], log.path([2, 0], goal: [5, 0]).map { |hop| hop[:to] }
-    assert_nil log.route([7, 0], goal: [5, 0])
+    assert_equal [[3, 1], [4, 1], [1, 0], [5, 1]], log.path([2, 1], goal: [5, 1]).map { |hop| hop[:to] }
+    assert_nil log.route([7, 1], goal: [5, 1])
     pocket = with(CLOSED, [7, 9], '.', [6, 9], '#', [7, 8], '#')
-    result, = explore(pocket, start: [148, 124], exits: [[[7, 9], :down], [[7, 9], :right]], explore_log: log, aim: { place: [5, 0] })
+    result, = explore(pocket, start: [148, 124], exits: [[[7, 9], :down], [[7, 9], :right]], explore_log: log, aim: { place: [5, 1] })
     assert_equal [:exit, 7, 9], result[:target].values_at(:kind, :row, :col)
   end
 
   def test_a_way_back_never_crossed_is_dropped_when_an_explore_finds_no_exit_for_it
     log = Koholint::ExploreLog.new
-    log.absorb({ from: { room: 5, map: 0 }, exits: [{ row: 7, col: 5, direction: :down, outcome: :left, to: [1, 0] }] })
-    log.absorb({ from: { room: 6, map: 0 }, exits: [{ row: 3, col: 9, direction: :right, outcome: :left, to: [1, 0] }] })
-    assert_equal [1, 0], log.route([6, 0], goal: [5, 0])[:next]
+    log.absorb({ from: { room: 5, map: 1 }, exits: [{ row: 7, col: 5, direction: :down, outcome: :left, to: [1, 0] }] })
+    log.absorb({ from: { room: 6, map: 1 }, exits: [{ row: 3, col: 9, direction: :right, outcome: :left, to: [1, 0] }] })
+    assert_equal [1, 0], log.route([6, 1], goal: [5, 1])[:next]
     rows = with(CLOSED, [0, 5], '.', [1, 5], '#')
-    result, = explore(rows, explore_log: log, aim: { place: [5, 0] }, limit: 50)
+    result, = explore(rows, explore_log: log, aim: { place: [5, 1] }, limit: 50)
     assert_equal [:no_frontier, [:up], true], result.values_at(:stopped_by, :unreachable, :dead_end)
     failed = result.merge(skill: 'explore', from: { room: 1, map: 0, row: 4, col: 5 })
     2.times { log.absorb(failed) }
-    assert_equal [1, 0], log.route([6, 0], goal: [5, 0])[:next], 'one visit cannot tell a ledge from a passing block'
-    log.note({ skill: 'walk', params: { direction: :right }, from: { room: 6, map: 0, row: 3, col: 9 }, to: { room: 1, map: 0, row: 3, col: 0 } })
+    assert_equal [1, 0], log.route([6, 1], goal: [5, 1])[:next], 'one visit cannot tell a ledge from a passing block'
+    log.note({ skill: 'walk', params: { direction: :right }, from: { room: 6, map: 1, row: 3, col: 9 }, to: { room: 1, map: 0, row: 3, col: 0 } })
     log.absorb(failed)
-    assert_nil log.route([6, 0], goal: [5, 0])
-    log.absorb({ from: { room: 6, map: 0 }, unreachable: ['right'] })
-    assert_equal [1, 0], log.route([6, 0], goal: [1, 0])[:next]
+    assert_nil log.route([6, 1], goal: [5, 1])
+    log.absorb({ from: { room: 6, map: 1 }, unreachable: ['right'] })
+    assert_equal [1, 0], log.route([6, 1], goal: [1, 0])[:next]
+  end
+
+  def test_a_first_crossing_away_from_the_neighbour_screen_is_a_puzzle_and_invents_no_way_back
+    log = Koholint::ExploreLog.new
+    up = { from: { room: 81, map: 0 }, exits: [{ row: 0, col: 3, direction: :up, outcome: :left, to: [99, 0] }] }
+    log.absorb(up, frame: 75199)
+    refute log.side_left?([99, 0], :down), 'the way back of a surprise is not assumed'
+    fresh = log.new_puzzles(place: [99, 0], cell: [7, 3])
+    assert_equal [['unexpected_arrival', { to: [65, 0], source: 'neighbour' }, { to: [99, 0], landing: [7, 3] }]], fresh.map { |p| p.values_at(:kind, :expected, :observed) }
+    assert_empty log.new_puzzles
+    log.absorb(up, frame: 80000)
+    assert_empty log.new_puzzles, 'the same arrival again is no new puzzle'
+    assert_equal [75199, 80000], log.puzzles([81, 0]).first[:frames]
+    log.absorb({ from: { room: 81, map: 0 }, exits: [{ row: 7, col: 5, direction: :down, outcome: :left, to: [97, 0] }] })
+    assert log.side_left?([97, 0], :up), 'a crossing to the neighbour screen still assumes its way back'
+  end
+
+  def test_a_second_destination_through_the_same_way_is_kept_as_a_contradiction_and_routed_last
+    log = Koholint::ExploreLog.new
+    log.absorb({ from: { room: 5, map: 1 }, exits: [{ row: 3, col: 9, direction: :right, outcome: :left, to: [6, 1] }] }, frame: 10)
+    log.absorb({ from: { room: 5, map: 1 }, exits: [{ row: 3, col: 9, direction: :right, outcome: :left, to: [7, 1] }] }, frame: 20)
+    assert_equal [['contradiction', { to: [6, 1], source: 'observed' }, { to: [7, 1] }, [20]]], log.new_puzzles.map { |p| p.values_at(:kind, :expected, :observed, :frames) }
+    assert log.contradicted?([5, 1], :right)
+    log.absorb({ from: { room: 5, map: 1 }, exits: [{ row: 0, col: 4, direction: :up, outcome: :left, to: [8, 1] }] })
+    log.absorb({ from: { room: 8, map: 1 }, exits: [{ row: 3, col: 9, direction: :right, outcome: :left, to: [7, 1] }] })
+    assert_equal [[8, 1], [7, 1]], log.path([5, 1], goal: [7, 1]).map { |hop| hop[:to] }, 'a way that led to two places is taken only without another route'
+    assert_equal [[7, 1]], log.path([8, 1], goal: [7, 1]).map { |hop| hop[:to] }
+  end
+
+  def test_an_assumed_way_back_that_leads_elsewhere_is_refuted
+    log = Koholint::ExploreLog.new
+    log.absorb({ from: { room: 5, map: 1 }, exits: [{ row: 7, col: 5, direction: :down, outcome: :left, to: [6, 1] }] })
+    assert log.side_left?([6, 1], :up)
+    log.absorb({ from: { room: 6, map: 1 }, exits: [{ row: 0, col: 5, direction: :up, outcome: :left, to: [9, 1] }] }, frame: 40)
+    assert_equal [['refuted', { to: [5, 1], source: 'reverse' }, { to: [9, 1] }]], log.new_puzzles.map { |p| p.values_at(:kind, :expected, :observed) }
+    refute log.contradicted?([6, 1], :up), 'an assumption is no observation'
+  end
+
+  def test_a_way_back_assumed_from_another_map_predicts_nothing
+    log = Koholint::ExploreLog.new
+    log.absorb({ from: { room: 178, map: 18 }, exits: [{ row: 7, col: 4, direction: :down, outcome: :left, to: [161, 0] }] })
+    assert_equal [178, 18], log.route([161, 0], goal: [178, 18])[:next], 'the way back is still routed'
+    log.absorb({ from: { room: 161, map: 0 }, exits: [{ row: 0, col: 2, direction: :up, outcome: :left, to: [145, 0] }] })
+    assert_empty log.new_puzzles
+    log.absorb({ from: { room: 5, map: 0 }, exits: [{ row: 0, col: 4, direction: :up, outcome: :left, to: [165, 16] }] })
+    log.absorb({ from: { room: 165, map: 16 }, exits: [{ row: 7, col: 4, direction: :down, outcome: :left, to: [166, 16] }] })
+    assert_empty log.new_puzzles
+  end
+
+  def test_a_way_with_two_destinations_routes_to_the_one_seen_most
+    log = Koholint::ExploreLog.new
+    [[6, 1], [6, 1], [7, 1]].each_with_index { |to, n| log.absorb({ from: { room: 5, map: 1 }, exits: [{ row: 3, col: 9, direction: :right, outcome: :left, to: }] }, frame: n) }
+    assert_equal [['contradiction', { to: [6, 1], source: 'observed' }]], log.new_puzzles.map { |p| p.values_at(:kind, :expected) }
+    assert_equal [6, 1], log.route([5, 1], goal: [6, 1])[:next]
+    assert_nil log.route([5, 1], goal: [7, 1])
+  end
+
+  def test_a_fork_between_a_crossing_and_its_puzzle_event_still_emits_the_puzzle
+    crossing = { 'type' => 'action', 'frame' => 75199, 'skill' => 'explore', 'result' => { 'from' => { 'room' => 81, 'map' => 0 },
+                                                                                        'exits' => [{ 'row' => 0, 'col' => 3, 'direction' => 'up', 'outcome' => 'left', 'to' => [99, 0] }] } }
+    log = Koholint::ExploreLog.from_events([crossing])
+    assert_equal ['unexpected_arrival-81-0-up'], log.new_puzzles(place: [99, 0], cell: [7, 3]).map { |p| p[:id] }
+  end
+
+  def test_a_rebuilt_log_emits_no_puzzle_again_and_keeps_the_traced_landing
+    crossing = { 'type' => 'action', 'frame' => 75199, 'skill' => 'explore', 'result' => { 'from' => { 'room' => 81, 'map' => 0 },
+                                                                                        'exits' => [{ 'row' => 0, 'col' => 3, 'direction' => 'up', 'outcome' => 'left', 'to' => [99, 0] }] } }
+    traced = { 'type' => 'puzzle', 'frame' => 75210, 'id' => 'unexpected_arrival-81-0-up', 'observed' => { 'to' => [99, 0], 'landing' => [7, 3] } }
+    log = Koholint::ExploreLog.from_events([crossing, traced])
+    assert_empty log.new_puzzles(place: [99, 0], cell: [5, 5])
+    assert_equal [7, 3], log.puzzles([81, 0]).first[:observed][:landing]
   end
 
   def test_the_side_a_place_was_entered_by_counts_as_left
     log = Koholint::ExploreLog.new
-    log.absorb({ from: { room: 1, map: 0 }, exits: [{ row: 7, col: 5, direction: :down, outcome: :left, to: [2, 0] }] })
-    assert log.side_left?([2, 0], :up)
-    refute log.side_left?([2, 0], :down)
+    log.absorb({ from: { room: 1, map: 0 }, exits: [{ row: 7, col: 5, direction: :down, outcome: :left, to: [17, 0] }] })
+    assert log.side_left?([17, 0], :up)
+    refute log.side_left?([17, 0], :down)
     assert log.side_left?([1, 0], :down)
     refute log.surveyed?([2, 0])
   end
@@ -670,8 +741,8 @@ class ExploreTest < Minitest::Test
   def test_a_dialogue_the_game_opens_mid_walk_bars_the_edge_so_the_place_reads_as_exhausted
     rows = with(CLOSED, *(1..6).flat_map { |row| [[row, 3], '#'] }, [3, 3], '.', [3, 0], '.', [7, 6], '.')
     log = Koholint::ExploreLog.new
-    log.absorb({ from: { room: 1, map: 0 }, exits: [{ row: 3, col: 0, direction: :left, outcome: :left, to: [2, 0] }] })
-    assert_equal({ goal: PLACE, next: PLACE, via: :right }, log.route([2, 0]))
+    log.absorb({ from: { room: 1, map: 0 }, exits: [{ row: 3, col: 0, direction: :left, outcome: :left, to: [0, 0] }] })
+    assert_equal({ goal: PLACE, next: PLACE, via: :right }, log.route([0, 0]))
     result, = explore(rows, rocks: [[3, 3]], start: Koholint::Geometry.center_of(3, 1), explore_log: log)
     assert_equal :dialogue, result[:stopped_by]
     assert_equal({ kind: :exit, row: 7, col: 6, direction: :down }, result[:target])
@@ -679,7 +750,7 @@ class ExploreTest < Minitest::Test
     refute result.dig(:survey, :pending)
     log.absorb(result)
     refute log.untried?(PLACE)
-    assert_nil log.route([2, 0])
+    assert_nil log.route([0, 0])
   end
 
   def test_a_dialogue_that_opens_while_link_walks_bars_nothing

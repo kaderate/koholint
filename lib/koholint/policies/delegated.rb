@@ -150,6 +150,8 @@ module Koholint
         @autopilot&.model_called(state:, objective: @objectives.current, news: !Array(result[:leads]).empty? || !result[:goal].nil?) if @asked
         notes = @revisit.notes + @notes
         @notes = []
+        puzzles = @explore_log.new_puzzles(place: [state.room_id, state.map_id], cell: state.cell)
+        result = result.merge(puzzles:) unless puzzles.empty?
         notes.empty? ? result : result.merge(notables: notes)
       end
 
@@ -259,8 +261,8 @@ module Koholint
         feed_ledger(choice, outcome, state, frame, objective: !revisiting)
         opened = feed_triggers(choice, outcome, state)
         feed_talk_log(choice, outcome, state)
-        @explore_log.note(outcome)
-        @explore_log.absorb(outcome) if choice[:skill] == 'explore'
+        @explore_log.note(outcome, frame:)
+        @explore_log.absorb(outcome, frame:) if choice[:skill] == 'explore'
         @skipped = { place: Ledger.place_of(outcome[:from]), vias: Array(outcome[:unreachable]) } if choice[:skill] == 'explore'
         note_no_path(choice, outcome, frame) unless revisiting
         note_stuck(outcome, state)

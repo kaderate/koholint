@@ -62,6 +62,14 @@ class GeometryFootprintTest < Minitest::Test
     [start, Koholint::Perception.read(emulator)]
   end
 
+  def test_the_neighbour_screen_follows_the_measured_overworld_layout_and_nothing_else
+    assert_equal [[65, 0], [97, 0], [80, 0], [82, 0]], %i[up down left right].map { |side| Koholint::Geometry.neighbour([81, 0], side) }
+    assert_nil Koholint::Geometry.neighbour([3, 0], :up), 'off the top of the map'
+    assert_nil Koholint::Geometry.neighbour([16, 0], :left), 'no wrap to the row above'
+    assert_nil Koholint::Geometry.neighbour([163, 16], :up), 'interiors are not measured'
+    assert_nil Koholint::Geometry.neighbour([81, 0], [3, 4]), 'a door has no neighbour'
+  end
+
   def test_link_walks_left_past_the_beds_at_y_32_but_not_at_y_39
     start, finish = walk_left_from(20)
     assert_equal 32, start.y

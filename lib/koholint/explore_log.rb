@@ -14,9 +14,10 @@ module Koholint
         next unless Ledger.pick(event, :type).to_s == 'action'
 
         result = Ledger.pick(event, :result)
-        log.note(result)
-        log.absorb(result) if Ledger.pick(event, :skill).to_s == 'explore'
+        log.note(result, frame: event['frame'])
+        log.absorb(result, frame: event['frame']) if Ledger.pick(event, :skill).to_s == 'explore'
       end
+      log.resumed(events.select { |event| event['type'] == 'puzzle' })
       log
     end
 
@@ -42,15 +43,20 @@ module Koholint
       @entered = {}
       @at = nil
       @through = []
+      @observed = Hash.new { |hash, key| hash[key] = {} }
+      @puzzles = {}
+      @pending = []
+      @frame = nil
     end
 
     def screen(place, grid)
       @screens[place] = grid if place.is_a?(Array) && grid.is_a?(Array)
     end
 
-    def absorb(result)
+    def absorb(result, frame: nil)
       return unless result.is_a?(Hash)
 
+      @frame = frame if frame
       place = Ledger.place_of(Ledger.pick(result, :from)) or return
       know(place)
       survey = Ledger.pick(result, :survey)
@@ -89,16 +95,17 @@ module Koholint
       to = Ledger.pick(exit, :to)
       return unless left && to.is_a?(Array) && to.size == 2 && to.all?(Integer)
 
-      observe_edge(place, edge_key(exit, cell, direction.to_sym), to)
+      surprised = observe_edge(place, edge_key(exit, cell, direction.to_sym), to)
       crossed(place, edge_key(exit, cell, direction.to_sym), to, door: Ledger.pick(exit, :kind).to_s == 'door' || Ledger.pick(exit, :walk_in))
       know(to)
       return if Ledger.pick(exit, :kind).to_s == 'door' || Ledger.pick(exit, :walk_in)
 
       note_arrival(to, cell, direction.to_sym)
-      assume_edge(to, OPPOSITE.fetch(direction.to_sym), place) if OPPOSITE.key?(direction.to_sym)
+      assume_edge(to, OPPOSITE.fetch(direction.to_sym), place) if OPPOSITE.key?(direction.to_sym) && !surprised
     end
 
-    def note(result)
+    def note(result, frame: nil)
+      @frame = frame if frame
       %i[from to].each { |end_| (place = Ledger.place_of(Ledger.pick(result, end_))) && know(place) }
       from = Ledger.place_of(Ledger.pick(result, :from))
       to = Ledger.place_of(Ledger.pick(result, :to))
@@ -169,17 +176,76 @@ module Koholint
       ahead = [cell[0] + dr, cell[1] + dc] if cell&.all?(Integer)
       return take_exit(from, ExploreLog.door_exit(cell, ahead, @surveys.dig(from, :doors) || [], to)) if ahead && ahead[0].between?(0, Geometry::ROWS - 1) && ahead[1].between?(0, Geometry::COLS - 1)
 
-      observe_edge(from, direction, @edges[from].fetch(direction, to))
+      surprised = observe_edge(from, direction, to)
       crossed(from, direction, to, door: exit && Ledger.pick(exit, :walk_in))
       # A door walk (a house left by its bottom edge) loads the next place instead of scrolling: it says nothing of the side Link arrives by.
-      assume_edge(to, OPPOSITE.fetch(direction), from) unless exit && Ledger.pick(exit, :walk_in)
+      assume_edge(to, OPPOSITE.fetch(direction), from) unless (exit && Ledger.pick(exit, :walk_in)) || surprised
     end
 
+    # A tie goes to the latest destination.
+    def self.most_observed(seen) = seen.keys.each_with_index.max_by { |to, index| [seen[to][:count], index] }.first
+
     # The way back across an edge Link crossed once is assumed until he crosses it; explores that find no exit for it on two visits drop it (a ledge jumped down).
+    # Every destination seen through a way is kept: a second one is a contradiction, and a first one other than its hypothesis is a puzzle; both return its kind.
     def observe_edge(place, key, to)
-      @edges[place][key] = to
+      seen = @observed[[place, key]]
+      kind = if seen.empty?
+               expected = hypothesis(place, key)
+               (@assumed.include?([place, key]) ? 'refuted' : 'unexpected_arrival') if expected && expected[:to] != to
+             elsif !seen.key?(to)
+               expected = { to: ExploreLog.most_observed(seen), source: 'observed' }
+               'contradiction'
+             end
+      record = seen[to] ||= { count: 0, frames: [] }
+      record[:count] += 1
+      record[:frames] << @frame if @frame
+      @edges[place][key] = ExploreLog.most_observed(seen)
       @assumed.delete([place, key])
+      kind ? raise_puzzle(kind, place, key, expected, to) : repeat_puzzle(place, key, to)
+      kind
     end
+
+    # A way back assumed from another map is still routed, but a door lands on its own cell, so it predicts nothing.
+    def hypothesis(place, key)
+      to = @edges[place][key]
+      return { to:, source: 'reverse' } if @assumed.include?([place, key]) && to[1] == place[1]
+
+      to = key.is_a?(Symbol) && Geometry.neighbour(place, key)
+      { to:, source: 'neighbour' } if to
+    end
+
+    def raise_puzzle(kind, place, way, expected, to)
+      id = "#{kind}-#{place.join('-')}-#{way.is_a?(Array) ? way.join('-') : way}"
+      puzzle = @puzzles[id] ||= { id:, kind:, place:, way:, expected:, observed: { to: }, frames: [] }.tap { |fresh| @pending << fresh }
+      puzzle[:frames] << @frame if @frame
+    end
+
+    def repeat_puzzle(place, way, to)
+      @puzzles.each_value { |puzzle| puzzle[:frames] << @frame if @frame && puzzle[:place] == place && puzzle[:way] == way && puzzle[:observed][:to] == to }
+    end
+
+    # Puzzles raised since the last call, for the engine to trace; the landing is where Link stands when it is read, if he is still in the arrival place.
+    def new_puzzles(place: nil, cell: nil)
+      fresh = @pending.map do |puzzle|
+        puzzle[:observed][:landing] ||= cell if cell && place == puzzle[:observed][:to]
+        puzzle.dup
+      end
+      @pending = []
+      fresh
+    end
+
+    # A rebuilt log keeps the landings of the puzzles already traced and emits only those a fork cut off before their event.
+    def resumed(events)
+      events.each { |event| (puzzle = @puzzles[event['id']]) && puzzle[:observed][:landing] ||= event.dig('observed', 'landing') }
+      traced = events.map { |event| event['id'] }
+      @pending.reject! { |puzzle| traced.include?(puzzle[:id]) }
+    end
+
+    def visits(place) = @visits[place]
+
+    def puzzles(place = nil) = @puzzles.values.select { |puzzle| place.nil? || puzzle[:place] == place }
+
+    def contradicted?(place, key) = @observed.fetch([place, key], {}).size > 1
 
     def assume_edge(place, key, to)
       return if @edges[place].key?(key)
@@ -227,7 +293,18 @@ module Koholint
       nil
     end
 
+    # Ways that led to one place first (a way back is assumed only across a crossing its hypothesis predicted), then ways that led to two.
+    TIERS = %i[consistent contradicted].freeze
+
     def path(from, goal: nil, avoid: [], skip: [])
+      TIERS.each do |tier|
+        found = search(from, goal:, avoid:, skip:, tier:)
+        return found if found
+      end
+      nil
+    end
+
+    def search(from, goal:, avoid:, skip:, tier:)
       seen = { from => nil }
       queue = [from]
       until queue.empty?
@@ -235,7 +312,7 @@ module Koholint
         return hops_to(seen, place) if place != from && (goal ? place == goal : untried?(place) && !skip.include?(place))
 
         @edges.fetch(place, {}).each do |key, to|
-          next if seen.key?(to) || pocket?(to, key) || (place == from && avoid.include?(key))
+          next if seen.key?(to) || pocket?(to, key) || (place == from && avoid.include?(key)) || beyond?(tier, place, key)
 
           seen[to] = [place, key]
           queue << to
@@ -243,6 +320,8 @@ module Koholint
       end
       nil
     end
+
+    def beyond?(tier, place, key) = tier == :consistent && contradicted?(place, key)
 
     # The cell an exit lands on in the next place; a call that finds nothing to do there while some place still has work, or
     # whose route has no reachable exit on two visits (an enemy may block it once), shows the landing is a closed pocket: routes must not

@@ -155,9 +155,18 @@ class SummaryTest < Minitest::Test
                      cost_by_skill: { 'choose_skill' => { calls: 4, usd: 1.0 } }, decisions_by_agent: { 'claude' => 4, 'start_game' => 1 },
                      usage: { goal_changes: 0, leads: { high: 0, normal: 0, low: 0, tip: 0 }, lead_rejected: 0, objectives_by_kind: { 'unknown' => 2 },
                               because_used: 0, talks: 0, talks_to_known: 0, dialogues: 0, not_ready_frames: 0, not_ready_waits: 0, deaths: 0, damage_events: 0, stuck_events: 0,
-                              autopilot_decisions: 0, chain_max: 0, left_with_unexhausted_people: 0 }, capability_uses: {} },
+                              autopilot_decisions: 0, chain_max: 0, left_with_unexhausted_people: 0 }, capability_uses: {},
+                     puzzles: { open: 0, by_place: {} } },
                    Koholint::Summary.record(run.dir))
     end
+  end
+
+  def test_puzzles_are_counted_once_per_id_by_place_and_kind
+    events = [{ 'type' => 'puzzle', 'id' => 'unexpected_arrival-81-0-up', 'kind' => 'unexpected_arrival', 'place' => [81, 0] },
+              { 'type' => 'puzzle', 'id' => 'unexpected_arrival-81-0-up', 'kind' => 'unexpected_arrival', 'place' => [81, 0] },
+              { 'type' => 'puzzle', 'id' => 'contradiction-81-0-left', 'kind' => 'contradiction', 'place' => [81, 0] },
+              { 'type' => 'puzzle', 'id' => 'refuted-99-0-down', 'kind' => 'refuted', 'place' => [99, 0] }]
+    assert_equal({ open: 3, by_place: { '81-0' => { 'unexpected_arrival' => 1, 'contradiction' => 1 }, '99-0' => { 'refuted' => 1 } } }, Koholint::Summary.puzzles(events))
   end
 
   def test_leaving_a_place_before_its_people_repeat_themselves_is_a_symptom
