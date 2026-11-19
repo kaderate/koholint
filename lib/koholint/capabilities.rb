@@ -97,7 +97,7 @@ module Koholint
       Digest::SHA256.hexdigest(JSON.generate(entries.sort_by { |entry| entry['id'] }) + (exits.empty? ? '' : JSON.generate(exits)))
     end
 
-    def empty_digest = digest([], [])
+    def empty_digest = digest([])
 
     def publish(entries, id, why) = change(entries, id, 'operational', why, from: %w[validated deprecated])
 
