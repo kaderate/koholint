@@ -65,7 +65,7 @@ module Koholint
           @ledger = context[:ledger]
           @talk_log = context[:talk_log]
           @log = context[:explore_log]
-          @walked = (@log ? @log.walked(@place) : []) | [@start.cell].compact
+          @walked = (@log ? @log.walked(@place) | @log.stood(@place) : []) | [@start.cell].compact
           @fresh = @log && !@log.surveyed?(@place)
           grid = context[:grid]
           @known = grid && Known.new(grid, @walked)
@@ -335,7 +335,8 @@ module Koholint
           clear = clearable(from, safe_to)
           return order(clear) if clear.any?
 
-          frontier = gather(from, safe_to) { |cell, direction| frontier_kind(cell, direction) }
+          objects = object_cells
+          frontier = gather(from, safe_to) { |cell, direction| frontier_kind(cell, direction) unless objects.include?(neighbour(cell, direction)) }
           return order(frontier) if frontier.any? && opened?
 
           if @aim[:place] && @aim[:place] != @place
@@ -364,15 +365,44 @@ module Koholint
           path_to = ->(cell) { @planner.path(from: @cell, to: cell) }
           safe_to = ->(cell) { @planner.path(from: @cell, to: cell, cross_margin: false) }
           untried(@cell, path_to).any? || clearable(@cell, safe_to).any? ||
-            ((opened? || untried(@cell, nil).any?) && gather(@cell, safe_to) { |cell, direction| frontier_kind(cell, direction) }.any?)
+            ((opened? || untried(@cell, nil).any?) && gather(@cell, safe_to) { |cell, direction| frontier_kind(cell, direction) unless object_cells.include?(neighbour(cell, direction)) }.any?)
         end
+
+        def object_cells = @clearing ? @clearing.cells.keys : []
 
         # A cleared object opens cells no survey has seen, so the frontiers behind it count as work here.
         def opened? = @clearing&.uses&.any? { |use| use[:effect] }
 
         def clearable(from, path_to)
           cells = @clearing ? @clearing.cells.keys - @walls - @failed : []
-          cells.empty? ? [] : gather(from, path_to) { |cell, direction| frontier_kind(cell, direction) if cells.include?(neighbour(cell, direction)) }
+          return [] if cells.empty?
+
+          gather(from, path_to) { |cell, direction| frontier_kind(cell, direction) if cells.include?(neighbour(cell, direction)) }
+            .select { |candidate| leads_on?(neighbour(*candidate.values_at(:cell, :direction)), cells, path_to) }
+        end
+
+        # Objects are cut only on the way to an untried exit or door or to an unknown cell that is not one, past cells no path reaches.
+        def leads_on?(start, cells, path_to)
+          patch = [start]
+          patch.each do |cell|
+            return true if untried_door?([cell[0] - 1, cell[1]])
+
+            DIRECTIONS.each do |direction|
+              ahead = neighbour(cell, direction)
+              return true if ahead.nil? ? exit_kind(cell, direction) : unknown?(ahead, direction, cells)
+              next if ahead.nil? || patch.include?(ahead)
+
+              patch << ahead if cells.include?(ahead) || (@known.known?(ahead) && !@known.static_sprite(*ahead) && !path_to.(ahead))
+            end
+          end
+          false
+        end
+
+        def untried_door?(cell) = @doors.include?(cell) && !@log&.door_tried?(@place, cell)
+
+        def unknown?(cell, direction, cells)
+          !cells.include?(cell) && !@walked.include?(cell) && !@walls.include?(cell) && !@known.static_sprite(*cell) &&
+            UNKNOWN.include?(@known.passable(*cell, direction))
         end
 
         def routed(from, path_to)
@@ -434,7 +464,7 @@ module Koholint
         end
 
         def exit_kind(cell, direction)
-          return nil if neighbour(cell, direction) || @log&.tried?(@place, cell, direction) || @log&.side_left?(@place, direction) ||
+          return nil if neighbour(cell, direction) || @log&.tried?(@place, cell, direction) || @log&.side_crossed?(@place, direction) ||
                         @exits.any? { |exit| exit[:outcome] == :left && exit[:direction] == direction }
 
           :exit

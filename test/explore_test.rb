@@ -828,10 +828,157 @@ class ExploreTest < Minitest::Test
     Koholint::Skills::Clearing.define_singleton_method(:of) { |_context| clearing }
     result, = explore(rows, truth: CLOSED)
     assert_equal :no_frontier, result[:stopped_by]
-    assert_equal [[4, 5, :left]], result[:crossed]
+    assert_empty result[:crossed], "objects among known cells lead nowhere"
     assert_operator result[:frames], :<, 20
   ensure
     Koholint::Skills::Clearing.define_singleton_method(:of, original) if original
+  end
+
+  def with_clearing(cells)
+    clearing = Struct.new(:cells) do
+      def uses = []
+      def active? = false
+      def start(*) = nil
+    end.new(cells.to_h { |cell| [cell, :skill] })
+    original = Koholint::Skills::Clearing.method(:of)
+    Koholint::Skills::Clearing.define_singleton_method(:of) { |_context| clearing }
+    yield
+  ensure
+    Koholint::Skills::Clearing.define_singleton_method(:of, original) if original
+  end
+
+  def test_an_object_is_cut_only_on_the_way_to_an_unknown_cell_that_is_not_one
+    with_clearing([[2, 4], [2, 5]]) do
+      result, = explore(with(CLOSED, [2, 4], '?', [2, 5], '?'), limit: 1)
+      assert_nil result[:target], 'objects among known cells lead nowhere'
+      result, = explore(with(CLOSED, [2, 4], '?', [2, 5], '?', [2, 6], '?'), limit: 1)
+      assert_equal({ kind: :frontier, row: 3, col: 5, direction: :up }, result[:target], 'objects in front of an unknown cell are cut')
+    end
+    log = Koholint::ExploreLog.new
+    log.absorb({ from: { room: 1, map: 0 }, exits: [{ row: 0, col: 5, direction: :up, outcome: :left, to: [3, 0] }] })
+    with_clearing([[0, 4], [1, 4]]) do
+      result, = explore(with(CLOSED, [0, 4], '?', [1, 4], '?'), explore_log: log, limit: 1)
+      assert_nil result[:target], 'objects on a border already crossed lead nowhere'
+    end
+  end
+
+  def test_an_object_in_front_of_a_cell_link_stood_in_on_an_earlier_visit_is_no_frontier
+    log = Koholint::ExploreLog.new
+    log.note({ skill: 'walk', from: { room: 1, map: 0, row: 4, col: 3 }, to: { room: 1, map: 0, row: 4, col: 4 }, crossed: [[4, 3, :right]] })
+    with_clearing([[4, 4]]) do
+      result, = explore(with(CLOSED, [4, 4], '?', [4, 5], '?'), explore_log: log, limit: 1)
+      refute_equal [4, 3, :right], result[:target]&.values_at(:row, :col, :direction)
+    end
+  end
+
+  def test_an_object_is_worth_cutting_only_when_an_untried_door_lies_behind_it
+    rows = with(CLOSED, [3, 7], '?', [2, 8], '#', [4, 8], '#', [2, 7], '#', [4, 7], '#')
+    with_clearing([[3, 7]]) do
+      result, = explore(rows, limit: 1)
+      assert_nil result[:target], 'nothing lies behind the object'
+      result, = explore(rows, objects: -> { [{ kind: 'door', cell: [2, 8] }] }, limit: 1)
+      assert_equal({ kind: :door, row: 3, col: 8, direction: :up }, result[:target])
+    end
+  end
+
+  def test_a_side_known_only_as_an_assumed_way_back_is_an_untried_exit
+    log = Koholint::ExploreLog.new
+    log.absorb({ from: { room: 17, map: 0 }, exits: [{ row: 0, col: 5, direction: :up, outcome: :left, to: [1, 0] }] })
+    log.absorb({ from: { room: 1, map: 0 }, survey: { sides: { down: [{ row: 7, col: 5 }] }, doors: [] } })
+    assert log.side_left?(PLACE, :down)
+    refute log.side_crossed?(PLACE, :down)
+    assert log.surveyed_untried?(PLACE)
+    result, = explore(with(CLOSED, [7, 5], '.'), exits: [[[7, 5], :down]], explore_log: log, limit: 1)
+    assert_equal({ kind: :exit, row: 7, col: 5, direction: :down }, result[:target])
+    log.absorb({ from: { room: 1, map: 0 }, exits: [{ row: 7, col: 5, direction: :down, outcome: :left, to: [17, 0] }] })
+    assert log.side_crossed?(PLACE, :down)
+    refute log.surveyed_untried?(PLACE)
+  end
+
+  def test_a_way_unreachable_from_the_side_entered_on_two_visits_is_not_routed_through_that_side
+    log = Koholint::ExploreLog.new
+    walk = ->(from, to, direction) { log.note({ skill: 'walk', params: { direction: }, from: { room: from, map: 0, row: 3, col: 5 }, to: { room: to, map: 0, row: 3, col: 5 } }) }
+    [[17, 18, 'right'], [18, 19, 'right'], [17, 1, 'up'], [1, 2, 'right'], [2, 3, 'right'], [3, 19, 'down'], [19, 18, 'left'], [18, 17, 'left']].each { |hop| walk.(*hop) }
+    assert_equal [18, 0], log.route([17, 0], goal: [19, 0])[:next]
+    walk.(17, 18, 'right')
+    log.absorb({ from: { room: 18, map: 0 }, unreachable: ['right'] })
+    assert_equal [18, 0], log.route([17, 0], goal: [19, 0])[:next], 'one visit cannot tell'
+    walk.(18, 17, 'left')
+    walk.(17, 18, 'right')
+    log.absorb({ from: { room: 18, map: 0 }, unreachable: ['right'] })
+    assert_equal [1, 0], log.route([17, 0], goal: [19, 0])[:next]
+    assert_equal [17, 0], log.route([18, 0], goal: [19, 0])[:next], 'inside the place too, the way is not taken from that side'
+    walk.(18, 19, 'right')
+    assert_equal [18, 0], log.route([17, 0], goal: [19, 0])[:next], 'a crossing from that side reopens the way'
+  end
+
+  def test_a_place_cut_off_from_one_side_is_still_routed_through_from_another
+    log = Koholint::ExploreLog.new
+    walk = ->(from, to, direction) { log.note({ skill: 'walk', params: { direction: }, from: { room: from, map: 0, row: 3, col: 5 }, to: { room: to, map: 0, row: 3, col: 5 } }) }
+    [[17, 18, 'right'], [18, 19, 'right'], [17, 1, 'up'], [1, 2, 'right'], [2, 18, 'down'], [18, 17, 'left']].each { |hop| walk.(*hop) }
+    2.times do
+      walk.(17, 18, 'right')
+      log.absorb({ from: { room: 18, map: 0 }, unreachable: ['right'] })
+      walk.(18, 17, 'left')
+    end
+    assert_equal [[2, 0], [18, 0], [19, 0]], log.path([17, 0], goal: [19, 0]).map { |hop| hop[:to] }.last(3), 'entered from above, 18 still leads right'
+  end
+
+  def test_a_way_cut_off_from_the_only_side_that_reaches_a_place_leaves_no_route_to_it
+    log = Koholint::ExploreLog.new
+    walk = ->(from, to, direction) { log.note({ skill: 'walk', params: { direction: }, from: { room: from, map: 0, row: 3, col: 5 }, to: { room: to, map: 0, row: 3, col: 5 } }) }
+    [[17, 18, 'right'], [18, 19, 'right'], [19, 18, 'left'], [18, 17, 'left']].each { |hop| walk.(*hop) }
+    2.times do
+      walk.(17, 18, 'right')
+      log.absorb({ from: { room: 18, map: 0 }, unreachable: ['right'] })
+      walk.(18, 17, 'left')
+    end
+    assert_nil log.path([17, 0], goal: [19, 0]), 'routing back and forth through it would only shuttle'
+  end
+
+  def cut_between(log, walk)
+    [[17, 18, 'right'], [18, 19, 'right'], [19, 18, 'left'], [18, 17, 'left']].each { |hop| walk.(*hop) }
+    2.times do
+      walk.(17, 18, 'right')
+      log.absorb({ from: { room: 18, map: 0 }, unreachable: ['right'] })
+      walk.(18, 17, 'left')
+    end
+  end
+
+  def test_a_cut_way_reopens_with_a_new_context
+    log = Koholint::ExploreLog.new
+    walk = ->(from, to, direction) { log.note({ skill: 'walk', params: { direction: }, from: { room: from, map: 0, row: 3, col: 5 }, to: { room: to, map: 0, row: 3, col: 5 } }) }
+    log.in_context({ 'milestone' => 'none', 'held' => [1] })
+    cut_between(log, walk)
+    assert_nil log.path([17, 0], goal: [19, 0])
+    log.in_context({ 'milestone' => 'none', 'held' => [1] })
+    assert_nil log.path([17, 0], goal: [19, 0]), 'the same context keeps the cut'
+    log.in_context({ 'milestone' => 'none', 'held' => [1, 2] })
+    assert_equal [[18, 0], [19, 0]], log.path([17, 0], goal: [19, 0]).map { |hop| hop[:to] }
+  end
+
+  def test_a_cut_way_expires_after_a_few_more_visits
+    log = Koholint::ExploreLog.new
+    walk = ->(from, to, direction) { log.note({ skill: 'walk', params: { direction: }, from: { room: from, map: 0, row: 3, col: 5 }, to: { room: to, map: 0, row: 3, col: 5 } }) }
+    cut_between(log, walk)
+    (Koholint::ExploreLog::CUT_VISITS - 1).times do
+      walk.(17, 18, 'right')
+      walk.(18, 17, 'left')
+    end
+    assert_nil log.path([17, 0], goal: [19, 0])
+    walk.(17, 18, 'right')
+    walk.(18, 17, 'left')
+    assert_equal [[18, 0], [19, 0]], log.path([17, 0], goal: [19, 0]).map { |hop| hop[:to] }
+  end
+
+  def test_a_rebuilt_log_reopens_cuts_at_the_context_change_the_trace_records
+    walk = ->(from, to, direction, frame) { { 'type' => 'action', 'frame' => frame, 'skill' => 'walk', 'result' => { 'skill' => 'walk', 'params' => { 'direction' => direction }, 'from' => { 'room' => from, 'map' => 0, 'row' => 3, 'col' => 5 }, 'to' => { 'room' => to, 'map' => 0, 'row' => 3, 'col' => 5 } } } }
+    blocked = ->(frame) { { 'type' => 'action', 'frame' => frame, 'skill' => 'explore', 'result' => { 'from' => { 'room' => 18, 'map' => 0 }, 'unreachable' => ['right'] } } }
+    decision = ->(frame, held) { { 'type' => 'decision', 'frame' => frame, 'input' => { 'milestone' => 'none', 'inventory' => held } } }
+    events = [decision.(0, []), walk.(17, 18, 'right', 1), walk.(18, 19, 'right', 2), walk.(19, 18, 'left', 3), walk.(18, 17, 'left', 4),
+              walk.(17, 18, 'right', 5), blocked.(6), walk.(18, 17, 'left', 7), walk.(17, 18, 'right', 8), blocked.(9), walk.(18, 17, 'left', 10)]
+    assert_nil Koholint::ExploreLog.from_events(events).path([17, 0], goal: [19, 0])
+    refute_nil Koholint::ExploreLog.from_events(events + [decision.(11, [2])]).path([17, 0], goal: [19, 0])
   end
 
   def test_a_new_cell_between_wall_probes_resets_the_stall

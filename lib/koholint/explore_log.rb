@@ -6,6 +6,7 @@ require 'koholint/navigation/planner'
 module Koholint
   class ExploreLog
     TRIED_AT = 2
+    CUT_VISITS = 4
     OPPOSITE = { up: :down, down: :up, left: :right, right: :left }.freeze
 
     def self.from_events(events)
@@ -13,6 +14,7 @@ module Koholint
       events.each do |event|
         log.screen(event['place'], event['grid']) if event['type'] == 'screen'
         if event['type'] == 'decision'
+          log.in_context(Exits.context(event['input'])) if event['input']
           Array(event['puzzles_offered']).each { |place| log.restore_offer(place, Exits.context(event['input'] || {})) }
           entry = event['puzzle_entry']
           log.enter_puzzle(entry['place'], Exits.context(event['input'] || {}), entry['texts']) if entry
@@ -57,6 +59,8 @@ module Koholint
       @context = nil
       @puzzle_offers = Set.new
       @puzzle_entries = Set.new
+      @cut_off = {}
+      @cut_seen = {}
     end
 
     # The exit bench's measured edges and benches for the current context (Exits.for_context); they fill ways this run never crossed.
@@ -72,7 +76,9 @@ module Koholint
     def bench_concluded?(place) = %w[leads_on depends_on_context].include?(bench_of(place)&.dig('status'))
 
     # The milestone and items held now (Exits.context): a puzzle objective is offered once per place and context in a run.
+    # A new item or milestone may open what was cut off.
     def in_context(context)
+      [@cut_off, @cut_seen].each(&:clear) if @context && context != @context
       @context = context
     end
 
@@ -99,7 +105,9 @@ module Koholint
       keep(place, parse_survey(survey).merge(provisional: provisional?(result))) if survey.is_a?(Hash)
       @explored_since_clear << place if (@looks.any? { |_, record| record[:wins].positive? } || Ledger.pick(result, :clears)) && !@explored_since_clear.include?(place)
       note_pocket(place, result)
+      side = @entered[place]
       Array(Ledger.pick(result, :exits)).each { |exit| take_exit(place, exit) }
+      Array(Ledger.pick(result, :unreachable)).each { |via| cut_off(place, side, via.is_a?(Array) ? via : via.to_s.to_sym) } if side
       drop_unreachable(place, result) if Ledger.pick(result, :dead_end)
       Array(Ledger.pick(result, :offered)).each { |object| offer(place, cell_of(object)) }
       Array(Ledger.pick(result, :walls)).each { |wall| (@walls[place] << cell_of(wall)).uniq! }
@@ -298,6 +306,11 @@ module Koholint
 
     def side_left?(place, direction) = ways(place).key?(direction.to_sym)
 
+    # A way back assumed and never crossed is still a frontier.
+    def side_crossed?(place, direction) = side_left?(place, direction) && !@assumed.include?([place, direction.to_sym])
+
+    def stood(place) = @stood.fetch(place, []).dup
+
     def door_tried?(place, cell) = tried?(place, [cell[0] + 1, cell[1]], :up)
 
     # A door Link has walked through, recognised or not as a door object (98/0's way into 189/10 is not one).
@@ -312,7 +325,7 @@ module Koholint
       return true if survey[:provisional]
       return survey[:pending] unless survey[:pending].nil?
 
-      survey[:sides].any? { |side, cells| !side_left?(place, side) && cells.any? { |cell| !tried?(place, cell, side) } } ||
+      survey[:sides].any? { |side, cells| !side_crossed?(place, side) && cells.any? { |cell| !tried?(place, cell, side) } } ||
         survey[:doors].any? { |cell| !door_tried?(place, cell) }
     end
 
@@ -340,18 +353,23 @@ module Koholint
       nil
     end
 
+    # A place is searched once per side it is entered by, since a way cut off from one side may be reached from another.
     def search(from, goal:, avoid:, skip:, tier:)
-      seen = { from => nil }
-      queue = [from]
+      start = [from, @entered[from]]
+      seen = { start => nil }
+      queue = [start]
       until queue.empty?
-        place = queue.shift
-        return hops_to(seen, place) if place != from && (goal ? place == goal : untried?(place) && !skip.include?(place))
+        state = queue.shift
+        place, came = state
+        return hops_to(seen, state) if place != from && (goal ? place == goal : untried?(place) && !skip.include?(place))
 
         ways(place).each do |key, to|
-          next if seen.key?(to) || pocket?(to, key) || (place == from && avoid.include?(key)) || beyond?(tier, place, key)
+          ahead = [to, OPPOSITE[key]]
+          next if seen.key?(ahead) || pocket?(to, key) || (place == from && avoid.include?(key)) || beyond?(tier, place, key) ||
+                  cut?(place, came, key)
 
-          seen[to] = [place, key]
-          queue << to
+          seen[ahead] = [state, key]
+          queue << ahead
         end
       end
       nil
@@ -396,6 +414,7 @@ module Koholint
     # Leaving a place by another way than the side Link came in by proves that landing leads on: it is never a pocket.
     def crossed(place, way, to, door: false)
       came = @entered[place]
+      @cut_off.delete([place, came, way])
       @through << [place, came] if came && came != way && !@through.include?([place, came])
       @entered[to] = (OPPOSITE[way] unless door)
     end
@@ -411,6 +430,14 @@ module Koholint
         @edges[place].delete(key)
       end
     end
+
+    # A way no path reaches from the side Link entered by, on two visits, is not routed through that side for CUT_VISITS more visits.
+    def cut_off(place, side, via)
+      key = [place, side, via]
+      @cut_off[key] = @visits[place] if again?(@cut_seen, key, place)
+    end
+
+    def cut?(place, side, via) = (at = @cut_off[[place, side, via]]) && @visits[place] - at < CUT_VISITS
 
     def again?(seen, key, place)
       return true if seen.key?(key) && seen[key] != @visits[place]
@@ -462,10 +489,10 @@ module Koholint
 
     def hops_to(seen, goal)
       hops = []
-      place = goal
-      while seen[place]
-        hops.unshift({ via: seen[place][1], to: place })
-        place = seen[place][0]
+      state = goal
+      while seen[state]
+        hops.unshift({ via: seen[state][1], to: state[0] })
+        state = seen[state][0]
       end
       hops
     end
