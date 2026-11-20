@@ -65,6 +65,7 @@ module Koholint
       @cut_seen = {}
       @unmet = {}
       @met = Set.new
+      @spent_cuts = Set.new
     end
 
     # The exit bench's measured edges and benches for the current context (Exits.for_context); they fill ways this run never crossed.
@@ -82,7 +83,7 @@ module Koholint
     # The milestone and items held now (Exits.context): a puzzle objective is offered once per place and context in a run.
     # A new item or milestone may open what was cut off.
     def in_context(context)
-      [@cut_off, @cut_seen].each(&:clear) if @context && context != @context
+      [@cut_off, @cut_seen, @spent_cuts].each(&:clear) if @context && context != @context
       @context = context
     end
 
@@ -354,9 +355,12 @@ module Koholint
     end
 
     # skip: places not to aim at (a loop's own places), still crossed on the way.
+    # lifted: the route needs a cut way, which only an explore with no aim takes.
     def route(from, goal: nil, avoid: [], skip: [])
-      hops = path(from, goal:, avoid:, skip:) or return nil
-      { goal: hops.last[:to], next: hops.first[:to], via: hops.first[:via] }
+      hops, lifted = lifting_path(from, goal:, avoid:, skip:)
+      return nil unless hops
+
+      { goal: hops.last[:to], next: hops.first[:to], via: hops.first[:via], **(lifted ? { lifted: true } : {}) }
     end
 
     # Where a loop goes when no place has untried work: the reachable place entered least, nearest first, outside the loop.
@@ -369,16 +373,25 @@ module Koholint
     # Ways that led to one place first (a way back is assumed only across a crossing its hypothesis predicted), then ways that led to two.
     TIERS = %i[consistent contradicted].freeze
 
-    def path(from, goal: nil, avoid: [], skip: [])
-      TIERS.each do |tier|
-        found = search(from, goal:, avoid:, skip:, tier:)
-        return found if found
+    def path(from, goal: nil, avoid: [], skip: []) = lifting_path(from, goal:, avoid:, skip:)&.first
+
+    # With no work reachable under the cuts, live cuts not yet tried in their episode are ignored, oldest first; a route to a goal keeps them all.
+    def lifting_path(from, goal:, avoid:, skip:)
+      lifted = []
+      loop do
+        TIERS.each do |tier|
+          found = search(from, goal:, avoid:, skip:, tier:, lifted:)
+          return [found, lifted.any?] if found
+        end
+        return nil if goal
+
+        cut = live_cuts.find { |key| !lifted.include?(key) && !@spent_cuts.include?(key) } or return nil
+        lifted << cut
       end
-      nil
     end
 
     # A place is searched once per side it is entered by, since a way cut off from one side may be reached from another.
-    def search(from, goal:, avoid:, skip:, tier:)
+    def search(from, goal:, avoid:, skip:, tier:, lifted: [])
       start = [from, @entered[from]]
       seen = { start => nil }
       queue = [start]
@@ -390,7 +403,7 @@ module Koholint
         ways(place).each do |key, to|
           ahead = [to, OPPOSITE[key]]
           next if seen.key?(ahead) || pocket?(to, key) || (place == from && avoid.include?(key)) || beyond?(tier, place, key) ||
-                  cut?(place, came, key)
+                  (cut?(place, came, key) && !lifted.include?([place, came, key]))
 
           seen[ahead] = [state, key]
           queue << ahead
@@ -439,6 +452,7 @@ module Koholint
     def crossed(place, way, to, door: false)
       came = @entered[place]
       @cut_off.delete([place, came, way])
+      @spent_cuts.delete([place, came, way])
       @through << [place, came] if came && came != way && !@through.include?([place, came])
       @entered[to] = (OPPOSITE[way] unless door)
     end
@@ -455,13 +469,20 @@ module Koholint
       end
     end
 
-    # A way no path reaches from the side Link entered by, on two visits, is not routed through that side for CUT_VISITS more visits.
+    # A way no path reaches from the side Link entered by, on two visits, is not routed through that side for CUT_VISITS more visits;
+    # found unreachable again while cut, after a route lifted it, the cut is spent and no route lifts it again in this episode.
     def cut_off(place, side, via)
       key = [place, side, via]
-      @cut_off[key] = @visits[place] if again?(@cut_seen, key, place)
+      return @spent_cuts << key if cut?(*key)
+      return unless again?(@cut_seen, key, place)
+
+      @spent_cuts.delete(key)
+      @cut_off[key] = @visits[place]
     end
 
     def cut?(place, side, via) = (at = @cut_off[[place, side, via]]) && @visits[place] - at < CUT_VISITS
+
+    def live_cuts = @cut_off.keys.select { |key| cut?(*key) }
 
     def again?(seen, key, place)
       return true if seen.key?(key) && seen[key] != @visits[place]
