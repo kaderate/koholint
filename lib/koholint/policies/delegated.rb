@@ -151,6 +151,7 @@ module Koholint
         @asked = false
         @leads.note_held(Items.held_ids(state))
         @explore_log.in_context(Exits.context(state))
+        @zero_watch.in_context(Exits.context(state))
         @explore_log.use_bench(Exits.for_context(@exits, Exits.context(state))) if @exits
         @puzzles_offered = []
         entry = @puzzle_ask if decision_point.name == :choose_objective
@@ -158,7 +159,9 @@ module Koholint
         @puzzle_ask = nil if entry
         result = result.merge(puzzles_offered: @puzzles_offered) unless @puzzles_offered.empty?
         result = result.merge(puzzle_entry: entry) if entry
-        @autopilot&.model_called(state:, objective: @objectives.current, news: !Array(result[:leads]).empty? || !result[:goal].nil?) if @asked
+        news = !Array(result[:leads]).empty? || !result[:goal].nil?
+        @autopilot&.model_called(state:, objective: @objectives.current, news:) if @asked
+        @zero_watch.news! if news
         notes = @revisit.notes + @notes
         @notes = []
         puzzles = @explore_log.new_puzzles(place: [state.room_id, state.map_id], cell: state.cell)
@@ -248,7 +251,8 @@ module Koholint
         return unless choice.key?(:skill)
 
         @autopilot&.acted(skill: choice[:skill], outcome:) unless @revisit_acting
-        @zero_watch.note(place: Ledger.place_of(outcome[:from]) || [state.room_id, state.map_id], skill: choice[:skill], stop: outcome[:stopped_by], frames: outcome[:frames])
+        @zero_watch.note(place: Ledger.place_of(outcome[:from]) || [state.room_id, state.map_id], skill: choice[:skill], stop: outcome[:stopped_by], frames: outcome[:frames],
+                         cells: outcome[:cells_walked], to: Ledger.place_of(outcome[:to]))
         @frame = frame
         @page += 1 if choice[:skill] == 'advance_dialogue'
         unless state.phase == :dialogue

@@ -954,6 +954,32 @@ class ExploreTest < Minitest::Test
     assert_nil log.path([17, 0], goal: [19, 0]), 'routing back and forth through it would only shuttle'
   end
 
+  def test_with_no_work_reachable_under_the_cuts_each_cut_is_lifted_once_oldest_first
+    log = Koholint::ExploreLog.new
+    walk = ->(from, to, direction) { log.note({ skill: 'walk', params: { direction: }, from: { room: from, map: 0, row: 3, col: 5 }, to: { room: to, map: 0, row: 3, col: 5 } }) }
+    [[17, 18, 'right'], [18, 19, 'right'], [19, 18, 'left'], [18, 17, 'left'], [17, 33, 'down'], [33, 34, 'right'], [34, 33, 'left'], [33, 17, 'up']].each { |hop| walk.(*hop) }
+    [[17, 0], [18, 0], [33, 0]].each { |place| log.absorb({ from: { room: place[0], map: 0, row: 3, col: 5 }, survey: { sides: {}, doors: [], pending: false } }) }
+    [[33, 'right', 'up'], [18, 'right', 'left']].each do |room, way, back|
+      2.times do
+        walk.(17, room, room == 18 ? 'right' : 'down')
+        log.absorb({ from: { room:, map: 0 }, unreachable: [way] })
+        walk.(room, 17, back)
+      end
+    end
+    assert_nil log.path([17, 0], goal: [19, 0]), 'a goal route keeps every cut'
+    assert_equal [[33, 0], [34, 0]], log.path([17, 0]).map { |hop| hop[:to] }, 'the cut through 33 is the older one'
+    assert log.route([17, 0])[:lifted]
+    [[33, 'right', 'down', 'up'], [18, 'right', 'right', 'left']].each do |room, way, there, back|
+      walk.(17, room, there)
+      log.absorb({ from: { room:, map: 0 }, unreachable: [way] })
+      walk.(room, 17, back)
+    end
+    assert_nil log.route([17, 0]), 'each cut is lifted once per episode, so both tried leave no route'
+    log.in_context({ 'milestone' => 'none', 'held' => [1] })
+    log.in_context({ 'milestone' => 'none', 'held' => [1, 2] })
+    refute log.route([17, 0])[:lifted], 'a new context clears the cuts and what was spent'
+  end
+
   def cut_between(log, walk)
     [[17, 18, 'right'], [18, 19, 'right'], [19, 18, 'left'], [18, 17, 'left']].each { |hop| walk.(*hop) }
     2.times do

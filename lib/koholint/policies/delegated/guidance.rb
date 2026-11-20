@@ -162,6 +162,9 @@ module Koholint
           fight = @autopilot.fight_choice(state:, entities: entities_now)
           return fight.tap { @autopilot_acting = true } if fight
 
+          door = @autopilot.door_choice(state:, doors: objects_now.select { |object| object[:kind].to_s == 'door' }.map { |object| object[:cell] })
+          return door.tap { @autopilot_acting = true } if door
+
           place = [state.room_id, state.map_id]
           trial = @autopilot.try_choice(state:, objective: @objectives.current, entities: entities_now, tried: ->(type) { @explore_log.met?(place, type) })
           return trial.tap { @autopilot_acting = true } if trial
@@ -207,7 +210,7 @@ module Koholint
           @objectives.start(frame: state.frame, **objective, target: ({ kind: 'place', place: away[:goal] } if away), autopilot: true)
           @autopilot&.adopt(@objectives.current)
           goal = (route || away)&.dig(:goal)
-          context[:aim] = { place: goal } if goal
+          context[:aim] = { place: goal } if goal && !route&.dig(:lifted)
           choice = decision_point.name == :choose_objective ? objective.dup : EXPLORE
           what = if away then "no place has untried work: explore toward #{goal.join('-')}, the reachable place entered least"
                  else "explore #{route ? "toward #{goal.join('-')}" : 'here'}, the nearest place with untried work outside the loop"
@@ -220,15 +223,20 @@ module Koholint
           place = [state.room_id, state.map_id]
           return unless decision_point.name == :choose_skill && !@sequence && @zero_watch.due?(place)
 
-          _, skill, stop = @zero_watch.key
-          count = @zero_watch.count
-          @notes << { kind: 'stuck', detail: "zero-frame: #{skill} #{stop} #{count} times in a row in #{place.join('-')}" }
-          route = @zero_watch.explore? && @explore_log.route(place)
-          context[:aim] = { place: route[:goal] } if route
-          choice = route ? EXPLORE : ZERO_WAIT
+          skill, stop, count, mark = @zero_watch.streak.values_at(:skill, :stop, :count, :mark)
+          detail = mark == ZeroWatch::MARK ? "zero-frame: #{skill} #{stop} #{count} times in a row" : "no cell walked: #{skill} #{stop} #{count} times on this visit"
+          @notes << { kind: 'stuck', detail: "#{detail} in #{place.join('-')}" }
+          route = @explore_log.route(place) if @zero_watch.explore?
+          away = @explore_log.least_visited(place) if @zero_watch.explore? && !route
+          goal = (route || away)&.dig(:goal)
+          context[:aim] = { place: goal } if goal && !route&.dig(:lifted)
+          choice = goal ? EXPLORE : ZERO_WAIT
           @zero_watch.capping(choice[:skill])
-          what = route ? "explore toward #{route[:goal].join('-')}, the nearest place with untried work" : "wait #{ZERO_WAIT[:params][:frames]} frames before asking again"
-          { choice:, justification: "#{skill} ended #{stop} #{ZeroWatch::MARK} #{count} times here: #{what}",
+          what = if route then "explore toward #{goal.join('-')}, the nearest place with untried work"
+                 elsif away then "no place has untried work: explore toward #{goal.join('-')}, the reachable place entered least"
+                 else "wait #{ZERO_WAIT[:params][:frames]} frames before asking again"
+                 end
+          { choice:, justification: "#{skill} ended #{stop} #{mark} #{count} times here: #{what}",
             confidence: 1.0, agent: 'delegated', latency_ms: 0, cost_usd: 0.0, fallback: false, autopilot: true, prompt: nil, image: nil }
         end
 

@@ -8,6 +8,9 @@ module Koholint
     CHAIN_FRAMES = 2400
     BENIGN = %w[new_place known_place budget untried_object tried].freeze
     ARRIVED = %w[new_place known_place].freeze
+    TALKED = 'talked'.freeze
+    TALK_ENDS = %w[done no_response].freeze
+    DOOR_STEP = { skill: 'walk', params: { direction: 'up', cells: 2 } }.freeze
     RETURNS = 3
     EXPLORING = %w[new_place leave_place new_text].freeze
     CHOICE = { skill: 'explore', params: {} }.freeze
@@ -54,6 +57,7 @@ module Koholint
       @walled = []
       @untried = []
       @tries = 0
+      @goto_done = false
     end
 
     def adopt(objective) = @objective = objective&.dig(:id)
@@ -64,11 +68,10 @@ module Koholint
       note_struck(skill, outcome) if outcome.is_a?(Hash)
       @walled |= [outcome[:params][:direction].to_s] if skill.to_s == 'walk' && outcome.is_a?(Hash) && outcome[:params].is_a?(Hash) && walled?(outcome)
       explored = skill.to_s == 'explore' && outcome.is_a?(Hash)
-      @stop = if explored then outcome[:stopped_by].to_s
-              elsif @trying && skill.to_s == 'talk_to' then 'tried'
-              end
+      @stop = stop_after(skill.to_s, outcome.is_a?(Hash) ? outcome[:stopped_by].to_s : nil)
       @trying = false
       @untried = Array(outcome[:untried_objects]).map { |cell| [cell[:row], cell[:col]] } if explored
+      @goto_done = skill.to_s == 'goto' ? outcome.is_a?(Hash) && outcome[:stopped_by].to_s == 'done' : skill.to_s == 'wait' && @goto_done
       to = outcome[:to] if @stop == 'known_place'
       @returns[[to[:room], to[:map]]] += 1 if to.is_a?(Hash) && @returns
     end
@@ -78,16 +81,16 @@ module Koholint
 
       target = objective&.dig(:target)
       first = follow && target && !@acted
-      return "last stop #{@stop || 'not an explore'}" unless first || BENIGN.include?(@stop)
+      return "last stop #{@stop || 'not an explore'}" unless first || BENIGN.include?(@stop) || @stop == TALKED
       return 'target followed' if target && @acted && follow && follow[:skill] != 'explore'
 
-      common = common_hold(state, news: !target)
+      common = common_hold(state, news: !target || @stop == TALKED)
       return common if common
       return 'objective changed' unless objective && objective[:id] == @objective
 
       kind = objective.dig(:predicate, :kind).to_s
       return "objective #{kind}" unless EXPLORING.include?(kind) || target
-      return 'no way to follow the target' if target && !follow
+      return 'no way to follow the target' if target && !follow && !ARRIVED.include?(@stop) && @stop != TALKED
 
       cap_hold(state) if caps
     end
@@ -95,7 +98,7 @@ module Koholint
     # A thing on screen never tried is tried once with talk_to before exploring on, nearest first: the sprites the last explore offered,
     # and uncatalogued entities of a type never aimed at here. Tries cost no call, so TRY_LIMIT per visit bounds them, not the chain caps.
     def try_choice(state:, objective:, entities:, tried:)
-      return unless state.cell && !hold_reason(state:, objective:, caps: false)
+      return unless state.cell && !objective&.dig(:target) && !hold_reason(state:, objective:, caps: false)
 
       here = [state.room_id, state.map_id]
       @tries = 0 unless @try_place == here
@@ -165,6 +168,18 @@ module Koholint
         confidence: 1.0, agent: 'delegated', latency_ms: 0, cost_usd: 0.0, fallback: false, autopilot: true, prompt: nil, image: nil }
     end
 
+    # After a goto that ended on the cell right below a door, step through the door without a call.
+    def door_choice(state:, doors:)
+      return unless @since && @goto_done && state.cell && !common_hold(state)
+
+      row, col = state.cell
+      return unless Array(doors).include?([row - 1, col])
+
+      @goto_done = false
+      { choice: DOOR_STEP, justification: "autopilot: step up through the door at (#{row - 1},#{col}) the goto ended below", confidence: 1.0,
+        agent: 'delegated', latency_ms: 0, cost_usd: 0.0, fallback: false, autopilot: true, prompt: nil, image: nil }
+    end
+
     def objective_hold(state:, last:)
       return 'no model call yet' unless @since
       return "last stop #{@stop || 'not an explore'}" unless ARRIVED.include?(@stop)
@@ -197,6 +212,15 @@ module Koholint
       end
       to = outcome[:to]
       @struck = { place: nil, types: [] } if to.is_a?(Hash) && @struck[:place] && [to[:room], to[:map]] != @struck[:place]
+    end
+
+    # A try stays benign whatever it met, through the dialogue it opened; only a talk the model chose ends as talked.
+    def stop_after(skill, stop)
+      return stop if skill == 'explore'
+      return 'tried' if @trying || (%w[advance_dialogue wait].include?(skill) && @stop == 'tried')
+      return TALKED if (skill == 'talk_to' && TALK_ENDS.include?(stop)) || (%w[advance_dialogue wait].include?(skill) && @stop == TALKED)
+
+      nil
     end
 
     def walled?(outcome) = outcome[:stopped_by].to_s == 'blocked' || (outcome[:stopped_by].to_s == 'danger' && outcome[:frames].to_i.zero?)

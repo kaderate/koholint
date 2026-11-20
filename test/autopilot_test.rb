@@ -110,11 +110,85 @@ class AutopilotTest < Minitest::Test
 
   def test_a_non_explore_action_or_no_model_call_yet_holds
     pilot = primed
-    pilot.acted(skill: 'talk_to', outcome: { stopped_by: :done })
+    pilot.acted(skill: 'goto', outcome: { stopped_by: :done })
     assert_nil pilot.next_choice(state: state, objective: objective)
     fresh = Koholint::Autopilot.new
     fresh.acted(skill: 'explore', outcome: { stopped_by: :new_place })
     assert_equal 'no model call yet', fresh.hold_reason(state: state, objective: objective)
+  end
+
+  def test_a_dialogue_that_ended_without_news_continues_and_one_with_news_holds
+    pilot = primed
+    pilot.acted(skill: 'talk_to', outcome: { stopped_by: :done })
+    pilot.acted(skill: 'advance_dialogue', outcome: { stopped_by: :done })
+    pilot.acted(skill: 'wait', outcome: { stopped_by: :done })
+    assert_equal({ skill: 'explore', params: {} }, pilot.next_choice(state: state, objective: objective)[:choice])
+    pilot = primed
+    pilot.acted(skill: 'talk_to', outcome: { stopped_by: :no_response })
+    assert_nil pilot.hold_reason(state: state, objective: objective)
+    pilot.acted(skill: 'talk_to', outcome: { stopped_by: :no_path })
+    assert_equal 'last stop not an explore', pilot.hold_reason(state: state, objective: objective)
+    pilot = primed
+    pilot.acted(skill: 'advance_dialogue', outcome: { stopped_by: :done })
+    assert_equal 'last stop not an explore', pilot.hold_reason(state: state, objective: objective), 'a dialogue the model did not ask for'
+    person = objective('new_text').merge(target: { kind: 'person', place: [1, 0] })
+    news = Koholint::Autopilot.new
+    news.model_called(state: state, objective: person, news: true)
+    news.acted(skill: 'talk_to', outcome: { stopped_by: :done })
+    news.acted(skill: 'advance_dialogue', outcome: { stopped_by: :done })
+    assert_equal 'new lead or goal', news.hold_reason(state: state, objective: person)
+  end
+
+  def test_a_try_stays_benign_whatever_it_met_and_through_its_dialogue
+    entities = [{ kind: :unknown, type: 79, cell: [1, 1] }]
+    %i[done no_response no_path frame_cap].each do |stop|
+      pilot = primed
+      pilot.try_choice(state: state(frame: 400), objective:, entities:, tried: ->(_) { false })
+      pilot.acted(skill: 'talk_to', outcome: { stopped_by: stop })
+      pilot.acted(skill: 'advance_dialogue', outcome: { stopped_by: :done })
+      pilot.acted(skill: 'wait', outcome: { stopped_by: :done })
+      assert_nil pilot.hold_reason(state: state(frame: 500), objective:), stop
+    end
+  end
+
+  def test_a_try_does_not_fire_under_a_targeted_objective_after_an_arrival
+    person = objective('new_text').merge(target: { kind: 'person', place: [146, 0] })
+    pilot = Koholint::Autopilot.new
+    pilot.model_called(state: state, objective: person)
+    pilot.acted(skill: 'explore', outcome: { stopped_by: :known_place })
+    assert_nil pilot.hold_reason(state: state, objective: person), 'the arrival itself continues'
+    assert_nil pilot.try_choice(state: state(frame: 400), objective: person, entities: [{ kind: :unknown, type: 79, cell: [1, 1] }], tried: ->(_) { false })
+  end
+
+  def test_an_arrival_continues_when_the_objective_target_cannot_be_followed_from_here
+    person = objective('new_text').merge(target: { kind: 'person', place: [146, 0] })
+    pilot = Koholint::Autopilot.new
+    pilot.model_called(state: state, objective: person)
+    pilot.acted(skill: 'explore', outcome: { stopped_by: :known_place })
+    assert_nil pilot.hold_reason(state: state, objective: person)
+    pilot.acted(skill: 'explore', outcome: { stopped_by: :untried_object })
+    assert_equal 'no way to follow the target', pilot.hold_reason(state: state, objective: person)
+  end
+
+  def test_a_goto_that_ends_below_a_door_steps_through_it_once
+    pilot = primed
+    below = state(x: 88, y: 92)
+    row, col = below.cell
+    door = [row - 1, col]
+    assert_nil pilot.door_choice(state: below, doors: [door]), 'no goto yet'
+    pilot.acted(skill: 'goto', outcome: { stopped_by: :done })
+    pilot.acted(skill: 'wait', outcome: { stopped_by: :done })
+    assert_nil pilot.door_choice(state: below, doors: [[row - 1, col + 1]])
+    result = pilot.door_choice(state: below, doors: [door])
+    assert_equal [{ skill: 'walk', params: { direction: 'up', cells: 2 } }, 0.0, true], result.values_at(:choice, :cost_usd, :autopilot)
+    assert_nil pilot.door_choice(state: below, doors: [door]), 'once per goto'
+    pilot.acted(skill: 'goto', outcome: { stopped_by: :no_path })
+    assert_nil pilot.door_choice(state: below, doors: [door])
+    pilot.acted(skill: 'goto', outcome: { stopped_by: :done })
+    assert_nil pilot.door_choice(state: state(x: 88, y: 92, hp: 20), doors: [door]), 'a model trigger holds it'
+    news = primed(news: true)
+    news.acted(skill: 'goto', outcome: { stopped_by: :done })
+    assert_nil news.door_choice(state: below, doors: [door])
   end
 
   def test_each_model_trigger_holds
@@ -184,7 +258,7 @@ class AutopilotTest < Minitest::Test
     pilot.model_called(state: state, objective: person)
     assert_equal talk, pilot.next_choice(state: state, objective: person, follow: talk)[:choice]
     pilot.acted(skill: 'talk_to', outcome: { stopped_by: :done })
-    assert_equal 'last stop not an explore', pilot.hold_reason(state: state, objective: person, follow: talk)
+    assert_equal 'target followed', pilot.hold_reason(state: state, objective: person, follow: talk)
     pilot.model_called(state: state, objective: target)
     pilot.acted(skill: 'walk', outcome: { stopped_by: :done })
     assert_equal 'last stop not an explore', pilot.hold_reason(state: state, objective: target, follow:)
