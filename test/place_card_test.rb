@@ -72,8 +72,24 @@ class PlaceCardTest < Minitest::Test
       trace.emit(:place_card, frame: 90, **card)
       Koholint::Leads.write_world(dir)
       place = JSON.parse(File.read(File.join(dir, 'world.json'))).fetch('places').fetch('162-0')
-      assert_equal [[47, [1, 4], 1, 0, true]], place['unknown'].map { |entity| entity.values_at('type', 'cell', 'tries', 'answered', 'moved') }
+      assert_equal [{ 'type' => 47, 'tries' => 1, 'answered' => 0, 'moved' => true }], place['unknown_types']
+      assert_equal [[47, [1, 4]]], place['unknown'].map { |entity| entity.values_at('type', 'cell') }
       assert_equal ['shield'], place['items_gained']
+    end
+  end
+
+  def test_world_tries_are_stored_once_per_type_and_moved_only_when_talk_to_chased_it
+    Dir.mktmpdir do |dir|
+      trace = Koholint::Trace.new(File.join(dir, 'trace.jsonl'))
+      two = card.merge(unknown: [{ type: 47, cell: [1, 4], moves: nil }, { type: 47, cell: [2, 6], moves: nil }])
+      trace.emit(:place_card, frame: 10, **two)
+      trace.emit(:action, frame: 50, skill: 'talk_to', params: { row: 1, col: 4 },
+                          result: { stopped_by: 'done', talked: true, target_type: 47, from: { room: 162, map: 0 } })
+      trace.emit(:place_card, frame: 90, **card.merge(unknown: [{ type: 47, cell: [3, 3], moves: nil }]))
+      Koholint::Leads.write_world(dir)
+      place = JSON.parse(File.read(File.join(dir, 'world.json'))).fetch('places').fetch('162-0')
+      assert_equal [{ 'type' => 47, 'tries' => 1, 'answered' => 1, 'moved' => false }], place['unknown_types']
+      refute place['unknown'].first.key?('tries')
     end
   end
 

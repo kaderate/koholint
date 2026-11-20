@@ -1,3 +1,4 @@
+require 'set'
 require 'koholint/navigation/threat'
 require 'koholint/perception'
 
@@ -11,6 +12,7 @@ module Koholint
     EXPLORING = %w[new_place leave_place new_text].freeze
     CHOICE = { skill: 'explore', params: {} }.freeze
     FIGHT_LIMIT = 8
+    TRY_LIMIT = 6
     FIGHT_FRAMES = 900
     FIGHT_REACH = 2
     FIGHT_FLOOR = 16
@@ -32,6 +34,9 @@ module Koholint
       @struck = { place: nil, types: [] }
       @untried = []
       @trying = false
+      @aimed = Set.new
+      @tries = 0
+      @try_place = nil
     end
 
     def model_called(state:, objective:, news: false)
@@ -48,6 +53,7 @@ module Koholint
       @disengaged = 0
       @walled = []
       @untried = []
+      @tries = 0
     end
 
     def adopt(objective) = @objective = objective&.dig(:id)
@@ -87,21 +93,26 @@ module Koholint
     end
 
     # A thing on screen never tried is tried once with talk_to before exploring on, nearest first: the sprites the last explore offered,
-    # and uncatalogued entities of a type never aimed at here. A try costs no call, so the chain caps do not hold it.
+    # and uncatalogued entities of a type never aimed at here. Tries cost no call, so TRY_LIMIT per visit bounds them, not the chain caps.
     def try_choice(state:, objective:, entities:, tried:)
       return unless state.cell && !hold_reason(state:, objective:, caps: false)
 
       here = [state.room_id, state.map_id]
+      @tries = 0 unless @try_place == here
+      @try_place = here
+      return if @tries >= TRY_LIMIT
+
       struck = @struck[:place] == here ? @struck[:types] : []
       things = @untried.map { |cell| [cell, nil] } +
-               Array(entities).select { |entity| entity[:kind].to_s == 'unknown' && entity[:cell] && !struck.include?(entity[:type]) && !tried.(entity[:type]) }
+               Array(entities).select { |entity| entity[:kind].to_s == 'unknown' && entity[:cell] && !struck.include?(entity[:type]) && !tried.(entity[:type]) && !@aimed.include?([here, entity[:type]]) }
                               .map { |entity| [entity[:cell], entity[:type]] }
       row, col = state.cell
       nearest = things.min_by { |(r, c), _| [(r - row).abs + (c - col).abs, r, c] } or return
       cell, type = nearest
       @untried.delete(cell)
+      @aimed << [here, type] if type
       @trying = true
-      @chain += 1
+      @tries += 1
       what = type ? "entity type #{type}" : 'object'
       { choice: { skill: 'talk_to', params: { row: cell[0], col: cell[1] } }, justification: "autopilot: try the never-tried #{what} at (#{cell.join(',')})",
         confidence: 1.0, agent: 'delegated', latency_ms: 0, cost_usd: 0.0, fallback: false, autopilot: true, prompt: nil, image: nil }

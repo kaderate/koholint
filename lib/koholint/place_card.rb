@@ -42,7 +42,7 @@ module Koholint
       end
     end
 
-    # Every talk_to aimed at an entity type in a place: how many, how many opened a dialogue, and whether the entity was tracked moving.
+    # Every talk_to aimed at an entity type in a place: how many, how many opened a dialogue, and whether talk_to had to chase it.
     def tries(events)
       found = Hash.new { |hash, key| hash[key] = { tries: 0, answered: 0, moved: false } }
       events.each do |event|
@@ -67,11 +67,8 @@ module Koholint
       cards.group_by { |event| event['place'] }.to_h do |place, seen|
         last = seen.last
         card = last.slice('people', 'enemies', 'creatures', 'unknown', 'signs', 'objects', 'doors', 'exits')
-        card['unknown'] = card['unknown'].map do |entity|
-          tried = tries[[place, entity['type']]]
-          layouts = seen.map { |event| Array(event['unknown']).select { |other| other['type'] == entity['type'] }.map { |other| other['cell'] }.sort }.reject(&:empty?).uniq
-          entity.merge('tries' => tried[:tries], 'answered' => tried[:answered], 'moved' => tried[:moved] || layouts.size > 1)
-        end
+        types = Array(card['unknown']).map { |entity| entity['type'] }.uniq
+        card['unknown_types'] = types.map { |type| { 'type' => type, **tries[[place, type]].transform_keys(&:to_s) } } unless types.empty?
         card['items_gained'] = items[place].map { |event| event['name'] || event['item'] } if items[place]
         card['people'] = card['people'].map do |person|
           name = log.name_of(place, person['type'])

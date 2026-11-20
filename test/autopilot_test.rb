@@ -44,6 +44,24 @@ class AutopilotTest < Minitest::Test
     assert_equal({ skill: 'explore', params: {} }, pilot.next_choice(state: state(frame: 600), objective:)[:choice])
   end
 
+  def test_tries_are_bounded_per_visit_by_the_autopilot_itself_and_leave_the_chain_alone
+    pilot = primed
+    never = ->(_) { false }
+    one = [{ kind: :unknown, type: 79, cell: [1, 1] }]
+    refute_nil pilot.try_choice(state: state(frame: 400), objective:, entities: one, tried: never)
+    pilot.acted(skill: 'talk_to', outcome: { stopped_by: :no_path })
+    assert_nil pilot.try_choice(state: state(frame: 410), objective:, entities: one, tried: never), 'the aimed type is remembered without the result'
+    many = (90..99).map { |type| { kind: :unknown, type:, cell: [type % 8, 1] } }
+    tries = (1..10).map do |i|
+      choice = pilot.try_choice(state: state(frame: 500 + i), objective:, entities: many, tried: never)
+      pilot.acted(skill: 'talk_to', outcome: { stopped_by: :no_response }) if choice
+      choice
+    end
+    assert_equal Koholint::Autopilot::TRY_LIMIT - 1, tries.compact.size
+    assert_equal 0, pilot.chain
+    refute_nil pilot.try_choice(state: state(frame: 700, room_id: 164), objective:, entities: many, tried: never), 'a new visit starts a new count'
+  end
+
   def test_the_objects_an_explore_offered_are_tried_before_exploring_on
     pilot = Koholint::Autopilot.new
     pilot.model_called(state:, objective:)
