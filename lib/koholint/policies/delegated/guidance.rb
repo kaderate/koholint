@@ -1,3 +1,5 @@
+require 'digest'
+
 module Koholint
   module Policies
     class Delegated
@@ -89,15 +91,23 @@ module Koholint
 
         MODEL_HOLD_FRAMES = 1800
 
-        # Entering a place with an open puzzle and texts read there ends a harness objective, once per visit, so the model chooses the next
-        # one with those texts in front of it; an objective of the model's own is left alone.
+        # Entering a place with an open puzzle and texts read there ends a harness objective so the model chooses the next one with those
+        # texts in front of it, once per context and set of texts read there: no new text, no new paid ask. An objective of the model's own
+        # is left alone.
         def note_puzzle_entry(state)
           place = [state.room_id, state.map_id]
-          @puzzle_ask = nil unless @puzzle_ask == place
-          return unless state.phase(booted: true) == :playing && puzzle_open?(place) && @leads.texts_at(place).any? && @explore_log.enter_puzzle(place)
+          @puzzle_ask = nil unless @puzzle_ask&.dig(:place) == place
+          return unless state.phase(booted: true) == :playing && puzzle_open?(place)
+          return if @objectives.current && !@objectives.current[:autopilot]
 
-          @objectives.abandon(frame: state.frame, reason: 'puzzle') if @objectives.current&.dig(:autopilot)
-          @puzzle_ask = place unless @objectives.current
+          texts = @leads.texts_at(place)
+          return if texts.empty?
+
+          entry = { place:, texts: Digest::SHA256.hexdigest(texts.map { |text| Dialogues.key(text) }.sort.join("\n"))[0, 16] }
+          return unless @explore_log.enter_puzzle(place, Exits.context(state), entry[:texts])
+
+          @objectives.abandon(frame: state.frame, reason: 'puzzle') if @objectives.current
+          @puzzle_ask = entry
         end
 
         # A loop break replaces a harness objective at once, and one the model wrote only after MODEL_HOLD_FRAMES.

@@ -36,7 +36,9 @@ module Koholint
                  decision: { prompt_sha: ->(v) { v.is_a?(String) && v.match?(/\A\h{64}\z/) }, image: ->(v) { [true, false].include?(v) },
                               plan: ->(v) { v.is_a?(String) && v.length <= 200 && !v.match?(/[[:cntrl:]]/) }, autopilot: ->(v) { v == true },
                               puzzles_offered: ->(v) { v.is_a?(Array) && v.all? { |place| place.is_a?(Array) && place.size == 2 && place.all?(Integer) } },
-                              puzzle_entry: ->(v) { v.is_a?(Array) && v.size == 2 && v.all?(Integer) } },
+                              puzzle_entry: lambda { |v|
+                                v.is_a?(Hash) && (place = v[:place] || v['place']).is_a?(Array) && place.size == 2 && place.all?(Integer) && (v[:texts] || v['texts']).to_s.match?(/\A\h{16}\z/)
+                              } },
                  dialogue: { speaker: ->(v) { v.is_a?(String) && v.length.between?(1, SPEAKER_MAX) && !v.match?(/[[:cntrl:]]/) },
                              conversation: ->(v) { v.is_a?(String) && v.match?(/\A\h{16}\z/) }, cached: ->(v) { [true, false].include?(v) } },
                  lead: { where: LABEL.(40) },

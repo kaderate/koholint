@@ -258,28 +258,90 @@ class DelegatedAutopilotTest < Minitest::Test
     assert_operator lines.sum { |line| line.size - Koholint::Policies::Delegated::TEXT_PREFIX.size - 4 }, :<=, Koholint::Policies::Delegated::TEXTS_BUDGET + 20
   end
 
-  def test_entering_a_puzzle_place_ends_a_harness_objective_once_per_visit_and_asks_the_model_with_its_texts
+  def entered(p, room, frame, **over)
+    now = state(room_id: room, map_id: 0, frame:, **over)
+    p.observe(now, frame:)
+    now
+  end
+
+  def test_entering_a_puzzle_place_asks_the_model_once_per_context_and_set_of_texts_read_there
     client = ScriptedClient.new(objective: ok('title' => 'follow what was said here', 'predicate' => { 'kind' => 'new_place' }), default: explore)
     log = Koholint::ExploreLog.from_events(puzzle_crossings)
     p = puzzled_policy(client, log)
     p.instance_variable_set(:@autopilot, Koholint::Autopilot.new)
     @objectives.start(frame: 90, **Koholint::Policies::Delegated::AUTO_OBJECTIVE, autopilot: true)
-    here = state(room_id: 81, map_id: 0, frame: 100)
-    p.observe(here, frame: here.frame)
+    here = entered(p, 81, 100)
     assert_equal ['abandoned', 'puzzle'], @objectives.history.last.values_at(:outcome, :reason).map(&:to_s)
     point = p.decision_point_for(here)
     assert_equal :choose_objective, point.name
     result = p.decide(point, here, { grid: OpenGrid.new })
     assert_includes client.calls.last[:system], 'choose the next objective', 'the model chooses, not the harness explore objective'
     assert_includes client.calls.last[:prompt], 'TEXT READ HERE (quoted in full while a puzzle here is open): « Hé hé! Tu vas te perdre dans la Forêt. »'
-    assert_equal [[81, 0], 'follow what was said here'], [result[:puzzle_entry], @objectives.current[:title]]
+    assert_equal [[81, 0], 'follow what was said here'], [result[:puzzle_entry][:place], @objectives.current[:title]]
+    restart = lambda do |frame|
+      @objectives.abandon(frame:, reason: 'test')
+      @objectives.start(frame:, **Koholint::Policies::Delegated::AUTO_OBJECTIVE, autopilot: true)
+    end
+    entered(p, 97, 110)
+    restart.(120)
+    entered(p, 81, 130)
+    assert @objectives.current[:autopilot], 'a second entry with no new text asks nothing'
+    p.instance_variable_get(:@leads).note_read('Un texte nouveau lu ici.', place: [81, 0])
+    entered(p, 97, 140)
+    restart.(145)
+    entered(p, 81, 150)
+    assert_equal 'puzzle', @objectives.history.last[:reason], 'a new text read there asks again'
+    entered(p, 97, 170)
+    restart.(175)
+    entered(p, 81, 180, item_a: 1)
+    assert_equal 'puzzle', @objectives.history.last[:reason], 'and so does a new context'
+    decision = { 'type' => 'decision', 'frame' => 100, 'input' => JSON.parse(JSON.generate(here.to_h)), 'puzzle_entry' => JSON.parse(JSON.generate(result[:puzzle_entry])) }
+    resumed = Koholint::ExploreLog.from_events(puzzle_crossings + [decision])
+    refute resumed.enter_puzzle([81, 0], Koholint::Exits.context(here), result[:puzzle_entry][:texts]), 'a resume keeps the entry'
+  end
+
+  def test_one_ask_clears_the_entry_whatever_comes_back_and_leaving_clears_it_too
+    client = ScriptedClient.new(objective: ok('title' => 'x', 'predicate' => { 'kind' => 'leave_place', 'place' => [5, 5] }), default: explore)
+    p = puzzled_policy(client, Koholint::ExploreLog.from_events(puzzle_crossings))
+    p.instance_variable_set(:@autopilot, Koholint::Autopilot.new)
+    here = entered(p, 81, 100)
+    refute_nil p.instance_variable_get(:@puzzle_ask)
+    refused = p.decide(p.decision_point_for(here), here, { grid: OpenGrid.new })
+    assert refused[:refused]
+    assert_nil p.instance_variable_get(:@puzzle_ask), 'a refusal ends the ask'
+    other = puzzled_policy(ScriptedClient.new(default: explore), Koholint::ExploreLog.from_events(puzzle_crossings))
+    entered(other, 81, 100)
+    refute_nil other.instance_variable_get(:@puzzle_ask)
+    entered(other, 97, 110)
+    assert_nil other.instance_variable_get(:@puzzle_ask), 'leaving the place drops the ask'
+  end
+
+  def test_an_entry_under_a_model_objective_is_kept_for_later
+    p = puzzled_policy(ScriptedClient.new(default: explore), Koholint::ExploreLog.from_events(puzzle_crossings))
+    @objectives.start(frame: 90, title: 'mine', predicate: { kind: 'new_place' })
+    entered(p, 81, 100)
+    assert_equal ['mine', nil], [@objectives.current[:title], p.instance_variable_get(:@puzzle_ask)]
     @objectives.abandon(frame: 110, reason: 'test')
-    @objectives.start(frame: 110, **Koholint::Policies::Delegated::AUTO_OBJECTIVE, autopilot: true)
-    later = state(room_id: 81, map_id: 0, frame: 120)
-    p.observe(later, frame: later.frame)
-    assert @objectives.current[:autopilot], 'once per visit'
-    decision = { 'type' => 'decision', 'frame' => 100, 'input' => JSON.parse(JSON.generate(here.to_h)), 'puzzle_entry' => [81, 0] }
-    refute Koholint::ExploreLog.from_events(puzzle_crossings + [decision]).enter_puzzle([81, 0]), 'a resume keeps the entry of this visit'
+    entered(p, 97, 120)
+    entered(p, 81, 130)
+    refute_nil p.instance_variable_get(:@puzzle_ask), 'the entry was never asked, so it asks now'
+  end
+
+  def test_a_pending_puzzle_ask_holds_back_the_loop_break_until_the_model_answered
+    client = ScriptedClient.new(objective: [new_place, new_place], default: explore)
+    log = Koholint::ExploreLog.from_events(puzzle_crossings)
+    p = puzzled_policy(client, log)
+    leads = p.instance_variable_get(:@leads)
+    leads.instance_variable_get(:@read_at).delete([81, 0])
+    ([81, 97] * 6).each_with_index { |room, i| entered(p, room, 100 + (i * 100)) }
+    refute_nil p.instance_variable_get(:@loop_watch).pending_hint
+    leads.note_read('Un texte lu ici.', place: [81, 0])
+    here = entered(p, 81, 1000)
+    first = p.decide(p.decision_point_for(here), here, { grid: OpenGrid.new })
+    assert_equal 'claude', first[:agent], 'the model is asked, the loop break waits'
+    @objectives.abandon(frame: 1010, reason: 'test')
+    second = p.decide(p.decision_point_for(here), here, { grid: OpenGrid.new })
+    assert_match(/\Aloop in/, second[:justification].to_s)
   end
 
   def test_a_model_objective_holds_through_a_loop_for_a_bounded_number_of_frames

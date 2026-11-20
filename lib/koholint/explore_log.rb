@@ -14,7 +14,8 @@ module Koholint
         log.screen(event['place'], event['grid']) if event['type'] == 'screen'
         if event['type'] == 'decision'
           Array(event['puzzles_offered']).each { |place| log.restore_offer(place, Exits.context(event['input'] || {})) }
-          log.enter_puzzle(event['puzzle_entry']) if event['puzzle_entry']
+          entry = event['puzzle_entry']
+          log.enter_puzzle(entry['place'], Exits.context(event['input'] || {}), entry['texts']) if entry
         end
         next unless Ledger.pick(event, :type).to_s == 'action'
 
@@ -81,8 +82,8 @@ module Koholint
 
     def restore_offer(place, context) = @puzzle_offers << [place, context]
 
-    # The first entry of each visit to a puzzle place; nil once this visit was entered.
-    def enter_puzzle(place) = @puzzle_entries.add?([place, @visits[place]])
+    # The first entry of a puzzle place in a context with a set of texts read there (a digest); nil when nothing changed since.
+    def enter_puzzle(place, context, texts) = @puzzle_entries.add?([place, context, texts])
 
     def screen(place, grid)
       @screens[place] = grid if place.is_a?(Array) && grid.is_a?(Array)

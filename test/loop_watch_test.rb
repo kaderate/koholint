@@ -20,6 +20,15 @@ class LoopWatchTest < Minitest::Test
     assert_nil watch.hint
   end
 
+  def test_the_hint_is_dropped_once_link_is_outside_the_looped_places
+    watch = enter(Koholint::LoopWatch.new, [[0, 9], [10, 1], [20, 2], [100, 1], [200, 2], [300, 1], [400, 2], [500, 1], [600, 2], [700, 1]])
+    assert watch.hint
+    enter(watch, [[800, 2]])
+    assert watch.hint
+    enter(watch, [[900, 9]])
+    assert_nil watch.hint
+  end
+
   def test_entries_older_than_the_window_and_a_new_place_do_not_count
     watch = enter(Koholint::LoopWatch.new, [[0, 1], [10, 2], [100, 1], [200, 2], [300, 1], [400, 2], [4000, 1], [4100, 2], [4200, 1]])
     assert_empty watch.notes

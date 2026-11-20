@@ -153,6 +153,7 @@ module Koholint
         @puzzles_offered = []
         entry = @puzzle_ask if decision_point.name == :choose_objective
         result = decide_with(decision_point, state, context)
+        @puzzle_ask = nil if entry
         result = result.merge(puzzles_offered: @puzzles_offered) unless @puzzles_offered.empty?
         result = result.merge(puzzle_entry: entry) if entry
         @autopilot&.model_called(state:, objective: @objectives.current, news: !Array(result[:leads]).empty? || !result[:goal].nil?) if @asked
@@ -332,7 +333,6 @@ module Koholint
         @refusals.clear
         because = nil unless @leads.known?(because)
         picked = @candidate
-        @puzzle_ask = nil
         @objectives.start(frame: state.frame, title: choice[:title], predicate: choice[:predicate], because:, candidate: picked&.dig(:id), target: picked&.dig(:target))
       end
 
