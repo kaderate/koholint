@@ -31,6 +31,11 @@ class CheckpointsTest < Minitest::Test
     assert_equal ['20261114-093702-a0dc', 90_638, 'flow-65'], point.values_at('run', 'frame', 'flow')
   end
 
+  def test_the_catalogue_loads_the_forest_checkpoint_in_129
+    point = Koholint::Checkpoints.load.fetch('forest-129-full-health')
+    assert_equal ['20261120-151729-2ce4', 94_471, 'flow-78'], point.values_at('run', 'frame', 'flow')
+  end
+
   def test_bad_entries_are_refused
     bad = [POINT.except('source'), POINT.merge('extra' => 1), POINT.merge('name' => 'Sword Obtained'), POINT.merge('run' => '9ba1'),
            POINT.merge('frame' => -1), POINT.merge('frame' => '60404'), POINT.merge('flow' => '37'), POINT.merge('source' => ' '), 'sword']
