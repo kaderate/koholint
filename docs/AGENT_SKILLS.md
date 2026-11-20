@@ -114,7 +114,7 @@ The skills, protocols and harness behaviours the agent works with. Versioned wit
   by that budget ends with `... (cut)`.
 - flow-78: explore treats a side known only as the assumed way back (never crossed) as an untried exit; it cuts a clearable object
   only on the way to an untried exit or door or an unknown cell that is not an object, and a cell Link stood in on an earlier visit is
-  never a frontier. A way explore could not reach from the side Link came in by, on two visits, is no longer routed through from that side.
+  never a frontier. A way explore could not reach from the side Link came in by, on two visits, is no longer routed through from that side, until a new item or milestone or 4 more visits of the place.
 - flow-77: entering a place with an open puzzle and texts read there, with no objective of yours current, ends the harness's own objective
   and asks you once for the next objective with those texts in the header; whatever comes back, the harness takes over again after that
   one ask. It asks again only after a new text was read there or with a new item or milestone. A loop hint is dropped once Link is

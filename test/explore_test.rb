@@ -936,6 +936,51 @@ class ExploreTest < Minitest::Test
     assert_nil log.path([17, 0], goal: [19, 0]), 'routing back and forth through it would only shuttle'
   end
 
+  def cut_between(log, walk)
+    [[17, 18, 'right'], [18, 19, 'right'], [19, 18, 'left'], [18, 17, 'left']].each { |hop| walk.(*hop) }
+    2.times do
+      walk.(17, 18, 'right')
+      log.absorb({ from: { room: 18, map: 0 }, unreachable: ['right'] })
+      walk.(18, 17, 'left')
+    end
+  end
+
+  def test_a_cut_way_reopens_with_a_new_context
+    log = Koholint::ExploreLog.new
+    walk = ->(from, to, direction) { log.note({ skill: 'walk', params: { direction: }, from: { room: from, map: 0, row: 3, col: 5 }, to: { room: to, map: 0, row: 3, col: 5 } }) }
+    log.in_context({ 'milestone' => 'none', 'held' => [1] })
+    cut_between(log, walk)
+    assert_nil log.path([17, 0], goal: [19, 0])
+    log.in_context({ 'milestone' => 'none', 'held' => [1] })
+    assert_nil log.path([17, 0], goal: [19, 0]), 'the same context keeps the cut'
+    log.in_context({ 'milestone' => 'none', 'held' => [1, 2] })
+    assert_equal [[18, 0], [19, 0]], log.path([17, 0], goal: [19, 0]).map { |hop| hop[:to] }
+  end
+
+  def test_a_cut_way_expires_after_a_few_more_visits
+    log = Koholint::ExploreLog.new
+    walk = ->(from, to, direction) { log.note({ skill: 'walk', params: { direction: }, from: { room: from, map: 0, row: 3, col: 5 }, to: { room: to, map: 0, row: 3, col: 5 } }) }
+    cut_between(log, walk)
+    (Koholint::ExploreLog::CUT_VISITS - 1).times do
+      walk.(17, 18, 'right')
+      walk.(18, 17, 'left')
+    end
+    assert_nil log.path([17, 0], goal: [19, 0])
+    walk.(17, 18, 'right')
+    walk.(18, 17, 'left')
+    assert_equal [[18, 0], [19, 0]], log.path([17, 0], goal: [19, 0]).map { |hop| hop[:to] }
+  end
+
+  def test_a_rebuilt_log_reopens_cuts_at_the_context_change_the_trace_records
+    walk = ->(from, to, direction, frame) { { 'type' => 'action', 'frame' => frame, 'skill' => 'walk', 'result' => { 'skill' => 'walk', 'params' => { 'direction' => direction }, 'from' => { 'room' => from, 'map' => 0, 'row' => 3, 'col' => 5 }, 'to' => { 'room' => to, 'map' => 0, 'row' => 3, 'col' => 5 } } } }
+    blocked = ->(frame) { { 'type' => 'action', 'frame' => frame, 'skill' => 'explore', 'result' => { 'from' => { 'room' => 18, 'map' => 0 }, 'unreachable' => ['right'] } } }
+    decision = ->(frame, held) { { 'type' => 'decision', 'frame' => frame, 'input' => { 'milestone' => 'none', 'inventory' => held } } }
+    events = [decision.(0, []), walk.(17, 18, 'right', 1), walk.(18, 19, 'right', 2), walk.(19, 18, 'left', 3), walk.(18, 17, 'left', 4),
+              walk.(17, 18, 'right', 5), blocked.(6), walk.(18, 17, 'left', 7), walk.(17, 18, 'right', 8), blocked.(9), walk.(18, 17, 'left', 10)]
+    assert_nil Koholint::ExploreLog.from_events(events).path([17, 0], goal: [19, 0])
+    refute_nil Koholint::ExploreLog.from_events(events + [decision.(11, [2])]).path([17, 0], goal: [19, 0])
+  end
+
   def test_a_new_cell_between_wall_probes_resets_the_stall
     rows = with(CLOSED.map { |line| line.tr('#', '?') }, [4, 7], '?')
     log = Koholint::ExploreLog.new

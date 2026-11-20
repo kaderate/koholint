@@ -6,6 +6,7 @@ require 'koholint/navigation/planner'
 module Koholint
   class ExploreLog
     TRIED_AT = 2
+    CUT_VISITS = 4
     OPPOSITE = { up: :down, down: :up, left: :right, right: :left }.freeze
 
     def self.from_events(events)
@@ -13,6 +14,7 @@ module Koholint
       events.each do |event|
         log.screen(event['place'], event['grid']) if event['type'] == 'screen'
         if event['type'] == 'decision'
+          log.in_context(Exits.context(event['input'])) if event['input']
           Array(event['puzzles_offered']).each { |place| log.restore_offer(place, Exits.context(event['input'] || {})) }
           entry = event['puzzle_entry']
           log.enter_puzzle(entry['place'], Exits.context(event['input'] || {}), entry['texts']) if entry
@@ -57,7 +59,7 @@ module Koholint
       @context = nil
       @puzzle_offers = Set.new
       @puzzle_entries = Set.new
-      @cut_off = Set.new
+      @cut_off = {}
       @cut_seen = {}
     end
 
@@ -74,7 +76,9 @@ module Koholint
     def bench_concluded?(place) = %w[leads_on depends_on_context].include?(bench_of(place)&.dig('status'))
 
     # The milestone and items held now (Exits.context): a puzzle objective is offered once per place and context in a run.
+    # A new item or milestone may open what was cut off.
     def in_context(context)
+      [@cut_off, @cut_seen].each(&:clear) if @context && context != @context
       @context = context
     end
 
@@ -362,7 +366,7 @@ module Koholint
         ways(place).each do |key, to|
           ahead = [to, OPPOSITE[key]]
           next if seen.key?(ahead) || pocket?(to, key) || (place == from && avoid.include?(key)) || beyond?(tier, place, key) ||
-                  @cut_off.include?([place, came, key])
+                  cut?(place, came, key)
 
           seen[ahead] = [state, key]
           queue << ahead
@@ -427,11 +431,13 @@ module Koholint
       end
     end
 
-    # A way no path reaches from the side Link entered by, on two visits, is no longer routed through that side.
+    # A way no path reaches from the side Link entered by, on two visits, is not routed through that side for CUT_VISITS more visits.
     def cut_off(place, side, via)
       key = [place, side, via]
-      @cut_off << key if again?(@cut_seen, key, place)
+      @cut_off[key] = @visits[place] if again?(@cut_seen, key, place)
     end
+
+    def cut?(place, side, via) = (at = @cut_off[[place, side, via]]) && @visits[place] - at < CUT_VISITS
 
     def again?(seen, key, place)
       return true if seen.key?(key) && seen[key] != @visits[place]
