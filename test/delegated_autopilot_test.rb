@@ -206,6 +206,7 @@ class DelegatedAutopilotTest < Minitest::Test
     here = state(room_id: 97, map_id: 0)
     first = p.decide(p.decision_point_for(here), here, { grid: OpenGrid.new })
     assert_includes client.calls.last[:prompt], 'puzzle-81-0'
+    assert_includes client.calls.last[:prompt], 'TEXT READ IN 81-0 (beside the candidate puzzle-81-0): « Hé hé! Tu vas te perdre dans la Forêt. »'
     assert_equal [[81, 0]], first[:puzzles_offered]
     there = state(room_id: 98, map_id: 0, frame: 200)
     p.observe(there, frame: there.frame)
@@ -255,6 +256,48 @@ class DelegatedAutopilotTest < Minitest::Test
     assert lines.last.end_with?('... (cut) »')
     refute lines.first.include?('(cut)')
     assert_operator lines.sum { |line| line.size - Koholint::Policies::Delegated::TEXT_PREFIX.size - 4 }, :<=, Koholint::Policies::Delegated::TEXTS_BUDGET + 20
+  end
+
+  def test_entering_a_puzzle_place_ends_a_harness_objective_once_per_visit_and_asks_the_model_with_its_texts
+    client = ScriptedClient.new(objective: ok('title' => 'follow what was said here', 'predicate' => { 'kind' => 'new_place' }), default: explore)
+    log = Koholint::ExploreLog.from_events(puzzle_crossings)
+    p = puzzled_policy(client, log)
+    p.instance_variable_set(:@autopilot, Koholint::Autopilot.new)
+    @objectives.start(frame: 90, **Koholint::Policies::Delegated::AUTO_OBJECTIVE, autopilot: true)
+    here = state(room_id: 81, map_id: 0, frame: 100)
+    p.observe(here, frame: here.frame)
+    assert_equal ['abandoned', 'puzzle'], @objectives.history.last.values_at(:outcome, :reason).map(&:to_s)
+    point = p.decision_point_for(here)
+    assert_equal :choose_objective, point.name
+    result = p.decide(point, here, { grid: OpenGrid.new })
+    assert_includes client.calls.last[:system], 'choose the next objective', 'the model chooses, not the harness explore objective'
+    assert_includes client.calls.last[:prompt], 'TEXT READ HERE (quoted in full while a puzzle here is open): « Hé hé! Tu vas te perdre dans la Forêt. »'
+    assert_equal [[81, 0], 'follow what was said here'], [result[:puzzle_entry], @objectives.current[:title]]
+    @objectives.abandon(frame: 110, reason: 'test')
+    @objectives.start(frame: 110, **Koholint::Policies::Delegated::AUTO_OBJECTIVE, autopilot: true)
+    later = state(room_id: 81, map_id: 0, frame: 120)
+    p.observe(later, frame: later.frame)
+    assert @objectives.current[:autopilot], 'once per visit'
+    decision = { 'type' => 'decision', 'frame' => 100, 'input' => JSON.parse(JSON.generate(here.to_h)), 'puzzle_entry' => [81, 0] }
+    refute Koholint::ExploreLog.from_events(puzzle_crossings + [decision]).enter_puzzle([81, 0]), 'a resume keeps the entry of this visit'
+  end
+
+  def test_a_model_objective_holds_through_a_loop_for_a_bounded_number_of_frames
+    log = Koholint::ExploreLog.new
+    log.absorb({ from: { room: 163, map: 16 }, exits: [{ row: 3, col: 0, direction: :left, outcome: :left, to: [164, 16] }, { row: 0, col: 5, direction: :up, outcome: :left, to: [165, 16] }],
+                 survey: { sides: { left: [{ row: 3, col: 0 }], up: [{ row: 0, col: 5 }] }, doors: [] } })
+    log.absorb({ from: { room: 164, map: 16 }, exits: [{ row: 3, col: 9, direction: :right, outcome: :left, to: [163, 16] }], survey: { sides: { right: [{ row: 3, col: 9 }] }, doors: [] } })
+    client = ScriptedClient.new(objective: objective(kind: 'reach_place', place: [146, 16]), default: explore)
+    @objectives = Koholint::Objectives.new(trace: trace)
+    p = Koholint::Policies::Delegated.new(client:, registry: Koholint::Skills::Registry.default, objectives: @objectives, manual: '', explore_log: log)
+    results = [163, 164, 163, 164, 163, 164, 163, 164, 163, 164, 163, 164, 163, 164].each_with_index.map do |room, i|
+      now = state(frame: 100 + (i * 150), room_id: room)
+      p.observe(now, frame: now.frame)
+      p.decide(p.decision_point_for(now), now, { grid: })
+    end
+    held = results.first(12).count { |result| result[:justification].to_s.start_with?('loop in') }
+    assert_equal 0, held, 'no loop break while the model objective is younger than MODEL_HOLD_FRAMES'
+    assert results.last(2).any? { |result| result[:justification].to_s.start_with?('loop in') }, 'and the break comes once the hold ran out'
   end
 
   def test_the_exit_bench_applies_only_in_the_context_it_measured

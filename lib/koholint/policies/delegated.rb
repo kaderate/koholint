@@ -140,6 +140,7 @@ module Koholint
         note_loop(state, frame)
         @revisit.observe(state)
         track { @objectives.update(state, frame:) }
+        note_puzzle_entry(state)
       end
 
       def cancel = (@client.cancel if @client.respond_to?(:cancel))
@@ -150,8 +151,10 @@ module Koholint
         @explore_log.in_context(Exits.context(state))
         @explore_log.use_bench(Exits.for_context(@exits, Exits.context(state))) if @exits
         @puzzles_offered = []
+        entry = @puzzle_ask if decision_point.name == :choose_objective
         result = decide_with(decision_point, state, context)
         result = result.merge(puzzles_offered: @puzzles_offered) unless @puzzles_offered.empty?
+        result = result.merge(puzzle_entry: entry) if entry
         @autopilot&.model_called(state:, objective: @objectives.current, news: !Array(result[:leads]).empty? || !result[:goal].nil?) if @asked
         notes = @revisit.notes + @notes
         @notes = []
@@ -329,6 +332,7 @@ module Koholint
         @refusals.clear
         because = nil unless @leads.known?(because)
         picked = @candidate
+        @puzzle_ask = nil
         @objectives.start(frame: state.frame, title: choice[:title], predicate: choice[:predicate], because:, candidate: picked&.dig(:id), target: picked&.dig(:target))
       end
 

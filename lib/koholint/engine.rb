@@ -132,7 +132,8 @@ module Koholint
                                  choice: choice, justification: result[:justification], confidence: result[:confidence],
                                  agent: result[:agent], latency_ms: result[:latency_ms].to_i, cost_usd: result[:cost_usd].to_f, fallback: result[:fallback] || false,
                                  **seen, **(result[:plan] ? { plan: result[:plan] } : {}), **(result[:autopilot] ? { autopilot: true } : {}),
-                                 **(result[:engine_error] ? { engine_error: true } : {}), **(result[:puzzles_offered] ? { puzzles_offered: result[:puzzles_offered] } : {}))
+                                 **(result[:engine_error] ? { engine_error: true } : {}), **(result[:puzzles_offered] ? { puzzles_offered: result[:puzzles_offered] } : {}),
+                                 **(result[:puzzle_entry] ? { puzzle_entry: result[:puzzle_entry] } : {}))
       if choice.key?(:skill)
         activity(:acting, "acting: #{choice[:skill]}", skill: choice[:skill], params: choice[:params])
         outcome = execute(choice, state, chosen.registry, context)

@@ -12,7 +12,10 @@ module Koholint
       log = new
       events.each do |event|
         log.screen(event['place'], event['grid']) if event['type'] == 'screen'
-        Array(event['puzzles_offered']).each { |place| log.restore_offer(place, Exits.context(event['input'] || {})) } if event['type'] == 'decision'
+        if event['type'] == 'decision'
+          Array(event['puzzles_offered']).each { |place| log.restore_offer(place, Exits.context(event['input'] || {})) }
+          log.enter_puzzle(event['puzzle_entry']) if event['puzzle_entry']
+        end
         next unless Ledger.pick(event, :type).to_s == 'action'
 
         result = Ledger.pick(event, :result)
@@ -52,6 +55,7 @@ module Koholint
       @bench = { edges: {}, status: {}, benches: {} }
       @context = nil
       @puzzle_offers = Set.new
+      @puzzle_entries = Set.new
     end
 
     # The exit bench's measured edges and benches for the current context (Exits.for_context); they fill ways this run never crossed.
@@ -76,6 +80,9 @@ module Koholint
     def puzzle_offered?(place) = @puzzle_offers.include?([place, @context])
 
     def restore_offer(place, context) = @puzzle_offers << [place, context]
+
+    # The first entry of each visit to a puzzle place; nil once this visit was entered.
+    def enter_puzzle(place) = @puzzle_entries.add?([place, @visits[place]])
 
     def screen(place, grid)
       @screens[place] = grid if place.is_a?(Array) && grid.is_a?(Array)
