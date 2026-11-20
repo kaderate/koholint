@@ -1,3 +1,5 @@
+require 'digest'
+
 module Koholint
   module Policies
     class Delegated
@@ -69,21 +71,49 @@ module Koholint
 
         # While a puzzle here is open, what was read here is quoted whole (a lead keeps one sentence, and a low one is never shown again),
         # newest first within a character budget, at every objective decision and at the first decision of each visit.
+        # The texts of a puzzle place offered as a candidate travel with the offer, in the same budget.
         def puzzle_texts(place, objective: false)
-          return [] if @explore_log.puzzles(place).empty? || @explore_log.bench_concluded?(place)
-
           @texts_shown ||= Set.new
-          first = @texts_shown.add?([place, @explore_log.visits(place)])
-          return [] unless objective || first
-
+          here = puzzle_open?(place) && (@texts_shown.add?([place, @explore_log.visits(place)]) || objective) ? [[place, TEXT_PREFIX]] : []
+          away = @candidates.filter_map { |candidate| candidate[:target][:place] if candidate[:id].start_with?('puzzle-') && candidate[:target][:place] != place }
+                            .map { |where| [where, "TEXT READ IN #{where.join('-')} (beside the candidate puzzle-#{where.join('-')}): "] }
           left = TEXTS_BUDGET
-          @leads.texts_at(place).reverse.map { |text| text.gsub(/\s+/, ' ').strip }.filter_map do |text|
+          (here + away).flat_map { |where, prefix| @leads.texts_at(where).reverse.map { |text| [prefix, text.gsub(/\s+/, ' ').strip] } }.filter_map do |prefix, text|
             next if left <= 0
 
             shown = text.size > left ? "#{text[0, left]}... (cut)" : text
             left -= text.size
-            "#{TEXT_PREFIX}« #{shown} »"
+            "#{prefix}« #{shown} »"
           end
+        end
+
+        def puzzle_open?(place) = @explore_log.puzzles(place).any? && !@explore_log.bench_concluded?(place)
+
+        MODEL_HOLD_FRAMES = 1800
+
+        # Entering a place with an open puzzle and texts read there ends a harness objective so the model chooses the next one with those
+        # texts in front of it, once per context and set of texts read there: no new text, no new paid ask. An objective of the model's own
+        # is left alone.
+        def note_puzzle_entry(state)
+          place = [state.room_id, state.map_id]
+          @puzzle_ask = nil unless @puzzle_ask&.dig(:place) == place
+          return unless state.phase(booted: true) == :playing && puzzle_open?(place)
+          return if @objectives.current && !@objectives.current[:autopilot]
+
+          texts = @leads.texts_at(place)
+          return if texts.empty?
+
+          entry = { place:, texts: Digest::SHA256.hexdigest(texts.map { |text| Dialogues.key(text) }.sort.join("\n"))[0, 16] }
+          return unless @explore_log.enter_puzzle(place, Exits.context(state), entry[:texts])
+
+          @objectives.abandon(frame: state.frame, reason: 'puzzle') if @objectives.current
+          @puzzle_ask = entry
+        end
+
+        # A loop break replaces a harness objective at once, and one the model wrote only after MODEL_HOLD_FRAMES.
+        def model_hold?(state)
+          current = @objectives.current
+          current && !current[:autopilot] && state.frame - current[:started_frame] < MODEL_HOLD_FRAMES
         end
 
         # Each puzzle is stated once per visit of its place, not in every prompt.
@@ -158,7 +188,7 @@ module Koholint
         # or, when no place has any, goes to the reachable place entered least outside the loop.
         def loop_break(decision_point, state, context)
           hint = @loop_watch.pending_hint
-          return if hint.nil? || @sequence || !%i[choose_skill choose_objective].include?(decision_point.name)
+          return if hint.nil? || @sequence || !%i[choose_skill choose_objective].include?(decision_point.name) || @puzzle_ask || model_hold?(state)
 
           place = [state.room_id, state.map_id]
           looped = hint[:places].map { |at| at.split('-').map(&:to_i) }
@@ -199,7 +229,7 @@ module Koholint
         end
 
         def auto_objective(decision_point, state)
-          return unless @autopilot && decision_point.name == :choose_objective
+          return unless @autopilot && decision_point.name == :choose_objective && !@puzzle_ask
           return if @autopilot.objective_hold(state:, last: @objectives.history.last)
 
           place = [state.room_id, state.map_id]

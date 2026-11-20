@@ -38,6 +38,7 @@ module Koholint
       return if place == @place
 
       @place = place
+      @hint = nil if @hint && !@hint[:places].include?(place.join('-'))
       unless @seen[place]
         @seen[place] = true
         @entries.clear
