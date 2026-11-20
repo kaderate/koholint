@@ -458,6 +458,23 @@ class DelegatedAutopilotTest < Minitest::Test
     assert_equal({ skill: 'wait', params: { frames: 120 } }, result[:choice], 'a harness explore that came back instantly escalates to the wait')
   end
 
+  def test_the_harness_tries_a_never_tried_unknown_entity_once_before_exploring_on
+    client = ScriptedClient.new(objective: new_place, default: explore)
+    p = autopiloted(client)
+    ctx = { grid:, entities: -> { [{ kind: :unknown, type: 79, cell: [2, 2], slot: 3, x: 40, y: 48 }] } }
+    p.prepare(ctx)
+    p.note_card({ place: [163, 16], unknown: [{ type: 79, cell: [2, 2] }] })
+    tours(p, 2)
+    result = p.decide(p.decision_point_for(state(frame: 800)), state(frame: 800), ctx)
+    assert_equal ['delegated', { skill: 'talk_to', params: { row: 2, col: 2 } }], result.values_at(:agent, :choice)
+    p.after_action(choice: result[:choice], outcome: { skill: 'talk_to', params: { row: 2, col: 2 }, stopped_by: 'no_response', talked: false, target_type: 79,
+                                                       from: { room: 163, map: 16, row: 3, col: 4 }, to: { room: 163, map: 16, row: 2, col: 3 } },
+                   state: state(frame: 900), frame: 900)
+    result = p.decide(p.decision_point_for(state(frame: 1000)), state(frame: 1000), ctx)
+    assert_equal ['delegated', { skill: 'explore', params: {} }], result.values_at(:agent, :choice)
+    assert_equal 2, client.calls.size
+  end
+
   def test_untried_objects_continue_and_other_stops_go_to_the_model
     client = ScriptedClient.new(objective: new_place, default: explore)
     results = tours(autopiloted(client), 4, stop: :untried_object)

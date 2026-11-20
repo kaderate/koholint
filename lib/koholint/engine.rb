@@ -162,6 +162,7 @@ module Koholint
       @card_place = place
       card = PlaceCard.build(place:, entities: Entities.read(@emulator), objects: Entities.objects(@emulator), grid:)
       @run.trace.emit(:place_card, frame: state.frame, **card)
+      @policy.note_card(card) if @policy.respond_to?(:note_card)
     end
 
     def carded_place(events)

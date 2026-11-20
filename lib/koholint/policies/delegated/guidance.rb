@@ -162,6 +162,10 @@ module Koholint
           fight = @autopilot.fight_choice(state:, entities: entities_now)
           return fight.tap { @autopilot_acting = true } if fight
 
+          place = [state.room_id, state.map_id]
+          trial = @autopilot.try_choice(state:, objective: @objectives.current, entities: entities_now, tried: ->(type) { @explore_log.met?(place, type) })
+          return trial.tap { @autopilot_acting = true } if trial
+
           follow = follow_choice(state)
           result = @autopilot.next_choice(state:, objective: @objectives.current, follow: follow&.dig(:choice)) or return
           context[:aim] = follow[:aim] if follow&.dig(:aim)
@@ -233,7 +237,7 @@ module Koholint
           return if @autopilot.objective_hold(state:, last: @objectives.history.last)
 
           place = [state.room_id, state.map_id]
-          return unless @explore_log.untried?(place) || @explore_log.route(place)
+          return unless @explore_log.work?(place) || @explore_log.route(place)
           return if unmet_person?(state, place)
 
           @objectives.start(frame: state.frame, **AUTO_OBJECTIVE, autopilot: true)

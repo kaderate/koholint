@@ -119,6 +119,8 @@ module Koholint
         offer_learned(context[:room_objects], context[:held]) if @composites.any? && context[:room_objects]
       end
 
+      def note_card(card) = @explore_log.card(card[:place], Array(card[:unknown]).map { |entity| entity[:type] })
+
       def decision_point_for(state)
         return @screen_points.fetch(screen(state)) if screen(state)
         return @skill_point if locked_waiting?(state) || settling?(state)

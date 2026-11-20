@@ -42,12 +42,37 @@ module Koholint
       end
     end
 
+    # Every talk_to aimed at an entity type in a place: how many, how many opened a dialogue, and whether the entity was tracked moving.
+    def tries(events)
+      found = Hash.new { |hash, key| hash[key] = { tries: 0, answered: 0, moved: false } }
+      events.each do |event|
+        next unless event['type'] == 'action' && event['skill'] == 'talk_to' && event['result'].is_a?(Hash)
+
+        result = event['result']
+        from = result['from'] or next
+        type = result['target_type'] || result.dig('entity', 'type') or next
+        tried = found[[[from['room'], from['map']], type]]
+        tried[:tries] += 1
+        tried[:answered] += 1 if result['talked'] == true
+        tried[:moved] ||= result['tracked'].to_i.positive?
+      end
+      found
+    end
+
     def world(events, names: {})
       log = TalkLog.from_events(events)
       cards = events.select { |event| event['type'] == 'place_card' }
+      tries = tries(events)
+      items = events.select { |event| event['type'] == 'item_gained' && event['place'] }.group_by { |event| event['place'] }
       cards.group_by { |event| event['place'] }.to_h do |place, seen|
         last = seen.last
         card = last.slice('people', 'enemies', 'creatures', 'unknown', 'signs', 'objects', 'doors', 'exits')
+        card['unknown'] = card['unknown'].map do |entity|
+          tried = tries[[place, entity['type']]]
+          layouts = seen.map { |event| Array(event['unknown']).select { |other| other['type'] == entity['type'] }.map { |other| other['cell'] }.sort }.reject(&:empty?).uniq
+          entity.merge('tries' => tried[:tries], 'answered' => tried[:answered], 'moved' => tried[:moved] || layouts.size > 1)
+        end
+        card['items_gained'] = items[place].map { |event| event['name'] || event['item'] } if items[place]
         card['people'] = card['people'].map do |person|
           name = log.name_of(place, person['type'])
           person.merge(**(name ? { 'name' => name } : {}), 'status' => log.last_status(place:, entity: person['type']).to_s)

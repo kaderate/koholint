@@ -48,6 +48,7 @@ module Koholint
           @cells = @who ? covered(@who) : [person]
           @faces = Array(@object&.dig(:faces)).map(&:to_sym)
           @non_person = !@who && !@object && non_person_at(person)
+          @aimed = @who || Array(@entities&.call).find { |entity| entity[:cell] == person }
           super(target: nil, context:, **rest)
           @cause = format(NOT_A_PERSON_CAUSE, @non_person[:type]) if @non_person
           @facing = facing_from(@standing) if @standing
@@ -71,6 +72,7 @@ module Koholint
           merged[:cause] = FREE_CAUSE if @stopped_by == :target_free
           entity = @entity || (faced_entity if scene_response?)
           merged[:entity] = entity if entity
+          merged[:target_type] = @aimed[:type] if @aimed
           merged[:person_cells] = @cells.map { |row, col| { row:, col: } } if @who
           merged[:tracked] = @tracks if @tracks.positive?
           merged
