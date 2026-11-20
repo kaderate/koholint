@@ -45,7 +45,7 @@ module Koholint
 
     def exits(place, grid, explore_log)
       PlaceCard.exits(grid).filter_map do |side, cells|
-        next if explore_log.side_left?(place, side) || cells.all? { |cell| explore_log.tried?(place, cell, side) }
+        next if explore_log.side_crossed?(place, side) || cells.all? { |cell| explore_log.tried?(place, cell, side) }
 
         { id: "exit-#{side}", label: "leave by the #{side} side (open border cells #{cells.map { |r, c| "(#{r},#{c})" }.join(' ')})",
           title: "Leave by the #{side} side", predicate: { kind: 'leave_place', place: }, target: { kind: 'exit', place:, direction: side.to_s } }
