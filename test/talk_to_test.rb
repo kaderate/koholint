@@ -317,6 +317,15 @@ class TalkToTest < Minitest::Test
     assert_equal({ row: 4, col: 7 }, other[:standing_cell])
   end
 
+  def test_the_result_names_the_type_of_the_entity_at_the_target_even_on_a_room_object
+    unknown = { slot: 2, type: 74, x: centre(4, 8)[0], y: centre(4, 8)[1], cell: [4, 8], kind: :unknown }
+    object = [{ object: 153, cell: [4, 8], kind: :object, verified: false }]
+    result, = talk(4, 8, entities: -> { [unknown] }, objects: -> { object })
+    assert_equal 74, result[:target_type]
+    plain, = talk(4, 8)
+    refute plain.key?(:target_type)
+  end
+
   def sign_run(entities)
     x, y = centre(5, 8)
     sign = [{ object: 94, cell: [4, 8], kind: :sign, verified: false, faces: [:up] }]

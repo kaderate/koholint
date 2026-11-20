@@ -138,6 +138,24 @@ class ExploreTest < Minitest::Test
     assert_equal [{ row: 7, col: 5, direction: :down }], result[:tried_exits]
   end
 
+  def test_a_place_whose_last_card_lists_an_uncatalogued_type_never_aimed_at_is_untried_work
+    events = [{ 'type' => 'action', 'skill' => 'explore', 'result' => { from: { room: 1, map: 0 }, survey: { sides: {}, doors: [] },
+                                                                          exits: [{ row: 7, col: 5, direction: :down, outcome: :left, to: [2, 0] }] } },
+              { 'type' => 'action', 'skill' => 'explore', 'result' => { from: { room: 2, map: 0 }, survey: { sides: {}, doors: [] } } }]
+    assert_nil Koholint::ExploreLog.from_events(events).route([1, 0])
+    events << { 'type' => 'place_card', 'place' => [2, 0], 'unknown' => [{ 'type' => 9, 'cell' => [3, 3] }] }
+    assert_nil Koholint::ExploreLog.from_events(events).route([1, 0]), 'type 9 is catalogued since the card'
+    events << { 'type' => 'place_card', 'place' => [2, 0], 'unknown' => [{ 'type' => 79, 'cell' => [3, 3] }, { 'type' => 79, 'cell' => [4, 3] }] }
+    log = Koholint::ExploreLog.from_events(events)
+    assert_equal [2, 0], log.route([1, 0])[:goal]
+    assert log.work?([2, 0])
+    refute log.untried?([2, 0])
+    events << { 'type' => 'action', 'skill' => 'talk_to', 'result' => { 'skill' => 'talk_to', 'from' => { 'room' => 2, 'map' => 0 }, 'target_type' => 79, 'stopped_by' => 'no_path' } }
+    log = Koholint::ExploreLog.from_events(events)
+    assert log.met?([2, 0], 79)
+    assert_nil log.route([1, 0])
+  end
+
   def test_a_side_left_once_is_not_offered_again_from_another_cell
     rows = with(CLOSED, [7, 4], '.', [7, 5], '.')
     log = Koholint::ExploreLog.new

@@ -26,6 +26,61 @@ class AutopilotTest < Minitest::Test
     end
   end
 
+  def test_a_never_tried_unknown_entity_is_tried_nearest_first_and_the_chain_goes_on
+    pilot = primed
+    entities = [{ kind: :unknown, type: 79, cell: [1, 1] }, { kind: :unknown, type: 80, cell: [3, 5] }, { kind: :npc, type: 5, cell: [3, 3] },
+                { kind: :unknown, type: 81, cell: [3, 6] }]
+    met = [80]
+    tried = ->(type) { met.include?(type) }
+    result = pilot.try_choice(state: state(frame: 400), objective:, entities:, tried:)
+    assert_equal({ skill: 'talk_to', params: { row: 3, col: 6 } }, result[:choice])
+    assert_equal [0.0, true], result.values_at(:cost_usd, :autopilot)
+    pilot.acted(skill: 'talk_to', outcome: { stopped_by: :no_response })
+    met << 81
+    assert_equal({ row: 1, col: 1 }, pilot.try_choice(state: state(frame: 500), objective:, entities:, tried:)[:choice][:params])
+    pilot.acted(skill: 'talk_to', outcome: { stopped_by: :no_path })
+    met << 79
+    assert_nil pilot.try_choice(state: state(frame: 600), objective:, entities:, tried:)
+    assert_equal({ skill: 'explore', params: {} }, pilot.next_choice(state: state(frame: 600), objective:)[:choice])
+  end
+
+  def test_tries_are_bounded_per_visit_by_the_autopilot_itself_and_leave_the_chain_alone
+    pilot = primed
+    never = ->(_) { false }
+    one = [{ kind: :unknown, type: 79, cell: [1, 1] }]
+    refute_nil pilot.try_choice(state: state(frame: 400), objective:, entities: one, tried: never)
+    pilot.acted(skill: 'talk_to', outcome: { stopped_by: :no_path })
+    assert_nil pilot.try_choice(state: state(frame: 410), objective:, entities: one, tried: never), 'the aimed type is remembered without the result'
+    many = (90..99).map { |type| { kind: :unknown, type:, cell: [type % 8, 1] } }
+    tries = (1..10).map do |i|
+      choice = pilot.try_choice(state: state(frame: 500 + i), objective:, entities: many, tried: never)
+      pilot.acted(skill: 'talk_to', outcome: { stopped_by: :no_response }) if choice
+      choice
+    end
+    assert_equal Koholint::Autopilot::TRY_LIMIT - 1, tries.compact.size
+    assert_equal 0, pilot.chain
+    refute_nil pilot.try_choice(state: state(frame: 700, room_id: 164), objective:, entities: many, tried: never), 'a new visit starts a new count'
+  end
+
+  def test_the_objects_an_explore_offered_are_tried_before_exploring_on
+    pilot = Koholint::Autopilot.new
+    pilot.model_called(state:, objective:)
+    pilot.acted(skill: 'explore', outcome: { stopped_by: :untried_object, untried_objects: [{ row: 2, col: 4 }] })
+    result = pilot.try_choice(state: state(frame: 400), objective:, entities: [], tried: ->(_) { false })
+    assert_equal({ skill: 'talk_to', params: { row: 2, col: 4 } }, result[:choice])
+    assert_match(/never-tried object at \(2,4\)/, result[:justification])
+    assert_nil pilot.try_choice(state: state(frame: 401), objective:, entities: [], tried: ->(_) { false })
+  end
+
+  def test_a_try_ignores_the_chain_caps_but_not_health_targets_or_other_stops
+    entities = [{ kind: :unknown, type: 79, cell: [1, 1] }]
+    tried = ->(_) { false }
+    refute_nil primed(chain_limit: 0).try_choice(state: state(frame: 400), objective:, entities:, tried:)
+    assert_nil primed.try_choice(state: state(frame: 400, hp: 20), objective:, entities:, tried:)
+    assert_nil primed.try_choice(state: state(frame: 400), objective: objective.merge(target: { kind: 'exit' }), entities:, tried:)
+    assert_nil primed(stop: :blocked).try_choice(state: state(frame: 400), objective:, entities:, tried:)
+  end
+
   def test_a_return_to_a_known_place_does_not_count_in_the_chain
     pilot = primed(stop: :known_place)
     pilot.next_choice(state: state(frame: 400), objective: objective)

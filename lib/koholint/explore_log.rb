@@ -1,3 +1,4 @@
+require 'koholint/entities'
 require 'koholint/exits'
 require 'koholint/geometry'
 require 'koholint/ledger'
@@ -13,6 +14,7 @@ module Koholint
       log = new
       events.each do |event|
         log.screen(event['place'], event['grid']) if event['type'] == 'screen'
+        log.card(event['place'], Array(event['unknown']).map { |entity| entity['type'] }) if event['type'] == 'place_card'
         if event['type'] == 'decision'
           log.in_context(Exits.context(event['input'])) if event['input']
           Array(event['puzzles_offered']).each { |place| log.restore_offer(place, Exits.context(event['input'] || {})) }
@@ -61,6 +63,8 @@ module Koholint
       @puzzle_entries = Set.new
       @cut_off = {}
       @cut_seen = {}
+      @unmet = {}
+      @met = Set.new
     end
 
     # The exit bench's measured edges and benches for the current context (Exits.for_context); they fill ways this run never crossed.
@@ -159,6 +163,26 @@ module Koholint
       note_crossing(result)
       note_looks(from, result) if from
       note_stood(from, result) if from
+      note_met(from, result) if from
+    end
+
+    # The uncatalogued entity types the last card of each place listed; a type no talk_to aimed at there is untried work.
+    def card(place, types)
+      @unmet[place] = types.uniq
+    end
+
+    def met?(place, type) = @met.include?([place, type])
+
+    def unmet(place) = Array(@unmet[place]).reject { |type| met?(place, type) || Entities.catalogue.key?(type) }
+
+    def work?(place) = untried?(place) || unmet(place).any?
+
+    def note_met(place, result)
+      return unless Ledger.pick(result, :skill).to_s == 'talk_to'
+
+      entity = Ledger.pick(result, :entity)
+      type = Ledger.pick(result, :target_type) || (Ledger.pick(entity, :type) if entity.is_a?(Hash))
+      @met << [place, type] if type
     end
 
     # Cells Link entered with any skill, which no object fills.
@@ -361,7 +385,7 @@ module Koholint
       until queue.empty?
         state = queue.shift
         place, came = state
-        return hops_to(seen, state) if place != from && (goal ? place == goal : untried?(place) && !skip.include?(place))
+        return hops_to(seen, state) if place != from && (goal ? place == goal : work?(place) && !skip.include?(place))
 
         ways(place).each do |key, to|
           ahead = [to, OPPOSITE[key]]

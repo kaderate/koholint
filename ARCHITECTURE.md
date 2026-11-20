@@ -92,7 +92,7 @@ screen change 53-66, a knockback 15-16, a door 62 (walk in, loading, walk out).
 table and the room objects and emits a `place_card` event: people (`npc` entities, verified or not), enemies, creatures, unknown
 entities, signs, objects (`object` entities and room objects) with their cells, doors (room objects of kind `door`), and exits
 (border cells believed walkable, by side). `world.json` `places` keeps per place the last card, the visits, the first and last card frames, the
-place name the agent gave (`name`), the names and talk status of the people and whether each sign was read (from the talk log rebuilt from the trace). The
+place name the agent gave (`name`), the names and talk status of the people and whether each sign was read (from the talk log rebuilt from the trace); flow-79: `unknown_types` gives, once per unknown type of the last card, `tries` (talk_to results aimed at that type there, `target_type` or `entity`), `answered` (those that opened a dialogue) and `moved` (talk_to had to chase it, `tracked`), and the place has `items_gained` (its `item_gained` events). The
 agent's context lists the doors of the screen with the cell to walk up from.
 
 **Vision** (`vision/`) — what RAM does not give: `screen_vision` and `screen_snapshot` read the screen,
@@ -200,7 +200,7 @@ as sheets, its stored text is emitted again with `cached: true`; when a revisit 
 also right after a sheet reading; and the explore autopilot, `autopilot.rb`: after an `explore` that stopped with
 `new_place`, `known_place` (not counted in the 6-explore chain; a third return to the same place goes back to the
 model), `budget` or `untried_object`, the policy issues the next `explore` with no direction itself (agent `delegated`, cost 0,
-`decision` event with `autopilot: true`), after the revisit, the hemmed wait (flow-63: each 120-frame wait is followed by a 2-pixel
+`decision` event with `autopilot: true`); flow-79: before that explore, and also after an autopilot try (stop `tried`), it issues one `talk_to` (`Autopilot#try_choice`) at the nearest thing never tried on screen: a cell the last `untried_object` stop named, or an `unknown` entity whose type no talk_to aimed at in this place (`ExploreLog#met?`, from the talk_to results' `target_type`, the type `talk_to` aimed at, or `entity`), skipping types struck this visit and types it already aimed at in that place (kept in the autopilot itself); a try costs no call and does not count in the chain, the chain and frame caps do not hold it but `TRY_LIMIT` (6 per visit, reset by a model call or a place change) does, and the other holds do (the val78 lineage: 27 of 29 `untried_object` stops were followed by another autopilot decision, and 26 of 34 places holding an unknown entity never had a talk_to); and the engine passes each place card to the policy (`note_card`), so `ExploreLog` keeps the uncatalogued types of each place's last card (`card`, rebuilt from the `place_card` events), and `route` aims at a place with such a type never aimed at (`work?`) as at a place with untried exits; after the revisit, the hemmed wait (flow-63: each 120-frame wait is followed by a 2-pixel
 `step` probe, and a probe that moves Link ends the latch) and pending dialogue pages (flow-65: after an
 `attack` that stopped `done` or `target_gone`, it strikes the nearest `enemy`, or unidentified type already struck in this visit
 (forgotten when Link leaves the place), within 2 cells and never in the slot just struck, the same way, until none is left,

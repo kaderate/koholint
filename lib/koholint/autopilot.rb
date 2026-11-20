@@ -1,3 +1,4 @@
+require 'set'
 require 'koholint/navigation/threat'
 require 'koholint/perception'
 
@@ -5,12 +6,13 @@ module Koholint
   class Autopilot
     CHAIN_LIMIT = 6
     CHAIN_FRAMES = 2400
-    BENIGN = %w[new_place known_place budget untried_object].freeze
+    BENIGN = %w[new_place known_place budget untried_object tried].freeze
     ARRIVED = %w[new_place known_place].freeze
     RETURNS = 3
     EXPLORING = %w[new_place leave_place new_text].freeze
     CHOICE = { skill: 'explore', params: {} }.freeze
     FIGHT_LIMIT = 8
+    TRY_LIMIT = 6
     FIGHT_FRAMES = 900
     FIGHT_REACH = 2
     FIGHT_FLOOR = 16
@@ -30,6 +32,11 @@ module Koholint
       @returns = Hash.new(0)
       @fight = 0
       @struck = { place: nil, types: [] }
+      @untried = []
+      @trying = false
+      @aimed = Set.new
+      @tries = 0
+      @try_place = nil
     end
 
     def model_called(state:, objective:, news: false)
@@ -45,6 +52,8 @@ module Koholint
       @attack_stop = nil
       @disengaged = 0
       @walled = []
+      @untried = []
+      @tries = 0
     end
 
     def adopt(objective) = @objective = objective&.dig(:id)
@@ -54,12 +63,17 @@ module Koholint
       @attack_stop = skill.to_s == 'attack' && outcome.is_a?(Hash) ? outcome[:stopped_by].to_s : nil unless skill.to_s == 'wait'
       note_struck(skill, outcome) if outcome.is_a?(Hash)
       @walled |= [outcome[:params][:direction].to_s] if skill.to_s == 'walk' && outcome.is_a?(Hash) && outcome[:params].is_a?(Hash) && walled?(outcome)
-      @stop = skill.to_s == 'explore' && outcome.is_a?(Hash) ? outcome[:stopped_by].to_s : nil
+      explored = skill.to_s == 'explore' && outcome.is_a?(Hash)
+      @stop = if explored then outcome[:stopped_by].to_s
+              elsif @trying && skill.to_s == 'talk_to' then 'tried'
+              end
+      @trying = false
+      @untried = Array(outcome[:untried_objects]).map { |cell| [cell[:row], cell[:col]] } if explored
       to = outcome[:to] if @stop == 'known_place'
       @returns[[to[:room], to[:map]]] += 1 if to.is_a?(Hash) && @returns
     end
 
-    def hold_reason(state:, objective:, follow: nil, danger: false)
+    def hold_reason(state:, objective:, follow: nil, danger: false, caps: true)
       return 'no model call yet' unless @since
 
       target = objective&.dig(:target)
@@ -75,7 +89,33 @@ module Koholint
       return "objective #{kind}" unless EXPLORING.include?(kind) || target
       return 'no way to follow the target' if target && !follow
 
-      cap_hold(state)
+      cap_hold(state) if caps
+    end
+
+    # A thing on screen never tried is tried once with talk_to before exploring on, nearest first: the sprites the last explore offered,
+    # and uncatalogued entities of a type never aimed at here. Tries cost no call, so TRY_LIMIT per visit bounds them, not the chain caps.
+    def try_choice(state:, objective:, entities:, tried:)
+      return unless state.cell && !hold_reason(state:, objective:, caps: false)
+
+      here = [state.room_id, state.map_id]
+      @tries = 0 unless @try_place == here
+      @try_place = here
+      return if @tries >= TRY_LIMIT
+
+      struck = @struck[:place] == here ? @struck[:types] : []
+      things = @untried.map { |cell| [cell, nil] } +
+               Array(entities).select { |entity| entity[:kind].to_s == 'unknown' && entity[:cell] && !struck.include?(entity[:type]) && !tried.(entity[:type]) && !@aimed.include?([here, entity[:type]]) }
+                              .map { |entity| [entity[:cell], entity[:type]] }
+      row, col = state.cell
+      nearest = things.min_by { |(r, c), _| [(r - row).abs + (c - col).abs, r, c] } or return
+      cell, type = nearest
+      @untried.delete(cell)
+      @aimed << [here, type] if type
+      @trying = true
+      @tries += 1
+      what = type ? "entity type #{type}" : 'object'
+      { choice: { skill: 'talk_to', params: { row: cell[0], col: cell[1] } }, justification: "autopilot: try the never-tried #{what} at (#{cell.join(',')})",
+        confidence: 1.0, agent: 'delegated', latency_ms: 0, cost_usd: 0.0, fallback: false, autopilot: true, prompt: nil, image: nil }
     end
 
     def next_choice(state:, objective:, follow: nil, danger: false)
