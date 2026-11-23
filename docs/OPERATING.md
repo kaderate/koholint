@@ -109,7 +109,7 @@ feeds `data/addresses.json` and the `ready` of the `play` mode in `data/modes.js
 finished run or one being written; Ctrl-C stops it. It listens on 127.0.0.1 only; `--host 0.0.0.0` opens it to other
 devices on the same network (no authentication: use it on a network you trust).
 
-Every page has the same top bar (Live, Runs, Compare once two runs are picked on `/runs`, the current run, a replay badge).
+Every page has the same top bar (Live, Runs, Atlas, Compare once two runs are picked on `/runs`, the current run, a replay badge).
 The live page and a replay share one layout, in equal columns on a desktop and one column on a phone: the game screen
 with the mode badge (phase and mode name from the last perception; `unknown_mode` notables and `stuck_boot` or
 `unknown_mode_stuck` stops raise a red alert), the activity banner and the grid toggle; the objective, goal and plan; the
@@ -131,6 +131,7 @@ run and serves the watched run without it):
 | Route | What it does |
 |---|---|
 | `/runs`, `/runs.json` | Table of runs with a `summary.json`: sort by column; filter by minimum milestone, maximum dollars, tag, starred only; `$/call` and `free` (decisions not made by Claude); pick two runs to compare |
+| `/atlas`, `/atlas.json` | The atlas of every run under the runs root (the `atlas` command under Run storage): the 16x16 overworld map labelled A-P by 1-16, each seen screen with its screenshot and marks (a person with no talk_to try, deaths, puzzle, interior), a click shows its card (first visit, visits, deaths, entities seen, talk_to tries and answers, people and unknown types with no try, ways taken, interiors, items, puzzles, the names that a text read there carries, the texts read with run and frame); interiors below, by the screen they open from |
 | `/run/<id>` | The live page as a read-only replay of that run, from boot; `/frame.png?run=<id>` and `/state.json?run=<id>` serve it |
 | `/control?run=<id>&speed=1\|4\|16`, `&pause=0\|1` and `&seek=<frame>` | Drive a replay; `seek` restores the nearest keyframe at or before the frame (or replays from boot) and steps to it |
 | `/screens/<room>-<map>.png[?run=<id>]` | The screenshot taken the first time the run played that place (`runs/<id>/screens/`; 404 when missing; cached 30 s) |
@@ -156,6 +157,7 @@ by importance, rejected leads, objectives by kind, `because` uses, talks, talks 
 |---|---|
 | `archive [--from DIR] [--root DIR] [--commit] [--full]` | Imports finished runs from `--from` (light bundle only, refreshed when the source changed, e.g. after a resume or a star; the source is never modified), gzips the trace, writes a missing or outdated (`v` below the current version) `summary.json`, regenerates `docs/runs/index.md`. `--commit` makes one commit (`Archive runs A..B`); `--full` also force-adds `prompts/`. Idempotent. Runs without a final `stop` event or with a live lock are skipped |
 | `star <run_dir> "why"` | Marks a run worth keeping (`star.json`, `summary.json` `starred`); `prune-heavy` never deletes a starred run. Run `archive --commit` afterwards to record it in git |
+| `atlas [--root DIR]...` | Merges what every run under the roots (default `runs`; repeat `--root` to add `~/Code/koholint/runs`) observed, per place, and writes `tmp/atlas.json`; prints the totals. Cost, calls and frames count each fork from its fork frame; places too when its parent is read. A root with no run is an error. Read-only: it never writes in a run directory. `watch` shows the same atlas at `/atlas` for its runs root |
 | `check-leads <run_dir>...` | Validator over the `lead` events of each run (`lead_check.rb`): lists every lead whose claim or `where` names a catalogued item (`data/items.json`, name or `aliases`) that no text read so far (dialogue texts and the lead's quote) names and that Link did not hold by then (A, B, inventory, or the item's milestone), i.e. a name taken from general knowledge of the game; exits 1 when it finds any. It then lists every sentence read (3 words or more, once per run) that no lead quotes whole and no low lead dismisses, and counts quoted, dismissed and dropped ones (report only). `test/lead_check_test.rb` runs it on the committed bundle `runs/20261111-194737-9ba1` |
 | `prune-heavy [--keep N] [--yes]` | Deletes `prompts/` and `keyframes/` of unstarred runs older than the N most recent (default 5); without `--yes` it only lists them |
 

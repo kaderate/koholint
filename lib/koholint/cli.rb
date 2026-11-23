@@ -30,7 +30,7 @@ module Koholint
   module CLI
     USAGE = 'usage: koholint run|resume <run_dir>|fork <run_dir> --at-frame N|branch <run_dir> --at FRAME|CHECKPOINT|verify <run_dir>|summary <run_dir>|watch <run_dir>|' \
             'archive|star <run_dir> WHY|prune-heavy|census boot|<run_dir> FRAME...|entities <run_dir> FRAME...|objects <run_dir> FRAME...|doors <run_dir> FRAME...|sword <run_dir> FRAME...|ready <run_dir>|' \
-            'ab-plan <run_dir> --at-frame N|ab-report PREFIX|check-leads <run_dir>...|learn <run_dir> [--limit N --object ID]|bench exits <run_dir> [--place R/M --at-frame N]|capability list|publish ID WHY|retire ID WHY ' \
+            'ab-plan <run_dir> --at-frame N|ab-report PREFIX|atlas [--root DIR]...|check-leads <run_dir>...|learn <run_dir> [--limit N --object ID]|bench exits <run_dir> [--place R/M --at-frame N]|capability list|publish ID WHY|retire ID WHY ' \
             '[--frames N --minutes N --steps N --dollars X --root DIR --runs-root DIR --tag NAME --realtime --grid --port N --host H --from live|start|DIR ' \
             '--speed X --agent --autopilot on|off --capabilities on|off --exits on|off --model M --max-dollars X --claude-command PATH --keep-viewer --commit --full --keep N --yes --arms A,B --forks N --crawl N]'.freeze
 
@@ -48,7 +48,7 @@ module Koholint
         o.on('--steps N', Integer) { |v| options[:steps] = v.positive? ? v : raise(OptionParser::InvalidArgument, v.to_s) }
         o.on('--dollars X', Float) { |v| options[:dollars] = v }
         o.on('--flow-version V') { |v| options[:flow_version] = v }
-        o.on('--root DIR') { |v| options[:root] = v }
+        o.on('--root DIR') { |v| (options[:roots] ||= []) << (options[:root] = v) }
         o.on('--runs-root DIR') { |v| options[:runs_root] = v }
         o.on('--tag NAME') { |v| options[:tag] = v }
         o.on('--at-frame N', Integer) { |v| options[:at_frame] = v }
@@ -119,6 +119,7 @@ module Koholint
       when 'ab-report'
         out.print AB.markdown(AB.report(prefix: args.first || raise(OptionParser::MissingArgument, 'prefix'), root: options.fetch(:root, 'runs')))
         0
+      when 'atlas' then atlas(options.fetch(:roots, ['runs']), out)
       when 'check-leads'
         require 'koholint/lead_check'
         LeadCheck.check(args.empty? ? raise(OptionParser::MissingArgument, 'run_dir') : args, out:)
@@ -174,6 +175,23 @@ module Koholint
       rescue Errno::ESRCH, Errno::ECHILD
         nil
       end
+    end
+
+    def atlas(roots, out)
+      require 'koholint/atlas'
+      empty = roots.find { |root| Archive.runs(root).empty? }
+      raise Error, "no runs under #{empty}" if empty
+
+      atlas = Atlas.build(roots)
+      FileUtils.mkdir_p(File.dirname(Atlas::OUT))
+      File.write(Atlas::OUT, JSON.pretty_generate(atlas))
+      totals = atlas[:totals]
+      out.puts "atlas: #{atlas[:runs]} runs from #{roots.join(', ')} (#{atlas[:unreadable]} unreadable), last #{atlas[:last_run] || '-'}"
+      out.puts "places: #{totals[:overworld]} overworld screens, #{totals[:interiors]} interiors; #{totals[:texts]} texts read; #{totals[:deaths]} deaths; " \
+               "items #{totals[:items].map { |name, count| "#{name} x#{count}" }.join(', ').then { |text| text.empty? ? 'none' : text }}; #{totals[:puzzles]} puzzles"
+      out.puts "cost: $#{format('%.2f', totals[:dollars])} over #{totals[:frames]} frames, #{totals[:calls]} model calls (each fork from its fork frame)"
+      out.puts "wrote #{Atlas::OUT}"
+      0
     end
 
     def capability(args, out)

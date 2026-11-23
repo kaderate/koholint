@@ -145,10 +145,25 @@ class ExplorerTest < Minitest::Test
   end
 
   def test_pages_insert_data_with_text_only
-    %w[runs.html compare.html page.html].each do |name|
+    %w[runs.html compare.html page.html atlas.html].each do |name|
       html = File.read(File.expand_path("../lib/koholint/viewer/#{name}", __dir__))
       %w[innerHTML outerHTML insertAdjacentHTML document.write].each { |sink| refute_includes html, sink, "#{name} uses #{sink}" }
       refute_match %r{https?://}, html
+    end
+  end
+
+  def test_the_atlas_page_is_static_and_its_data_merges_the_runs_of_the_root
+    with_root do |root|
+      with_server(root) do |port, built|
+        page = get(port, '/atlas')
+        assert_match %r{\Atext/html}, page['Content-Type']
+        assert_equal File.binread(File.expand_path('../lib/koholint/viewer/atlas.html', __dir__)), page.body.b
+        atlas = JSON.parse(get(port, '/atlas.json').body)
+        assert_equal [root], atlas['roots']
+        assert_equal 2, atlas['runs']
+        assert_equal(%w[3/1 4/1], atlas['places'].map { |place| place['label'] })
+        assert_empty built
+      end
     end
   end
 
