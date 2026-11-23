@@ -544,6 +544,12 @@ class PageTest < Minitest::Test
     assert_equal 'data/items.json — 3 entrées · verified 2, sans statut 1', atlas_eval("factSummary(#{JSON.generate(file)})")
     assert_equal ['1 sword', 'verified', '2', 'probe', '—'], atlas_eval("factCells({ label: '1 sword', status: 'verified', verified_count: 2, source: 'probe', note: null })")
     assert_equal ['a', '—', '—', '—', '—'], atlas_eval("factCells({ label: 'a' })")
+    assert_equal '2 (dérivé)', atlas_eval("factCells({ label: 'c', status: 'operational', verified_count: 2, derived: true })[2]")
+    status = atlas_eval("factStatus({ status: 'verified', subfacts: [{ name: 'sword_hits', status: 'hypothesis' }] })")
+    assert_equal({ 'text' => 'verified · sword_hits : hypothesis', 'cls' => 'f-mixed' }, status)
+    assert_equal 'data/x.json — illisible : boom', atlas_eval("factSummary({ file: 'data/x.json', error: 'boom' })")
+    assert_equal 'data/m.json — non lu par l\'atlas', atlas_eval("factSummary({ file: 'data/m.json', skipped: true })")
+    assert_match(/au moins 2 vérifications.* 3 lieux de succès.* 4 lignées/, atlas_eval('factRules({ verified: 2, places: 3, lineages: 4 })'))
   end
 
   def test_atlas_kpis_read_the_totals
