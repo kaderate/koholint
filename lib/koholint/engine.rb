@@ -104,7 +104,7 @@ module Koholint
       @run.trace.emit(:perception, frame: state.frame, state: state.to_h, state_hash: @emulator.state_hash,
                                    **(waited.positive? ? { not_ready_frames: waited } : {}))
       @played ||= state.game_mode == PLAY_MODE
-      @shots.capture(@emulator, state)
+      @shots.capture(@emulator, state, settled: @readiness.ready?(state))
       note_unknown_mode(state)
       if @builder
         activity(:mapping, 'mapping the screen')

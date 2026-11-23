@@ -282,7 +282,7 @@ schema and reports cost and latency. Jev (tactical choices) is planned, not wire
 
 **Run storage** — `run.rb`: `runs/<id>/` with `manifest.json` (flow version, ROM hash, tag, harness/prompts
 sha, model, `autopilot` for agent runs; `resume` keeps it, `capabilities`: the digest of the operational capabilities at creation, `exits`: the digest of the exit bench data (`false` for a run without it), or `false` for an A/B arm without them; a fork takes the current digest unless it or its parent is `false`), `inputs.log`, `trace.jsonl` (events validated by `trace.rb`), `keyframes/`, `save/`, `prompts/`, `screens/` (one PNG per place, written by `place_shots.rb`:
-observability only, no trace event, the set of captured places is rebuilt from the directory),
+observability only, no trace event, the set of captured places is rebuilt from the directory; written after 20 playable frames in the place, or at once when the engine reads it settled before a decision, so a place left within those frames still has one),
 `world.json` (`{ goal, leads, places }`, rewritten from the trace at every stop), `summary.json` (written at every stop by
 `summary.rb` from the trace only, versioned by `Summary::VERSION`: totals, cost by skill, decisions by agent and
 feature usage, with `autopilot_decisions`, `chain_max`, `deaths`, `damage_events`, `stuck_events`, `chests_opened` and `rupees` (the last perceived count), `puzzles` (`{open, by_place}`: the `puzzle` events counted once per id, per place and kind), and `symptoms`: `left_with_unexhausted_people`, place changes
@@ -303,7 +303,7 @@ deaths, the stitched texts read there (`Dialogues`, with speaker, run and frame)
 `talk_to` tries and answers per type (`PlaceCard.tries`), the people types with no try at all (`untried`) and, apart, the unknown
 types with no try that no card saw as an enemy or creature (`unknown_untried`), signs and doors, ways taken to neighbour screens
 (same row for left and right) or through a door, never the first place change after a death (a respawn), the overworld screen an
-interior opens from, items gained, puzzles, and the latest run with its screenshot. A `place_name` is kept only with a text read at
+interior opens from, items gained, puzzles, and the latest run with its screenshot (a visited screen without one is drawn hatched, "vu, sans capture"). A `place_name` is kept only with a text read at
 that place, at or before it, that carries one of its words of 4 letters or more (accents and case folded); the others are counted as
 withheld, since the model writes names. Leads: one per quote (`Dialogues.key`), with the claim, importance and place label of its
 first reading, the runs that read it (a fork reads only its own segment's leads when its parent is read), the objectives that
