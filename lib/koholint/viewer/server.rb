@@ -11,7 +11,7 @@ module Koholint
   module Viewer
     class Server
       PAGE_PATH = File.join(__dir__, 'page.html')
-      PAGES = { runs: File.join(__dir__, 'runs.html'), compare: File.join(__dir__, 'compare.html') }.freeze
+      PAGES = { runs: File.join(__dir__, 'runs.html'), compare: File.join(__dir__, 'compare.html'), atlas: File.join(__dir__, 'atlas.html') }.freeze
       MAX_LINE = 8192
       MAX_HEADERS = 100
       MAX_BODY = 32_768
@@ -147,6 +147,8 @@ module Koholint
         when '/state.json' then json(params['run'] ? explorer.state(params['run']) : @feed.call)
         when '/runs' then html(@pages[:runs])
         when '/runs.json' then json(explorer.runs)
+        when '/atlas' then html(@pages[:atlas])
+        when '/atlas.json' then json(explorer.atlas)
         when '/compare.json' then json(explorer.compare(*only(params, %w[a b], required: %w[a b]).values_at('a', 'b')))
         when *INSIGHTS.keys then json(insight(INSIGHTS[path], only(params, %w[run])['run']))
         when '/header.json' then json(header(only(params, %w[run])['run']))

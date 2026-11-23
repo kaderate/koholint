@@ -3,6 +3,7 @@ require 'json'
 require 'stringio'
 require 'koholint'
 require 'koholint/archive'
+require 'koholint/atlas'
 require 'koholint/perception'
 require 'koholint/run_compare'
 require 'koholint/summary'
@@ -30,6 +31,8 @@ module Koholint
       def initialize(root:, registry:)
         @root = root
         @registry = registry
+        @atlas = {}
+        @atlas_lock = Mutex.new
       end
 
       def self.default_root(run_dir)
@@ -108,6 +111,8 @@ module Koholint
       def runs
         Archive.runs(@root).filter_map { |dir| row(dir) if File.basename(dir).match?(RUN_ID) }.sort_by { |row| row['run_id'] }.reverse
       end
+
+      def atlas = @atlas_lock.synchronize { Atlas.build([@root], cache: @atlas) }
 
       def compare(a, b) = readable("#{a} or #{b}") { RunCompare.compare(resolve(a), resolve(b)) }
 

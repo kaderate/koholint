@@ -1,0 +1,126 @@
+require_relative 'test_helper'
+require 'fileutils'
+require 'stringio'
+require 'tmpdir'
+require 'koholint/atlas'
+require 'koholint/cli'
+
+class AtlasTest < Minitest::Test
+  RUNS = File.expand_path('../runs', __dir__)
+  SWORD = '20261111-194737-9ba1'.freeze
+  VAL = '20261120-151729-2ce4'.freeze
+  VAL_PARENT = '20261114-093702-a0dc'.freeze
+  VAL_FORK = 90_638
+
+  def with_root(*ids, parent: false)
+    Dir.mktmpdir do |root|
+      ids.each { |id| FileUtils.cp_r(File.join(RUNS, id), root) }
+      if parent
+        FileUtils.mkdir_p(File.join(root, VAL_PARENT))
+        File.write(File.join(root, VAL_PARENT, 'manifest.json'), JSON.generate('flow_version' => 'flow-65'))
+        File.write(File.join(root, VAL_PARENT, 'trace.jsonl'), '')
+      end
+      yield root
+    end
+  end
+
+  def atlas_of(*ids, parent: false) = with_root(*ids, parent:) { |root| Koholint::Atlas.build([root]) }
+
+  def place(atlas, label) = atlas[:places].find { |entry| entry[:label] == label }
+
+  def test_overworld_screens_carry_their_map_label_and_interiors_their_ids
+    assert_equal 'B10', Koholint::Atlas.label([145, 0])
+    assert_equal 'A1', Koholint::Atlas.label([0, 0])
+    assert_equal 'P16', Koholint::Atlas.label([255, 0])
+    assert_equal '189/10', Koholint::Atlas.label([189, 10])
+  end
+
+  def test_a_fork_counts_only_its_events_from_the_fork_frame_when_its_parent_is_read
+    events = Koholint::Trace.read(File.join(RUNS, VAL, 'trace.jsonl'))
+    own = events.select { |e| e['type'] == 'decision' && e['frame'] >= VAL_FORK }
+    alone = atlas_of(VAL)
+    forked = atlas_of(VAL, parent: true)
+    assert_equal 2, forked[:runs]
+    assert_in_delta own.sum { |e| e['cost_usd'].to_f }, forked[:totals][:dollars], 0.01
+    assert_equal events.map { |e| e['frame'] }.max - VAL_FORK, forked[:totals][:frames]
+    assert_operator alone[:totals][:dollars], :>, forked[:totals][:dollars]
+    assert_operator alone[:totals][:overworld], :>, forked[:totals][:overworld]
+  end
+
+  def test_places_merge_across_runs_with_first_visit_and_counts
+    atlas = atlas_of(SWORD, VAL)
+    assert_equal 2, atlas[:runs]
+    assert_equal VAL, atlas[:last_run]
+    house = place(atlas, '163/16')
+    assert_equal ['C11'], house[:opens_from]
+    assert_equal SWORD, house[:first][:run]
+    assert_equal 2, house[:runs]
+    assert_operator house[:texts].size, :>, 0
+    assert(house[:texts].all? { |text| text[:run] && text[:frame] })
+    assert_equal atlas[:places].count { |entry| entry[:grid] }, atlas[:totals][:overworld]
+  end
+
+  def test_the_open_puzzle_names_screens_by_label
+    puzzle = place(atlas_of(VAL), 'B6')[:puzzles].first
+    assert_equal({ kind: 'unexpected_arrival', way: 'up', expected: 'B5', observed: 'D7' }, puzzle.slice(:kind, :way, :expected, :observed))
+  end
+
+  def test_a_place_name_is_kept_only_with_a_text_read_there_that_carries_it
+    atlas = atlas_of(SWORD, VAL)
+    named = atlas[:places].flat_map { |entry| entry[:names] }
+    refute_empty named
+    named.each do |name|
+      words = Koholint::Atlas.fold(name[:name]).scan(/\p{L}+/).select { |word| word.length >= Koholint::Atlas::NAME_WORD }
+      assert(words.any? { |word| Koholint::Atlas.fold(name[:source][:text]).include?(word) }, name[:name])
+    end
+    assert_operator atlas[:totals][:names_withheld], :>, 0
+  end
+
+  def test_the_source_must_share_a_word_of_the_name
+    talks = [{ text: 'Bienvenue à la Forêt Enchantée', frame: 3 }]
+    assert_equal 3, Koholint::Atlas.source_text('Foret enchantee', talks)[:frame]
+    assert_nil Koholint::Atlas.source_text('Fishing pond', talks)
+    assert_nil Koholint::Atlas.source_text('Hut', talks)
+  end
+
+  def test_exits_join_neighbours_or_doors_only
+    exits = atlas_of(VAL)[:places].flat_map { |entry| entry[:exits].map { |exit| exit[:way] } }.uniq
+    assert_empty exits - %w[up down left right door]
+  end
+
+  def test_untried_types_are_people_or_unknown_never_talked_to
+    atlas_of(VAL)[:places].each do |entry|
+      assert_empty entry[:untried] & entry[:tried]
+      assert_empty entry[:untried] - (entry[:seen].fetch('people', []) | entry[:seen].fetch('unknown', []))
+    end
+  end
+
+  def test_screenshots_come_from_a_run_that_has_one
+    atlas = atlas_of(SWORD, VAL)
+    shot = atlas[:places].find { |entry| entry[:screen] }
+    assert shot
+    assert_includes [SWORD, VAL], shot[:screen]
+  end
+
+  def test_the_command_writes_the_atlas_and_prints_totals
+    with_root(SWORD) do |root|
+      Dir.mktmpdir do |work|
+        out = StringIO.new
+        Dir.chdir(work) { assert_equal 0, Koholint::CLI.run(['atlas', '--root', root], out:) }
+        assert_match(/atlas: 1 runs from #{Regexp.escape(root)} \(0 unreadable\), last #{SWORD}/, out.string)
+        assert_match(/wrote tmp\/atlas.json/, out.string)
+        assert_equal 1, JSON.parse(File.read(File.join(work, Koholint::Atlas::OUT)))['runs']
+      end
+    end
+  end
+
+  def test_an_unreadable_run_is_counted_and_skipped
+    with_root(SWORD) do |root|
+      FileUtils.mkdir_p(File.join(root, 'broken'))
+      File.write(File.join(root, 'broken', 'manifest.json'), '{')
+      atlas = Koholint::Atlas.build([root])
+      assert_equal 1, atlas[:runs]
+      assert_equal 1, atlas[:unreadable]
+    end
+  end
+end

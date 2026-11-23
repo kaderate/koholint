@@ -1,0 +1,258 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Koholint atlas</title>
+<style>
+  :root { --bg: #14161a; --panel: #1c1f26; --line: #2a2e38; --ink: #e8e6df; --mut: #8b90a0; --acc: #6ec1a2; --warn: #e0a84a; --bad: #e06c6c; --blue: #6aa3e0; }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--ink); font: 14px/1.5 -apple-system, system-ui, sans-serif; }
+  a { color: var(--blue); }
+  #nav { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 14px; padding: 10px 16px; background: var(--panel); border-bottom: 1px solid var(--line); }
+  #nav b { letter-spacing: 0.04em; }
+  .seg { display: flex; border: 1px solid var(--line); border-radius: 99px; overflow: hidden; }
+  .seg a { padding: 3px 14px; font-size: 12.5px; color: var(--mut); text-decoration: none; }
+  .seg a.here { background: #b83a3a; color: #fff; }
+  .pill { display: inline-block; padding: 1px 10px; border-radius: 99px; font-size: 12px; border: 1px solid var(--line); color: var(--mut); overflow-wrap: anywhere; }
+  .pill:empty { display: none; }
+  #error { display: none; padding: 8px 16px; background: #a60; color: #fff; }
+  #kpis { display: flex; flex-wrap: wrap; gap: 10px; padding: 12px 16px 0; }
+  #kpis div { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 6px 12px; color: var(--mut); font-size: 12px; }
+  #kpis b { display: block; color: var(--ink); font-size: 18px; font-variant-numeric: tabular-nums; }
+  .legend { padding: 8px 16px; color: var(--mut); font-size: 12px; }
+  .legend i, .badges i { font-style: normal; margin-right: 10px; }
+  .u { color: var(--blue); } .x { color: var(--bad); } .p { color: var(--warn); font-weight: 700; } .d { color: var(--ink); }
+  #wrap { display: flex; flex-wrap: wrap; gap: 16px; align-items: flex-start; padding: 0 16px 16px; }
+  #grid { display: grid; grid-template-columns: 22px repeat(16, 54px); grid-auto-rows: 49px; gap: 1px; }
+  .h { display: flex; align-items: center; justify-content: center; color: var(--mut); font-size: 11px; }
+  .c { position: relative; background: #181a1f; border: 0; padding: 0; color: inherit; font: inherit; }
+  .c.k { background: #23372c; cursor: pointer; }
+  .c.sel { outline: 2px solid var(--warn); z-index: 2; }
+  .c img { width: 54px; height: 49px; image-rendering: pixelated; display: block; opacity: 0.85; }
+  .c .l { position: absolute; left: 2px; top: 0; font-size: 9.5px; color: #555; }
+  .c.k .l { color: #fff; text-shadow: 0 0 2px #000, 0 0 2px #000; }
+  .c .badges { position: absolute; right: 1px; bottom: 0; font-size: 10px; text-shadow: 0 0 2px #000, 0 0 2px #000; }
+  .c .badges i { margin: 0 0 0 2px; }
+  #card { flex: 1; min-width: 320px; max-width: 560px; background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px; }
+  #card h3 { margin: 0 0 6px; }
+  #card img { width: 240px; image-rendering: pixelated; border-radius: 4px; }
+  #card table { border-collapse: collapse; width: 100%; font-size: 13px; }
+  #card th, #card td { padding: 4px 6px; border-bottom: 1px solid #22262e; text-align: left; vertical-align: top; overflow-wrap: anywhere; }
+  #card th { color: var(--mut); font-weight: 600; width: 9em; }
+  #texts { max-height: 320px; overflow-y: auto; margin-top: 8px; }
+  #texts p { margin: 0 0 8px; white-space: pre-line; font-size: 13px; }
+  #texts small, .mut { color: var(--mut); }
+  h2 { margin: 8px 16px 6px; font-size: 11.5px; font-weight: 600; color: var(--mut); text-transform: uppercase; letter-spacing: 0.1em; }
+  #interiors { display: flex; flex-wrap: wrap; gap: 8px; padding: 0 16px 24px; }
+  #interiors button { display: flex; gap: 8px; align-items: center; background: var(--panel); border: 1px solid var(--line); border-radius: 8px; color: var(--ink); font: inherit; font-size: 12.5px; padding: 4px 8px; cursor: pointer; }
+  #interiors img { width: 64px; height: 58px; image-rendering: pixelated; }
+</style>
+</head>
+<body>
+<nav id="nav"><b>KOHOLINT</b><span class="seg"><a href="/">Live</a><a href="/runs">Historique</a><a class="here" href="/atlas">Atlas</a></span><span id="scope" class="pill"></span></nav>
+<div id="error"></div>
+<div id="kpis"></div>
+<div class="legend">Tout ce que les runs lus ont observé, cumulé par écran (un fork ne compte qu'à partir de sa frame de fork). Écrans nommés par la carte : colonne A–P, ligne 1–16.
+  <br><i class="u">● entité jamais essayée</i><i class="x">✝ morts</i><i class="p">? énigme</i><i class="d">⌂ intérieur</i></div>
+<div id="wrap"><div id="grid"></div><section id="card"><h3>Atlas</h3><span class="mut">Cliquer un écran vu.</span></section></div>
+<h2>Intérieurs</h2>
+<div id="interiors"></div>
+<script>
+(function () {
+  // pure:begin
+  var COLUMNS = 'ABCDEFGHIJKLMNOP';
+
+  function cellLabel(index) { return COLUMNS[index % 16] + (Math.floor(index / 16) + 1); }
+
+  function plural(n, word) { return n + ' ' + word + (n === 1 ? '' : 's'); }
+
+  function kpis(atlas) {
+    var t = atlas.totals || {};
+    var items = Object.keys(t.items || {}).map(function (name) { return name + ' ×' + t.items[name]; }).join(', ') || 'aucun';
+    return [
+      { value: (t.overworld || 0) + ' / 256', label: 'écrans vus' },
+      { value: String(t.interiors || 0), label: 'intérieurs' },
+      { value: String(t.texts || 0), label: 'textes du jeu lus' },
+      { value: String(t.deaths || 0), label: 'morts' },
+      { value: items, label: 'objets obtenus (runs)' },
+      { value: String(t.puzzles || 0), label: 'énigmes' },
+      { value: '$' + Number(t.dollars || 0).toFixed(2), label: plural(t.calls || 0, 'appel') + ' au modèle, ' + (t.frames || 0) + ' frames' }
+    ];
+  }
+
+  function scopeText(atlas) {
+    return plural(atlas.runs || 0, 'run') + ' lus dans ' + (atlas.roots || []).join(', ') + (atlas.unreadable ? ' (' + atlas.unreadable + ' illisibles)' : '') +
+      (atlas.last_run ? ' · dernier ' + atlas.last_run : '');
+  }
+
+  function badges(place) {
+    var out = [];
+    if (place.untried && place.untried.length) out.push({ text: '●', cls: 'u', title: plural(place.untried.length, 'type') + ' jamais essayé' + (place.untried.length === 1 ? '' : 's') });
+    if (place.deaths) out.push({ text: '✝' + place.deaths, cls: 'x', title: plural(place.deaths, 'mort') });
+    if (place.puzzles && place.puzzles.length) out.push({ text: '?', cls: 'p', title: 'énigme ouverte' });
+    if (place.interiors && place.interiors.length) out.push({ text: '⌂', cls: 'd', title: 'intérieurs : ' + place.interiors.join(', ') });
+    return out;
+  }
+
+  function indexPlaces(places) {
+    var byLabel = {};
+    places.forEach(function (place) { byLabel[place.label] = Object.assign({ interiors: [] }, place); });
+    places.forEach(function (place) {
+      (place.opens_from || []).forEach(function (from) { if (byLabel[from]) byLabel[from].interiors.push(place.label); });
+    });
+    return byLabel;
+  }
+
+  function types(list) { return list && list.length ? list.map(function (t) { return 'type ' + t; }).join(', ') : '—'; }
+
+  function title(place) {
+    return place.grid ? place.label : place.label + (place.opens_from && place.opens_from.length ? ' · intérieur qui part de ' + place.opens_from.join(', ') : ' · intérieur');
+  }
+
+  function cardRows(place) {
+    var seen = place.seen || {};
+    var names = (place.names || []).map(function (n) { return n.name + ' — « ' + n.source.text.replace(/\s+/g, ' ') + ' » (' + n.run + ', frame ' + n.source.frame + ')'; });
+    if (place.names_withheld) names.push(plural(place.names_withheld, 'nom') + ' proposé' + (place.names_withheld === 1 ? '' : 's') + ' par le modèle sans texte lu qui le porte, non affiché' + (place.names_withheld === 1 ? '' : 's'));
+    var rows = [
+      { label: 'nom', text: names.length ? names.join(' · ') : '—' },
+      { label: 'première visite', text: place.first ? place.first.run + ', frame ' + place.first.frame : '—' },
+      { label: 'visites', text: place.visits + ' dans ' + plural(place.runs, 'run') },
+      { label: 'morts', text: String(place.deaths || 0) },
+      { label: 'personnes', text: types(seen.people) },
+      { label: 'ennemis', text: types(seen.enemies) },
+      { label: 'inconnus', text: types(seen.unknown) },
+      { label: 'créatures', text: types(seen.creatures) },
+      { label: 'panneaux, portes', text: (place.signs || 0) + ', ' + (place.doors || 0) },
+      { label: 'parlé à', text: types(place.tried) },
+      { label: 'jamais essayés', text: types(place.untried) },
+      { label: 'sorties prises', text: (place.exits || []).map(function (e) { return (e.way === 'door' ? 'porte' : e.way) + ' → ' + e.to + ' ×' + e.count; }).join(', ') || '—' },
+      { label: 'intérieurs', text: (place.interiors || []).join(', ') || '—' },
+      { label: 'objets obtenus', text: (place.items || []).map(function (i) { return i.name + ' (' + i.run + ', frame ' + i.frame + ')'; }).join(', ') || '—' },
+      { label: 'énigmes', text: (place.puzzles || []).map(function (p) { return p.kind + ' ' + p.way + ' : attendu ' + p.expected + ', observé ' + p.observed + ' (' + p.run + ', frame ' + p.frame + ')'; }).join(' · ') || '—' }
+    ];
+    return rows;
+  }
+
+  function textLine(text) { return (text.speaker ? text.speaker + ' · ' : '') + text.run + ', frame ' + text.frame; }
+
+  function screenUrl(place) { return place.screen ? '/screens/' + encodeURIComponent(place.key) + '.png?run=' + encodeURIComponent(place.screen) : null; }
+  // pure:end
+
+  var places = {};
+  var selected = null;
+
+  function el(tag, cls, text) {
+    var node = document.createElement(tag);
+    if (cls) node.className = cls;
+    if (text !== undefined) node.textContent = text;
+    return node;
+  }
+
+  function showError(text) {
+    var box = document.getElementById('error');
+    box.style.display = text ? 'block' : 'none';
+    box.textContent = text || '';
+  }
+
+  function image(place, cls) {
+    var url = screenUrl(place);
+    if (!url) return null;
+    var img = el('img', cls);
+    img.src = url;
+    img.alt = place.label;
+    return img;
+  }
+
+  function renderCard(place) {
+    var card = document.getElementById('card');
+    card.textContent = '';
+    card.appendChild(el('h3', null, title(place)));
+    var img = image(place);
+    if (img) card.appendChild(img);
+    var table = el('table');
+    cardRows(place).forEach(function (row) {
+      var tr = el('tr');
+      tr.appendChild(el('th', null, row.label));
+      tr.appendChild(el('td', null, row.text));
+      table.appendChild(tr);
+    });
+    card.appendChild(table);
+    card.appendChild(el('h3', null, 'Textes lus ici · ' + (place.texts || []).length));
+    var texts = el('div');
+    texts.id = 'texts';
+    (place.texts || []).forEach(function (text) {
+      var p = el('p', null, text.text);
+      p.appendChild(document.createElement('br'));
+      p.appendChild(el('small', null, textLine(text)));
+      texts.appendChild(p);
+    });
+    card.appendChild(texts);
+  }
+
+  function select(label, node) {
+    if (selected) selected.classList.remove('sel');
+    selected = node;
+    if (node) node.classList.add('sel');
+    renderCard(places[label]);
+  }
+
+  function renderGrid() {
+    var grid = document.getElementById('grid');
+    grid.textContent = '';
+    grid.appendChild(el('div'));
+    for (var c = 0; c < 16; c++) grid.appendChild(el('div', 'h', COLUMNS[c]));
+    for (var i = 0; i < 256; i++) {
+      if (i % 16 === 0) grid.appendChild(el('div', 'h', String(i / 16 + 1)));
+      var label = cellLabel(i);
+      var place = places[label];
+      var cell = el(place ? 'button' : 'div', place ? 'c k' : 'c');
+      if (place) {
+        cell.type = 'button';
+        cell.title = label;
+        var img = image(place);
+        if (img) cell.appendChild(img);
+        var marks = el('span', 'badges');
+        badges(place).forEach(function (b) { var mark = el('i', b.cls, b.text); mark.title = b.title; marks.appendChild(mark); });
+        cell.appendChild(marks);
+        cell.addEventListener('click', select.bind(null, label, cell));
+      }
+      cell.appendChild(el('span', 'l', label));
+      grid.appendChild(cell);
+    }
+  }
+
+  function renderInteriors() {
+    var box = document.getElementById('interiors');
+    box.textContent = '';
+    Object.keys(places).map(function (label) { return places[label]; }).filter(function (place) { return !place.grid; }).forEach(function (place) {
+      var button = el('button');
+      button.type = 'button';
+      var img = image(place);
+      if (img) button.appendChild(img);
+      button.appendChild(el('span', null, title(place)));
+      button.addEventListener('click', select.bind(null, place.label, null));
+      box.appendChild(button);
+    });
+  }
+
+  function render(atlas) {
+    places = indexPlaces(atlas.places || []);
+    document.getElementById('scope').textContent = scopeText(atlas);
+    var box = document.getElementById('kpis');
+    box.textContent = '';
+    kpis(atlas).forEach(function (k) { var div = el('div', null, k.label); div.insertBefore(el('b', null, k.value), div.firstChild); box.appendChild(div); });
+    renderGrid();
+    renderInteriors();
+  }
+
+  fetch('/atlas.json').then(function (response) {
+    return response.json().then(function (body) {
+      if (!response.ok) throw new Error(body.error || response.statusText);
+      return body;
+    });
+  }).then(function (atlas) { showError(''); render(atlas); }).catch(function (e) { showError('atlas: ' + e.message); });
+})();
+</script>
+</body>
+</html>

@@ -483,13 +483,47 @@ class PageTest < Minitest::Test
            /setAttribute\(\s*['"]on/, /\.on[a-z]+\s*=/].freeze
 
   def test_no_page_puts_data_through_an_html_or_code_sink
-    { 'page.html' => PAGE, 'runs.html' => RUNS, 'compare.html' => COMPARE }.each do |name, html|
+    { 'page.html' => PAGE, 'runs.html' => RUNS, 'compare.html' => COMPARE, 'atlas.html' => ATLAS }.each do |name, html|
       SINKS.each { |sink| refute_match sink, html, "#{name} uses #{sink.source}" }
     end
   end
 
   RUNS = File.read(File.join(VIEWER, 'runs.html'))
   COMPARE = File.read(File.join(VIEWER, 'compare.html'))
+  ATLAS = File.read(File.join(VIEWER, 'atlas.html'))
+  PLACE = { key: '163-16', label: '163/16', grid: false, opens_from: ['C11'], first: { run: 'r1', frame: 351 }, visits: 3, runs: 2, deaths: 1,
+            seen: { people: [62, 63] }, signs: 0, doors: 1, tried: [62], untried: [63], exits: [{ way: 'door', to: 'C11', count: 2 }],
+            names: [{ name: "Marine's house", run: 'r1', frame: 1719, source: { text: "Je suis\nMarine", frame: 801 } }], names_withheld: 1,
+            items: [{ name: 'shield', run: 'r1', frame: 3906 }], puzzles: [], texts: [], screen: 'r1' }.freeze
+
+  def atlas_eval(expression) = evaluate(expression, page: ATLAS)
+
+  def test_atlas_cells_follow_the_map_labels
+    assert_equal %w[A1 B10 P16], atlas_eval('[cellLabel(0), cellLabel(145), cellLabel(255)]')
+  end
+
+  def test_atlas_card_shows_a_name_with_its_source_and_counts_the_withheld_ones
+    rows = atlas_eval("cardRows(#{JSON.generate(PLACE)})").to_h { |row| [row['label'], row['text']] }
+    assert_equal "Marine's house — « Je suis Marine » (r1, frame 801) · 1 nom proposé par le modèle sans texte lu qui le porte, non affiché", rows['nom']
+    assert_equal 'type 63', rows['jamais essayés']
+    assert_equal 'porte → C11 ×2', rows['sorties prises']
+    assert_equal 'shield (r1, frame 3906)', rows['objets obtenus']
+    assert_equal '163/16 · intérieur qui part de C11', atlas_eval("title(#{JSON.generate(PLACE)})")
+  end
+
+  def test_atlas_badges_and_interiors_hang_on_the_screen_they_open_from
+    places = [PLACE, { label: 'C11', grid: true, untried: [], deaths: 2, puzzles: [{ id: 'x' }] }]
+    marks = atlas_eval("badges(indexPlaces(#{JSON.generate(places)}).C11).map(function (b) { return b.text; })")
+    assert_equal ['✝2', '?', '⌂'], marks
+    assert_equal '/screens/163-16.png?run=r1', atlas_eval("screenUrl(#{JSON.generate(PLACE)})")
+    assert_nil atlas_eval("screenUrl({ key: '1-0' })")
+  end
+
+  def test_atlas_kpis_read_the_totals
+    atlas = { runs: 2, roots: ['runs'], last_run: 'r2', unreadable: 0, totals: { overworld: 55, interiors: 12, texts: 75, deaths: 8, items: { shield: 2 }, puzzles: 1, dollars: 47.614, calls: 10, frames: 99 } }
+    assert_equal ['55 / 256', '12', '75', '8', 'shield ×2', '1', '$47.61'], atlas_eval("kpis(#{JSON.generate(atlas)}).map(function (k) { return k.value; })")
+    assert_equal '2 runs lus dans runs · dernier r2', atlas_eval("scopeText(#{JSON.generate(atlas)})")
+  end
   SAMPLE = [{ run_id: 'r1', tag: 'Agent-x', dollars: 0.5, milestone_rank: 0, highest_milestone: 'none', starred: false, frames: 10 },
             { run_id: 'r2', tag: nil, dollars: 1.5, milestone_rank: 1, highest_milestone: 'shield', starred: true, frames: nil },
             { run_id: 'r3', tag: 'other', dollars: nil, milestone_rank: nil, highest_milestone: nil, starred: false, frames: 30 }].freeze
