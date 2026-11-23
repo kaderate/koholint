@@ -10,7 +10,7 @@ module Koholint
     SLOTS = 16
     KINDS = %w[npc enemy object creature unknown].freeze
     NOT_PEOPLE = %w[creature unknown].freeze
-    OBJECT_KINDS = %w[sign object door chest].freeze
+    OBJECT_KINDS = %w[sign object door chest stone].freeze
     FACES = Geometry::DIRECTIONS.map(&:to_s).freeze
     DEFAULT_PATH = File.expand_path('../../data/entities.json', __dir__)
     ADDRESSES = Addresses.load.slice(:entity_x, :entity_y, :entity_status, :entity_state, :entity_type, :entity_health, :room_objects).freeze
@@ -42,7 +42,7 @@ module Koholint
         Geometry::COLS.times.filter_map do |col|
           object = reader.read(ADDRESSES.fetch(:room_objects) + (row * ROOM_ROW_STRIDE) + col)
           known = kinds[object] or next
-          { object:, cell: [row, col], kind: known[:kind], verified: known[:verified], faces: known[:faces], open: known[:open] }.compact
+          { object:, cell: [row, col], kind: known[:kind], verified: known[:verified], faces: known[:faces], open: known[:open], push: known[:push] }.compact
         end
       end
     end
@@ -51,7 +51,8 @@ module Koholint
       @object_catalogue ||= {}
       @object_catalogue[path] ||= JSON.parse(File.read(path)).select { |entry| entry.key?('object') }.to_h do |entry|
         validate!(entry)
-        [Integer(entry.fetch('object')), { kind: entry.fetch('kind').to_sym, verified: entry['confidence'] == 'verified', faces: entry['faces']&.map(&:to_sym), open: (true if entry['open']) }.compact]
+        [Integer(entry.fetch('object')), { kind: entry.fetch('kind').to_sym, verified: entry['confidence'] == 'verified', faces: entry['faces']&.map(&:to_sym), open: (true if entry['open']),
+                                             push: entry.dig('push', 'value') }.compact]
       end.freeze
     end
 
@@ -79,6 +80,7 @@ module Koholint
       raise Invalid, "entity #{entry['type']}: verified needs verified_count >= 2" if entry['confidence'] == 'verified' && entry['verified_count'] < 2
 
       validate_fact!(entry['sword_hits'], "entity #{entry['type']} sword_hits") if entry.key?('sword_hits')
+      validate_fact!(entry['push'], "object #{entry['object']} push") if entry.key?('push')
     end
 
     def validate_fact!(fact, label)

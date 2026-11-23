@@ -11,6 +11,8 @@ module Koholint
       CENTRING_FRAMES = 16
       CENTRING_STILL = 3
       EDGE_FRAMES = 120
+      PUSH_MARGIN = 8
+      PUSH_SETTLE = 48
 
       attr_reader :frames, :stopped_by
       attr_writer :triggers
@@ -29,6 +31,9 @@ module Koholint
         @trigger_input = nil
         @exit = nil
         @walked_in = false
+        @room_objects = nil
+        @push = nil
+        @pushed = nil
       end
 
       def next_input(state)
@@ -37,12 +42,15 @@ module Koholint
         return nil if @stopped_by
 
         @walked_in ||= state.door_walk_in?
+        landed_push
         buttons = if @frames >= hard_cap then finish(:frame_cap)
                   elsif state.scene? && !@start.scene? then finish(:scene)
+                  elsif @pushed then settle_push
                   elsif waits_through_doors? && door_walk?(state) then []
                   elsif @centring then centre(state)
                   else input_for(state)
                   end
+        watch_push(state, buttons)
         note_exit(state, buttons)
         @frames += 1 if buttons
         @last_input = buttons if buttons
@@ -59,7 +67,10 @@ module Koholint
         { skill: @skill, params: @params, frames: @frames, from: place(@start), to: place(state),
           moved_cells: moved_cells(state), room_changed: @start.place != state.place, hp_delta: state.health - @start.health,
           dialog_before: @start.dialog_open?, dialog_after: state.dialog_open?, stopped_by: @stopped_by,
-          aligned:, offset:, blocked_at: @blocked_at, trigger_input: trigger_input }.tap { |r| r[:exit] = @walked_in ? @exit.merge(walk_in: true) : @exit if r[:room_changed] && @exit }
+          aligned:, offset:, blocked_at: @blocked_at, trigger_input: trigger_input }.tap do |r|
+          r[:exit] = @walked_in ? @exit.merge(walk_in: true) : @exit if r[:room_changed] && @exit
+          r[:pushed] = @pushed.slice(:row, :col, :direction) if @pushed
+        end
       end
 
       private
@@ -76,12 +87,65 @@ module Koholint
       end
 
       # Stationary enemies the raised shield pushes aside (sea urchins) sit on cells their sprites make look like objects; only with the shield held.
-      # Cells of objects a published capability clears are passable at the same last-resort cost.
+      # Cells of objects a published capability clears are passable at the same last-resort cost, and so is a stone entered in a direction it slides.
       def pushable_of(context)
         shield = Array(context[:held]).include?(Items::SHIELD)
         urchins = context[:entities] && shield ? -> { Array(context[:entities].call).select { |e| e[:kind].to_s == 'enemy' && e[:moves] == false && e[:cell] }.map { |e| e[:cell] } } : nil
-        clearing = Clearing.of(context) or return urchins
-        -> { Array(urchins&.call) | clearing.cells.keys }
+        stones = context[:room_objects] && context[:grid] ? -> { stone_pushes(context[:room_objects].call, context[:grid]) } : nil
+        clearing = Clearing.of(context)
+        sources = [urchins, stones, (-> { clearing.cells.keys } if clearing)].compact
+        -> { sources.flat_map(&:call).uniq } if sources.any?
+      end
+
+      # [stone cell, direction] for each catalogued stone and each direction whose far cell is floor.
+      def stone_pushes(objects, grid)
+        catalogue = Entities.object_catalogue
+        objects.each_with_index.flat_map do |row, r|
+          row.each_index.select { |c| catalogue.dig(row[c], :push) }.flat_map do |c|
+            Geometry::DIRECTIONS.filter_map do |direction|
+              far = ahead_of([r, c], direction)
+              [[r, c], direction] if far && !catalogue.key?(objects.dig(*far)) && !grid.static_sprite(*far) && grid.passable(*far, direction) == :yes
+            end
+          end
+        end
+      end
+
+      def ahead_of(cell, direction) = cell && Geometry.step(cell, direction)
+
+      # A stone ahead slides only after a measured hold, so a moving skill keeps pressing that long before it reads blocked.
+      def still_limit(state, direction, base)
+        ahead = @room_objects && ahead_of(state.cell, direction) or return base
+        hold = Entities.object_catalogue.dig(@room_objects.call.dig(*ahead), :push)
+        hold ? [base, hold + PUSH_MARGIN].max : base
+      end
+
+      # A stone pressed on the last frame that has left its cell is sliding: Link waits for it to land, then the skill stops so the next one reads the changed screen.
+      def landed_push
+        return unless @push && !@pushed
+
+        objects = @room_objects.call
+        return if objects.dig(*@push[:cell]) == @push[:object]
+
+        far = ahead_of(@push[:cell], @push[:direction])
+        @pushed = { row: @push[:cell][0], col: @push[:cell][1], direction: @push[:direction], far:, before: far && objects.dig(*far), frames: 0 }
+      end
+
+      def watch_push(state, buttons)
+        return if @pushed || !@room_objects
+
+        direction = (Array(buttons) & Geometry::DIRECTIONS).first
+        ahead = direction && ahead_of(state.cell, direction)
+        object = ahead && @room_objects.call.dig(*ahead)
+        @push = Entities.object_catalogue.dig(object, :push) ? { cell: ahead, object:, direction: } : nil
+      end
+
+      def settle_push
+        @pushed[:frames] += 1
+        landed = @pushed[:far].nil? || @room_objects.call.dig(*@pushed[:far]) != @pushed[:before]
+        return [] unless landed || @pushed[:frames] >= PUSH_SETTLE
+
+        @stopped_by = :pushed
+        nil
       end
 
       # At one heart or less, every enemy contact zone grows by a cell and is never crossed.

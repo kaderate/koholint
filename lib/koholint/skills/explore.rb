@@ -36,11 +36,11 @@ module Koholint
       end
 
       class Leg < Goto::Run
-        def initialize(planner:, clearing: nil, cross_margin: true, **rest)
+        def initialize(planner:, clearing: nil, cross_margin: true, room_objects: nil, **rest)
           @shared = planner
           @shared_clearing = clearing
           @cross_margin = cross_margin
-          super(context: {}, **rest)
+          super(context: { room_objects: }, **rest)
         end
 
         private
@@ -64,13 +64,14 @@ module Koholint
           @ledger = context[:ledger]
           @talk_log = context[:talk_log]
           @log = context[:explore_log]
-          @walked = (@log ? @log.walked(@place) | @log.stood(@place) : []) | [@start.cell].compact
+          @walked = ((@log ? @log.walked(@place) | @log.stood(@place) : []) - stone_cells(context)) | [@start.cell].compact
           @fresh = @log && !@log.surveyed?(@place)
           grid = context[:grid]
           @known = grid && Known.new(grid, @walked)
           @planner = @known && Navigation::Planner.new(grid: @known, ledger: @ledger, place: @place, triggers: context[:triggers], mode: :free_only, danger: danger_of(context), pushable: pushable_of(context), contact: contact_of(context), away: away_of(context))
           @pushable = Array(pushable_of(context)&.call)
           @clearing = Clearing.of(context)
+          @room_objects = context[:room_objects]
           @objects = grid ? TalkLog.objects(grid) : []
           @doors = Array(context[:objects]&.call).select { |object| object[:kind].to_s == 'door' && object[:cell][0] < Geometry::ROWS - 1 }.map { |object| object[:cell] }
           @survey = @known && survey
@@ -146,6 +147,12 @@ module Koholint
             return heading(buttons) if buttons
             return stop_now(@stop) if @stop
           end
+        end
+
+        # The room puts its stones back on re-entry, so a stone's cell walked after an earlier push is a stone again.
+        def stone_cells(context)
+          objects = context[:room_objects]&.call or return []
+          objects.each_with_index.flat_map { |row, r| row.each_index.select { |c| Entities.object_catalogue.dig(row[c], :kind) == :stone }.map { |c| [r, c] } }
         end
 
         def stop_now(reason)
@@ -250,7 +257,7 @@ module Koholint
           else
             row, col = @target[:cell]
             @leg = Leg.new(skill: 'goto', params: { row:, col: }, state:, target: @target[:cell], planner: @planner, clearing: @clearing,
-                           cross_margin: @target[:kind] != :frontier)
+                           cross_margin: @target[:kind] != :frontier, room_objects: @room_objects)
             @leg.triggers = @triggers
           end
           nil
@@ -287,7 +294,8 @@ module Koholint
           position = [state.x, state.y]
           @outward[:still] = @outward[:frames].positive? && position == @outward[:position] ? @outward[:still] + 1 : 0
           @outward[:position] = position
-          if @outward[:still] >= STILL_FRAMES || @outward[:frames] >= OUTWARD_FRAMES
+          limit = still_limit(state, direction, STILL_FRAMES) if @outward[:still] >= STILL_FRAMES || @outward[:frames] >= OUTWARD_FRAMES
+          if limit && (@outward[:still] >= limit || @outward[:frames] >= OUTWARD_FRAMES + limit - STILL_FRAMES)
             return @clearing&.start(state, direction) || outward_blocked(state, cell, direction)
           end
 
@@ -342,16 +350,20 @@ module Koholint
             aimed = routed(from, path_to)
             return order(aimed) if aimed.any?
           end
-          local = untried(from, path_to)
+          back, local = untried(from, path_to).partition { |candidate| way_back?(candidate) }
           return order(local) if local.any?
 
           return order(frontier) if frontier.any? && (@fresh || untried(from, nil).any? || @log&.untried?(@place))
+          return order(back) if back.any?
 
           routed = routed(from, path_to)
           return order(routed) if routed.any?
 
           order(frontier)
         end
+
+        # A side known only as the assumed way back, never crossed, still counts as untried, after every other reachable piece of work here.
+        def way_back?(candidate) = candidate[:kind] == :exit && @log&.side_left?(@place, candidate[:direction]) && !@log.side_crossed?(@place, candidate[:direction])
 
         def untried(from, path_to)
           gather(from, path_to) { |cell, direction| exit_kind(cell, direction) } +
@@ -475,7 +487,8 @@ module Koholint
           return nil if direction == :up && [cell, ahead].any? { |at| @log&.door_edge?(@place, at) }
           return nil if @walked.include?(ahead) || [cell, ahead].any? { |at| @known.hole_margin.include?(at) }
 
-          :frontier if !@walls.include?(ahead) && (@pushable.include?(ahead) || (!@known.static_sprite(*ahead) && UNKNOWN.include?(@known.passable(*ahead, direction))))
+          :frontier if !@walls.include?(ahead) && (@pushable.include?(ahead) || @pushable.include?([ahead, direction]) ||
+                                                  (!@known.static_sprite(*ahead) && UNKNOWN.include?(@known.passable(*ahead, direction))))
         end
 
         def open?(cell, direction)

@@ -55,6 +55,10 @@ module Koholint
 
       def after_action(**result) = (@after.after_action(**result) if @after.respond_to?(:after_action))
 
+      def note_card(card) = (@after.note_card(card) if @after.respond_to?(:note_card))
+
+      def offered_candidates = @after.respond_to?(:offered_candidates) ? @after.offered_candidates : []
+
       def decide(decision_point, state, context)
         return @after.decide(decision_point, state, context) if ready?(state)
 
