@@ -20,6 +20,8 @@ module Koholint
     NAME_WORD = 4
     STATUSES = %w[open refuted tested].freeze
     INHERITED = 'inherited'.freeze
+    DATA = File.expand_path('../../data', __dir__)
+    FACTS = %w[addresses entities items modes place_kinds geometry exits capabilities checkpoints].freeze
 
     module_function
 
@@ -34,7 +36,7 @@ module Koholint
       dirs = roots.flat_map { |root| Archive.runs(root) }.uniq { |dir| File.basename(dir) }
       ids = dirs.to_h { |dir| [File.basename(dir), dir] }
       digests = dirs.map { |dir| cached(dir, ids, cache) }
-      merge(digests.compact, dirs:, roots:, unreadable: digests.count(&:nil?))
+      merge(digests.compact, dirs:, roots:, unreadable: digests.count(&:nil?)).merge(facts: facts)
     end
 
     def cached(dir, ids, cache)
@@ -50,6 +52,66 @@ module Koholint
       cache[dir][:digest]
     rescue Error, SystemCallError, Zlib::Error, JSON::ParserError
       nil
+    end
+
+    # The typed facts of data/, one row each with its status, check count and provenance as written there.
+    def facts(dir = DATA)
+      FACTS.filter_map do |name|
+        path = File.join(dir, "#{name}.json")
+        next unless File.file?(path)
+
+        rows = fact_rows(name, JSON.parse(File.read(path)))
+        { file: "data/#{name}.json", rows:, statuses: rows.map { |row| row[:status] || '-' }.tally }
+      end
+    end
+
+    def fact_rows(name, data)
+      case name
+      when 'exits' then exit_rows(data)
+      when 'capabilities' then data.map { |entry| capability_row(entry) }
+      when 'checkpoints'
+        data.map { |entry| { label: entry['name'], status: nil, verified_count: nil, source: entry['source'], note: "run #{entry['run']}, frame #{entry['frame']}, #{entry['flow']}" } }
+      when 'geometry'
+        data.map { |key, entry| { label: key, status: nil, verified_count: entry['verified_count'], source: entry['provenance'], note: JSON.generate(entry['value']) } }
+      else
+        data.map do |entry|
+          { label: fact_label(name, entry), status: entry['confidence'], verified_count: entry['verified_count'], source: entry['source'], note: entry['note'] }
+        end
+      end
+    end
+
+    def fact_label(name, entry)
+      case name
+      when 'addresses' then "#{entry['name']} (#{entry['addr']})"
+      when 'entities' then entry['type'] ? "type #{entry['type']} (#{entry['kind']})" : "object #{entry['object']} (#{entry['kind']})"
+      when 'items' then "#{entry['id']} #{entry['name']}"
+      when 'modes' then "#{entry['name']} (#{entry['kind']})"
+      when 'place_kinds' then "#{entry['kind']} (maps #{Array(entry['map_ids']).join(', ')})"
+      end
+    end
+
+    def exit_rows(data)
+      context = ->(entry) { "context: #{entry.dig('context', 'milestone')}, held #{Array(entry.dig('context', 'held')).join(', ')}" }
+      edges = Array(data['edges']).map do |edge|
+        trials = Array(edge['trials'])
+        { label: "#{label(edge['place'])} #{edge['way']} → #{edge['to'] ? label(edge['to']) : '?'}", status: edge['status'], verified_count: edge['verified_count'],
+          source: trials.empty? ? 'no trial reached it' : "#{trials.size} trials: runs #{trials.map { |t| t['run'] }.join(', ')}; lineages #{trials.map { |t| t['lineage'] }.uniq.join(', ')}",
+          note: [context.(edge), *Array(edge['refutes']).map { |refuted| "refutes #{label(refuted['to'])} (#{refuted['source']})" }].join('; ') }
+      end
+      benches = Array(data['benches']).map do |bench|
+        ways = bench['ways'].to_h.map { |way, to| "#{way} #{to.is_a?(Array) ? label(to) : to}" }.join(', ')
+        { label: "bench #{label(bench['place'])}", status: bench['status'], verified_count: nil,
+          source: "#{Array(bench['runs']).size} forks of #{Array(bench['runs']).map { |run| "#{run['parent']} @#{run['frame']}" }.uniq.join(', ')}", note: "#{context.(bench)}; #{ways}" }
+      end
+      edges + benches
+    end
+
+    def capability_row(entry)
+      trials = Array(entry['evidence'])
+      wins = trials.select { |trial| trial['outcome'] == 'success' }
+      { label: "#{entry['id']} v#{entry['version']}", status: entry['status'], verified_count: wins.map { |trial| trial['place'] }.uniq.size,
+        source: entry['source'], note: "#{trials.size} trials, #{wins.size} successes in #{wins.map { |trial| label(trial['place']) }.uniq.join(', ').then { |s| s.empty? ? 'no place' : s }}; " \
+                                       "last: #{entry['history'].to_a.last&.dig('reason')}" }
     end
 
     def blank = { visits: 0, deaths: 0, texts: {}, names: [], seen: {}, signs: 0, doors: 0, tried: {}, exits: {}, opens_from: [], items: [], puzzles: [] }

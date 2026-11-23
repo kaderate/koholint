@@ -185,6 +185,31 @@ class AtlasTest < Minitest::Test
     assert_equal ['sword'], atlas[:flows][1][:items]
   end
 
+  def test_facts_list_every_data_file_with_status_checks_and_provenance
+    facts = Koholint::Atlas.facts
+    assert_equal Koholint::Atlas::FACTS.map { |name| "data/#{name}.json" }, facts.map { |file| file[:file] }
+    facts.each do |file|
+      refute_empty file[:rows], file[:file]
+      assert_equal file[:rows].size, file[:statuses].values.sum
+      assert(file[:rows].all? { |row| row[:label] && row[:source] }, file[:file])
+    end
+    addresses = facts.find { |file| file[:file] == 'data/addresses.json' }
+    data = JSON.parse(File.read(File.join(Koholint::Atlas::DATA, 'addresses.json')))
+    assert_equal data.map { |entry| entry['confidence'] }.tally, addresses[:statuses]
+    exits = facts.find { |file| file[:file] == 'data/exits.json' }[:rows]
+    assert_includes exits.map { |row| row[:label] }, 'B6 up → D7'
+    capability = facts.find { |file| file[:file] == 'data/capabilities.json' }[:rows].find { |row| row[:status] == 'operational' }
+    assert_operator capability[:verified_count], :>=, 2
+  end
+
+  def test_facts_read_a_given_directory_and_skip_missing_files
+    Dir.mktmpdir do |dir|
+      File.write(File.join(dir, 'items.json'), JSON.generate([{ 'id' => 4, 'name' => 'shield', 'source' => 'probe', 'confidence' => 'hypothesis', 'verified_count' => 1 }]))
+      assert_equal [{ file: 'data/items.json', rows: [{ label: '4 shield', status: 'hypothesis', verified_count: 1, source: 'probe', note: nil }], statuses: { 'hypothesis' => 1 } }],
+                   Koholint::Atlas.facts(dir)
+    end
+  end
+
   def test_a_root_with_no_run_is_an_error
     Dir.mktmpdir do |root|
       err = StringIO.new
@@ -207,6 +232,7 @@ class AtlasTest < Minitest::Test
         Dir.chdir(work) { assert_equal 0, Koholint::CLI.run(['atlas', '--root', root], out:) }
         assert_match(/atlas: 1 runs from #{Regexp.escape(root)} \(0 unreadable\), last #{SWORD}/, out.string)
         assert_match(/wrote tmp\/atlas.json/, out.string)
+        assert_match(/facts: \d+ entries in 9 data files, \d+ verified/, out.string)
         assert_equal 1, JSON.parse(File.read(File.join(work, Koholint::Atlas::OUT)))['runs']
       end
     end
