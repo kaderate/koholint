@@ -345,16 +345,20 @@ module Koholint
             aimed = routed(from, path_to)
             return order(aimed) if aimed.any?
           end
-          local = untried(from, path_to)
+          back, local = untried(from, path_to).partition { |candidate| way_back?(candidate) }
           return order(local) if local.any?
 
           return order(frontier) if frontier.any? && (@fresh || untried(from, nil).any? || @log&.untried?(@place))
+          return order(back) if back.any?
 
           routed = routed(from, path_to)
           return order(routed) if routed.any?
 
           order(frontier)
         end
+
+        # A side known only as the assumed way back, never crossed, still counts as untried, after every other reachable piece of work here.
+        def way_back?(candidate) = candidate[:kind] == :exit && @log&.side_left?(@place, candidate[:direction]) && !@log.side_crossed?(@place, candidate[:direction])
 
         def untried(from, path_to)
           gather(from, path_to) { |cell, direction| exit_kind(cell, direction) } +

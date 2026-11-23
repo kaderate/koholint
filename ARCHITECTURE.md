@@ -139,6 +139,8 @@ flow-82: walk, goto and explore (its legs and outward steps) keep holding into a
 for that delay plus 8 frames before they read blocked (`Execution#still_limit`); once the stone has left its cell Link waits for it to land and the skill
 stops `pushed` with the stone's cell and direction, so the next skill plans on a fresh grid. `pushable_of` adds each stone with the directions whose far
 cell is floor; the planner crosses a stone only in such a direction, and explore takes it as a frontier. The autopilot reads `pushed` as benign.
+Also flow-82: within a place, explore ranks a side known only as the assumed way back, never crossed, after the place's other reachable untried exits,
+doors and frontiers, and before any route to another place (from cave-171 it had walked straight back out through the side Link came in by).
 flow-56: when the game opens a dialogue by itself during an explore leg or outward step, explore blocks the edge Link pushed before it
 stops `dialogue`, but only when the push is evidenced. Link must still stand in the cell he last entered, his position must be unchanged
 on that frame, and he must be flush against the cell's edge in his heading (`link_footprint`: half its width across, its row band along).
