@@ -54,7 +54,7 @@
 <div id="error"></div>
 <div id="kpis"></div>
 <div class="legend">Tout ce que les runs lus ont observé, cumulé par écran (un fork ne compte qu'à partir de sa frame de fork). Écrans nommés par la carte : colonne A–P, ligne 1–16.
-  <br><i class="u">● entité jamais essayée</i><i class="x">✝ morts</i><i class="p">? énigme</i><i class="d">⌂ intérieur</i></div>
+  <br><i class="u">● personne à qui talk_to n'a jamais été tenté</i><i class="x">✝ morts</i><i class="p">? énigme</i><i class="d">⌂ intérieur</i></div>
 <div id="wrap"><div id="grid"></div><section id="card"><h3>Atlas</h3><span class="mut">Cliquer un écran vu.</span></section></div>
 <h2>Intérieurs</h2>
 <div id="interiors"></div>
@@ -77,7 +77,7 @@
       { value: String(t.deaths || 0), label: 'morts' },
       { value: items, label: 'objets obtenus (runs)' },
       { value: String(t.puzzles || 0), label: 'énigmes' },
-      { value: '$' + Number(t.dollars || 0).toFixed(2), label: plural(t.calls || 0, 'appel') + ' au modèle, ' + (t.frames || 0) + ' frames' }
+      { value: '$' + Number(t.dollars || 0).toFixed(2), label: plural(t.calls || 0, 'appel') + ' au modèle, ' + (t.frames || 0) + ' frames (chaque fork depuis sa frame de fork)' }
     ];
   }
 
@@ -88,7 +88,7 @@
 
   function badges(place) {
     var out = [];
-    if (place.untried && place.untried.length) out.push({ text: '●', cls: 'u', title: plural(place.untried.length, 'type') + ' jamais essayé' + (place.untried.length === 1 ? '' : 's') });
+    if (place.untried && place.untried.length) out.push({ text: '●', cls: 'u', title: plural(place.untried.length, 'personne') + ' sans aucun talk_to' });
     if (place.deaths) out.push({ text: '✝' + place.deaths, cls: 'x', title: plural(place.deaths, 'mort') });
     if (place.puzzles && place.puzzles.length) out.push({ text: '?', cls: 'p', title: 'énigme ouverte' });
     if (place.interiors && place.interiors.length) out.push({ text: '⌂', cls: 'd', title: 'intérieurs : ' + place.interiors.join(', ') });
@@ -124,8 +124,9 @@
       { label: 'inconnus', text: types(seen.unknown) },
       { label: 'créatures', text: types(seen.creatures) },
       { label: 'panneaux, portes', text: (place.signs || 0) + ', ' + (place.doors || 0) },
-      { label: 'parlé à', text: types(place.tried) },
-      { label: 'jamais essayés', text: types(place.untried) },
+      { label: 'talk_to tentés', text: (place.tried || []).map(function (t) { return 'type ' + t.type + ' (' + plural(t.tries, 'essai') + ', ' + plural(t.answered, 'réponse') + ')'; }).join(', ') || '—' },
+      { label: 'personnes sans talk_to', text: types(place.untried) },
+      { label: 'inconnus sans talk_to', text: String((place.unknown_untried || []).length) + ((place.unknown_untried || []).length ? ' (' + types(place.unknown_untried) + ')' : '') },
       { label: 'sorties prises', text: (place.exits || []).map(function (e) { return (e.way === 'door' ? 'porte' : e.way) + ' → ' + e.to + ' ×' + e.count; }).join(', ') || '—' },
       { label: 'intérieurs', text: (place.interiors || []).join(', ') || '—' },
       { label: 'objets obtenus', text: (place.items || []).map(function (i) { return i.name + ' (' + i.run + ', frame ' + i.frame + ')'; }).join(', ') || '—' },

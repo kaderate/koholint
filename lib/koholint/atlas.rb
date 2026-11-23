@@ -3,6 +3,7 @@ require 'zlib'
 require 'koholint'
 require 'koholint/archive'
 require 'koholint/dialogues'
+require 'koholint/place_card'
 require 'koholint/place_kinds'
 require 'koholint/summary'
 require 'koholint/trace'
@@ -36,25 +37,38 @@ module Koholint
     def cached(dir, ids, cache)
       trace = Trace.located(File.join(dir, TRACE))
       parent = Summary.read_json(File.join(dir, 'manifest.json'))['parent']
-      since = parent.is_a?(Hash) && ids.key?(parent['id']) ? parent['frame'].to_i : 0
-      stat = File.stat(trace)
-      cache[[dir, since, stat.mtime.to_f, stat.size]] ||= digest(dir, since:)
+      fork = parent.is_a?(Hash) ? parent['frame'].to_i : 0
+      since = parent.is_a?(Hash) && ids.key?(parent['id']) ? fork : 0
+      stamp = [since, fork, File.mtime(trace).to_f, File.size(trace)]
+      found = cache[dir]
+      return found[:digest] if found && found[:stamp] == stamp
+
+      cache[dir] = { stamp:, digest: digest(dir, since:, fork:) }
+      cache[dir][:digest]
     rescue Error, SystemCallError, Zlib::Error, JSON::ParserError
       nil
     end
 
-    def digest(dir, since: 0)
+    def blank = { visits: 0, deaths: 0, texts: {}, names: [], seen: {}, signs: 0, doors: 0, tried: {}, exits: {}, opens_from: [], items: [], puzzles: [] }
+
+    # Places count from `since` (the fork frame when the parent is read, else 0); cost, calls and frames always from the fork frame.
+    def digest(dir, since: 0, fork: since)
       events = Trace.read(File.join(dir, TRACE))
       run = File.basename(dir)
-      places = Hash.new { |hash, place| hash[place] = { visits: 0, deaths: 0, texts: {}, names: [], seen: Hash.new { |h, k| h[k] = [] }, signs: 0, doors: 0, tried: [], exits: Hash.new(0), opens_from: [], items: [], puzzles: [] } }
+      places = {}
+      at = ->(place) { places[place] ||= blank }
       dialogues = Dialogues.from_events(events).select { |talk| talk[:place].is_a?(Array) }
       dialogues.each do |talk|
         next if talk[:frame].to_i < since
 
-        texts = places[talk[:place]][:texts]
+        texts = at.(talk[:place])[:texts]
         texts[Dialogues.key(talk[:text])] ||= { text: talk[:text], speaker: talk[:speaker], run:, frame: talk[:frame] }.compact
       end
+      PlaceCard.tries(events.select { |event| event['frame'].to_i >= since }).each do |(place, type), tried|
+        at.(place)[:tried][type] = tried.slice(:tries, :answered)
+      end
       current = nil
+      respawn = false
       run_frames = 0
       dollars = 0.0
       calls = 0
@@ -67,58 +81,62 @@ module Koholint
           next if place.nil? || place == current
 
           if own
-            entry = places[place]
+            entry = at.(place)
             entry[:visits] += 1
             entry[:first] ||= frame
-            way = current && way(current, place)
-            places[current][:exits][[way, label(place)]] += 1 if way
+            way = current && !respawn && way(current, place)
+            if way
+              exits = at.(current)[:exits]
+              exits[[way, label(place)]] = exits.fetch([way, label(place)], 0) + 1
+            end
             entry[:opens_from] |= [label(current)] if way == 'door' && PlaceKinds.grid?(current)
           end
+          respawn = false
           current = place
         when 'decision'
-          next unless own
+          next if frame < fork
 
           dollars += event['cost_usd'].to_f
           calls += 1 if event['agent'] == 'claude'
         when 'place_card'
           next unless own && event['place'].is_a?(Array)
 
-          entry = places[event['place']]
-          ENTITIES.each { |kind| entry[:seen][kind] |= Array(event[kind]).filter_map { |thing| thing['type'] if thing.is_a?(Hash) } }
+          entry = at.(event['place'])
+          ENTITIES.each { |kind| entry[:seen][kind] = Array(entry[:seen][kind]) | Array(event[kind]).filter_map { |thing| thing['type'] if thing.is_a?(Hash) } }
           entry[:signs] = [entry[:signs], Array(event['signs']).size].max
           entry[:doors] = [entry[:doors], Array(event['doors']).size].max
-        when 'action'
-          result = event['result']
-          next unless own && event['skill'] == 'talk_to' && result.is_a?(Hash) && result['from'].is_a?(Hash)
-
-          type = result['target_type'] || (result['entity']['type'] if result['entity'].is_a?(Hash))
-          places[[result['from']['room'], result['from']['map']]][:tried] |= [type] if type
         when 'notable'
-          places[current][:deaths] += 1 if own && current && event['kind'] == 'death'
+          next unless event['kind'] == 'death'
+
+          respawn = true
+          at.(current)[:deaths] += 1 if own && current
         when 'place_name'
           next unless own && event['place'].is_a?(Array)
 
           source = source_text(event['name'], dialogues.select { |talk| talk[:place] == event['place'] && talk[:frame].to_i <= frame })
-          places[event['place']][:names] << { name: event['name'], run:, frame:, source: source && { text: source[:text], frame: source[:frame] } }
+          at.(event['place'])[:names] << { name: event['name'], run:, frame:, source: source && { text: source[:text], frame: source[:frame] } }
         when 'item_gained'
-          places[event['place']][:items] << { name: event['name'], run:, frame: } if own && event['place'].is_a?(Array)
+          at.(event['place'])[:items] << { name: event['name'], run:, frame: } if own && event['place'].is_a?(Array)
         when 'puzzle'
           next unless own && event['place'].is_a?(Array)
 
-          places[event['place']][:puzzles] << { id: event['id'], kind: event['kind'], way: event['way'], expected: event.dig('expected', 'to')&.then { |to| label(to) },
-                                                observed: event.dig('observed', 'to')&.then { |to| label(to) }, run:, frame: }
+          at.(event['place'])[:puzzles] << { id: event['id'], kind: event['kind'], way: event['way'], expected: event.dig('expected', 'to')&.then { |to| label(to) },
+                                             observed: event.dig('observed', 'to')&.then { |to| label(to) }, run:, frame: }
         end
-        run_frames = [run_frames, frame - since].max if own
+        run_frames = [run_frames, frame - fork].max if frame >= fork
       end
       { run:, frames: run_frames, dollars:, calls:, places: }
     end
 
-    # Two overworld screens that are not neighbours are a respawn or a warp, not a way.
+    # Overworld screens that are not neighbours (a warp, or a row wrap from P to A) are not a way.
     def way(from, to)
       return 'door' unless PlaceKinds.grid?(from) && PlaceKinds.grid?(to)
 
-      WAYS[to[0] - from[0]]
+      delta = to[0] - from[0]
+      WAYS[delta] unless delta.abs == 1 && to[0] / 16 != from[0] / 16
     end
+
+    def order(types) = types.sort_by { |type| type.is_a?(Integer) ? [0, type, ''] : [1, 0, type.to_s] }
 
     def source_text(name, talks)
       words = fold(name).scan(/\p{L}+/).select { |word| word.length >= NAME_WORD }
@@ -131,20 +149,23 @@ module Koholint
       places = {}
       digests.sort_by { |digest| digest[:run] }.each do |digest|
         digest[:places].each do |place, found|
-          entry = places[place] ||= { key: key(place), room: place[0], map: place[1], label: label(place), kind: PlaceKinds.kind(place), grid: PlaceKinds.grid?(place),
-                                      first: nil, visits: 0, runs: 0, deaths: 0, texts: {}, names: [], seen: Hash.new { |h, k| h[k] = [] }, signs: 0, doors: 0,
-                                      tried: [], exits: Hash.new(0), opens_from: [], items: [], puzzles: [] }
+          entry = places[place] ||= blank.merge(key: key(place), room: place[0], map: place[1], label: label(place), kind: PlaceKinds.kind(place),
+                                                grid: PlaceKinds.grid?(place), first: nil, runs: 0)
           entry[:first] ||= { run: digest[:run], frame: found[:first] } if found[:first]
           entry[:visits] += found[:visits]
           entry[:runs] += 1 if found[:visits].positive?
           entry[:deaths] += found[:deaths]
           found[:texts].each { |text_key, text| entry[:texts][text_key] ||= text }
           entry[:names].concat(found[:names])
-          found[:seen].each { |kind, types| entry[:seen][kind] |= types }
+          found[:seen].each { |kind, types| entry[:seen][kind] = Array(entry[:seen][kind]) | types }
           entry[:signs] = [entry[:signs], found[:signs]].max
           entry[:doors] = [entry[:doors], found[:doors]].max
-          entry[:tried] |= found[:tried]
-          found[:exits].each { |exit, count| entry[:exits][exit] += count }
+          found[:tried].each do |type, tried|
+            sum = entry[:tried][type] ||= { tries: 0, answered: 0 }
+            sum[:tries] += tried[:tries]
+            sum[:answered] += tried[:answered]
+          end
+          found[:exits].each { |exit, count| entry[:exits][exit] = entry[:exits].fetch(exit, 0) + count }
           entry[:opens_from] |= found[:opens_from]
           entry[:items].concat(found[:items])
           entry[:puzzles].concat(found[:puzzles])
@@ -153,11 +174,13 @@ module Koholint
       shots = dirs.reverse
       list = places.values.select { |entry| entry[:first] }.sort_by { |entry| [entry[:map], entry[:room]] }.map do |entry|
         named = entry[:names].select { |name| name[:source] }.uniq { |name| name[:name] }
-        seen = entry[:seen].transform_values(&:sort)
-        untried = (seen.fetch('people', []) | seen.fetch('unknown', [])) - entry[:tried]
-        entry.merge(texts: entry[:texts].values, names: named, names_withheld: entry[:names].map { |name| name[:name] }.uniq.size - named.size,
-                    seen:, tried: entry[:tried].sort, untried: untried.sort,
-                    exits: entry[:exits].map { |(way, to), count| { way:, to:, count: } }.sort_by { |exit| [exit[:way], -exit[:count]] },
+        seen = entry[:seen].transform_values { |types| order(types) }
+        hostile = seen.fetch('enemies', []) | seen.fetch('creatures', [])
+        entry.merge(texts: entry[:texts].values, names: named, names_withheld: entry[:names].map { |name| name[:name] }.uniq.size - named.size, seen:,
+                    tried: order(entry[:tried].keys).map { |type| { type:, **entry[:tried][type] } },
+                    untried: order(seen.fetch('people', []) - entry[:tried].keys),
+                    unknown_untried: order(seen.fetch('unknown', []) - hostile - entry[:tried].keys),
+                    exits: entry[:exits].map { |(way, to), count| { way:, to:, count: } }.sort_by { |exit| [exit[:way], -exit[:count], exit[:to]] },
                     puzzles: entry[:puzzles].uniq { |puzzle| puzzle[:id] },
                     screen: shots.find { |dir| File.file?(File.join(dir, 'screens', "#{entry[:key]}.png")) }&.then { |dir| File.basename(dir) })
       end

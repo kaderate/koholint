@@ -179,6 +179,9 @@ module Koholint
 
     def atlas(roots, out)
       require 'koholint/atlas'
+      empty = roots.find { |root| Archive.runs(root).empty? }
+      raise Error, "no runs under #{empty}" if empty
+
       atlas = Atlas.build(roots)
       FileUtils.mkdir_p(File.dirname(Atlas::OUT))
       File.write(Atlas::OUT, JSON.pretty_generate(atlas))
@@ -186,7 +189,7 @@ module Koholint
       out.puts "atlas: #{atlas[:runs]} runs from #{roots.join(', ')} (#{atlas[:unreadable]} unreadable), last #{atlas[:last_run] || '-'}"
       out.puts "places: #{totals[:overworld]} overworld screens, #{totals[:interiors]} interiors; #{totals[:texts]} texts read; #{totals[:deaths]} deaths; " \
                "items #{totals[:items].map { |name, count| "#{name} x#{count}" }.join(', ').then { |text| text.empty? ? 'none' : text }}; #{totals[:puzzles]} puzzles"
-      out.puts "cost: $#{format('%.2f', totals[:dollars])} over #{totals[:frames]} frames, #{totals[:calls]} model calls (each fork from its fork frame on)"
+      out.puts "cost: $#{format('%.2f', totals[:dollars])} over #{totals[:frames]} frames, #{totals[:calls]} model calls (each fork from its fork frame)"
       out.puts "wrote #{Atlas::OUT}"
       0
     end

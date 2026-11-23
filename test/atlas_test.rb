@@ -43,7 +43,7 @@ class AtlasTest < Minitest::Test
     assert_equal 2, forked[:runs]
     assert_in_delta own.sum { |e| e['cost_usd'].to_f }, forked[:totals][:dollars], 0.01
     assert_equal events.map { |e| e['frame'] }.max - VAL_FORK, forked[:totals][:frames]
-    assert_operator alone[:totals][:dollars], :>, forked[:totals][:dollars]
+    assert_in_delta alone[:totals][:dollars], forked[:totals][:dollars], 0.001
     assert_operator alone[:totals][:overworld], :>, forked[:totals][:overworld]
   end
 
@@ -88,10 +88,68 @@ class AtlasTest < Minitest::Test
     assert_empty exits - %w[up down left right door]
   end
 
-  def test_untried_types_are_people_or_unknown_never_talked_to
-    atlas_of(VAL)[:places].each do |entry|
-      assert_empty entry[:untried] & entry[:tried]
-      assert_empty entry[:untried] - (entry[:seen].fetch('people', []) | entry[:seen].fetch('unknown', []))
+  def test_untried_people_have_no_try_and_unknown_types_count_apart_without_enemies
+    atlas = atlas_of(SWORD, VAL)
+    atlas[:places].each do |entry|
+      tried = entry[:tried].map { |t| t[:type] }
+      assert_empty entry[:untried] & tried
+      assert_empty entry[:untried] - entry[:seen].fetch('people', [])
+      assert_empty entry[:unknown_untried] & (tried | entry[:seen].fetch('enemies', []) | entry[:seen].fetch('creatures', []))
+    end
+    house = place(atlas, '163/16')[:tried].find { |t| t[:type] == 62 }
+    assert_operator house[:tries], :>=, house[:answered]
+    assert_operator house[:answered], :>, 0
+  end
+
+  def test_a_digest_is_plain_data_holding_no_events
+    digest = Koholint::Atlas.digest(File.join(RUNS, VAL))
+    assert Marshal.dump(digest)
+  end
+
+  def test_cost_counts_each_fork_from_its_fork_frame_even_without_its_parent
+    events = Koholint::Trace.read(File.join(RUNS, VAL, 'trace.jsonl'))
+    own = events.select { |e| e['type'] == 'decision' && e['frame'] >= VAL_FORK }.sum { |e| e['cost_usd'].to_f }
+    alone = atlas_of(VAL)
+    assert_in_delta own, alone[:totals][:dollars], 0.01
+    assert_equal events.map { |e| e['frame'] }.max - VAL_FORK, alone[:totals][:frames]
+  end
+
+  def test_a_respawn_after_a_death_is_no_way_even_onto_a_neighbour
+    Dir.mktmpdir do |root|
+      dir = File.join(root, 'r1')
+      FileUtils.mkdir_p(dir)
+      File.write(File.join(dir, 'manifest.json'), JSON.generate('flow_version' => 'flow-80'))
+      trace = Koholint::Trace.new(File.join(dir, 'trace.jsonl'))
+      state = { 'game_mode' => 0x0B, 'game_submode' => 7, 'room_id' => 101, 'map_id' => 0 }
+      trace.emit(:perception, frame: 10, state:, state_hash: 'h')
+      trace.emit(:notable, frame: 20, kind: 'death', detail: 'game over: save and continue')
+      trace.emit(:perception, frame: 30, state: state.merge('room_id' => 100), state_hash: 'h')
+      trace.emit(:perception, frame: 40, state: state.merge('room_id' => 101), state_hash: 'h')
+      trace.emit(:perception, frame: 50, state: state.merge('room_id' => 112), state_hash: 'h')
+      atlas = Koholint::Atlas.build([root])
+      assert_equal 1, place(atlas, 'F7')[:deaths]
+      assert_empty place(atlas, 'F7')[:exits]
+      assert_equal [{ way: 'right', to: 'F7', count: 1 }], place(atlas, 'E7')[:exits]
+      assert_empty place(atlas, 'A8')[:exits]
+    end
+  end
+
+  def test_left_and_right_stay_in_one_row
+    assert_equal 'right', Koholint::Atlas.way([14, 0], [15, 0])
+    assert_nil Koholint::Atlas.way([15, 0], [16, 0])
+    assert_nil Koholint::Atlas.way([16, 0], [15, 0])
+    assert_equal 'door', Koholint::Atlas.way([162, 0], [163, 16])
+  end
+
+  def test_types_sort_with_mixed_kinds
+    assert_equal [5, 40, 'npc'], Koholint::Atlas.order(['npc', 40, 5])
+  end
+
+  def test_a_root_with_no_run_is_an_error
+    Dir.mktmpdir do |root|
+      err = StringIO.new
+      assert_equal 1, Koholint::CLI.run(['atlas', '--root', File.join(root, 'nothing')], out: StringIO.new, err:)
+      assert_match(/no runs under/, err.string)
     end
   end
 

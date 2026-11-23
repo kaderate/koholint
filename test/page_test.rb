@@ -492,7 +492,7 @@ class PageTest < Minitest::Test
   COMPARE = File.read(File.join(VIEWER, 'compare.html'))
   ATLAS = File.read(File.join(VIEWER, 'atlas.html'))
   PLACE = { key: '163-16', label: '163/16', grid: false, opens_from: ['C11'], first: { run: 'r1', frame: 351 }, visits: 3, runs: 2, deaths: 1,
-            seen: { people: [62, 63] }, signs: 0, doors: 1, tried: [62], untried: [63], exits: [{ way: 'door', to: 'C11', count: 2 }],
+            seen: { people: [62, 63], unknown: [70, 71] }, signs: 0, doors: 1, tried: [{ type: 62, tries: 3, answered: 1 }], untried: [63], unknown_untried: [71], exits: [{ way: 'door', to: 'C11', count: 2 }],
             names: [{ name: "Marine's house", run: 'r1', frame: 1719, source: { text: "Je suis\nMarine", frame: 801 } }], names_withheld: 1,
             items: [{ name: 'shield', run: 'r1', frame: 3906 }], puzzles: [], texts: [], screen: 'r1' }.freeze
 
@@ -505,7 +505,9 @@ class PageTest < Minitest::Test
   def test_atlas_card_shows_a_name_with_its_source_and_counts_the_withheld_ones
     rows = atlas_eval("cardRows(#{JSON.generate(PLACE)})").to_h { |row| [row['label'], row['text']] }
     assert_equal "Marine's house — « Je suis Marine » (r1, frame 801) · 1 nom proposé par le modèle sans texte lu qui le porte, non affiché", rows['nom']
-    assert_equal 'type 63', rows['jamais essayés']
+    assert_equal 'type 62 (3 essais, 1 réponse)', rows['talk_to tentés']
+    assert_equal 'type 63', rows['personnes sans talk_to']
+    assert_equal '1 (type 71)', rows['inconnus sans talk_to']
     assert_equal 'porte → C11 ×2', rows['sorties prises']
     assert_equal 'shield (r1, frame 3906)', rows['objets obtenus']
     assert_equal '163/16 · intérieur qui part de C11', atlas_eval("title(#{JSON.generate(PLACE)})")
