@@ -47,6 +47,14 @@
   #interiors { display: flex; flex-wrap: wrap; gap: 8px; padding: 0 16px 24px; }
   #interiors button { display: flex; gap: 8px; align-items: center; background: var(--panel); border: 1px solid var(--line); border-radius: 8px; color: var(--ink); font: inherit; font-size: 12.5px; padding: 4px 8px; cursor: pointer; }
   #interiors img { width: 64px; height: 58px; image-rendering: pixelated; }
+  .scroll { overflow-x: auto; margin: 0 16px 20px; background: var(--panel); border: 1px solid var(--line); border-radius: 12px; }
+  .scroll table { border-collapse: collapse; width: 100%; font-size: 13px; }
+  .scroll th, .scroll td { padding: 5px 10px; border-bottom: 1px solid #22262e; text-align: left; vertical-align: top; }
+  .scroll th { color: var(--mut); font-weight: 600; font-size: 11.5px; }
+  .scroll td.num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .scroll td.q { min-width: 18em; }
+  .s-open { color: var(--warn); } .s-tested { color: var(--acc); } .s-refuted { color: var(--bad); }
+  .note { padding: 0 16px 6px; color: var(--mut); font-size: 12px; }
 </style>
 </head>
 <body>
@@ -58,6 +66,12 @@
 <div id="wrap"><div id="grid"></div><section id="card"><h3>Atlas</h3><span class="mut">Cliquer un écran vu.</span></section></div>
 <h2>Intérieurs</h2>
 <div id="interiors"></div>
+<h2>Pistes lues dans les textes du jeu</h2>
+<div class="note">Une piste par citation, toutes runs confondues. Statut : testée quand un objectif qui la citait a été atteint, réfutée après deux échecs, sinon ouverte. La citation est le texte du jeu ; la lecture et l'importance viennent du modèle, ou du moteur pour un texte ouvert par contact.</div>
+<div class="scroll"><table><thead><tr><th>statut</th><th>importance (modèle)</th><th>citation</th><th>lecture</th><th>lue à</th><th>première lecture</th><th>runs</th><th>objectifs</th></tr></thead><tbody id="leads"></tbody></table></div>
+<h2>Progrès par flow</h2>
+<div class="note">Ce que les runs de chaque version du jeu de règles ont atteint en premier parmi les runs lus, depuis la frame de fork de chaque run ; ce qu'un fork dont le parent n'est pas lu tient d'avant sa frame de fork est compté à part, sans coût.</div>
+<div class="scroll"><table><thead><tr><th>flow</th><th>runs</th><th>frames</th><th>coût</th><th>écrans nouveaux</th><th>intérieurs nouveaux</th><th>textes nouveaux</th><th>pistes nouvelles</th><th>objets</th><th>$ par écran nouveau</th></tr></thead><tbody id="flows"></tbody></table></div>
 <script>
 (function () {
   // pure:begin
@@ -136,6 +150,32 @@
   }
 
   function textLine(text) { return (text.speaker ? text.speaker + ' · ' : '') + text.run + ', frame ' + text.frame; }
+
+  var STATUS = { open: 'ouverte', tested: 'testée', refuted: 'réfutée' };
+  var IMPORTANCE = { high: 'haute', normal: 'normale', low: 'basse', tip: 'conseil' };
+  var IMPORTANCE_ORDER = ['high', 'normal', 'tip', 'low'];
+  var STATUS_ORDER = ['open', 'refuted', 'tested'];
+
+  function rank(list, value) { var i = list.indexOf(value); return i < 0 ? list.length : i; }
+
+  function leadRows(leads) {
+    return (leads || []).slice().sort(function (a, b) {
+      return rank(IMPORTANCE_ORDER, a.importance) - rank(IMPORTANCE_ORDER, b.importance) || rank(STATUS_ORDER, a.status) - rank(STATUS_ORDER, b.status) ||
+        (a.first.run < b.first.run ? -1 : a.first.run > b.first.run ? 1 : a.first.frame - b.first.frame);
+    }).map(function (lead) {
+      return { status: lead.status, cells: [STATUS[lead.status] || lead.status, IMPORTANCE[lead.importance] || lead.importance || '—', lead.quote, lead.claim ? (lead.contact ? 'moteur : ' : 'modèle : ') + lead.claim : '—', lead.place || '—',
+        lead.first.run + ', frame ' + lead.first.frame, String(lead.runs), lead.tried ? lead.achieved + ' atteint' + (lead.achieved === 1 ? '' : 's') + ' sur ' + lead.tried : '—'] };
+    });
+  }
+
+  function flowRows(flows) {
+    return (flows || []).map(function (f) {
+      var screens = (f.screens || []).length;
+      return [f.flow === 'inherited' ? 'hérité (parent non lu)' : f.flow, String(f.runs), String(f.frames), '$' + Number(f.dollars || 0).toFixed(2),
+        screens ? screens + ' (' + f.screens.join(', ') + ')' : '0', (f.interiors || []).length ? f.interiors.join(', ') : '0',
+        String(f.texts || 0), String(f.leads || 0), (f.items || []).join(', ') || '—', screens ? '$' + (f.dollars / screens).toFixed(2) : '—'];
+    });
+  }
 
   function screenUrl(place) { return place.screen ? '/screens/' + encodeURIComponent(place.key) + '.png?run=' + encodeURIComponent(place.screen) : null; }
   // pure:end
@@ -237,6 +277,21 @@
     });
   }
 
+  function fillRows(id, rows) {
+    var body = document.getElementById(id);
+    body.textContent = '';
+    rows.forEach(function (row) {
+      var tr = el('tr');
+      var cells = row.cells || row;
+      cells.forEach(function (text, i) {
+        var td = el('td', i === 2 && row.cells ? 'q' : (id === 'flows' && i > 0 && i < 4) || (id === 'flows' && i === 9) ? 'num' : null, text);
+        if (i === 0 && row.status) td.className = 's-' + row.status;
+        tr.appendChild(td);
+      });
+      body.appendChild(tr);
+    });
+  }
+
   function render(atlas) {
     places = indexPlaces(atlas.places || []);
     document.getElementById('scope').textContent = scopeText(atlas);
@@ -245,6 +300,8 @@
     kpis(atlas).forEach(function (k) { var div = el('div', null, k.label); div.insertBefore(el('b', null, k.value), div.firstChild); box.appendChild(div); });
     renderGrid();
     renderInteriors();
+    fillRows('leads', leadRows(atlas.leads));
+    fillRows('flows', flowRows(atlas.flows));
   }
 
   fetch('/atlas.json').then(function (response) {

@@ -3,6 +3,7 @@ require 'zlib'
 require 'koholint'
 require 'koholint/archive'
 require 'koholint/dialogues'
+require 'koholint/leads'
 require 'koholint/place_card'
 require 'koholint/place_kinds'
 require 'koholint/summary'
@@ -17,6 +18,8 @@ module Koholint
     WAYS = { 1 => 'right', -1 => 'left', 16 => 'down', -16 => 'up' }.freeze
     ENTITIES = %w[people enemies unknown creatures].freeze
     NAME_WORD = 4
+    STATUSES = %w[open refuted tested].freeze
+    INHERITED = 'inherited'.freeze
 
     module_function
 
@@ -125,7 +128,23 @@ module Koholint
         end
         run_frames = [run_frames, frame - fork].max if frame >= fork
       end
-      { run:, frames: run_frames, dollars:, calls:, places: }
+      { run:, flow: Summary.read_json(File.join(dir, 'manifest.json'))['flow_version'], since:, fork:, frames: run_frames, dollars:, calls:, places:, leads: leads(events, since:, run:) }
+    end
+
+    # Each lead the run holds, keyed by its quote: read here when its event is from `since` on; status and attempts from the whole run.
+    def leads(events, since:, run:)
+      read = events.select { |event| event['type'] == 'lead' }.to_h { |event| [event['id'], event['frame'].to_i] }
+      Leads.from_events(events).with_status.filter_map do |lead|
+        quote = lead[:quote].to_s
+        key = Dialogues.key(quote)
+        next if key.empty?
+
+        frame = read[lead[:id]]
+        attempts = lead[:evidence].select { |attempt| attempt[:frame].to_i >= since }
+        { key:, quote:, claim: lead[:claim], contact: lead[:contact] ? true : nil, importance: lead[:importance], place: lead[:place].is_a?(Array) ? label(lead[:place]) : nil,
+          status: lead[:status], read: frame && frame >= since ? { run:, frame: } : nil,
+          tried: attempts.size, achieved: attempts.count { |attempt| attempt[:outcome] == 'achieved' } }
+      end
     end
 
     # Overworld screens that are not neighbours (a warp, or a row wrap from P to A) are not a way.
@@ -185,6 +204,7 @@ module Koholint
                     screen: shots.find { |dir| File.file?(File.join(dir, 'screens', "#{entry[:key]}.png")) }&.then { |dir| File.basename(dir) })
       end
       texts = list.flat_map { |entry| entry[:texts].map { |text| Dialogues.key(text[:text]) } }.uniq
+      leads = merge_leads(digests)
       items = list.flat_map { |entry| entry[:items] }
       {
         roots:, runs: digests.size, unreadable:, last_run: digests.map { |digest| digest[:run] }.max,
@@ -193,8 +213,52 @@ module Koholint
                   overworld: list.count { |entry| entry[:grid] }, interiors: list.count { |entry| !entry[:grid] }, texts: texts.size,
                   deaths: list.sum { |entry| entry[:deaths] }, items: items.group_by { |item| item[:name] }.transform_values(&:size),
                   puzzles: list.sum { |entry| entry[:puzzles].size }, names_withheld: list.sum { |entry| entry[:names_withheld] } },
-        places: list
+        places: list,
+        leads:,
+        flows: flows(digests, list, leads)
       }
+    end
+
+    def merge_leads(digests)
+      found = {}
+      digests.sort_by { |digest| digest[:run] }.each do |digest|
+        digest[:leads].each do |lead|
+          entry = found[lead[:key]] ||= lead.except(:key, :read, :tried, :achieved).compact.merge(first: nil, runs: [], tried: 0, achieved: 0)
+          entry[:first] ||= lead[:read]
+          entry[:runs] |= [digest[:run]] if lead[:read]
+          entry[:tried] += lead[:tried]
+          entry[:achieved] += lead[:achieved]
+          entry[:status] = lead[:status] if STATUSES.index(lead[:status]).to_i > STATUSES.index(entry[:status]).to_i
+        end
+      end
+      found.values.select { |lead| lead[:first] }.map { |lead| lead.merge(runs: lead[:runs].size) }
+    end
+
+    # Per flow version: the runs, their own frames, cost and calls, and what they reached first in the runs read; what a fork whose
+    # parent is not read reached before its fork frame goes to an inherited row with no cost.
+    def flows(digests, places, leads)
+      by_run = digests.to_h { |digest| [digest[:run], digest] }
+      bucket = lambda do |run, frame|
+        digest = by_run[run]
+        digest[:since] < digest[:fork] && frame.to_i < digest[:fork] ? INHERITED : digest[:flow].to_s
+      end
+      rows = Hash.new { |hash, flow| hash[flow] = { flow:, runs: 0, frames: 0, dollars: 0.0, calls: 0, screens: [], interiors: [], texts: 0, items: [], leads: 0 } }
+      digests.each do |digest|
+        row = rows[digest[:flow].to_s]
+        row[:runs] += 1
+        row[:frames] += digest[:frames]
+        row[:dollars] += digest[:dollars]
+        row[:calls] += digest[:calls]
+      end
+      places.each { |place| rows[bucket.(place[:first][:run], place[:first][:frame])][place[:grid] ? :screens : :interiors] << place[:label] }
+      places.flat_map { |place| place[:texts] }.sort_by { |text| [text[:run], text[:frame]] }.uniq { |text| Dialogues.key(text[:text]) }.each do |text|
+        rows[bucket.(text[:run], text[:frame])][:texts] += 1
+      end
+      places.flat_map { |place| place[:items] }.sort_by { |item| [item[:run], item[:frame]] }.uniq { |item| item[:name] }.each do |item|
+        rows[bucket.(item[:run], item[:frame])][:items] << item[:name]
+      end
+      leads.each { |lead| rows[bucket.(lead[:first][:run], lead[:first][:frame])][:leads] += 1 }
+      rows.values.map { |row| row.merge(dollars: row[:dollars].round(2)) }.sort_by { |row| row[:flow] == INHERITED ? [-1, 0, ''] : [0, row[:flow][/\d+/].to_i, row[:flow]] }
     end
   end
 end

@@ -145,6 +145,46 @@ class AtlasTest < Minitest::Test
     assert_equal [5, 40, 'npc'], Koholint::Atlas.order(['npc', 40, 5])
   end
 
+  def test_leads_merge_by_quote_with_their_best_status_and_first_reading
+    atlas = atlas_of(SWORD, VAL)
+    keys = atlas[:leads].map { |lead| Koholint::Dialogues.key(lead[:quote]) }
+    assert_equal keys.uniq, keys
+    owl = atlas[:leads].find { |lead| lead[:quote].include?('Viens me voir dans la Forêt') }
+    assert_equal 'tested', owl[:status]
+    assert_equal 'C16', owl[:place]
+    assert_operator owl[:achieved], :>, 0
+    assert(atlas[:leads].all? { |lead| lead[:first][:run] && lead[:runs].between?(1, 2) && Koholint::Atlas::STATUSES.include?(lead[:status]) })
+    contact = atlas[:leads].select { |lead| lead[:contact] }
+    refute_empty contact
+    assert(contact.all? { |lead| lead[:claim].start_with?('Contact with') })
+  end
+
+  def test_a_fork_reads_only_the_leads_of_its_own_segment_when_its_parent_is_read
+    with_root(VAL, parent: true) do |root|
+      events = Koholint::Trace.read(File.join(RUNS, VAL, 'trace.jsonl'))
+      own = events.count { |e| e['type'] == 'lead' && e['frame'] >= VAL_FORK }
+      assert_equal own, Koholint::Atlas.build([root])[:leads].size
+    end
+  end
+
+  def test_flows_sum_their_runs_and_place_each_first_reach_once
+    atlas = atlas_of(SWORD, VAL)
+    assert_equal %w[inherited flow-37 flow-78], atlas[:flows].map { |flow| flow[:flow] }
+    assert_in_delta atlas[:totals][:dollars], atlas[:flows].sum { |flow| flow[:dollars] }, 0.02
+    assert_equal atlas[:totals][:texts], atlas[:flows].sum { |flow| flow[:texts] }
+    inherited = atlas[:flows].first
+    assert_equal [0, 0, 0.0], inherited.values_at(:runs, :frames, :dollars)
+    first = atlas[:places].to_h { |place| [place[:label], place[:first]] }
+    forks = { SWORD => 52_200, VAL => VAL_FORK }
+    inherited[:screens].each { |label| assert_operator first[label][:frame], :<, forks.fetch(first[label][:run]) }
+    atlas[:flows].drop(1).flat_map { |flow| flow[:screens] }.each { |label| assert_operator first[label][:frame], :>=, forks.fetch(first[label][:run]) }
+    assert_equal atlas[:totals][:overworld], atlas[:flows].sum { |flow| flow[:screens].size }
+    assert_equal atlas[:totals][:interiors], atlas[:flows].sum { |flow| flow[:interiors].size }
+    assert_equal atlas[:leads].size, atlas[:flows].sum { |flow| flow[:leads] }
+    assert_equal ['shield'], inherited[:items]
+    assert_equal ['sword'], atlas[:flows][1][:items]
+  end
+
   def test_a_root_with_no_run_is_an_error
     Dir.mktmpdir do |root|
       err = StringIO.new

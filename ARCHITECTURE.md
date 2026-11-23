@@ -305,7 +305,12 @@ types with no try that no card saw as an enemy or creature (`unknown_untried`), 
 (same row for left and right) or through a door, never the first place change after a death (a respawn), the overworld screen an
 interior opens from, items gained, puzzles, and the latest run with its screenshot. A `place_name` is kept only with a text read at
 that place, at or before it, that carries one of its words of 4 letters or more (accents and case folded); the others are counted as
-withheld, since the model writes names. Totals: runs, unreadable runs, frames, dollars, model calls, screens, interiors, distinct
+withheld, since the model writes names. Leads: one per quote (`Dialogues.key`), with the claim, importance and place label of its
+first reading, the runs that read it (a fork reads only its own segment's leads when its parent is read), the objectives that
+followed it and those achieved, and its best status over the runs (`Leads#status`: tested, then refuted, then open). Flows: per
+`flow_version`, the runs, own frames, dollars and calls, and the screens, interiors, texts, leads and items those runs reached first
+among the runs read (by run id, which is chronological), from each fork frame; what a fork whose parent is not read reached before
+its fork frame goes to an `inherited` row with no cost. Contact leads carry the engine's claim, not the model's. Totals: runs, unreadable runs, frames, dollars, model calls, screens, interiors, distinct
 texts, deaths, items, puzzles. `koholint atlas [--root DIR]...` writes `tmp/atlas.json` (default root `runs`; a root with no run is
 an error); the viewer's `/atlas` page and `/atlas.json` read the runs root and keep one digest of plain data per run directory,
 rebuilt when its trace's size or mtime changes.
@@ -316,12 +321,12 @@ goal, leads and the stitched dialogue history (newest first, with the person tal
 up to the shown frame, and `Insights` the world map (places on the overworld grid or attached to the screen they were
 entered from, kinds from `data/place_kinds.json` via `place_kinds.rb`; exits taken, belief grids, people, leads, and a `screenshot` flag per place served by `/screens/<room>-<map>.png`), the timeline
 markers, cached by trace and shown frame, and the `cockpit` (KPIs against the manifest budget, the health band, HUD, current objective with its offered candidates, reasoning, symptoms, the place card of the current place, interiors with their entry door, leads and the dialogues grouped by person) that feeds the page: a top bar, a sticky chronological strip, three columns (screen with people, sign and door overlays, HUD and reasoning; objective and dialogues; symptoms, place card, leads) and, below, the world map in an exterior and an interiors tab, the complete inventory and the dialogue history. `Explorer` and `Registry` serve past runs (list,
-read-only replays with pacing and seek, comparison via `run_compare.rb`, star, the run header and `notes.md`). It
-never writes game state; the only files it writes are `star.json`, `summary.json`'s `starred` and `notes.md`.
+read-only replays with pacing and seek, comparison via `run_compare.rb`, star, the run header and `notes.md`) and the
+atlas (`/atlas`, above). It never writes game state; the only files it writes are `star.json`, `summary.json`'s `starred` and `notes.md`.
 
 **CLI** — `cli.rb`, `bin/koholint`: `run`, `resume`, `fork`, `branch` (fork at a frame or a checkpoint of
 `data/checkpoints.json`, spawn `watch` on the child, resume it, then stop the viewer and exit, or with `--keep-viewer` wait for it; say when it did not start), `verify`, `summary` (a fork's `cost_usd` counts its own decisions only, `inherited_cost_usd` the parent's; the viewer's spent figure does the same), `watch`, `archive`, `star`,
-`prune-heavy`, `census` (modes, `census entities`, `census objects`, `census doors`, `census sword` or `census ready`), `ab-plan` and
+`prune-heavy`, `atlas` (above), `census` (modes, `census entities`, `census objects`, `census doors`, `census sword` or `census ready`), `ab-plan` and
 `ab-report` (`ab.rb`: the fork and resume commands of an A/B between autopilot arms, or with `--arms capabilities,no-capabilities` between forks with and without the operational capabilities (`--capabilities on|off`), from one frame of a run, written to
 `tmp/ab/plan.json` and `tmp/ab/run.sh`; then a table per arm measured from the fork frame on: cost, paid calls, new places and
 new cells per 1000 frames, stalls, autopilot decisions, and the pre-registered criterion), `learn` and `capability list|publish|retire` (capability learning above), `bench exits` (the exit bench above; the capability arms of `ab-report` add progress, new places plus items gained plus milestone steps, per 1000 frames and per dollar, capability uses and cleared objects, a use-based criterion and a per-fork table; a new place is one no ancestor run reached, before or after the fork frame). `fork` opens a parent of any flow
@@ -355,6 +360,7 @@ version, and may set the child's `--tag`, `--autopilot` and `--root`.
 |---|---|
 | Design rationale | `docs/superpowers/specs/` |
 | Measurements of agent runs | `docs/runs/` (`index.md` lists every archived run) |
+| What all runs observed, per place, lead and flow | `koholint atlas`, the viewer's `/atlas` |
 | What remains | `ROADMAP.md` |
 | Conventions | `AGENTS.md` |
 | Commands, censuses, viewer and run storage | `docs/OPERATING.md` |
