@@ -189,6 +189,37 @@ class RevisitTest < Minitest::Test
     @revisit.read
   end
 
+  def chest(cell, **over) = { cell:, object: 160, kind: :chest, verified: true, reachable: true, **over }
+
+  def test_a_reachable_closed_chest_is_opened_with_talk_to_and_left_once_open
+    action = act(entities: [], signs: [chest([2, 3])])
+    assert_equal({ skill: 'talk_to', params: { row: 2, col: 3 } }, action.slice(:skill, :params))
+    assert_equal({ place: PLACE, cell: [2, 3], chest: true }, action[:sign])
+    @revisit.talked({ talked: true })
+    @revisit.read(opened: true)
+    assert_nil act(entities: [], signs: [chest([2, 3], object: 161, open: true)])
+    assert_equal [{ sign: { place: PLACE, cell: [2, 3] }, round: 1, outcome: 'opened' }], @revisit.notes.map { |note| note[:detail] }
+  end
+
+  def test_a_dialogue_that_left_the_chest_closed_is_not_called_opened
+    act(entities: [], signs: [chest([2, 3])])
+    @revisit.talked({ talked: true })
+    @revisit.read
+    assert_equal ['not_opened'], @revisit.notes.map { |note| note[:detail][:outcome] }
+  end
+
+  def test_a_chest_no_route_reaches_from_below_is_not_work
+    assert_nil act(entities: [], signs: [chest([2, 3], reachable: false)])
+  end
+
+  def test_a_chest_that_does_not_open_is_tried_at_most_twice
+    2.times do |i|
+      refute_nil act(entities: [], signs: [chest([2, 3])], frame: 100 + i)
+      @revisit.talked({ talked: false })
+    end
+    assert_nil act(entities: [], signs: [chest([2, 3])], frame: 110)
+  end
+
   def test_an_unread_sign_is_engaged_like_a_person_and_read_once
     action = act(entities: [], signs: [sign([2, 3])])
     assert_equal({ skill: 'talk_to', params: { row: 2, col: 3 } }, action.slice(:skill, :params))

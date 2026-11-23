@@ -34,7 +34,7 @@ deterministic, so *ROM + journal* is the whole run. Time is the frame; wall cloc
 pacing (`pacer.rb`) and observability.
 
 **Perception** — `perception.rb`, `addresses.rb`, `game_state.rb`, `data/addresses.json`: a typed `GameState`
-(position, room/map, HP, phase such as dialogue or locked, `link_frozen` (a scripted scene holds Link), milestone, inventory cursor, menu option, A/B items, the 10 inventory slots, `shield_raised`) read from RAM. Every address carries
+(position, room/map, HP, the rupee count (`rupees`: the BCD byte 0xDB5E for tens and units, verified, plus the hundreds byte 0xDB5D, a hypothesis), phase such as dialogue or locked, `link_frozen` (a scripted scene holds Link), milestone, inventory cursor, menu option, A/B items, the 10 inventory slots, `shield_raised`) read from RAM. Every address carries
 provenance and a `verified_count`; `verified` needs two independent checks. No RAM writes to gameplay state.
 `items.rb` and `data/items.json` name item ids (with provenance; unmeasured names are shown with a `?`); the milestone is the best of `shield_level` and the `milestone` of the items held (`none`, `shield`, `sword`). The engine runs an `ItemWatch` on every frame and emits `item_gained` (`item`, `name`, `place`, `held`) the first time an item id appears among the held items after the first play frame (once per id per run, rebuilt from the trace on resume).
 `GameState` also carries the readiness signals (`room_transition`, `link_airborne`, `link_z`, `link_knockback`,
@@ -46,7 +46,7 @@ same control (`enemy`: types 9, 10 and 197 of the beach zone, measured for speed
 an uncatalogued type is `unknown`. The engine passes `Entities.read` to the policy and
 skills as the `entities` context entry. `Entities.objects` reads the room object table (`room_objects`, one id per cell)
 and keeps the ids that `data/entities.json` lists with an `object` key and a kind (`sign`: shows a text when read with A,
-`object`, `door`: walking up into it from the cell below enters a building) and the directions Link faced when it answered (`faces`, which restrict the standing cells of `talk_to`); it is
+`object`, `door`: walking up into it from the cell below enters a building, `chest`: a treasure chest that opens when Link walks up into it from the cell below and presses A; object 160 is closed and 161, flagged `open`, opened) and the directions Link faced when it answered (`faces`, which restrict the standing cells of `talk_to`); it is
 the `objects` context entry. `probes/object_census.rb` (`bin/koholint census objects`) measures them: in
 a throwaway copy with every entity slot cleared, Link is put next to each cell, faces it by walking 6 frames and presses
 A (a dialogue that also opens without A in a control copy is not the object's; the first page is saved as a PNG); each
@@ -90,7 +90,7 @@ screen change 53-66, a knockback 15-16, a door 62 (walk in, loading, walk out).
 **Place cards** — `place_card.rb`: on the first ready observation in the `playing` phase of each visit of a place
 (a new place since the last card; rebuilt from the trace on resume), after the grid builder, the engine scans the entity
 table and the room objects and emits a `place_card` event: people (`npc` entities, verified or not), enemies, creatures, unknown
-entities, signs, objects (`object` entities and room objects) with their cells, doors (room objects of kind `door`), and exits
+entities, signs, objects (`object` entities and room objects) with their cells, doors (room objects of kind `door`), chests (`{cell, open}`, room objects of kind `chest`; `PlaceCard.latest` gives the policy the closed ones not opened since, so a resume keeps away chests), and exits
 (border cells believed walkable, by side). `world.json` `places` keeps per place the last card, the visits, the first and last card frames, the
 place name the agent gave (`name`), the names and talk status of the people and whether each sign was read (from the talk log rebuilt from the trace); flow-79: `unknown_types` gives, once per unknown type of the last card, `tries` (talk_to results aimed at that type there, `target_type` or `entity`), `answered` (those that opened a dialogue) and `moved` (talk_to had to chase it, `tracked`), and the place has `items_gained` (its `item_gained` events). The
 agent's context lists the doors of the screen with the cell to walk up from.
@@ -168,7 +168,7 @@ not in it (nor among the candidates, the place card people or the revisit target
 `Creatures on screen` line.
 `revisit.rb` is the deterministic revisit and arrival engagement: for the `npc` entities of a `verified` kind in the
 current place that are not exhausted for the current stamp (flow-62: a person of another place whose last talk was under
-other held items or another milestone, `TalkLog#stale?`, is a `person-R-M-tT` candidate again until Link talks to them), and the `verified` `sign` room objects not read yet (a sign
+other held items or another milestone, `TalkLog#stale?`, is a `person-R-M-tT` candidate again until Link talks to them), and the `verified` `sign` room objects not read yet and the closed `chest` objects a route on the current grid reaches from the cell below (flow-81: `objects_for` marks each closed chest `reachable` by the default planner, which counts unknown cells as walkable; a `talk_to` at a chest that drew no response keeps it unreachable for the rest of that visit of the place, and any `talk_to` at it drops it from the away cards; an opened one is no work; 2 rounds per chest, its close note says `opened` or `not_opened` from the object read after the dialogue; a `chest` objective ends when its chest is seen open, whatever its text) (a sign
 is read once: a text remembered on its cell with no entity; `TalkLog#sign_status` is `never`, `tried` or `read`), it
 gives the next `talk_to` (nearest target first, the same target until done, each person of a type shared by several
 tried once per stamp), with caps counted in rounds and in frames of free play only (`Revisit#observe`, fed by the policy
@@ -212,7 +212,89 @@ explores or 2400 frames since the last call. flow-80 (val78: 73 of 146 model ski
 skill decision after the model's call: `explore` with the exit's direction, or with an `aim` in the skill context (a door to enter first,
 a place to route to through `ExploreLog#route(goal:)`; a model `explore` with no direction gets the same aim, or the objective's place, and the prompt shows the known route to that place, `ExploreLog#path`), or one `talk_to` of a person or sign of the current place (a `new_text` target left behind is not routed back to, except a sign offered from another place, `remote` on its target, which is routed to and ends only when that sign's text is read, `Objectives#note_sign_read` (flow-69); a door Link stands on or just below is not a candidate); a new goal
 from that call does not hold it. When a chain stopped `new_place` or `known_place` and achieved the model's objective, the next
-`choose_objective` is answered by the policy (`new_place`, `autopilot: true` on the objective) while the place or a routed place ha**Atlas** (`atlas.rb`) — what every run under one or more roots observed, merged per place, read only from what the engine
+`choose_objective` is answered by the policy (`new_place`, `autopilot: true` on the objective) while the place or a routed place has
+untried exits and the caps allow it, and (flow-52) no person on screen was never tried (no talk attempt with its type here): such a person is the first candidate of the model's objective choice (run `20261113-160556-fef5` kept exploring past the never-tried type 49 at (5,5) of 242/0 and left). Results of autopilot decisions are marked `(autopilot)` in the context's results and attempts. Autopilot explores are objective attempts like any other (loop and stall
+abandonment still apply) and leave the engine's consecutive failure and refusal counters untouched; `--autopilot off`
+(manifest `autopilot`) disables it),
+`policies/walk_and_talk.rb` and `start_game.rb` (deterministic baselines and the intro). In `delegated.rb` an invalid
+answer falls back deterministically, 5 consecutive fallbacks stop the run; an engine exception before the
+agent call is an `engine_error` fallback counted apart and stops as `engine_errors`. Phases come from the mode
+catalogue (see Game modes): the boot script owns `boot` and `loading`; once the run has played (a `perception` in play
+mode, rebuilt from the trace on resume) the screens go to the agent with their own skills only (`menu`: `menu_move`,
+`menu_assign`, `close_menu`; `map`: `close_map`; `save`: `choose_option`; `unknown`: `press` and `wait`;
+all with `press` and `wait`), after a deterministic wait while the screen is still opening; `cutscene` (the dying
+animation included) waits like `locked`, in waits that end the frame Link is free (flow-50); a lock is followed by a wait as long
+as itself, up to 30 frames, before the model is asked (flow-40: the sword scene released Link for 3 frames between two locks;
+flow-50: the owl of 128/0 for 1); a lock that outlasts the 900-frame wait cap emits one
+`notable` `lock_cap` and the model decides from then on. A dialogue sequence that reaches its page or frame cap is
+sent as sheets once and the advance goes on (the model's choice is replaced while the box is open); only a second cap of the same
+dialogue hands the pages to the model (the owl and sword texts together run over 40 pages); a dialogue that opens with no current
+objective is advanced before a new objective is asked for. The game-over screen is never sent to the model: the policy picks its first
+catalogue option not flagged `quits` with `choose_option` (agent `delegated`, no prompt) and emits one `notable` `death`
+per screen. A drop of `hp` between two observations emits a `notable` `damage` (`hp 16 -> 12`), and the next prompt's
+health line adds the hearts lost (and a death) since the last model call. flow-68 brings back one low-health rule (flow-34 had removed them all): at one heart or less (`health <= HP_PER_HEART`) the autopilot holds (`low health`), so the model takes every decision, and walk, goto and explore grow every enemy contact zone by a cell (`Execution#danger_of`). The planner crosses that ring only as a last tier and never the contact zone itself (`contact:`), a goal inside a zone is still reached, and from inside a zone Link may take any step that does not bring him closer to an enemy (`closeness:`, `Entities.threat_distance`); walk stops `danger` before a zone cell under the same rule, and a goto with no route outside the contact zones names them in its `no_path` cause. In the 9 post-57/61/65 forks, 5 of 15 deaths were enemy contact at one heart or less (4 at half a heart). There is still no retreat and no shelter candidate: flow-34 removed rules whose thresholds were never measured, and this one rests on those death counts. flow-73 (66/0, per-frame probes of run `20261118-155549-c9c4` at frames 87880 and 88140 with every other entity cleared): type 27 hurts at an axis gap of 8 px or less on 7 of 8 sides (11 px above it in one state, so `contact_px` 11) and barely moves (0.07 to 0.23 px/frame); one sword hit turns it into two type 28, which chase Link (0.4 to 1.0 px/frame) but never hurt him (0 hp in 4 of 4 placed contacts); 28 stays `unknown` until a second independent check, a moving contact included. `Attack#closest` now uses the default reach (9 px) when a type has no `contact_px`, so the lineup no longer strikes from inside contact (it did at 2 px, and those strikes missed), and a back-off into a wall switches to the other axis (`BACKOFF_STILL`). The away rule for zones (`Execution#away_of`) is a direction test from Link's own position against the enemies within a cell of their touch, because comparing cell centres let him walk down into a 27 sharing his cell. At one heart or less with such an enemy near, `Autopilot#disengage_choice` walks one cell in the direction with no enemy ahead that ends farthest from them, skipping directions a walk found blocked (or refused at once for danger) since the last model call and cells on or beside a learned hole, up to `DISENGAGE_LIMIT` (3) times per model call; the model decides after. Continuing the attack chain after a `damage` stop was tried and dropped: in replays the next attack re-entered contact and lost another half heart. Six `no_frontier`, `no_path`, `blocked` or `stalled` results in one place without reaching a new cell emit a
+`notable` `stuck` and add a `STUCK` reset hint to the header until Link reaches a new cell or leaves. `loop_watch.rb` (`LoopWatch`, fed by the policy with every play-mode observation and rebuilt from the `perception` events on resume) catches the loops across places that this per-place count misses: a known place entered for the 4th time within 3600 frames with no place new to the run in between emits a `notable` `stuck` (`loop: ...`) and a `LOOP` hint in the header until Link reaches a new place (thresholds measured on run `20261111-232729-4ec5`, where it fires at frames 63755 and 65331). flow-44: the detection also changes behaviour. At the next skill or objective decision, once per detection (`LoopWatch#act!`, rebuilt from the trace on resume), `Delegated#loop_break` abandons the current objective (reason `loop`) and starts the harness's new-place objective. It then explores toward the nearest place with untried work outside the loop (flow-66: `route(skip:)`) (`ExploreLog#route`), or explores here when this place still has some. flow-47: when no known place has untried work, it starts a `reach_place` objective (target kind `place`) toward the reachable place entered least outside the loop's places, nearest first (`ExploreLog#least_visited`, from the explore log's visit counts), and explores toward it; every later detection acts again (run `20261113-101324-216d`: the 178/0 ↔ 203/16 phone-booth loop was detected 4 more times while every known place read as exhausted, so the break never acted). Explore also takes a clearable object's frontier in the current place before an aimed route, and counts it as untried work in its survey. A capability that ran on an object without clearing it is recorded in the explore log (`failed_clears`), and that cell is no longer a frontier there. NPC revisits wait while a surveyed place still has untried work. A skill that ends its move with Link off the grid (a border crossing whose room id changes only after the scroll) waits up to `EDGE_FRAMES` for the room change. flow-45: after `ZERO_LIMIT` (3) identical results of at most one frame in the same place (same skill and stop), `Delegated#zero_cap` answers the next skill decision itself with a `stuck` notable. The streak is counted by `zero_watch.rb` (`ZeroWatch`, rebuilt from the trace's actions and the harness's own decisions on resume). The harness explores toward the nearest place with untried work when there is one, unless its explore already came back instantly in this streak; otherwise it waits 120 frames. Its own answer keeps the count, so each further instant repeat costs one model call per wait, until a result takes more than a frame or the place changes. flow-80: explores that stop `no_frontier` or `stalled` with no cell walked (or in a frame) are also counted over one visit of a place, whatever moves run between them, reset by an explore that walked, by leaving, by a new context (item or milestone), a lead or goal (the `lead` and `goal` events on rebuild), or a skill other than a move (explore, goto, walk, step, wait) that took more than 8 frames; the third such result gets the same harness answer (`walking no cell` in its justification and `no cell walked` in the notable), and when no place has untried work the harness explores toward the reachable place entered least (`least_visited`) before waiting. flow-57: a hit sets `pending_damage` (0xDB94) to its whole loss and the game then lowers `hp` one unit every 2 frames (per-frame replays in two run lineages), so every skill started during that drain stopped `damage` within 2 frames and cost a model call per unit (24 calls, 0.46 USD in the 3 post-56 forks). `GameState#health` (hp minus the pending damage) is what every damage check compares: the skills (and so composites and learn trials), the autopilot hold and the damage notable. A hit now stops a skill once, on its own frame. flow-46: `attack` takes an unknown or creature (`Entities.creature?`) at or next to the cell when no `enemy` is there, never a person nor any other kind (run `20261113-090835-21b0`: types 11 and 27 of the northern places hurt Link 18 times while all 9 attacks on them stopped `no_target`); both types are catalogued as `enemy` hypotheses. The play skill set has no screen-only skill. The engine stops the run with
+`stuck_boot` when the boot script decides for over 900 consecutive frames in a non-play mode past boot, or 3600 in any case. It stops
+with `unknown_mode_stuck` after 600 consecutive frames on an uncatalogued screen, and with `not_ready_stuck` after 600
+frames waited for readiness. `choose_option` refuses (`refused`) the
+catalogue options flagged `quits` (save and quit to the title), and the context lists only the other options.
+
+**Candidates** — `candidates.rb` builds the `choose_objective` menu: people here first (`npc`, status never/new/changed/repeat),
+unread signs here, unidentified things here (flow-40: `unknown` entities and sprites holding no entity never talked to, nearest 4,
+`examine-ROW-COL`, followed by one `talk_to`), untried exits by side and untried doors of the place (every candidate that leaves the place is labelled
+`leaves unexhausted people here` while such a person is listed), known places with untried exits, people (never/new) and unread signs of
+other places from their last place card (`PlaceCard.latest`, kept current by the policy), and places a lead's `where` resolves to (a
+place id or a place name); remote ones are nearest first by `ExploreLog#hops`, 4 per kind. Each candidate carries an id, a label, a
+title, a predicate and a `target` (`exit`, `door`, `person`, `sign`, `place`, `lead`); an unknown id is a refusal. Place names (`place_name`
+events) live in `leads.rb` with the leads and resolve `where`.
+
+**Objectives** — `objectives.rb`: a short goal with a predicate the harness checks from memory
+(`leave_place`, `reach_place`, `reach_cell`, `dialogue_closed`, `new_place`, `new_text`: a text not read before in
+the run, compared whitespace-insensitively on the stitched text, the read texts rebuilt from `dialogue` events on resume); the engine emits started and
+achieved/abandoned/failed events; a `started` event may carry `because`, the id of the lead that motivated it, `candidate` and `target`, and `autopilot`. The
+long-term direction is the agent's own `goal` (a short text it restates or revises at every objective; the context shows
+when it was set). `leads.rb` holds the leads: claims the
+agent extracts from texts it read (dialogue, signs, objects), each with a verbatim `quote`, a `claim` and an importance
+(`high`, `normal`, `low`, or `tip` for how-to-play advice; the context shows all high leads, the normal ones of the
+place and the 4 newest tips). A lead whose quote is not in the transcription of the same call is dropped (`notable`
+`lead_rejected`), duplicates are dropped by quote. Goal and leads are rebuilt from the `goal` and `lead` trace events on
+resume. flow-48: each lead has a status derived from the objectives that followed it (`because`, or a `lead` candidate's target), read from the finished
+objectives (`Leads#note_objective`, fed with `Objectives#history` before each prompt and rebuilt from the `objective` events on resume): `open` until one
+follows it, `tested` once one is achieved, `refuted` after `REFUTE_AT` (2) that failed, or were abandoned for a reason other than `loop`, `stall`, `unreachable`
+or `resume` (navigation and restarts say nothing of the claim). The evidence is those objectives (id, title, outcome, place, frame, reason).
+The context tags a followed lead with its status and its last 3 objectives and lists open leads first; a lead stops being a `lead-N` candidate once refuted
+or once an achieved objective reached the place it points to (a loosely cited `tested` keeps it), and
+`world.json` carries `status` and `evidence` per lead. flow-58: when a skill opens a text without pressing A (`Triggers.scripted?`, the barred edge), the policy
+notes what is in the cell ahead in the `trigger_input` direction (an `npc` entity's type, else the `room_objects` id unless that id lies under Link or under a
+cell the explore log walked in that place or fills at least 10% of the room's cells, since the table holds an id in every cell) in the dialogue sequence, and the call that reads that text adds
+`Leads#contact`: a `normal` lead with the text as quote, the place as `where`, the cell as `source` and `contact` (`row`, `col`, `object` or `entity`), claiming
+only that contact opened the text; one per thing and text (a quote overlapping one about the same thing, or any lead's quote in that place, model leads
+included, counts once), `LIMIT` per place, restored from its `lead` event like the others; its `where` is its own place, so it never becomes a goto candidate. `Dialogues.leads_count` leaves contact leads out, so they never change the stamp that reopens people.
+flow-59: `lead_check.rb` holds the walkthrough rule on leads: a claim or `where`
+naming a catalogued item (under its name or an `aliases` entry of `data/items.json`) that the text read does not name and that Link does not hold
+(`Items.held_ids`: A, B, inventory, milestone) is general knowledge, not something read. `Leads#absorb` drops such a lead at runtime with the same inputs as the offline
+check: every text the run has read (`note_read`, from the policy and from `dialogue` events on resume), the current transcription and earlier lead quotes,
+and the items ever held (`note_held`, cumulative, so a used-up item still counts); the engine traces a `lead_leak` notable and `koholint check-leads` reports them in traces. It also checks that every sentence read (3 words or more, once per run) is quoted by a lead or dismissed by a low lead quoting it, and lists the dropped ones (`LeadCheck.sentences`; a quote cut inside a sentence covers nothing).
+
+**Agents** (`agents/`) — `context.rb` renders state for the model (grid map, neighbours, entities and objects on screen, people's names,
+goal, leads — every `high` one, `normal` ones of the current place, never `low` ones —, recent results, plan), `prompts.rb` holds the system prompts, `claude_cli.rb` calls `claude -p` with a JSON
+schema and reports cost and latency. Jev (tactical choices) is planned, not wired.
+
+**Run storage** — `run.rb`: `runs/<id>/` with `manifest.json` (flow version, ROM hash, tag, harness/prompts
+sha, model, `autopilot` for agent runs; `resume` keeps it, `capabilities`: the digest of the operational capabilities at creation, `exits`: the digest of the exit bench data (`false` for a run without it), or `false` for an A/B arm without them; a fork takes the current digest unless it or its parent is `false`), `inputs.log`, `trace.jsonl` (events validated by `trace.rb`), `keyframes/`, `save/`, `prompts/`, `screens/` (one PNG per place, written by `place_shots.rb`:
+observability only, no trace event, the set of captured places is rebuilt from the directory),
+`world.json` (`{ goal, leads, places }`, rewritten from the trace at every stop), `summary.json` (written at every stop by
+`summary.rb` from the trace only, versioned by `Summary::VERSION`: totals, cost by skill, decisions by agent and
+feature usage, with `autopilot_decisions`, `chain_max`, `deaths`, `damage_events`, `stuck_events`, `chests_opened` and `rupees` (the last perceived count), `puzzles` (`{open, by_place}`: the `puzzle` events counted once per id, per place and kind), and `symptoms`: `left_with_unexhausted_people`, place changes
+away from a place whose last place card listed a verified person whose `TalkLog#last_status` was not `exhausted`; `archive` rewrites an outdated one), `star.json`, `notes.md` (owner notes from the viewer). Trace events (`dialogue` may carry `speaker`, `conversation` and `cached`; a `talk_to` result may carry `entity`; a `perception` may carry `not_ready_frames`; a `decision` may carry `autopilot`; a `keyframe` may carry `reason` and `place`; a `choose_objective` decision lists the offered candidates in `options` as `{id, label, leaves_unexhausted, picked}`): `perception`, `decision`, `action`, `objective`, `dialogue`, `lead`, `goal`,
+`notable`, `place_card`, `place_name`, `item_gained`, `chest_opened` (`place`, `cell`: a chest closed at the last ready look at the place and open now, emitted by the engine), `puzzle`, `screen`, `screen_changed`, `affordance`, `keyframe`, `save`, `budget_stop`, `stop`. `budget.rb` enforces frames,
+minutes, dollars and objective steps. `archive.rb` keeps a light bundle per run in git (trace gzipped, `screens/` included);
+heavy artifacts stay local. A run resumes only with the same `flow_version`, ROM hash, capabilities digest and exits digest (`Run#check_exits!`)
+(`Run#check_capabilities!` in `Engine.resume`: a manifest without the key is the empty digest, `false` always resumes, a
+mismatch names both digests and the `fork` command to continue with the current set); a change to the play flow in code means
+a new `flow_version`, publishing or retiring a capability changes only the digest.
+
+**Atlas** (`atlas.rb`) — what every run under one or more roots observed, merged per place, read only from what the engine
 wrote (`manifest.json`, the trace, `screens/`). A run whose parent is among the runs read counts its places from the fork frame on,
 so a shared prefix counts once; without its parent, the prefix's places count, since nothing else holds them. Frames, dollars and
 model calls always count each fork from its fork frame (as `Summary`'s `cost_usd`). Per place: label (overworld screens by map
@@ -226,4 +308,55 @@ that place, at or before it, that carries one of its words of 4 letters or more 
 withheld, since the model writes names. Totals: runs, unreadable runs, frames, dollars, model calls, screens, interiors, distinct
 texts, deaths, items, puzzles. `koholint atlas [--root DIR]...` writes `tmp/atlas.json` (default root `runs`; a root with no run is
 an error); the viewer's `/atlas` page and `/atlas.json` read the runs root and keep one digest of plain data per run directory,
-rebuilt when its trace's size or mtime changes.s
+rebuilt when its trace's size or mtime changes.
+
+**Viewer** (`viewer.rb`, `viewer/`) — a small HTTP server. A `Follower` replays the journal of the watched
+run and seeks by restoring the nearest keyframe; `Feed` derives status, mode and alerts, feed, reasoning, objectives,
+goal, leads and the stitched dialogue history (newest first, with the person talked to and their state) from the trace
+up to the shown frame, and `Insights` the world map (places on the overworld grid or attached to the screen they were
+entered from, kinds from `data/place_kinds.json` via `place_kinds.rb`; exits taken, belief grids, people, leads, and a `screenshot` flag per place served by `/screens/<room>-<map>.png`), the timeline
+markers, cached by trace and shown frame, and the `cockpit` (KPIs against the manifest budget, the health band, HUD, current objective with its offered candidates, reasoning, symptoms, the place card of the current place, interiors with their entry door, leads and the dialogues grouped by person) that feeds the page: a top bar, a sticky chronological strip, three columns (screen with people, sign and door overlays, HUD and reasoning; objective and dialogues; symptoms, place card, leads) and, below, the world map in an exterior and an interiors tab, the complete inventory and the dialogue history. `Explorer` and `Registry` serve past runs (list,
+read-only replays with pacing and seek, comparison via `run_compare.rb`, star, the run header and `notes.md`). It
+never writes game state; the only files it writes are `star.json`, `summary.json`'s `starred` and `notes.md`.
+
+**CLI** — `cli.rb`, `bin/koholint`: `run`, `resume`, `fork`, `branch` (fork at a frame or a checkpoint of
+`data/checkpoints.json`, spawn `watch` on the child, resume it, then stop the viewer and exit, or with `--keep-viewer` wait for it; say when it did not start), `verify`, `summary` (a fork's `cost_usd` counts its own decisions only, `inherited_cost_usd` the parent's; the viewer's spent figure does the same), `watch`, `archive`, `star`,
+`prune-heavy`, `census` (modes, `census entities`, `census objects`, `census doors`, `census sword` or `census ready`), `ab-plan` and
+`ab-report` (`ab.rb`: the fork and resume commands of an A/B between autopilot arms, or with `--arms capabilities,no-capabilities` between forks with and without the operational capabilities (`--capabilities on|off`), from one frame of a run, written to
+`tmp/ab/plan.json` and `tmp/ab/run.sh`; then a table per arm measured from the fork frame on: cost, paid calls, new places and
+new cells per 1000 frames, stalls, autopilot decisions, and the pre-registered criterion), `learn` and `capability list|publish|retire` (capability learning above), `bench exits` (the exit bench above; the capability arms of `ab-report` add progress, new places plus items gained plus milestone steps, per 1000 frames and per dollar, capability uses and cleared objects, a use-based criterion and a per-fork table; a new place is one no ancestor run reached, before or after the fork frame). `fork` opens a parent of any flow
+version, and may set the child's `--tag`, `--autopilot` and `--root`.
+
+## Data flow of one decision
+
+1. The engine waits for readiness (see Readiness gate), reads `GameState` and emits a `perception` event; vision updates the grid and beliefs;
+   on a new place the engine emits its `place_card`.
+2. The policy gets a decision point and a context. For an agent policy: render context, call the model, validate
+   the answer against the schema; invalid twice means deterministic fallback.
+3. The engine emits a `decision` event (choice, justification, confidence, cost, latency, prompt sha) and runs
+   the chosen skill frame by frame, appending every input to the journal.
+4. The skill result becomes an `action` event and feeds the next context; objectives are re-evaluated.
+5. The budget is checked after every frame; at stop the engine saves, checkpoints, emits `stop` and writes
+   `summary.json`.
+
+## Invariants
+
+- Only the engine writes `trace.jsonl`, `inputs.log` and `save/`; `verify` replays the journal and compares hashes.
+- Determinism: the same journal on the same ROM gives the same states. Agents are never called in replay.
+- No walkthrough in code or prompts (how-to-play knowledge is allowed, see `AGENTS.md`); facts live in `data/addresses.json`,
+  `data/modes.json`, `data/entities.json` and a run's `world.json`, with provenance; named branch points live in
+  `data/checkpoints.json`.
+- A rule a script can check is a validator, not a paragraph.
+- Playing and evolving the flow are separate: a run only emits `suggestions.md`.
+
+## Where things are
+
+| Need | Look at |
+|---|---|
+| Design rationale | `docs/superpowers/specs/` |
+| Measurements of agent runs | `docs/runs/` (`index.md` lists every archived run) |
+| What remains | `ROADMAP.md` |
+| Conventions | `AGENTS.md` |
+| Commands, censuses, viewer and run storage | `docs/OPERATING.md` |
+| Agent skills and harness behaviour (per flow) | `docs/AGENT_SKILLS.md` |
+| Game manual digest given to the agent | `docs/AGENT_MANUAL.md` |

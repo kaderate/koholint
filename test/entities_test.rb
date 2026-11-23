@@ -55,6 +55,12 @@ class EntitiesTest < Minitest::Test
     assert_equal [{ object: 99, cell: [2, 3], kind: :sign, verified: true, faces: [:up] }, { object: 98, cell: [7, 9], kind: :object, verified: false }], found
   end
 
+  def test_chest_objects_are_catalogued_closed_and_open
+    catalogue = Koholint::Entities.object_catalogue
+    assert_equal({ kind: :chest, verified: true, faces: [:up] }, catalogue[160])
+    assert_equal({ kind: :chest, verified: true, faces: [:up], open: true }, catalogue[161])
+  end
+
   def test_object_entries_are_validated_apart_from_entity_types
     Dir.mktmpdir do |dir|
       path = File.join(dir, 'entities.json')

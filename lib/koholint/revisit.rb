@@ -47,7 +47,7 @@ module Koholint
 
       people = entities.select { |entity| npc?(entity) }
       pending = people.select { |entity| pending?(place, entity, stamp, world, people, visit) }
-      unread = signs.select { |sign| sign?(sign) && unread?(place, sign, visit) }
+      unread = signs.select { |sign| (sign?(sign) || chest?(sign)) && unread?(place, sign, visit) }
       return if pending.empty? && unread.empty?
       return spent(visit) if spent?(visit)
 
@@ -70,7 +70,7 @@ module Koholint
       visit[:cycles][stamp] ||= @clock
       visit[:started] ||= @clock
       visit[:engaged] += 1
-      return engage_sign(place, visit, target, stamp) if sign?(target)
+      return engage_sign(place, visit, target, stamp) if sign?(target) || chest?(target)
 
       visit[:current] = target[:type]
       entry = @npcs[[place, target[:type], stamp]]
@@ -89,8 +89,9 @@ module Koholint
       close(@failures[key] >= FAILURE_CAP ? :unreachable : :no_dialogue)
     end
 
-    def read
+    def read(opened: false)
       return unless @open
+      return close(opened ? :opened : :not_opened) if @open[:chest]
       return close(@talk_log.sign_read?(place: @open[:place], cell: @open[:cell]) ? :read : :no_text) if @open[:sign]
 
       close(@talk_log.last_status(place: @open[:place], entity: @open[:type]))
@@ -108,16 +109,19 @@ module Koholint
 
     def sign?(object) = object[:kind].to_s == 'sign' && object[:verified] == true && object[:cell]
 
+    # A closed chest stays work until it opens, and only while a route reaches the cell below it.
+    def chest?(object) = object[:kind].to_s == 'chest' && !object[:open] && object[:reachable] == true && object[:verified] == true && object[:cell]
+
     def unread?(place, sign, visit)
       @sign_rounds[[place, sign[:cell]]] < SIGN_ROUNDS && @failures[[visit[:id], [:sign, sign[:cell]]]] < FAILURE_CAP &&
-        !@talk_log.sign_read?(place:, cell: sign[:cell])
+        (chest?(sign) || !@talk_log.sign_read?(place:, cell: sign[:cell]))
     end
 
     def engage_sign(place, visit, sign, stamp)
       visit[:current] = [:sign, sign[:cell]]
       round = @sign_rounds[[place, sign[:cell]]] += 1
-      @open = { place:, sign: true, cell: sign[:cell], round:, stamp:, visit: visit[:id] }
-      { skill: 'talk_to', params: { row: sign[:cell][0], col: sign[:cell][1] }, sign: { place:, cell: sign[:cell] }, round: }
+      @open = { place:, sign: true, cell: sign[:cell], round:, stamp:, visit: visit[:id], **(chest?(sign) ? { chest: true } : {}) }
+      { skill: 'talk_to', params: { row: sign[:cell][0], col: sign[:cell][1] }, sign: { place:, cell: sign[:cell], **(chest?(sign) ? { chest: true } : {}) }, round: }
     end
 
     def spent?(visit) = visit[:started] && @clock - visit[:started] >= @visit_frames
