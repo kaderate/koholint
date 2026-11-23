@@ -913,6 +913,18 @@ class ExploreTest < Minitest::Test
     refute log.surveyed_untried?(PLACE)
   end
 
+  def test_an_assumed_way_back_ranks_after_the_other_reachable_work_of_the_place
+    log = Koholint::ExploreLog.new
+    log.absorb({ from: { room: 17, map: 0 }, exits: [{ row: 0, col: 5, direction: :up, outcome: :left, to: [1, 0] }] })
+    rows = with(CLOSED, [7, 5], '.', [3, 9], '.')
+    result, = explore(rows, exits: [[[7, 5], :down], [[3, 9], :right]], explore_log: log, limit: 1)
+    assert_equal({ kind: :exit, row: 3, col: 9, direction: :right }, result[:target])
+    result, = explore(with(CLOSED, [7, 5], '.', [2, 3], '?'), exits: [[[7, 5], :down]], explore_log: log, limit: 1)
+    assert_equal :frontier, result[:target][:kind]
+    result, = explore(with(CLOSED, [7, 5], '.'), exits: [[[7, 5], :down]], explore_log: log, limit: 1)
+    assert_equal({ kind: :exit, row: 7, col: 5, direction: :down }, result[:target], 'with nothing else here, the way back is still taken')
+  end
+
   def test_a_way_unreachable_from_the_side_entered_on_two_visits_is_not_routed_through_that_side
     log = Koholint::ExploreLog.new
     walk = ->(from, to, direction) { log.note({ skill: 'walk', params: { direction: }, from: { room: from, map: 0, row: 3, col: 5 }, to: { room: to, map: 0, row: 3, col: 5 } }) }

@@ -83,7 +83,8 @@ module Koholint
 
     private
 
-    def instant_due?(place) = @fresh && @count >= LIMIT && @key&.first == place
+    # An explore that found no frontier at once would find none again from the same cell, so it is answered after the first.
+    def instant_due?(place) = @fresh && @count >= (@key&.drop(1) == %w[explore no_frontier] ? 1 : LIMIT) && @key&.first == place
 
     def idle_due?(place) = @idle_fresh && @idle && @idle[:count] >= LIMIT && @idle[:place] == place
 

@@ -30,6 +30,7 @@ module Koholint
           @exact = false
           @recentre = nil
           @clearing = clearing_for(context)
+          @room_objects = context[:room_objects]
         end
 
         def result(state = @last)
@@ -94,7 +95,7 @@ module Koholint
           return finish(:damage) if state.health < @start.health
           return finish(:dialogue) if state.dialog_open? && !@start.dialog_open?
           return recentre(state) if @recentre
-          return @clearing&.start(state, @heading) || centre_exactly(state) || reroute(state) || finish(:blocked) if @still >= STILL_FRAMES
+          return @clearing&.start(state, @heading) || centre_exactly(state) || reroute(state) || finish(:blocked) if @still >= STILL_FRAMES && @still >= still_limit(state, @heading, STILL_FRAMES)
 
           advance(state)
         end

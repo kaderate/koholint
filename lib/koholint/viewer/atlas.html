@@ -22,12 +22,15 @@
   #kpis b { display: block; color: var(--ink); font-size: 18px; font-variant-numeric: tabular-nums; }
   .legend { padding: 8px 16px; color: var(--mut); font-size: 12px; }
   .legend i, .badges i { font-style: normal; margin-right: 10px; }
-  .u { color: var(--blue); } .x { color: var(--bad); } .p { color: var(--warn); font-weight: 700; } .d { color: var(--ink); }
+  .u { color: var(--blue); } .x { color: var(--bad); } .p { color: var(--warn); font-weight: 700; } .d { color: var(--ink); } .legend .n { color: var(--acc); }
   #wrap { display: flex; flex-wrap: wrap; gap: 16px; align-items: flex-start; padding: 0 16px 16px; }
   #grid { display: grid; grid-template-columns: 22px repeat(16, 54px); grid-auto-rows: 49px; gap: 1px; }
   .h { display: flex; align-items: center; justify-content: center; color: var(--mut); font-size: 11px; }
   .c { position: relative; background: #181a1f; border: 0; padding: 0; color: inherit; font: inherit; }
   .c.k { background: #23372c; cursor: pointer; }
+  .c.k.n { background: repeating-linear-gradient(45deg, #3b5f4b 0 3px, #23372c 3px 7px); box-shadow: inset 0 0 0 1px var(--acc); }
+  .c .t { position: absolute; left: 1px; right: 1px; top: 15px; font-size: 8.5px; line-height: 1.1; text-align: center; color: #fff; text-shadow: 0 0 2px #000, 0 0 2px #000; }
+  #card .nocap { display: inline-block; padding: 18px 12px; margin-bottom: 6px; border-radius: 4px; background: repeating-linear-gradient(45deg, #3b5f4b 0 3px, #23372c 3px 7px); color: #fff; text-shadow: 0 0 2px #000; }
   .c.sel { outline: 2px solid var(--warn); z-index: 2; }
   .c img { width: 54px; height: 49px; image-rendering: pixelated; display: block; opacity: 0.85; }
   .c .l { position: absolute; left: 2px; top: 0; font-size: 9.5px; color: #555; }
@@ -69,7 +72,7 @@
 <div id="error"></div>
 <div id="kpis"></div>
 <div class="legend">Tout ce que les runs lus ont observé, cumulé par écran (un fork ne compte qu'à partir de sa frame de fork). Écrans nommés par la carte : colonne A–P, ligne 1–16.
-  <br><i class="u">● personne à qui talk_to n'a jamais été tenté</i><i class="x">✝ morts</i><i class="p">? énigme</i><i class="d">⌂ intérieur</i></div>
+  <br><i class="u">● personne à qui talk_to n'a jamais été tenté</i><i class="x">✝ morts</i><i class="p">? énigme</i><i class="d">⌂ intérieur</i><i class="n">▨ vu, sans capture</i></div>
 <div id="wrap"><div id="grid"></div><section id="card"><h3>Atlas</h3><span class="mut">Cliquer un écran vu.</span></section></div>
 <h2>Intérieurs</h2>
 <div id="interiors"></div>
@@ -86,6 +89,10 @@
 (function () {
   // pure:begin
   var COLUMNS = 'ABCDEFGHIJKLMNOP';
+
+  var NO_SHOT = 'vu, sans capture';
+
+  function cellClass(place) { return place ? (place.screen ? 'c k' : 'c k n') : 'c'; }
 
   function cellLabel(index) { return COLUMNS[index % 16] + (Math.floor(index / 16) + 1); }
 
@@ -141,6 +148,7 @@
     var rows = [
       { label: 'nom', text: names.length ? names.join(' · ') : '—' },
       { label: 'première visite', text: place.first ? place.first.run + ', frame ' + place.first.frame : '—' },
+      { label: 'capture', text: place.screen ? 'screens/' + place.key + '.png (' + place.screen + ')' : NO_SHOT + ' : aucun screens/' + place.key + '.png dans les runs lus' },
       { label: 'visites', text: place.visits + ' dans ' + plural(place.runs, 'run') },
       { label: 'morts', text: String(place.deaths || 0) },
       { label: 'personnes', text: types(seen.people) },
@@ -245,7 +253,7 @@
     card.textContent = '';
     card.appendChild(el('h3', null, title(place)));
     var img = image(place);
-    if (img) card.appendChild(img);
+    card.appendChild(img || el('div', 'nocap', NO_SHOT));
     var table = el('table');
     cardRows(place).forEach(function (row) {
       var tr = el('tr');
@@ -282,12 +290,12 @@
       if (i % 16 === 0) grid.appendChild(el('div', 'h', String(i / 16 + 1)));
       var label = cellLabel(i);
       var place = places[label];
-      var cell = el(place ? 'button' : 'div', place ? 'c k' : 'c');
+      var cell = el(place ? 'button' : 'div', cellClass(place));
       if (place) {
         cell.type = 'button';
-        cell.title = label;
+        cell.title = place.screen ? label : label + ' · ' + NO_SHOT;
         var img = image(place);
-        if (img) cell.appendChild(img);
+        cell.appendChild(img || el('span', 't', NO_SHOT));
         var marks = el('span', 'badges');
         badges(place).forEach(function (b) { var mark = el('i', b.cls, b.text); mark.title = b.title; marks.appendChild(mark); });
         cell.appendChild(marks);

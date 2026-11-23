@@ -113,7 +113,7 @@ module Koholint
       def walkable?(cell, target, direction, allowed, doubt, forbid, push = [])
         return false if @avoided.include?([cell, direction])
         return false if forbid && @triggers&.forbidden(@place, cell)&.include?(direction)
-        return true if push.include?(target)
+        return true if push.include?(target) || push.include?([target, direction])
         return false if @grid.static_sprite(*target)
 
         belief = @grid.passable(*target, direction)

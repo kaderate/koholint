@@ -17,6 +17,7 @@ module Koholint
           @away = away_of(context)
           @position = [@start.x, @start.y]
           @still = 0
+          @room_objects = context[:room_objects]
         end
 
         private
@@ -34,7 +35,7 @@ module Koholint
           return finish(:dialogue) if state.dialog_open? && !@start.dialog_open?
           return finish(:done) if moved_cells(state) >= @cells
           return finish(:danger) if danger_ahead?(state)
-          return finish(:blocked) if @still >= STILL_FRAMES
+          return finish(:blocked) if @still >= STILL_FRAMES && @still >= still_limit(state, @direction, STILL_FRAMES)
           return finish(:frame_cap) if @frames >= FRAMES_PER_CELL * @cells
 
           [@direction]

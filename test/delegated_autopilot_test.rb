@@ -427,15 +427,13 @@ class DelegatedAutopilotTest < Minitest::Test
     p = autopiloted(client, autopilot: nil)
     decide(p)
     instant = outcome(:no_frontier, 0).merge(frames: 1, moved_cells: 0, cells_walked: 0)
-    3.times do |i|
-      result = p.decide(p.decision_point_for(state), state, { grid: })
-      assert_equal 'claude', result[:agent]
-      p.after_action(choice: result[:choice], outcome: instant, state:, frame: 200 + i)
-    end
+    result = p.decide(p.decision_point_for(state), state, { grid: })
+    assert_equal 'claude', result[:agent]
+    p.after_action(choice: result[:choice], outcome: instant, state:, frame: 200)
     calls = client.calls.size
     result = p.decide(p.decision_point_for(state), state, { grid: })
-    assert_equal [{ skill: 'wait', params: { frames: 120 } }, 'delegated', calls], [result[:choice], result[:agent], client.calls.size]
-    assert_equal ['zero-frame: explore no_frontier 3 times in a row in 163-16'], result[:notables].map { |note| note[:detail] }
+    assert_equal [{ skill: 'wait', params: { frames: 120 } }, 'delegated', calls], [result[:choice], result[:agent], client.calls.size], 'an explore with no frontier at once is not asked again'
+    assert_equal ['zero-frame: explore no_frontier 1 times in a row in 163-16'], result[:notables].map { |note| note[:detail] }
     p.after_action(choice: result[:choice], outcome: { skill: 'wait', params: { frames: 120 }, frames: 120, stopped_by: 'done' }, state:, frame: 500)
     result = p.decide(p.decision_point_for(state), state, { grid: })
     assert_equal 'claude', result[:agent]
@@ -456,6 +454,19 @@ class DelegatedAutopilotTest < Minitest::Test
     p.after_action(choice: result[:choice], outcome: instant, state:, frame: 701)
     result = p.decide(p.decision_point_for(state), state, { grid: })
     assert_equal({ skill: 'wait', params: { frames: 120 } }, result[:choice], 'a harness explore that came back instantly escalates to the wait')
+  end
+
+  def test_other_zero_frame_results_are_answered_after_three
+    client = ScriptedClient.new(objective: new_place, default: walk)
+    p = autopiloted(client, autopilot: nil)
+    decide(p)
+    blocked = outcome(:blocked, 0).merge(frames: 1, moved_cells: 0)
+    3.times do |i|
+      result = p.decide(p.decision_point_for(state), state, { grid: })
+      assert_equal 'claude', result[:agent]
+      p.after_action(choice: result[:choice], outcome: blocked, state:, frame: 200 + i)
+    end
+    assert_equal 'delegated', p.decide(p.decision_point_for(state), state, { grid: })[:agent]
   end
 
   def test_the_harness_tries_a_never_tried_unknown_entity_once_before_exploring_on

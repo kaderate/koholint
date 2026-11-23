@@ -7,7 +7,7 @@ module Koholint
   class Autopilot
     CHAIN_LIMIT = 6
     CHAIN_FRAMES = 2400
-    BENIGN = %w[new_place known_place budget untried_object tried].freeze
+    BENIGN = %w[new_place known_place budget untried_object tried pushed].freeze
     ARRIVED = %w[new_place known_place].freeze
     TALKED = 'talked'.freeze
     TALK_ENDS = %w[done no_response].freeze
