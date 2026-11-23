@@ -119,7 +119,7 @@ module Koholint
       def self.items_line(state)
         slots = Items.slots(state).each_with_index.reject { |id, _| id.to_i.zero? }.map { |id, slot| "#{slot} #{Items.label(id)}" }
         "Items (a ? marks a name not yet measured): A #{Items.label(state.item_a)}, B #{Items.label(state.item_b)}; " \
-          "inventory slots: #{slots.empty? ? 'all empty' : slots.join(', ')}#{"; rupees: #{state.rupees}" if state.rupees}"
+          "inventory slots: #{slots.empty? ? 'all empty' : slots.join(', ')}#{"; rupees: #{state.rupees}#{' (the hundreds digit is not measured yet)' if state.rupees >= 100}" if state.rupees}"
       end
       private_class_method :items_line
 
@@ -135,6 +135,7 @@ module Koholint
         lines += signs.select { |chest| chest[:kind].to_s == 'chest' }.sort_by { |chest| chest[:cell] }.map do |chest|
           row, col = chest[:cell]
           next "- at (#{row},#{col}): chest: open" if chest[:open]
+          next "- at (#{row},#{col}): chest: closed, on the bottom row: the cell below it, from where it opens, is not on this screen" if row == Geometry::ROWS - 1
 
           "- at (#{row},#{col}): chest: closed, opens when Link walks up into it from (#{row + 1},#{col}) and presses A#{', no known route to that cell' unless chest[:reachable]}"
         end

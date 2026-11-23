@@ -36,10 +36,14 @@ module Koholint
       end.to_h
     end
 
+    # Chests come back closed as the last card saw them, less those opened since; their reachability is checked again on arrival.
     def latest(events)
+      opened = events.select { |event| event['type'] == 'chest_opened' }
       events.select { |event| event['type'] == 'place_card' && event['place'].is_a?(Array) }.to_h do |event|
+        later = opened.select { |open| open['place'] == event['place'] && open['frame'] >= event['frame'] }.map { |open| open['cell'] }
+        chests = Array(event['chests']).reject { |chest| chest['open'] }.map { |chest| chest['cell'] } - later
         [event['place'], { people: Array(event['people']).map { |person| { type: person['type'], cell: person['cell'] } },
-                           signs: Array(event['signs']).map { |sign| { cell: sign['cell'] } } }]
+                           signs: Array(event['signs']).map { |sign| { cell: sign['cell'] } }, chests: }]
       end
     end
 

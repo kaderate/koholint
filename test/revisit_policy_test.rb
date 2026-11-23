@@ -58,11 +58,54 @@ class RevisitPolicyTest < Minitest::Test
     assert_match(/\Aopen chest at \(5,4\), round 1/, opened[:justification])
 
     p = setup_revisit(skill: [walk, walk], entities: [])
-    at = context.merge(objects: -> { [chest.merge(cell: [7, 4])] })
+    at = context.merge(objects: -> { [chest] }, grid: walled)
     p.prepare(at)
     step(p, state)
     asked = p.decide(p.decision_point_for(state(frame: 120)), state(frame: 120), at)
-    assert_equal 'claude', asked[:agent]
+    assert_equal 'claude', asked[:agent], 'a wall across row 4 cuts Link off from the cell below the chest'
+  end
+
+  # Row 4 is wall from side to side; Link stands above it.
+  def walled
+    beliefs = Koholint::Vision::Beliefs.new
+    %i[up down left right].each do |direction|
+      { 'floor' => :yes, 'wall' => :no }.each do |look, result|
+        beliefs.record(appearance: look, action: :walk, direction:, result:, method: 'test', context: Koholint::Vision::Capabilities.new, frame: 1, source: 'test')
+      end
+    end
+    cells = Array.new(8) { |row| Array.new(10) { row == 4 ? 'wall' : 'floor' } }
+    Koholint::Vision::Grid.new(cells:, static_sprites: {}, beliefs:, capabilities: Koholint::Vision::Capabilities.new)
+  end
+
+  def test_a_chest_that_did_not_answer_is_no_work_for_the_rest_of_the_visit
+    chest = { object: 160, cell: [5, 4], kind: :chest, verified: true, faces: [:up] }
+    p = setup_revisit(skill: [walk, walk, walk], entities: [])
+    at = context.merge(objects: -> { [chest] })
+    p.prepare(at)
+    step(p, state)
+    opened = p.decide(p.decision_point_for(state(frame: 120)), state(frame: 120), at)
+    assert_equal 'talk_to', opened[:choice][:skill]
+    p.after_action(choice: opened[:choice], outcome: { stopped_by: 'no_path', talked: false }, state: state(frame: 130), frame: 130)
+    later = p.decide(p.decision_point_for(state(frame: 140)), state(frame: 140), at)
+    assert_equal 'claude', later[:agent]
+    refute_match(/chest: closed, opens when Link walks up into it from \(6,4\) and presses A\n/, @client.calls.last[:prompt])
+    assert_includes @client.calls.last[:prompt], 'from (6,4) and presses A, no known route to that cell'
+  end
+
+  def test_a_chest_objective_is_followed_with_talk_to_and_ends_once_the_chest_is_open
+    chest = { object: 160, cell: [5, 4], kind: :chest, verified: true, faces: [:up] }
+    objects = [chest]
+    p = setup_revisit(skill: [walk], entities: [])
+    at = context.merge(objects: -> { objects })
+    p.prepare(at)
+    @objectives.note_text('Something already read')
+    @objectives.start(frame: 100, title: 'Open the chest at (5,4)', predicate: { kind: 'new_text' }, target: { kind: 'chest', place: [163, 16], cell: [5, 4] })
+    assert_equal({ choice: { skill: 'talk_to', params: { row: 5, col: 4 } } }, p.send(:follow_choice, state))
+    objects = [chest.merge(object: 161, open: true)]
+    refute @objectives.note_text('Something already read')
+    p.observe(state(frame: 200), frame: 200)
+    assert_nil @objectives.current
+    assert_equal :achieved, @objectives.history.last[:outcome]
   end
 
   def test_the_revisit_fires_right_after_a_milestone_change_without_a_model_call

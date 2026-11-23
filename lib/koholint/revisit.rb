@@ -89,9 +89,9 @@ module Koholint
       close(@failures[key] >= FAILURE_CAP ? :unreachable : :no_dialogue)
     end
 
-    def read
+    def read(opened: false)
       return unless @open
-      return close(:opened) if @open[:chest]
+      return close(opened ? :opened : :not_opened) if @open[:chest]
       return close(@talk_log.sign_read?(place: @open[:place], cell: @open[:cell]) ? :read : :no_text) if @open[:sign]
 
       close(@talk_log.last_status(place: @open[:place], entity: @open[:type]))

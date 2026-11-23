@@ -234,7 +234,7 @@ class SummaryTest < Minitest::Test
       t.emit(:notable, frame: 140, kind: 'death', detail: 'game over: save and continue')
       t.emit(:notable, frame: 150, kind: 'stuck', detail: '6 results in 165-16 without a new cell (1 times here)')
       t.emit(:perception, frame: 160, state: PLAYING.merge('rupees' => 12))
-      t.emit(:chest_opened, frame: 170, place: [113, 0], cell: [5, 4])
+      t.emit(:chest_opened, frame: 170, place: [1, 16], cell: [2, 3])
       t.emit(:perception, frame: 180, state: PLAYING)
       record = Koholint::Summary.record(run.dir)
       assert_equal({ 'choose_objective' => { calls: 1, usd: 0.1 }, 'walk' => { calls: 2, usd: 0.5 } }, record[:cost_by_skill])

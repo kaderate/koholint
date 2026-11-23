@@ -121,9 +121,17 @@ class AgentsContextTest < Minitest::Test
                           '- at (5,6): chest: closed, opens when Link walks up into it from (6,6) and presses A, no known route to that cell'
   end
 
+  def test_a_chest_on_the_bottom_row_names_no_cell_off_the_screen
+    text = build(talk_log: Koholint::TalkLog.new, signs: [{ object: 160, cell: [7, 2], kind: :chest, verified: true, reachable: false }])
+    assert_includes text, '- at (7,2): chest: closed, on the bottom row: the cell below it, from where it opens, is not on this screen'
+    refute_includes text, '(8,2)'
+  end
+
   def test_the_items_line_gives_the_rupee_count
     assert_includes Context.build(state: state(rupees: 7), grid: grid, objective: nil, history: [], attempts: [], manual: '', last_results: []),
                     'inventory slots: all empty; rupees: 7'
+    assert_includes Context.build(state: state(rupees: 120), grid: grid, objective: nil, history: [], attempts: [], manual: '', last_results: []),
+                    'rupees: 120 (the hundreds digit is not measured yet)'
   end
 
   def test_signs_on_screen_are_listed_with_their_reading_status

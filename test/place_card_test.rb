@@ -38,6 +38,16 @@ class PlaceCardTest < Minitest::Test
                    exits: { up: [[0, 4], [0, 5]], right: [[3, 9]] } }, card)
   end
 
+  def test_latest_cards_keep_the_closed_chests_not_opened_since
+    events = [{ 'type' => 'place_card', 'frame' => 10, 'place' => [1, 0], 'people' => [], 'signs' => [],
+                'chests' => [{ 'cell' => [2, 3], 'open' => false }, { 'cell' => [4, 5], 'open' => false }, { 'cell' => [6, 7], 'open' => true }] },
+              { 'type' => 'chest_opened', 'frame' => 40, 'place' => [1, 0], 'cell' => [4, 5] },
+              { 'type' => 'place_card', 'frame' => 50, 'place' => [2, 0], 'people' => [], 'signs' => [] }]
+    cards = Koholint::PlaceCard.latest(events)
+    assert_equal [[2, 3]], cards[[1, 0]][:chests]
+    assert_equal [], cards[[2, 0]][:chests]
+  end
+
   def test_unknown_passability_gives_no_exit
     assert_equal({}, Koholint::PlaceCard.build(place: PLACE, entities: [], objects: [], grid: grid(false))[:exits])
     assert_equal({}, Koholint::PlaceCard.build(place: PLACE, entities: [], objects: [], grid: nil)[:exits])

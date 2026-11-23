@@ -118,7 +118,7 @@ The skills, protocols and harness behaviours the agent works with. Versioned wit
 - flow-81: a closed treasure chest (object 160) is untried work like an unread sign, but only while a route on the current grid reaches the cell below it:
   the revisit opens it with `talk_to` (walk up into it from below, then A; no model call, 2 rounds per chest), it is a `chest-R-C` objective candidate
   (`chest-R-M-R-C` for a place where one was seen reachable), and the things on screen list each chest as open or closed with the cell to open it from
-  (or `no known route to that cell`). The Items line gives the rupee count (`rupees: N`). The engine traces `chest_opened` and summary.json counts it.
+  (or `no known route to that cell`). A chest that gave no response stays off the work list for the rest of that visit, and a chest objective ends once its chest is open. The Items line gives the rupee count (`rupees: N`). The engine traces `chest_opened` and summary.json counts it.
 - flow-80: when every place with untried work is reachable only through cut ways, explore routes through the oldest cut not yet tried
   instead of stopping `no_frontier`; each cut is tried once until a new item or milestone. Three explores that find no frontier and walk
   no cell on one visit of a place (moves between them do not count; a new item, lead or goal, or a longer non-move skill starts over)

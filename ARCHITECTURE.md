@@ -90,7 +90,7 @@ screen change 53-66, a knockback 15-16, a door 62 (walk in, loading, walk out).
 **Place cards** — `place_card.rb`: on the first ready observation in the `playing` phase of each visit of a place
 (a new place since the last card; rebuilt from the trace on resume), after the grid builder, the engine scans the entity
 table and the room objects and emits a `place_card` event: people (`npc` entities, verified or not), enemies, creatures, unknown
-entities, signs, objects (`object` entities and room objects) with their cells, doors (room objects of kind `door`), chests (`{cell, open}`, room objects of kind `chest`), and exits
+entities, signs, objects (`object` entities and room objects) with their cells, doors (room objects of kind `door`), chests (`{cell, open}`, room objects of kind `chest`; `PlaceCard.latest` gives the policy the closed ones not opened since, so a resume keeps away chests), and exits
 (border cells believed walkable, by side). `world.json` `places` keeps per place the last card, the visits, the first and last card frames, the
 place name the agent gave (`name`), the names and talk status of the people and whether each sign was read (from the talk log rebuilt from the trace); flow-79: `unknown_types` gives, once per unknown type of the last card, `tries` (talk_to results aimed at that type there, `target_type` or `entity`), `answered` (those that opened a dialogue) and `moved` (talk_to had to chase it, `tracked`), and the place has `items_gained` (its `item_gained` events). The
 agent's context lists the doors of the screen with the cell to walk up from.
@@ -168,7 +168,7 @@ not in it (nor among the candidates, the place card people or the revisit target
 `Creatures on screen` line.
 `revisit.rb` is the deterministic revisit and arrival engagement: for the `npc` entities of a `verified` kind in the
 current place that are not exhausted for the current stamp (flow-62: a person of another place whose last talk was under
-other held items or another milestone, `TalkLog#stale?`, is a `person-R-M-tT` candidate again until Link talks to them), and the `verified` `sign` room objects not read yet and the closed `chest` objects a route on the current grid reaches from the cell below (flow-81: `objects_for` marks each closed chest `reachable`; an opened one is no work; 2 rounds per chest, its close note says `opened`) (a sign
+other held items or another milestone, `TalkLog#stale?`, is a `person-R-M-tT` candidate again until Link talks to them), and the `verified` `sign` room objects not read yet and the closed `chest` objects a route on the current grid reaches from the cell below (flow-81: `objects_for` marks each closed chest `reachable` by the default planner, which counts unknown cells as walkable; a `talk_to` at a chest that drew no response keeps it unreachable for the rest of that visit of the place, and any `talk_to` at it drops it from the away cards; an opened one is no work; 2 rounds per chest, its close note says `opened` or `not_opened` from the object read after the dialogue; a `chest` objective ends when its chest is seen open, whatever its text) (a sign
 is read once: a text remembered on its cell with no entity; `TalkLog#sign_status` is `never`, `tried` or `read`), it
 gives the next `talk_to` (nearest target first, the same target until done, each person of a type shared by several
 tried once per stamp), with caps counted in rounds and in frames of free play only (`Revisit#observe`, fed by the policy

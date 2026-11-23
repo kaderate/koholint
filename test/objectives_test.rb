@@ -236,6 +236,17 @@ class ObjectivesTest < Minitest::Test
     assert_nil @objectives.update(state(frame: 4), frame: 4)
   end
 
+  def test_a_chest_objective_ends_when_that_chest_is_seen_open_even_with_a_known_text
+    @objectives.note_text('Tu as trouvé quelque chose')
+    @objectives.start(frame: 1, title: 'Open the chest', predicate: { kind: 'new_text' }, target: { kind: 'chest', place: [1, 0], cell: [3, 4] })
+    refute @objectives.note_text('Tu as trouvé quelque chose')
+    assert_nil @objectives.update(state(frame: 2), frame: 2)
+    @objectives.note_chest_open(place: [1, 0], cell: [5, 6])
+    assert_nil @objectives.update(state(frame: 3), frame: 3), 'another chest'
+    @objectives.note_chest_open(place: [1, 0], cell: [3, 4])
+    assert_equal :achieved, @objectives.update(state(frame: 4), frame: 4)
+  end
+
   def test_a_sign_objective_ends_on_that_signs_text_only_even_when_the_text_is_known
     @objectives.note_text('Attention au plancher')
     @objectives.start(frame: 1, title: 'Go read the sign', predicate: { kind: 'new_text' }, target: { kind: 'sign', place: [101, 0], cell: [4, 8], remote: true })

@@ -196,9 +196,16 @@ class RevisitTest < Minitest::Test
     assert_equal({ skill: 'talk_to', params: { row: 2, col: 3 } }, action.slice(:skill, :params))
     assert_equal({ place: PLACE, cell: [2, 3], chest: true }, action[:sign])
     @revisit.talked({ talked: true })
-    @revisit.read
+    @revisit.read(opened: true)
     assert_nil act(entities: [], signs: [chest([2, 3], object: 161, open: true)])
     assert_equal [{ sign: { place: PLACE, cell: [2, 3] }, round: 1, outcome: 'opened' }], @revisit.notes.map { |note| note[:detail] }
+  end
+
+  def test_a_dialogue_that_left_the_chest_closed_is_not_called_opened
+    act(entities: [], signs: [chest([2, 3])])
+    @revisit.talked({ talked: true })
+    @revisit.read
+    assert_equal ['not_opened'], @revisit.notes.map { |note| note[:detail][:outcome] }
   end
 
   def test_a_chest_no_route_reaches_from_below_is_not_work
