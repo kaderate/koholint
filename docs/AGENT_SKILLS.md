@@ -1,6 +1,6 @@
 # Agent skills
 
-The skills, protocols and harness behaviours the agent works with. Versioned with the play flow (currently `flow-81`): update this page, not the README, when a flow changes. Layers and data flow are in [ARCHITECTURE.md](../ARCHITECTURE.md).
+The skills, protocols and harness behaviours the agent works with. Versioned with the play flow (currently `flow-82`): update this page, not the README, when a flow changes. Layers and data flow are in [ARCHITECTURE.md](../ARCHITECTURE.md).
 
 
 - Learned capabilities (`data/capabilities.json`, `bin/koholint capability list`): an `operational` entry is a composite of the skills below, offered in the skill schema and listed under "Learned skills" only while its trigger item is held (flow-49) and its object is on screen (today `sword_on_object_92 row col direction`: stand next to object 92, face it, use the sword, step into its cell). `explore` and `goto` also run it themselves when blocked facing such a cell, and the planner routes through those cells as a last resort. `learn` and `capability publish|retire` are offline commands.
@@ -115,6 +115,9 @@ The skills, protocols and harness behaviours the agent works with. Versioned wit
 - flow-78: explore treats a side known only as the assumed way back (never crossed) as an untried exit; it cuts a clearable object
   only on the way to an untried exit or door or an unknown cell that is not an object, and a cell Link stood in on an earlier visit is
   never a frontier. A way explore could not reach from the side Link came in by, on two visits, is no longer routed through from that side, until a new item or milestone or 4 more visits of the place.
+- flow-82: a stone (object 167) slides one cell when Link holds a direction into it for 32 frames and the cell beyond is floor; walk, goto and explore
+  keep pressing that long before they report `blocked`, wait for it to land and stop `pushed`; routes and explore frontiers cross a stone only in a
+  direction it slides, and the things on screen list such stones. Object 166 is a stone that does not move, and the room puts stones back on re-entry.
 - flow-81: a closed treasure chest (object 160) is untried work like an unread sign, but only while a route on the current grid reaches the cell below it:
   the revisit opens it with `talk_to` (walk up into it from below, then A; no model call, 2 rounds per chest), it is a `chest-R-C` objective candidate
   (`chest-R-M-R-C` for a place where one was seen reachable), and the things on screen list each chest as open or closed with the cell to open it from

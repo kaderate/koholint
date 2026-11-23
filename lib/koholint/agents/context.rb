@@ -139,6 +139,9 @@ module Koholint
 
           "- at (#{row},#{col}): chest: closed, opens when Link walks up into it from (#{row + 1},#{col}) and presses A#{', no known route to that cell' unless chest[:reachable]}"
         end
+        lines += signs.select { |stone| stone[:push] }.sort_by { |stone| stone[:cell] }.map do |stone|
+          "- at (#{stone[:cell][0]},#{stone[:cell][1]}): stone: slides one cell when Link holds a direction into it for about #{stone[:push]} frames and the cell beyond is floor; walk, goto and explore keep pressing that long"
+        end
         lines += signs.select { |door| door[:kind].to_s == 'door' }.sort_by { |door| door[:cell] }.map do |door|
           "- at (#{door[:cell][0]},#{door[:cell][1]}): door: walk up into it from (#{door[:cell][0] + 1},#{door[:cell][1]}) to enter"
         end

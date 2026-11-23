@@ -46,7 +46,7 @@ same control (`enemy`: types 9, 10 and 197 of the beach zone, measured for speed
 an uncatalogued type is `unknown`. The engine passes `Entities.read` to the policy and
 skills as the `entities` context entry. `Entities.objects` reads the room object table (`room_objects`, one id per cell)
 and keeps the ids that `data/entities.json` lists with an `object` key and a kind (`sign`: shows a text when read with A,
-`object`, `door`: walking up into it from the cell below enters a building, `chest`: a treasure chest that opens when Link walks up into it from the cell below and presses A; object 160 is closed and 161, flagged `open`, opened) and the directions Link faced when it answered (`faces`, which restrict the standing cells of `talk_to`); it is
+`object`, `door`: walking up into it from the cell below enters a building, `chest`: a treasure chest that opens when Link walks up into it from the cell below and presses A; object 160 is closed and 161, flagged `open`, opened; `stone`: object 167 slides one cell when Link holds a direction into it for the measured `push` delay of 32 frames and the cell beyond is floor, landing as 166, a stone that never moves; the room puts the stones back when Link re-enters; object 32 is the rock that answers "bien trop lourd") and the directions Link faced when it answered (`faces`, which restrict the standing cells of `talk_to`); it is
 the `objects` context entry. `probes/object_census.rb` (`bin/koholint census objects`) measures them: in
 a throwaway copy with every entity slot cleared, Link is put next to each cell, faces it by walking 6 frames and presses
 A (a dialogue that also opens without A in a control copy is not the object's; the first page is saved as a PNG); each
@@ -135,6 +135,10 @@ its next standing cell). flow-54: before that, a goto blocked off-centre backs o
 centres exactly across it and tries the same edge once more with no tolerance, since stairs and one-cell gaps take Link only when
 exactly centred (208/0's stairs refuse him 3 px off). The retry happens once per cell and heading, never in a direction the
 triggers forbid, and the zero tolerance ends at the next cell or replan; talk_to's and attack's walks share it, as do explore's legs.
+flow-82: walk, goto and explore (its legs and outward steps) keep holding into a cell whose room object carries a `push` delay
+for that delay plus 8 frames before they read blocked (`Execution#still_limit`); once the stone has left its cell Link waits for it to land and the skill
+stops `pushed` with the stone's cell and direction, so the next skill plans on a fresh grid. `pushable_of` adds each stone with the directions whose far
+cell is floor; the planner crosses a stone only in such a direction, and explore takes it as a frontier. The autopilot reads `pushed` as benign.
 flow-56: when the game opens a dialogue by itself during an explore leg or outward step, explore blocks the edge Link pushed before it
 stops `dialogue`, but only when the push is evidenced. Link must still stand in the cell he last entered, his position must be unchanged
 on that frame, and he must be flush against the cell's edge in his heading (`link_footprint`: half its width across, its row band along).
