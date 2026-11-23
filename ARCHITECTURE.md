@@ -34,7 +34,7 @@ deterministic, so *ROM + journal* is the whole run. Time is the frame; wall cloc
 pacing (`pacer.rb`) and observability.
 
 **Perception** — `perception.rb`, `addresses.rb`, `game_state.rb`, `data/addresses.json`: a typed `GameState`
-(position, room/map, HP, phase such as dialogue or locked, `link_frozen` (a scripted scene holds Link), milestone, inventory cursor, menu option, A/B items, the 10 inventory slots, `shield_raised`) read from RAM. Every address carries
+(position, room/map, HP, the rupee count (`rupees`: the BCD byte 0xDB5E for tens and units, verified, plus the hundreds byte 0xDB5D, a hypothesis), phase such as dialogue or locked, `link_frozen` (a scripted scene holds Link), milestone, inventory cursor, menu option, A/B items, the 10 inventory slots, `shield_raised`) read from RAM. Every address carries
 provenance and a `verified_count`; `verified` needs two independent checks. No RAM writes to gameplay state.
 `items.rb` and `data/items.json` name item ids (with provenance; unmeasured names are shown with a `?`); the milestone is the best of `shield_level` and the `milestone` of the items held (`none`, `shield`, `sword`). The engine runs an `ItemWatch` on every frame and emits `item_gained` (`item`, `name`, `place`, `held`) the first time an item id appears among the held items after the first play frame (once per id per run, rebuilt from the trace on resume).
 `GameState` also carries the readiness signals (`room_transition`, `link_airborne`, `link_z`, `link_knockback`,
@@ -46,7 +46,7 @@ same control (`enemy`: types 9, 10 and 197 of the beach zone, measured with `Ent
 an uncatalogued type is `unknown`. The engine passes `Entities.read` to the policy and
 skills as the `entities` context entry. `Entities.objects` reads the room object table (`room_objects`, one id per cell)
 and keeps the ids that `data/entities.json` lists with an `object` key and a kind (`sign`: shows a text when read with A,
-`object`, `door`: walking up into it from the cell below enters a building) and the directions Link faced when it answered (`faces`, which restrict the standing cells of `talk_to`); it is
+`object`, `door`: walking up into it from the cell below enters a building, `chest`: a treasure chest that opens when Link walks up into it from the cell below and presses A; object 160 is closed and 161, flagged `open`, opened) and the directions Link faced when it answered (`faces`, which restrict the standing cells of `talk_to`); it is
 the `objects` context entry. `probes/object_census.rb` (`bin/koholint census objects`) measures them: in
 a throwaway copy with every entity slot cleared, Link is put next to each cell, faces it by walking 6 frames and presses
 A (a dialogue that also opens without A in a control copy is not the object's; the first page is saved as a PNG); each
@@ -90,7 +90,7 @@ screen change 53-66, a knockback 15-16, a door 62 (walk in, loading, walk out).
 **Place cards** — `place_card.rb`: on the first ready observation in the `playing` phase of each visit of a place
 (a new place since the last card; rebuilt from the trace on resume), after the grid builder, the engine scans the entity
 table and the room objects and emits a `place_card` event: people (`npc` entities, verified or not), enemies, creatures, unknown
-entities, signs, objects (`object` entities and room objects) with their cells, doors (room objects of kind `door`), and exits
+entities, signs, objects (`object` entities and room objects) with their cells, doors (room objects of kind `door`), chests (`{cell, open}`, room objects of kind `chest`), and exits
 (border cells believed walkable, by side). `world.json` `places` keeps per place the last card, the visits, the first and last card frames, the
 place name the agent gave (`name`), the names and talk status of the people and whether each sign was read (from the talk log rebuilt from the trace); flow-79: `unknown_types` gives, once per unknown type of the last card, `tries` (talk_to results aimed at that type there, `target_type` or `entity`), `answered` (those that opened a dialogue) and `moved` (talk_to had to chase it, `tracked`), and the place has `items_gained` (its `item_gained` events). The
 agent's context lists the doors of the screen with the cell to walk up from.
@@ -168,7 +168,7 @@ not in it (nor among the candidates, the place card people or the revisit target
 `Creatures on screen` line.
 `revisit.rb` is the deterministic revisit and arrival engagement: for the `npc` entities of a `verified` kind in the
 current place that are not exhausted for the current stamp (flow-62: a person of another place whose last talk was under
-other held items or another milestone, `TalkLog#stale?`, is a `person-R-M-tT` candidate again until Link talks to them), and the `verified` `sign` room objects not read yet (a sign
+other held items or another milestone, `TalkLog#stale?`, is a `person-R-M-tT` candidate again until Link talks to them), and the `verified` `sign` room objects not read yet and the closed `chest` objects a route on the current grid reaches from the cell below (flow-81: `objects_for` marks each closed chest `reachable`; an opened one is no work; 2 rounds per chest, its close note says `opened`) (a sign
 is read once: a text remembered on its cell with no entity; `TalkLog#sign_status` is `never`, `tried` or `read`), it
 gives the next `talk_to` (nearest target first, the same target until done, each person of a type shared by several
 tried once per stamp), with caps counted in rounds and in frames of free play only (`Revisit#observe`, fed by the policy
@@ -285,9 +285,9 @@ sha, model, `autopilot` for agent runs; `resume` keeps it, `capabilities`: the d
 observability only, no trace event, the set of captured places is rebuilt from the directory; `screens <run_dir>` backfills older runs by replay),
 `world.json` (`{ goal, leads, places }`, rewritten from the trace at every stop), `summary.json` (written at every stop by
 `summary.rb` from the trace only, versioned by `Summary::VERSION`: totals, cost by skill, decisions by agent and
-feature usage, with `autopilot_decisions`, `chain_max`, `deaths`, `damage_events` and `stuck_events`, `puzzles` (`{open, by_place}`: the `puzzle` events counted once per id, per place and kind), and `symptoms`: `left_with_unexhausted_people`, place changes
+feature usage, with `autopilot_decisions`, `chain_max`, `deaths`, `damage_events`, `stuck_events`, `chests_opened` and `rupees` (the last perceived count), `puzzles` (`{open, by_place}`: the `puzzle` events counted once per id, per place and kind), and `symptoms`: `left_with_unexhausted_people`, place changes
 away from a place whose last place card listed a verified person whose `TalkLog#last_status` was not `exhausted`; `archive` rewrites an outdated one), `star.json`, `notes.md` (owner notes from the viewer). Trace events (`dialogue` may carry `speaker`, `conversation` and `cached`; a `talk_to` result may carry `entity`; a `perception` may carry `not_ready_frames`; a `decision` may carry `autopilot`; a `keyframe` may carry `reason` and `place`; a `choose_objective` decision lists the offered candidates in `options` as `{id, label, leaves_unexhausted, picked}`): `perception`, `decision`, `action`, `objective`, `dialogue`, `lead`, `goal`,
-`notable`, `place_card`, `place_name`, `item_gained`, `puzzle`, `screen`, `screen_changed`, `affordance`, `grid_contradiction`, `keyframe`, `save`, `budget_stop`, `stop`. `budget.rb` enforces frames,
+`notable`, `place_card`, `place_name`, `item_gained`, `chest_opened` (`place`, `cell`: a chest closed at the last ready look at the place and open now, emitted by the engine), `puzzle`, `screen`, `screen_changed`, `affordance`, `grid_contradiction`, `keyframe`, `save`, `budget_stop`, `stop`. `budget.rb` enforces frames,
 minutes, dollars and objective steps. `archive.rb` keeps a light bundle per run in git (trace gzipped, `screens/` included);
 heavy artifacts stay local. A run resumes only with the same `flow_version`, ROM hash, capabilities digest and exits digest (`Run#check_exits!`)
 (`Run#check_capabilities!` in `Engine.resume`: a manifest without the key is the empty digest, `false` always resumes, a

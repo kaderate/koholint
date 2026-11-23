@@ -21,6 +21,7 @@ module Koholint
         objects: of.('object').map { |entity| { cell: entity[:cell], type: entity[:type] } } +
           objects.select { |object| object[:kind].to_s == 'object' }.map { |object| object.slice(:cell, :object) },
         doors: objects.select { |object| object[:kind].to_s == 'door' }.map { |object| { cell: object[:cell], object: object[:object], verified: object[:verified] == true } },
+        chests: objects.select { |object| object[:kind].to_s == 'chest' }.map { |object| { cell: object[:cell], open: object[:open] == true } },
         exits: exits(grid) }
     end
 
@@ -66,7 +67,7 @@ module Koholint
       items = events.select { |event| event['type'] == 'item_gained' && event['place'] }.group_by { |event| event['place'] }
       cards.group_by { |event| event['place'] }.to_h do |place, seen|
         last = seen.last
-        card = last.slice('people', 'enemies', 'creatures', 'unknown', 'signs', 'objects', 'doors', 'exits')
+        card = last.slice('people', 'enemies', 'creatures', 'unknown', 'signs', 'objects', 'doors', 'chests', 'exits')
         types = Array(card['unknown']).map { |entity| entity['type'] }.uniq
         card['unknown_types'] = types.map { |type| { 'type' => type, **tries[[place, type]].transform_keys(&:to_s) } } unless types.empty?
         card['items_gained'] = items[place].map { |event| event['name'] || event['item'] } if items[place]

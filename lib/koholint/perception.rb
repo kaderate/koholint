@@ -16,6 +16,8 @@ module Koholint
       reached.max_by { |milestone| MILESTONES.index(milestone) || 0 } || :none
     end
 
+    def bcd(byte) = ((byte >> 4) * 10) + (byte & 0x0F)
+
     def read(emulator)
       read_byte = ->(name) { emulator.read(ADDRESSES.fetch(name)) }
       first = ADDRESSES.fetch(:inventory_items)
@@ -34,7 +36,7 @@ module Koholint
                     room_transition: read_byte.(:room_transition), link_airborne: read_byte.(:link_airborne),
                     link_z: read_byte.(:link_z), link_knockback: read_byte.(:link_knockback),
                     link_frozen: read_byte.(:link_frozen), pending_damage: read_byte.(:pending_damage),
-                    pending_heal: read_byte.(:pending_heal))
+                    pending_heal: read_byte.(:pending_heal), rupees: (bcd(read_byte.(:rupees_hundreds)) * 100) + bcd(read_byte.(:rupees)))
     end
   end
 end

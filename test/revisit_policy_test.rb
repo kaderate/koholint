@@ -47,6 +47,24 @@ class RevisitPolicyTest < Minitest::Test
     2.times { @talk_log.remember(place: [163, 16], cell: [4, 7], text: 'Hello, take this.', stamp:, entity: 63, conversation: 'e' * 16) }
   end
 
+  def test_a_closed_chest_is_opened_without_a_model_call_only_when_a_route_reaches_the_cell_below
+    chest = { object: 160, cell: [5, 4], kind: :chest, verified: true, faces: [:up] }
+    p = setup_revisit(skill: [walk, walk], entities: [])
+    at = context.merge(objects: -> { [chest] })
+    p.prepare(at)
+    step(p, state)
+    opened = p.decide(p.decision_point_for(state(frame: 120)), state(frame: 120), at)
+    assert_equal [{ skill: 'talk_to', params: { row: 5, col: 4 } }, 'delegated'], opened.values_at(:choice, :agent)
+    assert_match(/\Aopen chest at \(5,4\), round 1/, opened[:justification])
+
+    p = setup_revisit(skill: [walk, walk], entities: [])
+    at = context.merge(objects: -> { [chest.merge(cell: [7, 4])] })
+    p.prepare(at)
+    step(p, state)
+    asked = p.decide(p.decision_point_for(state(frame: 120)), state(frame: 120), at)
+    assert_equal 'claude', asked[:agent]
+  end
+
   def test_the_revisit_fires_right_after_a_milestone_change_without_a_model_call
     sheet = ok('skill' => 'explore', 'params' => {}, 'transcription' => 'By the way, something was left on the beach.', 'speaker' => 'Tarkin')
     p = setup_revisit(skill: [walk, sheet, walk])

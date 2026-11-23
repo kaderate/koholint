@@ -357,10 +357,11 @@ module Koholint
 
       def build_candidates(state, context)
         place = [state.room_id, state.map_id]
-        signs = objects_now
+        signs = objects_for(state)
         if state.phase(booted: true) == :playing
           @cards[place] = { people: @entities.select { |entity| entity[:kind].to_s == 'npc' && entity[:cell] }.map { |entity| entity.slice(:type, :cell) },
-                            signs: signs.select { |object| object[:kind].to_s == 'sign' }.map { |object| object.slice(:cell) } }
+                            signs: signs.select { |object| object[:kind].to_s == 'sign' }.map { |object| object.slice(:cell) },
+                            chests: signs.select { |object| object[:reachable] }.map { |object| object[:cell] } }
         end
         @candidates = Candidates.build(place:, grid: context[:grid], explore_log: @explore_log, talk_log: @talk_log, leads: @leads, cards: @cards,
                                        entities: @entities, signs:, stamp: stamp(state), link: state.cell, low_health: false)
@@ -396,7 +397,7 @@ module Koholint
         @candidates = decision_point.name == :choose_objective ? build_candidates(state, context) : []
         @prompt = Agents::Context.build(state:, grid: grid_for(state, context), objective: @objectives.current, history: @objectives.history, entities: @entities,
                                        attempts: @objectives.attempts_for_prompt, manual: @manual, last_results: @last_results, ledger: @ledger, refusals: @refusals, plan: @plan,
-                                       triggers: @triggers, talk_log: @talk_log, signs: objects_now, locked: (@hemmed[:attempts] if @hemmed && hemmed?(state)),
+                                       triggers: @triggers, talk_log: @talk_log, signs: objects_for(state), locked: (@hemmed[:attempts] if @hemmed && hemmed?(state)),
                                        locked_frames: (locked_frames(state) if Modes::HELD.include?(state.phase)), goal: goal_line, leads: @leads.with_status, stamp: stamp(state),
                                        place_name: @leads.name_of([state.room_id, state.map_id]), candidates: (Candidates.lines(@candidates) if decision_point.name == :choose_objective),
                                        learned: (@learned if decision_point.name == :choose_skill),
@@ -459,6 +460,19 @@ module Koholint
       end
 
       def objects_now = @objects_reader ? Array(@objects_reader.call) : []
+
+      # Closed chests carry whether a route on the current grid reaches the cell below them, from where they open.
+      def objects_for(state)
+        place = [state.room_id, state.map_id]
+        grid = @last_grid if @last_place == place
+        objects_now.map do |object|
+          next object unless object[:kind].to_s == 'chest' && !object[:open]
+
+          below = [object[:cell][0] + 1, object[:cell][1]]
+          object.merge(reachable: state.cell == below || (!grid.nil? && !state.cell.nil? &&
+            !Navigation::Planner.new(grid:, ledger: @ledger, place:, triggers: @triggers).path(from: state.cell, to: below).nil?))
+        end
+      end
 
       def grid_for(_state, _context)
         @last_grid || Vision::Grid.new(cells: Array.new(Vision::Grid::ROWS) { Array.new(Vision::Grid::COLS) }, static_sprites: [],

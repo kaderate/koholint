@@ -27,6 +27,7 @@ module Koholint
       place_card: %i[place people enemies signs objects exits],
       place_name: %i[place name],
       item_gained: %i[item name place held],
+      chest_opened: %i[place cell],
       puzzle: %i[id kind place way expected observed frames]
     }.freeze
     SPEAKER_MAX = 40
@@ -45,7 +46,7 @@ module Koholint
                  keyframe: { reason: ->(v) { %w[item_gained new_place].include?(v) }, place: ->(v) { v.is_a?(Array) && v.size == 2 && v.all?(Integer) } },
                  place_name: { name: LABEL.(40), place: ->(v) { v.is_a?(Array) && v.size == 2 && v.all?(Integer) } },
                  objective: { because: ->(v) { v.is_a?(String) && v.match?(/\Alead-\d+\z/) }, autopilot: ->(v) { v == true },
-                              candidate: LABEL.(40), target: ->(v) { v.is_a?(Hash) && %w[exit door person sign place lead].include?((v[:kind] || v['kind']).to_s) },
+                              candidate: LABEL.(40), target: ->(v) { v.is_a?(Hash) && %w[exit door person sign chest place lead].include?((v[:kind] || v['kind']).to_s) },
                               predicate: ->(v) { (kind = v.is_a?(Hash) && (v[:kind] || v['kind'])) ? Objectives::PREDICATES.key?(kind.to_s) : true } } }.freeze
 
     def self.read(path)

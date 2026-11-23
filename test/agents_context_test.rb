@@ -113,6 +113,19 @@ class AgentsContextTest < Minitest::Test
                           'type 47 at (2,7) (not identified), type 110 at (3,3) (gives no dialogue)'
   end
 
+  def test_chests_on_screen_say_how_they_open_and_whether_a_route_reaches_them
+    chests = [{ object: 160, cell: [3, 4], kind: :chest, verified: true, reachable: true }, { object: 160, cell: [5, 6], kind: :chest, verified: true, reachable: false },
+              { object: 161, cell: [1, 8], kind: :chest, verified: true, open: true }]
+    text = build(talk_log: Koholint::TalkLog.new, signs: chests)
+    assert_includes text, "- at (1,8): chest: open\n- at (3,4): chest: closed, opens when Link walks up into it from (4,4) and presses A\n" \
+                          '- at (5,6): chest: closed, opens when Link walks up into it from (6,6) and presses A, no known route to that cell'
+  end
+
+  def test_the_items_line_gives_the_rupee_count
+    assert_includes Context.build(state: state(rupees: 7), grid: grid, objective: nil, history: [], attempts: [], manual: '', last_results: []),
+                    'inventory slots: all empty; rupees: 7'
+  end
+
   def test_signs_on_screen_are_listed_with_their_reading_status
     log = Koholint::TalkLog.new
     signs = [{ object: 99, cell: [3, 4], kind: :sign, verified: true }, { object: 99, cell: [5, 6], kind: :sign, verified: true }]

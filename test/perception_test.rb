@@ -29,6 +29,13 @@ class PerceptionTest < Minitest::Test
     assert_equal [24, 4, 20], [state.hp, state.pending_damage, state.health]
   end
 
+  def test_reads_the_rupee_count_from_its_bcd_digits
+    addresses = Koholint::Addresses.load
+    ram = Hash.new(0).merge(addresses.fetch(:rupees) => 0x47, addresses.fetch(:rupees_hundreds) => 0x01)
+    emulator = Struct.new(:frame) { define_method(:read) { |addr| ram[addr] } }.new(1)
+    assert_equal 147, Koholint::Perception.read(emulator).rupees
+  end
+
   def test_milestone_maps_the_shield_level
     assert_equal :none, Koholint::Perception.milestone_for(0)
     assert_equal :shield, Koholint::Perception.milestone_for(1)

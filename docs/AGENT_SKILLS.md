@@ -1,6 +1,6 @@
 # Agent skills
 
-The skills, protocols and harness behaviours the agent works with. Versioned with the play flow (currently `flow-80`): update this page, not the README, when a flow changes. Layers and data flow are in [ARCHITECTURE.md](../ARCHITECTURE.md).
+The skills, protocols and harness behaviours the agent works with. Versioned with the play flow (currently `flow-81`): update this page, not the README, when a flow changes. Layers and data flow are in [ARCHITECTURE.md](../ARCHITECTURE.md).
 
 
 - Learned capabilities (`data/capabilities.json`, `bin/koholint capability list`): an `operational` entry is a composite of the skills below, offered in the skill schema and listed under "Learned skills" only while its trigger item is held (flow-49) and its object is on screen (today `sword_on_object_92 row col direction`: stand next to object 92, face it, use the sword, step into its cell). `explore` and `goto` also run it themselves when blocked facing such a cell, and the planner routes through those cells as a last resort. `learn` and `capability publish|retire` are offline commands.
@@ -115,6 +115,10 @@ The skills, protocols and harness behaviours the agent works with. Versioned wit
 - flow-78: explore treats a side known only as the assumed way back (never crossed) as an untried exit; it cuts a clearable object
   only on the way to an untried exit or door or an unknown cell that is not an object, and a cell Link stood in on an earlier visit is
   never a frontier. A way explore could not reach from the side Link came in by, on two visits, is no longer routed through from that side, until a new item or milestone or 4 more visits of the place.
+- flow-81: a closed treasure chest (object 160) is untried work like an unread sign, but only while a route on the current grid reaches the cell below it:
+  the revisit opens it with `talk_to` (walk up into it from below, then A; no model call, 2 rounds per chest), it is a `chest-R-C` objective candidate
+  (`chest-R-M-R-C` for a place where one was seen reachable), and the things on screen list each chest as open or closed with the cell to open it from
+  (or `no known route to that cell`). The Items line gives the rupee count (`rupees: N`). The engine traces `chest_opened` and summary.json counts it.
 - flow-80: when every place with untried work is reachable only through cut ways, explore routes through the oldest cut not yet tried
   instead of stopping `no_frontier`; each cut is tried once until a new item or milestone. Three explores that find no frontier and walk
   no cell on one visit of a place (moves between them do not count; a new item, lead or goal, or a longer non-move skill starts over)

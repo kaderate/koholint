@@ -119,7 +119,7 @@ module Koholint
       def self.items_line(state)
         slots = Items.slots(state).each_with_index.reject { |id, _| id.to_i.zero? }.map { |id, slot| "#{slot} #{Items.label(id)}" }
         "Items (a ? marks a name not yet measured): A #{Items.label(state.item_a)}, B #{Items.label(state.item_b)}; " \
-          "inventory slots: #{slots.empty? ? 'all empty' : slots.join(', ')}"
+          "inventory slots: #{slots.empty? ? 'all empty' : slots.join(', ')}#{"; rupees: #{state.rupees}" if state.rupees}"
       end
       private_class_method :items_line
 
@@ -131,6 +131,12 @@ module Koholint
         lines = talk_log.lines(grid, place, limit: THINGS_LIMIT, stamp:, entities:)
         lines += signs.select { |sign| sign[:kind].to_s == 'sign' }.sort_by { |sign| sign[:cell] }.map do |sign|
           "- at (#{sign[:cell][0]},#{sign[:cell][1]}): sign: #{SIGN_STATUS.fetch(talk_log.sign_status(place:, cell: sign[:cell]))}"
+        end
+        lines += signs.select { |chest| chest[:kind].to_s == 'chest' }.sort_by { |chest| chest[:cell] }.map do |chest|
+          row, col = chest[:cell]
+          next "- at (#{row},#{col}): chest: open" if chest[:open]
+
+          "- at (#{row},#{col}): chest: closed, opens when Link walks up into it from (#{row + 1},#{col}) and presses A#{', no known route to that cell' unless chest[:reachable]}"
         end
         lines += signs.select { |door| door[:kind].to_s == 'door' }.sort_by { |door| door[:cell] }.map do |door|
           "- at (#{door[:cell][0]},#{door[:cell][1]}): door: walk up into it from (#{door[:cell][0] + 1},#{door[:cell][1]}) to enter"

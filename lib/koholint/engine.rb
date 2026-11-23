@@ -112,6 +112,7 @@ module Koholint
         grid = @builder.observe(@emulator, state) if Readiness.signals_ready?(state)
       end
       note_place(state, grid)
+      note_chests(state)
       @policy.observe(state, frame: state.frame) if @policy.respond_to?(:observe)
       return if @budget.exhausted
 
@@ -163,6 +164,19 @@ module Koholint
       card = PlaceCard.build(place:, entities: Entities.read(@emulator), objects: Entities.objects(@emulator), grid:)
       @run.trace.emit(:place_card, frame: state.frame, **card)
       @policy.note_card(card) if @policy.respond_to?(:note_card)
+    end
+
+    # A chest closed at the last ready look at this place and open now was opened in between.
+    def note_chests(state)
+      return unless state.phase(booted: true) == :playing && Readiness.signals_ready?(state)
+
+      place = [state.room_id, state.map_id]
+      chests = Entities.objects(@emulator).select { |object| object[:kind] == :chest }
+      if @closed_chests&.first == place
+        chests.select { |chest| chest[:open] && @closed_chests.last.include?(chest[:cell]) }
+              .each { |chest| @run.trace.emit(:chest_opened, frame: state.frame, place:, cell: chest[:cell]) }
+      end
+      @closed_chests = [place, chests.reject { |chest| chest[:open] }.map { |chest| chest[:cell] }]
     end
 
     def carded_place(events)
