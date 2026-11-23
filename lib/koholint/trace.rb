@@ -20,7 +20,6 @@ module Koholint
       screen: %i[place terrain_hash objects_hash grid static_sprites],
       screen_changed: %i[place cells],
       affordance: %i[appearance action direction result method context source],
-      grid_contradiction: %i[place row col direction believed observed],
       dialogue: %i[place text source page],
       lead: %i[id place source quote claim importance],
       goal: %i[text],

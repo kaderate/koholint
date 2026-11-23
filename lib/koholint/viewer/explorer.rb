@@ -105,28 +105,6 @@ module Koholint
         { run_id: id, saved: true, bytes: text.bytesize }
       end
 
-      REFERENCE_CACHE = {}
-      REFERENCE_LOCK = Mutex.new
-
-      def reference(dir)
-        others = Archive.runs(@root).reject { |other| File.expand_path(other) == File.expand_path(dir) }
-                                    .select { |other| File.basename(other).match?(RUN_ID) }
-        before = others.select { |other| File.basename(other) < File.basename(dir) }
-        other = (before.empty? ? others : before).last or return nil
-        path = Trace.located(File.join(other, 'trace.jsonl'))
-        stat = File.stat(path)
-        key = [path, stat.size, stat.mtime]
-        REFERENCE_LOCK.synchronize do
-          REFERENCE_CACHE.clear unless REFERENCE_CACHE.key?(key)
-          REFERENCE_CACHE[key] ||= begin
-            trace = Trace.read(File.join(other, 'trace.jsonl'))
-            { run_id: File.basename(other), series: Insights.cost(trace)[:series], frames: trace.last&.fetch('frame', 0).to_i }
-          end
-        end
-      rescue Error, SystemCallError, Zlib::Error, JSON::ParserError
-        nil
-      end
-
       def runs
         Archive.runs(@root).filter_map { |dir| row(dir) if File.basename(dir).match?(RUN_ID) }.sort_by { |row| row['run_id'] }.reverse
       end

@@ -1,12 +1,7 @@
 require 'fileutils'
-require 'json'
 require 'koholint'
 require 'koholint/game_state'
-require 'koholint/emulator'
-require 'koholint/input_log'
 require 'koholint/modes'
-require 'koholint/run'
-require 'koholint/trace'
 
 module Koholint
   class PlaceShots
@@ -22,36 +17,6 @@ module Koholint
     end
 
     def self.places(run_dir) = names(run_dir).to_h { |file| [file.match(NAME).captures.map(&:to_i), true] }
-
-    def self.backfill(dir, out: $stdout)
-      manifest = JSON.parse(File.read(File.join(dir, 'manifest.json')))
-      raise Error, "run #{File.basename(dir)} was recorded with another ROM" if manifest['rom_sha256'] != Run.rom_hash(Koholint.rom_path)
-
-      shots = new(dir)
-      targets = []
-      Trace.read(File.join(dir, 'trace.jsonl')).each do |event|
-        next unless event['type'] == 'perception' && event['state'].is_a?(Hash)
-
-        state = GameState.new(**event['state'].slice(*GameState.members.map(&:to_s)).transform_keys(&:to_sym))
-        place = shots.due(state, frame: event['frame'])
-        next unless place
-
-        shots.skip(place)
-        targets << [event['frame'], place]
-      end
-      return 0 if targets.empty?
-
-      emulator = Emulator.boot
-      frames = InputLog.new(File.join(dir, 'inputs.log')).each_frame
-      targets.each do |frame, place|
-        while emulator.frame < frame
-          emulator.step(frames.next)
-        end
-        shots.write(emulator, place)
-      end
-      out.puts "#{targets.size} screens written to #{File.join(dir, DIR)}"
-      targets.size
-    end
 
     def initialize(run_dir)
       @dir = File.join(run_dir, DIR)
@@ -73,8 +38,6 @@ module Koholint
       end
       place if frame - @since >= SETTLE_FRAMES
     end
-
-    def skip(place) = @captured[place] = true
 
     def capture(emulator, state)
       place = due(state, frame: emulator.frame)

@@ -20,7 +20,7 @@ Only what is left to do. When something lands, delete it here (git is the histor
 
 ## Cleanups
 - `resume` without `--agent` on an agent run silently continues with WalkAndTalk: make it an error (WalkAndTalk stays: no-agent baseline, `StartGame` fallback, 13 test files).
-- Archive the finished plans of `docs/superpowers/plans/`; `probes/readiness_census.rb` has no test (test it or drop it); keep the other census probes (provenance of `data/addresses.json` and `data/entities.json`).
+- `probes/readiness_census.rb` has no test (test it or drop it); keep the other census probes (provenance of `data/addresses.json` and `data/entities.json`).
 
 ## Open questions and unmeasured limits (one line each, details in `docs/loose-ends.md`)
 - Zero-frame cap (flow-45): its thresholds are not measured: 3 identical results, at most 1 frame each, then a 120-frame wait. The key is place + skill + stop, so a model alternating two instant skills never trips it.

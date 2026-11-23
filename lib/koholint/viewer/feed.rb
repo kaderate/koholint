@@ -13,7 +13,6 @@ require 'koholint/viewer/insights'
 module Koholint
   module Viewer
     module Feed
-      RunDir = Struct.new(:dir)
       EVENT_LIMIT = 300
 
       FIELDS = {
@@ -100,7 +99,7 @@ module Koholint
         end
       end
 
-      INSIGHTS = %i[map timeline stats cockpit].freeze
+      INSIGHTS = %i[map timeline cockpit].freeze
       INSIGHT_CACHE = {}
       INSIGHT_LIMIT = MAX_RUNS * INSIGHTS.size
 
@@ -136,7 +135,6 @@ module Koholint
           Insights.map(trace, screens: lists[:screens], affordances: lists[:affordances], frame: follower.frame, shots: PlaceShots.places(run_dir))
         when :cockpit then Insights.cockpit(trace, manifest: read_manifest(run_dir), frame: follower.frame).merge(run_id: File.basename(run_dir))
         when :timeline then Insights.timeline(trace, frames:).merge(run_id: File.basename(run_dir))
-        when :stats then Insights.stats(trace).merge(run_id: File.basename(run_dir), frames: [follower.journal_frames.to_i, trace.last&.fetch('frame', 0).to_i].max)
         end
       end
 

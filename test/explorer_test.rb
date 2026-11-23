@@ -366,13 +366,9 @@ class ExplorerTest < Minitest::Test
         timeline = JSON.parse(get(port, "/timeline.json?run=#{B}").body)
         assert_equal [100, B], timeline.values_at('frames', 'run_id')
         assert_equal %w[place], timeline['markers'].map { |m| m['kind'] }
-        stats = JSON.parse(get(port, "/stats.json?run=#{B}").body)
-        assert_equal %w[series by_skill total decisions usage run_id frames reference], stats.keys
-        assert_equal A, stats.dig('reference', 'run_id')
-        assert_equal B, JSON.parse(get(port, "/stats.json?run=#{A}").body).dig('reference', 'run_id')
         header = JSON.parse(get(port, "/header.json?run=#{A}").body)
         assert_equal [A, XSS, '', A], header.values_at('run_id', 'tag', 'notes', 'notes_run')
-        %w[/map.json /timeline.json /stats.json /header.json].each do |path|
+        %w[/map.json /timeline.json /header.json].each do |path|
           assert_equal '404', code(port, "#{path}?run=nope"), path
           assert_equal '404', code(port, "#{path}?run=..%2F#{A}"), path
           assert_equal '400', code(port, "#{path}?run=#{A}&x=1"), path
@@ -425,7 +421,7 @@ class ExplorerTest < Minitest::Test
   def test_live_insight_routes_need_a_live_run
     server = Koholint::Viewer::Server.new(follower: StubFollower.new, feed: -> { {} })
     port = server.start
-    %w[/map.json /timeline.json /stats.json /header.json].each { |path| assert_equal '404', get(port, path).code, path }
+    %w[/map.json /timeline.json /header.json].each { |path| assert_equal '404', get(port, path).code, path }
   ensure
     server&.stop
   end

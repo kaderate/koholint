@@ -84,21 +84,4 @@ class PlaceShotsTest < Minitest::Test
       assert_match(/screenshot 3-1.png not written/, err)
     end
   end
-
-  def test_backfill_writes_the_missing_screens_and_is_idempotent
-    skip_without_rom!
-    Dir.mktmpdir do |root|
-      run = Koholint::Run.create(root:, flow_version: Koholint::FLOW_VERSION, budget: {})
-      30.times { run.inputs.append([]) }
-      run.inputs.flush
-      playing = PLAYING.transform_keys(&:to_s)
-      [0, 25].each { |frame| run.trace.emit(:perception, frame:, state: playing.merge('frame' => frame), state_hash: 'h') }
-      out = StringIO.new
-      assert_equal 1, Koholint::PlaceShots.backfill(run.dir, out:)
-      png = File.binread(File.join(run.dir, 'screens', '3-1.png'))
-      assert_equal "\x89PNG\r\n\x1a\n".b, png[0, 8]
-      assert_equal 0, Koholint::PlaceShots.backfill(run.dir, out:)
-      assert_equal png, File.binread(File.join(run.dir, 'screens', '3-1.png'))
-    end
-  end
 end

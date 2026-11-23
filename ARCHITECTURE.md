@@ -42,7 +42,7 @@ measured by `probes/readiness_census.rb`, `bin/koholint census ready <run_dir>`)
 cell, kind }` for the active slots; the kind per type id (`npc`, `enemy`, `object`, `creature`, `unknown`) comes from
 `data/entities.json`, measured by `probes/entity_census.rb` (`bin/koholint census entities`): A pressed next to the
 entity opens a dialogue (or a scripted scene, flow-40, whose dialogue is then awaited up to 600 frames) that does not open with its slot cleared in a control copy (`npc`); contact damage against the
-same control (`enemy`: types 9, 10 and 197 of the beach zone, measured with `EntityCensus.trajectory`, `motion_summary` and `hit_profile`: speed, contact gap, damage and whether the raised shield blocks it); neither, measured (`creature`: not a person, never a talk target, no danger);
+same control (`enemy`: types 9, 10 and 197 of the beach zone, measured for speed, contact gap, damage and whether the raised shield blocks it); neither, measured (`creature`: not a person, never a talk target, no danger);
 an uncatalogued type is `unknown`. The engine passes `Entities.read` to the policy and
 skills as the `entities` context entry. `Entities.objects` reads the room object table (`room_objects`, one id per cell)
 and keeps the ids that `data/entities.json` lists with an `object` key and a kind (`sign`: shows a text when read with A,
@@ -282,12 +282,12 @@ schema and reports cost and latency. Jev (tactical choices) is planned, not wire
 
 **Run storage** — `run.rb`: `runs/<id>/` with `manifest.json` (flow version, ROM hash, tag, harness/prompts
 sha, model, `autopilot` for agent runs; `resume` keeps it, `capabilities`: the digest of the operational capabilities at creation, `exits`: the digest of the exit bench data (`false` for a run without it), or `false` for an A/B arm without them; a fork takes the current digest unless it or its parent is `false`), `inputs.log`, `trace.jsonl` (events validated by `trace.rb`), `keyframes/`, `save/`, `prompts/`, `screens/` (one PNG per place, written by `place_shots.rb`:
-observability only, no trace event, the set of captured places is rebuilt from the directory; `screens <run_dir>` backfills older runs by replay),
+observability only, no trace event, the set of captured places is rebuilt from the directory),
 `world.json` (`{ goal, leads, places }`, rewritten from the trace at every stop), `summary.json` (written at every stop by
 `summary.rb` from the trace only, versioned by `Summary::VERSION`: totals, cost by skill, decisions by agent and
 feature usage, with `autopilot_decisions`, `chain_max`, `deaths`, `damage_events` and `stuck_events`, `puzzles` (`{open, by_place}`: the `puzzle` events counted once per id, per place and kind), and `symptoms`: `left_with_unexhausted_people`, place changes
 away from a place whose last place card listed a verified person whose `TalkLog#last_status` was not `exhausted`; `archive` rewrites an outdated one), `star.json`, `notes.md` (owner notes from the viewer). Trace events (`dialogue` may carry `speaker`, `conversation` and `cached`; a `talk_to` result may carry `entity`; a `perception` may carry `not_ready_frames`; a `decision` may carry `autopilot`; a `keyframe` may carry `reason` and `place`; a `choose_objective` decision lists the offered candidates in `options` as `{id, label, leaves_unexhausted, picked}`): `perception`, `decision`, `action`, `objective`, `dialogue`, `lead`, `goal`,
-`notable`, `place_card`, `place_name`, `item_gained`, `puzzle`, `screen`, `screen_changed`, `affordance`, `grid_contradiction`, `keyframe`, `save`, `budget_stop`, `stop`. `budget.rb` enforces frames,
+`notable`, `place_card`, `place_name`, `item_gained`, `puzzle`, `screen`, `screen_changed`, `affordance`, `keyframe`, `save`, `budget_stop`, `stop`. `budget.rb` enforces frames,
 minutes, dollars and objective steps. `archive.rb` keeps a light bundle per run in git (trace gzipped, `screens/` included);
 heavy artifacts stay local. A run resumes only with the same `flow_version`, ROM hash, capabilities digest and exits digest (`Run#check_exits!`)
 (`Run#check_capabilities!` in `Engine.resume`: a manifest without the key is the empty digest, `false` always resumes, a
@@ -299,14 +299,13 @@ run and seeks by restoring the nearest keyframe; `Feed` derives status, mode and
 goal, leads and the stitched dialogue history (newest first, with the person talked to and their state) from the trace
 up to the shown frame, and `Insights` the world map (places on the overworld grid or attached to the screen they were
 entered from, kinds from `data/place_kinds.json` via `place_kinds.rb`; exits taken, belief grids, people, leads, and a `screenshot` flag per place served by `/screens/<room>-<map>.png`), the timeline
-markers and the cost series, cached by trace and shown frame, and the `cockpit` (KPIs against the manifest budget, the health band, HUD, current objective with its offered candidates, reasoning, symptoms, the place card of the current place, interiors with their entry door, leads and the dialogues grouped by person) that feeds the page: a top bar, a sticky chronological strip, three columns (screen with people, sign and door overlays, HUD and reasoning; objective and dialogues; symptoms, place card, leads) and, below, the world map in an exterior and an interiors tab, the complete inventory and the dialogue history. `Explorer` and `Registry` serve past runs (list,
+markers, cached by trace and shown frame, and the `cockpit` (KPIs against the manifest budget, the health band, HUD, current objective with its offered candidates, reasoning, symptoms, the place card of the current place, interiors with their entry door, leads and the dialogues grouped by person) that feeds the page: a top bar, a sticky chronological strip, three columns (screen with people, sign and door overlays, HUD and reasoning; objective and dialogues; symptoms, place card, leads) and, below, the world map in an exterior and an interiors tab, the complete inventory and the dialogue history. `Explorer` and `Registry` serve past runs (list,
 read-only replays with pacing and seek, comparison via `run_compare.rb`, star, the run header and `notes.md`). It
 never writes game state; the only files it writes are `star.json`, `summary.json`'s `starred` and `notes.md`.
 
 **CLI** — `cli.rb`, `bin/koholint`: `run`, `resume`, `fork`, `branch` (fork at a frame or a checkpoint of
-`data/checkpoints.json`, spawn `watch` on the child, resume it, then stop the viewer and exit, or with `--keep-viewer` wait for it; say when it did not start), `verify`, `summary` (a fork's `cost_usd` counts its own decisions only, `inherited_cost_usd` the parent's; the viewer's spent figure does the same), `screens`, `watch`, `archive`, `star`,
-`prune-heavy`, `census` (modes, `census entities`, `census objects`, `census doors`, `census sword` or `census ready`), `npcs` (`npc_catalogue.rb`: a markdown table of the people of all
-runs, their names and the distinct texts read with the milestone and the number of runs; writes nothing), `ab-plan` and
+`data/checkpoints.json`, spawn `watch` on the child, resume it, then stop the viewer and exit, or with `--keep-viewer` wait for it; say when it did not start), `verify`, `summary` (a fork's `cost_usd` counts its own decisions only, `inherited_cost_usd` the parent's; the viewer's spent figure does the same), `watch`, `archive`, `star`,
+`prune-heavy`, `census` (modes, `census entities`, `census objects`, `census doors`, `census sword` or `census ready`), `ab-plan` and
 `ab-report` (`ab.rb`: the fork and resume commands of an A/B between autopilot arms, or with `--arms capabilities,no-capabilities` between forks with and without the operational capabilities (`--capabilities on|off`), from one frame of a run, written to
 `tmp/ab/plan.json` and `tmp/ab/run.sh`; then a table per arm measured from the fork frame on: cost, paid calls, new places and
 new cells per 1000 frames, stalls, autopilot decisions, and the pre-registered criterion), `learn` and `capability list|publish|retire` (capability learning above), `bench exits` (the exit bench above; the capability arms of `ab-report` add progress, new places plus items gained plus milestone steps, per 1000 frames and per dollar, capability uses and cleared objects, a use-based criterion and a per-fork table; a new place is one no ancestor run reached, before or after the fork frame). `fork` opens a parent of any flow
@@ -339,7 +338,6 @@ version, and may set the child's `--tag`, `--autopilot` and `--root`.
 | Need | Look at |
 |---|---|
 | Design rationale | `docs/superpowers/specs/` |
-| Plans of past work | `docs/superpowers/plans/` |
 | Measurements of agent runs | `docs/runs/` (`index.md` lists every archived run) |
 | What remains | `ROADMAP.md` |
 | Conventions | `AGENTS.md` |

@@ -55,8 +55,7 @@ most 50 % of `off` with places per 1000 frames at least 90 % of `off`.
 journal or the game state.
 
 **Collision grid.** `--grid` reads the screen at each observation and probes unknown neighbour cells by walking. The
-trace gains `screen` and `screen_changed`, `affordance` (walk evidence per tile appearance), `grid_contradiction`
-(Link entered a cell believed blocked) and a `notable` of kind `grid_overlay_stuck` (over 600 frames of overlay in one
+trace gains `screen` and `screen_changed`, `affordance` (walk evidence per tile appearance) and a `notable` of kind `grid_overlay_stuck` (over 600 frames of overlay in one
 place, so the grid went dark). The live view has a grid toggle that overlays the believed passability.
 
 **Resume and fork.** `resume` continues a run with the same `flow_version` and ROM hash and rebuilds the ledger and
@@ -103,13 +102,6 @@ frames after it until the BG tile indices stop changing, the durations per kind,
 0xFF80-0xFFBF that are at rest in still play yet move in every screen change (how `room_transition` was found). It
 feeds `data/addresses.json` and the `ready` of the `play` mode in `data/modes.json`. About 4 minutes per 25,000 frames.
 
-## NPC catalogue
-
-`bin/koholint npcs [--root DIR]` prints a markdown table of the people of all runs under `DIR` (default `runs`): per
-place and person (entity type, or talk_to cell for older runs, or texts that opened by themselves), the names given, the
-number of talks and of runs, and the distinct texts read with the milestone when each first appeared and in how many
-runs. It writes nothing.
-
 ## Live view
 
 `bin/koholint watch <run_dir> [--port N] [--host H] [--from live|start] [--speed X] [--runs-root DIR]` prints
@@ -122,9 +114,7 @@ The live page and a replay share one layout, in equal columns on a desktop and o
 with the mode badge (phase and mode name from the last perception; `unknown_mode` notables and `stuck_boot` or
 `unknown_mode_stuck` stops raise a red alert), the activity banner and the grid toggle; the objective, goal and plan; the
 reasoning and the event feed; the leads; the dialogues (with the person's state when the text came from a `talk_to`:
-which talk it was, new text or not, and for the latest one exhausted or worth retrying); budget and agent stats
-(cumulative dollars by frame, the previous run's curve in grey, cost split by skill, decisions paid and free and the
-`summary.json` usage counters); a timeline of the whole run (places, objectives, agent calls coloured by skill,
+which talk it was, new text or not, and for the latest one exhausted or worth retrying); a timeline of the whole run (places, objectives, agent calls coloured by skill,
 dialogues, leads, explore stops, notables, stop; clustered past 300 markers; a click seeks a replay, or scrolls the
 feed live); the world map of the places seen up to the shown frame (overworld screens on the 16-wide `room_id` grid,
 interiors and other places in a lane below, under the overworld screen they were entered from, kinds from
@@ -144,7 +134,7 @@ run and serves the watched run without it):
 | `/run/<id>` | The live page as a read-only replay of that run, from boot; `/frame.png?run=<id>` and `/state.json?run=<id>` serve it |
 | `/control?run=<id>&speed=1\|4\|16`, `&pause=0\|1` and `&seek=<frame>` | Drive a replay; `seek` restores the nearest keyframe at or before the frame (or replays from boot) and steps to it |
 | `/screens/<room>-<map>.png[?run=<id>]` | The screenshot taken the first time the run played that place (`runs/<id>/screens/`; 404 when missing; cached 30 s) |
-| `/map.json`, `/timeline.json`, `/stats.json`, `/cockpit.json`, `/header.json` | World map, run timeline, cost series and usage (with `reference`, the previous run's cost series), the cockpit data of the page (KPIs, health, HUD, objective and offered candidates, reasoning, symptoms, place card, interiors, leads, dialogues by person), run header and notes |
+| `/map.json`, `/timeline.json`, `/cockpit.json`, `/header.json` | World map, run timeline, the cockpit data of the page (KPIs, health, HUD, objective and offered candidates, reasoning, symptoms, place card, interiors, leads, dialogues by person), run header and notes |
 | `/compare/<a>/<b>`, `/compare.json?a=&b=` | Summaries, usage and cost by skill side by side with differing fields marked, and the first frame at which each run reached each milestone and place |
 | `POST /star?run=<id>` (form body `why=...`) | Same as `bin/koholint star`; the `Host` header must name the viewer itself and an `Origin` header, if sent, must match |
 | `POST /notes?run=<id>` (form body `text=...`) | Writes `runs/<id>/notes.md` (at most 8 KB, no control characters but newlines and tabs; empty text deletes it), same origin check; only for runs under the runs root |

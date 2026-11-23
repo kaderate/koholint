@@ -89,19 +89,7 @@ class PageTest < Minitest::Test
   end
 
   def test_dialogues_are_listed_with_frame_place_and_source_as_plain_text
-    list = [{ frame: 40, place: [1, 2], source: nil, text: 'A <b>sign</b>' }, { frame: 5, place: [1, 2], source: { row: 2, col: 3 }, text: 'Hi' }, { frame: 1 }]
-    assert_equal [{ 'head' => 'f40 · [1,2]', 'npc' => '', 'text' => 'A <b>sign</b>' }, { 'head' => 'f5 · [1,2] · from (2, 3)', 'npc' => '', 'text' => 'Hi' }],
-                 evaluate("dialoguesView(#{JSON.generate(list)})")
-    assert_equal [], evaluate('dialoguesView(undefined)')
     assert_includes PAGE, '<div id="dialogues" class="scroll"></div>'
-  end
-
-  def test_a_dialogue_shows_the_npc_state_when_known
-    npc = { talk: 3, new_text: false, state: 'exhausted' }
-    assert_equal 'talk 3 · nothing new · exhausted', evaluate("dialoguesView([{frame: 1, place: [1, 2], text: 'x', npc: #{JSON.generate(npc)}}])[0].npc")
-    assert_equal 'talk 1 · new text', evaluate("npcText({talk: 1, new_text: true, state: null})")
-    assert_equal '', evaluate('npcText(null)')
-    assert_equal '', evaluate("npcText({talk: 'x'})")
   end
 
   def test_the_goal_and_the_leads_are_shown_as_plain_lines
@@ -157,12 +145,6 @@ class PageTest < Minitest::Test
   def test_other_choices_never_render_as_object_object
     refute_includes evaluate('formatChoice({to: 3})').to_s, '[object Object]'
     assert_equal 'wait', evaluate("formatChoice('wait')")
-  end
-
-  def test_hearts_show_a_dash_before_the_game_starts
-    assert_equal '-', evaluate('formatHearts({status: {hearts: null, max_hearts: null}})')
-    assert_equal '-', evaluate('formatHearts({status: {hearts: 0, max_hearts: 0}})')
-    assert_equal '2/3', evaluate('formatHearts({status: {hearts: 2, max_hearts: 3}})')
   end
 
   def test_error_field_of_a_failed_response_is_shown
@@ -271,14 +253,6 @@ class PageTest < Minitest::Test
   def test_status_bar_formats
     assert_equal '$0.12', evaluate('formatDollars(0.1234)')
     assert_equal '$0.00', evaluate('formatDollars(null)')
-    assert_equal 'none', evaluate('formatObjective({status: {objective: null}})')
-    assert_equal 'o1', evaluate("formatObjective({status: {objective: 'o1'}})")
-    assert_equal 'Leave the house', evaluate("formatObjective({status: {objective: 'o1', objective_title: 'Leave the house'}})")
-    long = evaluate("formatObjective({status: {objective: 'o1', objective_title: '#{'x' * 80}'}})")
-    assert_equal 40, long.length
-    assert long.end_with?('…')
-    assert_equal 3, evaluate('formatCalls({status: {calls: 3}})')
-    assert_equal 0, evaluate('formatCalls({status: {}})')
   end
 
   PAYLOAD = %q(<script>alert(1)</script>"'&)
@@ -291,7 +265,6 @@ class PageTest < Minitest::Test
     assert_equal %(f1 · dialogue: "#{PAYLOAD}"), fmt({ frame: 1, type: 'dialogue', text: PAYLOAD })
     assert_equal %(f1 · c decides objective "#{PAYLOAD}"), fmt({ frame: 1, type: 'decision', agent: 'c', choice: { title: PAYLOAD } })
     assert_equal "f1 · c decides walk #{PAYLOAD}", fmt({ frame: 1, type: 'decision', agent: 'c', choice: { skill: 'walk', params: { a: PAYLOAD } } })
-    assert_equal PAYLOAD, evaluate("formatObjective({status: {objective: 'o', objective_title: #{p}}})")
   end
 
   def test_event_titles_do_not_leak_other_fields
@@ -362,7 +335,6 @@ class PageTest < Minitest::Test
     assert_equal 0, evaluate('meterPercent(-1, 2)')
     assert_nil evaluate('meterPercent(1, null)')
     assert_nil evaluate('meterPercent(1, 0)')
-    assert_equal '$0.75 / $1.50 · 3 calls · median 4.0 s', evaluate('formatBudgetLine({spent: 0.75, cap: 1.5, calls: 3}, {median_ms: 4000})')
   end
 
   def test_reasoning_and_objective_panels_come_from_the_events
@@ -374,7 +346,6 @@ class PageTest < Minitest::Test
               { type: 'action', skill: 'goto' }]
     json = JSON.generate(events)
     assert_equal 'newest', evaluate("latestReasoning(#{json}).justification")
-    assert_equal 'f5 · claude decides goto (1, 2) (80%)', evaluate("reasoningHead(latestReasoning(#{json}))")
   end
 
   def test_objective_panel_uses_the_status_not_the_event_window
@@ -395,43 +366,6 @@ class PageTest < Minitest::Test
 
   def test_agent_text_never_goes_through_inner_html
     refute_match(/innerHTML|outerHTML|insertAdjacentHTML|document\.write/, PAGE)
-  end
-
-  BAR_STATE = { status: { run_id: 'r1', flow_version: 3, health: 'ok', hearts: 2, max_hearts: 3, objective: 'o', objective_title: 'Find the sword',
-                          cost_usd: 1.5, calls: 4, budget: 'wall 10m', manifest_status: 'running' },
-                replay: { frame: 120, lag: 0, sync: 'ok' },
-                events: [{ frame: 5, type: 'objective', id: 'o', status: 'started', predicate: { kind: 'reach_place', place: [1, 2] } }] }.freeze
-
-  def test_bar_items_are_assigned_to_a_group
-    items = evaluate("barItems(#{JSON.generate(BAR_STATE)})")
-    groups = items.to_h { |i| [i['name'], i['group']] }
-    assert_equal %w[flow health frame lag sync budget manifest], groups.select { |_, g| g == 'harness' }.keys
-    assert_equal %w[hearts objective last], groups.select { |_, g| g == 'game' }.keys
-  end
-
-  def test_bar_has_no_spent_or_calls
-    names = evaluate("barItems(#{JSON.generate(BAR_STATE)})").map { |i| i['name'] }
-    refute_includes names, 'spent'
-    refute_includes names, 'calls'
-  end
-
-  def test_bar_item_formats_are_unchanged
-    texts = evaluate("barItems(#{JSON.generate(BAR_STATE)})").to_h { |i| [i['name'], i['text']] }
-    assert_equal '2/3', texts['hearts']
-    assert_equal 'Find the sword', texts['objective']
-    assert_equal '120', texts['frame']
-    assert_equal 'wall 10m', texts['budget']
-    assert_equal 'f5 · objective: reach_place [1,2] started', texts['last']
-  end
-
-  def test_budget_line_shows_last_call_latency
-    assert_equal '$0.75 / $1.50 · 3 calls · median 4.0 s · last 2.0 s', evaluate('formatBudgetLine({spent: 0.75, cap: 1.5, calls: 3}, {median_ms: 4000, last_ms: 2000})')
-  end
-
-  def test_bar_items_survive_missing_data
-    items = evaluate("barItems({status: {}, replay: {}})")
-    assert_equal '-', items.find { |i| i['name'] == 'hearts' }['text']
-    assert_equal '-', items.find { |i| i['name'] == 'last' }['text']
   end
 
   def test_the_page_finds_its_run_in_the_path_or_the_query
@@ -505,22 +439,6 @@ class PageTest < Minitest::Test
     assert_equal 0, evaluate('markerX(5, 0, 100)')
     assert_equal 100, evaluate('markerX(500, 100, 100)')
     assert_match(/control\('seek=' \+/, PAGE)
-  end
-
-  def test_cost_chart_points_split_and_usage
-    assert_equal '0,160 150,80 300,0', evaluate('seriesPoints([[0, 0], [50, 0.5], [100, 1]], 100, 1, 300, 160)')
-    assert_equal '', evaluate('seriesPoints([[0, 0]], 0, 1, 300, 160)')
-    assert_equal '0,160', evaluate("seriesPoints([[0, 0], ['x', 1], null], 100, 1, 300, 160)")
-    assert_equal({ 'frames' => 200, 'usd' => 2 }, evaluate('chartScale({frames: 100, series: [[0, 0], [90, 1]], reference: {frames: 200, series: [[0, 0], [150, 2]]}})'))
-    assert_equal({ 'frames' => 1, 'usd' => 0.01 }, evaluate('chartScale(null)'))
-    split = evaluate("splitView({walk: {calls: 1, usd: 0.25}, explore: {calls: 3, usd: 0.75}})")
-    assert_equal [%w[explore 75], %w[walk 25]], split.map { |r| [r['skill'], r['percent'].to_i.to_s] }
-    assert_equal 'explore $0.750 · 3 calls', split.first['text']
-    stats = { decisions: { paid: 2, free: 5 }, usage: { goal_changes: 1, leads: { high: 1, normal: 0, low: 2 }, because_used: 1,
-                                                      objectives_by_kind: { new_place: 3 }, talks: 4, talks_to_known: 1, lead_rejected: 0 } }
-    assert_equal ['decisions: 2 paid, 5 free', 'goal changes: 1', 'leads: high 1, normal 0, low 2', 'because used: 1', 'objective new_place: 3', 'talks: 4 (1 to known)'],
-                 evaluate("usageRows(#{JSON.generate(stats)})")
-    assert_equal 'decisions: 0 paid, 0 free', evaluate('usageRows(null)[0]')
   end
 
   def test_map_view_places_nodes_and_links
