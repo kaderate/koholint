@@ -73,7 +73,7 @@ module Koholint
         before = frames[[first - 1, 0].max][:state]
         after = frames[[last + 1, frames.size - 1].min][:state]
         { from: rows.first[:frame], to: rows.last[:frame], length: rows.size, kind: kind(rows),
-          place: [[before.room_id, before.map_id], [after.room_id, after.map_id]].uniq,
+          place: [before.place, after.place].uniq,
           link_z_max: rows.map { |r| r[:signals][:link_z] }.max, stable_after: stable_after(frames, last) }
       end
 

@@ -1,3 +1,4 @@
+require 'koholint/geometry'
 require 'koholint/talk_log'
 require 'koholint/vision/grid'
 
@@ -5,7 +6,6 @@ module Koholint
   module PlaceCard
     SIDES = { up: ->(row, _col) { row.zero? }, down: ->(row, _col) { row == Vision::Grid::ROWS - 1 },
               left: ->(_row, col) { col.zero? }, right: ->(_row, col) { col == Vision::Grid::COLS - 1 } }.freeze
-    DIRECTIONS = %i[up down left right].freeze
 
     module_function
 
@@ -30,7 +30,7 @@ module Koholint
 
       SIDES.filter_map do |side, border|
         cells = (0...Vision::Grid::ROWS).to_a.product((0...Vision::Grid::COLS).to_a).select do |row, col|
-          border.(row, col) && !grid.static_sprite(row, col) && DIRECTIONS.any? { |direction| grid.passable(row, col, direction) == :yes }
+          border.(row, col) && !grid.static_sprite(row, col) && Geometry::DIRECTIONS.any? { |direction| grid.passable(row, col, direction) == :yes }
         end
         [side, cells] unless cells.empty?
       end.to_h

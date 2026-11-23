@@ -1,7 +1,6 @@
 require 'koholint/entities'
 require 'koholint/geometry'
 require 'koholint/items'
-require 'koholint/navigation/planner'
 require 'koholint/perception'
 require 'koholint/skills/clearing'
 
@@ -12,7 +11,6 @@ module Koholint
       CENTRING_FRAMES = 16
       CENTRING_STILL = 3
       EDGE_FRAMES = 120
-      DIRECTIONS = %i[up right down left].freeze
       PUSH_MARGIN = 8
       PUSH_SETTLE = 48
 
@@ -67,7 +65,7 @@ module Koholint
       def result(state = @last)
         aligned, offset = alignment(state)
         { skill: @skill, params: @params, frames: @frames, from: place(@start), to: place(state),
-          moved_cells: moved_cells(state), room_changed: room(@start) != room(state), hp_delta: state.health - @start.health,
+          moved_cells: moved_cells(state), room_changed: @start.place != state.place, hp_delta: state.health - @start.health,
           dialog_before: @start.dialog_open?, dialog_after: state.dialog_open?, stopped_by: @stopped_by,
           aligned:, offset:, blocked_at: @blocked_at, trigger_input: trigger_input }.tap do |r|
           r[:exit] = @walked_in ? @exit.merge(walk_in: true) : @exit if r[:room_changed] && @exit
@@ -83,9 +81,9 @@ module Koholint
       def waits_through_doors? = false
 
       def note_exit(state, buttons)
-        direction = (Array(buttons) & DIRECTIONS).first
+        direction = (Array(buttons) & Geometry::DIRECTIONS).first
         row, col = state.cell
-        @exit = { row:, col:, direction: } if direction && row && room(state) == room(@start)
+        @exit = { row:, col:, direction: } if direction && row && state.place == @start.place
       end
 
       # Stationary enemies the raised shield pushes aside (sea urchins) sit on cells their sprites make look like objects; only with the shield held.
@@ -104,7 +102,7 @@ module Koholint
         catalogue = Entities.object_catalogue
         objects.each_with_index.flat_map do |row, r|
           row.each_index.select { |c| catalogue.dig(row[c], :push) }.flat_map do |c|
-            DIRECTIONS.filter_map do |direction|
+            Geometry::DIRECTIONS.filter_map do |direction|
               far = ahead_of([r, c], direction)
               [[r, c], direction] if far && !catalogue.key?(objects.dig(*far)) && !grid.static_sprite(*far) && grid.passable(*far, direction) == :yes
             end
@@ -113,7 +111,7 @@ module Koholint
       end
 
       def ahead_of(cell, direction)
-        dr, dc = Navigation::Planner::DELTAS.fetch(direction) { return nil }
+        dr, dc = Geometry::DELTAS.fetch(direction) { return nil }
         ahead = cell && [cell[0] + dr, cell[1] + dc]
         ahead if ahead && ahead[0].between?(0, Geometry::ROWS - 1) && ahead[1].between?(0, Geometry::COLS - 1)
       end
@@ -139,7 +137,7 @@ module Koholint
       def watch_push(state, buttons)
         return if @pushed || !@room_objects
 
-        direction = (Array(buttons) & DIRECTIONS).first
+        direction = (Array(buttons) & Geometry::DIRECTIONS).first
         ahead = direction && ahead_of(state.cell, direction)
         object = ahead && @room_objects.call.dig(*ahead)
         @push = Entities.object_catalogue.dig(object, :push) ? { cell: ahead, object:, direction: } : nil
@@ -179,14 +177,14 @@ module Koholint
       def trigger_input
         return nil unless @stopped_by == :dialogue && !@start.dialog_open?
 
-        directions = Array(@trigger_input) & DIRECTIONS
+        directions = Array(@trigger_input) & Geometry::DIRECTIONS
         directions.empty? ? nil : directions
       end
 
       def forbidden_at(state)
         return [] unless @triggers && state.cell
 
-        @triggers.forbidden([state.room_id, state.map_id], state.cell)
+        @triggers.forbidden(state.place, state.cell)
       end
 
       def finish(reason)
@@ -217,7 +215,7 @@ module Koholint
 
       def centre(state)
         reason = @centring[:reason]
-        event = if room(state) != room(@start) then :room_change
+        event = if state.place != @start.place then :room_change
                 elsif state.health < @start.health then :damage
                 elsif state.dialog_open? && !@start.dialog_open? then :dialogue
                 end
@@ -257,7 +255,6 @@ module Koholint
         [Geometry.aligned?(state.x, state.y, cell), { dx:, dy: }]
       end
 
-      def room(state) = [state.room_id, state.map_id]
 
       def moved_cells(state)
         from = @start.cell

@@ -97,7 +97,7 @@ module Koholint
 
       held.uniq.reject { |id| @baseline.include?(id) || @gained.include?(id) }.map do |id|
         @gained << id
-        { item: id, name: Items.name(id), place: [state.room_id, state.map_id], held: held.uniq.sort }
+        { item: id, name: Items.name(id), place: state.place, held: held.uniq.sort }
       end
     end
   end

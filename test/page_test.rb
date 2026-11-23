@@ -521,6 +521,16 @@ class PageTest < Minitest::Test
     assert_nil atlas_eval("screenUrl({ key: '1-0' })")
   end
 
+  def test_atlas_shows_a_visited_screen_without_a_capture
+    place = PLACE.merge(key: '210-0', label: 'C14', grid: true, opens_from: [], screen: nil)
+    assert_equal ['c k n', 'c k', 'c'], atlas_eval("[cellClass(#{JSON.generate(place)}), cellClass(#{JSON.generate(PLACE)}), cellClass(undefined)]")
+    rows = atlas_eval("cardRows(#{JSON.generate(place)})").to_h { |row| [row['label'], row['text']] }
+    assert_equal 'vu, sans capture : aucun screens/210-0.png dans les runs lus', rows['capture']
+    assert_equal 'r1, frame 351', rows['première visite']
+    assert_equal 'C14', atlas_eval("title(#{JSON.generate(place)})")
+    assert_equal 'screens/163-16.png (r1)', atlas_eval("cardRows(#{JSON.generate(PLACE)})").find { |row| row['label'] == 'capture' }['text']
+  end
+
   def test_atlas_leads_sort_by_importance_then_status_and_read_as_text
     leads = [{ quote: 'b', importance: 'normal', status: 'open', first: { run: 'r1', frame: 5 }, runs: 1, tried: 0, achieved: 0 },
              { quote: 'a', claim: 'c', importance: 'high', status: 'tested', place: 'C16', first: { run: 'r2', frame: 9 }, runs: 2, tried: 3, achieved: 1 },

@@ -2,6 +2,7 @@ require 'koholint'
 require 'json'
 require 'koholint/skills/registry'
 require 'koholint/objectives'
+require 'koholint/geometry'
 require 'koholint/leads'
 require 'koholint/trace'
 
@@ -9,14 +10,13 @@ module Koholint
   class DecisionPoint
     class Invalid < Error; end
 
-    DIRECTIONS = %i[up right down left].freeze
     BUTTONS = %i[up down left right a b start select].freeze
     MAX_MACRO_FRAMES = 300
 
     attr_reader :name, :options, :output_schema, :registry
 
     def self.move
-      options = DIRECTIONS.map { |direction| { buttons: [direction], frames: 30 } } + [{ buttons: [:a], frames: 2 }]
+      options = Geometry::DIRECTIONS.map { |direction| { buttons: [direction], frames: 30 } } + [{ buttons: [:a], frames: 2 }]
       new(name: :move, options: options, output_schema: %i[buttons frames])
     end
 

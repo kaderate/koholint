@@ -41,7 +41,7 @@ module Koholint
 
       def summarize(direction, before, after, control, frames)
         axis, sign = AXES.fetch(direction)
-        room_changed = [before.room_id, before.map_id] != [after.room_id, after.map_id]
+        room_changed = before.place != after.place
         delta = (after[axis] - before[axis]) * sign
         inconclusive = [control.x, control.y, control.room_id, control.map_id] != [before.x, before.y, before.room_id, before.map_id]
         { moved: !inconclusive && !room_changed && delta >= 1, from: { x: before.x, y: before.y }, to: { x: after.x, y: after.y },

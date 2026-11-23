@@ -155,12 +155,12 @@ module Koholint
         result = event['result'] if event['type'] == 'action'
         place = result.is_a?(Hash) && Ledger.place_of(result['from']) or next
         ahead = [*Array(result['blocked_edges']), result['blocked_at']].compact.filter_map do |edge|
-          delta = Skills::Composite::DELTAS[edge['direction'].to_s.to_sym] or next
+          delta = Geometry::DELTAS[edge['direction'].to_s.to_sym] or next
           [edge['row'].to_i + delta[0], edge['col'].to_i + delta[1]]
         end
         faced = uses(result).filter_map { |use| target_of(use) if Array(use['steps']).any? { |step| step['skill'] == 'step' && step['stopped_by'] == 'blocked' } }
         (ahead + faced + Array(result['walls']).map { |wall| [wall['row'].to_i, wall['col'].to_i] }).each do |row, col|
-          cells[place] << [row, col] if row.between?(0, Geometry::ROWS - 1) && col.between?(0, Geometry::COLS - 1)
+          cells[place] << [row, col] if Geometry.in_grid?([row, col])
         end
       end
     end
@@ -300,9 +300,9 @@ module Koholint
     end
 
     def stands(cell, sighting)
-      Skills::Composite::DELTAS.filter_map do |direction, (dr, dc)|
+      Geometry::DELTAS.filter_map do |direction, (dr, dc)|
         stand = [cell[0] - dr, cell[1] - dc]
-        next unless stand[0].between?(0, Geometry::ROWS - 1) && stand[1].between?(0, Geometry::COLS - 1)
+        next unless Geometry.in_grid?(stand)
         next if sighting[:grid][stand[0]][stand[1]] == sighting[:grid][cell[0]][cell[1]]
 
         [stand, direction]

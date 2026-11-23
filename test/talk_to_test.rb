@@ -137,7 +137,7 @@ class TalkToTest < Minitest::Test
     assert_equal covered, result[:person_cells].map { |c| [c[:row], c[:col]] }.sort
     standing = result[:standing_cell].values_at(:row, :col)
     refute_includes covered, standing
-    faced = Koholint::Navigation::Planner::DELTAS.fetch(result[:facing]).zip(standing).map(&:sum)
+    faced = Koholint::Geometry::DELTAS.fetch(result[:facing]).zip(standing).map(&:sum)
     assert_includes covered, faced
   end
 

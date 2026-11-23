@@ -11,6 +11,10 @@ module Koholint
 
     def key(text) = text.to_s.downcase.gsub(/[^\p{L}\p{N}]/, '')
 
+    def normalize(text) = text.to_s.gsub(/\s+/, ' ').strip.downcase
+
+    def clean(text, cap = nil) = text.to_s.gsub(/[[:cntrl:]]/, ' ').gsub(/\s+/, ' ').strip.then { |t| cap ? t[0, cap] : t }
+
     def known?(key, seen) = seen.any? { |text| text.include?(key) }
 
     def stitch(pages)

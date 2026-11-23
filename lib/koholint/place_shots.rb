@@ -25,22 +25,22 @@ module Koholint
       @since = nil
     end
 
-    def due(state, frame: state.frame)
+    def due(state, frame: state.frame, settled: false)
       return nil unless state.room_id && state.map_id && state.phase(booted: true) == :playing && !state.dialog_open? &&
                     Modes.ready?(state)
 
-      place = [state.room_id, state.map_id]
+      place = state.place
       return nil if @captured[place]
 
       unless place == @place
         @place = place
         @since = frame
       end
-      place if frame - @since >= SETTLE_FRAMES
+      place if settled || frame - @since >= SETTLE_FRAMES
     end
 
-    def capture(emulator, state)
-      place = due(state, frame: emulator.frame)
+    def capture(emulator, state, settled: false)
+      place = due(state, frame: emulator.frame, settled:)
       write(emulator, place) if place
     end
 

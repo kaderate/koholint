@@ -5,7 +5,6 @@ require 'koholint/talk_log'
 module Koholint
   module Skills
     class Explore
-      DIRECTIONS = %i[up right down left].freeze
       BUDGET_FRAMES = 600
       OUTWARD_FRAMES = 48
       STILL_FRAMES = 8
@@ -33,7 +32,7 @@ module Koholint
 
         def hole_margin = @grid.respond_to?(:hole_margin) ? @grid.hole_margin : []
 
-        def known?(cell) = !static_sprite(*cell) && (@walked.include?(cell) || DIRECTIONS.any? { |d| @grid.passable(*cell, d) == :yes })
+        def known?(cell) = !static_sprite(*cell) && (@walked.include?(cell) || Geometry::DIRECTIONS.any? { |d| @grid.passable(*cell, d) == :yes })
       end
 
       class Leg < Goto::Run
@@ -61,7 +60,7 @@ module Koholint
           super(**rest)
           @aim = context[:aim] || {}
           @hint = direction || @aim[:direction]
-          @place = room(@start)
+          @place = @start.place
           @ledger = context[:ledger]
           @talk_log = context[:talk_log]
           @log = context[:explore_log]
@@ -101,7 +100,7 @@ module Koholint
         end
 
         def result(state = @last)
-          merged = super.merge(place_changed: room(state) != @place, cells_walked: @cells_walked, legs: @legs, target: target_summary,
+          merged = super.merge(place_changed: state.place != @place, cells_walked: @cells_walked, legs: @legs, target: target_summary,
                                crossed: @crossed.map(&:dup), walls: @new_walls.map { |row, col| { row:, col: } }, blocked_edges: @blocked.map(&:dup), exits: @exits.map(&:dup),
                                offered: @offered.map { |row, col| { row:, col: } })
           merged[:clears] = @clearing.uses if @clearing&.uses&.any?
@@ -128,7 +127,7 @@ module Koholint
           @still = [state.x, state.y] == @position ? @still + 1 : 0
           @position = [state.x, state.y]
           return @clearing.step(state) if @clearing&.active? && !@leg
-          return depart(state) if room(state) != @place
+          return depart(state) if state.place != @place
           return harmed if state.health < @start.health
           return interrupted(state) if state.dialog_open?
           return entering if walking_in?(state)
@@ -179,17 +178,17 @@ module Koholint
         end
 
         def heading(buttons)
-          direction = (buttons & DIRECTIONS).first
+          direction = (buttons & Geometry::DIRECTIONS).first
           @heading = direction if direction
           buttons
         end
 
         def depart(state)
-          to = room(state)
+          to = state.place
           if @target && @target[:kind] == :door && (@outward || @entering.positive?)
             @exits << { row: @target[:cell][0], col: @target[:cell][1], direction: :up, outcome: :left, to:, kind: :door }
-          elsif @cell && @heading && neighbour(@cell, @heading)
-            @exits << ExploreLog.door_exit(@cell, neighbour(@cell, @heading), @doors, to)
+          elsif @cell && @heading && Geometry.step(@cell, @heading)
+            @exits << ExploreLog.door_exit(@cell, Geometry.step(@cell, @heading), @doors, to)
           elsif @cell && @heading
             @exits << { row: @cell[0], col: @cell[1], direction: @heading, outcome: :left, to:, **(@walked_in ? { walk_in: true } : {}) }
           end
@@ -208,7 +207,7 @@ module Koholint
         def survey
           sides = SIDES.to_h do |side, border|
             cells = Geometry::ROWS.times.to_a.product(Geometry::COLS.times.to_a).select do |row, col|
-              border.(row, col) && @known.known?([row, col]) && DIRECTIONS.any? { |d| @known.passable(row, col, d) == :yes }
+              border.(row, col) && @known.known?([row, col]) && Geometry::DIRECTIONS.any? { |d| @known.passable(row, col, d) == :yes }
             end
             [side, cells.map { |row, col| { row:, col: } }]
           end
@@ -282,7 +281,7 @@ module Koholint
         def outward(state)
           cell, direction = @target.values_at(:cell, :direction)
           if state.cell && state.cell != cell && @target[:kind] != :door
-            @crossed << [*cell, direction] if state.cell == neighbour(cell, direction)
+            @crossed << [*cell, direction] if state.cell == Geometry.step(cell, direction)
             @outward = nil
             return attempt_over(state)
           end
@@ -311,8 +310,8 @@ module Koholint
           @exits << edge.merge(outcome: :blocked) if %i[exit door].include?(@target[:kind])
           return unless @target[:kind] == :frontier
 
-          @new_walls << neighbour(cell, direction)
-          @walls << neighbour(cell, direction)
+          @new_walls << Geometry.step(cell, direction)
+          @walls << Geometry.step(cell, direction)
         end
 
         def block(edge)
@@ -338,7 +337,7 @@ module Koholint
           return order(clear) if clear.any?
 
           objects = object_cells
-          frontier = gather(from, safe_to) { |cell, direction| frontier_kind(cell, direction) unless objects.include?(neighbour(cell, direction)) }
+          frontier = gather(from, safe_to) { |cell, direction| frontier_kind(cell, direction) unless objects.include?(Geometry.step(cell, direction)) }
           return order(frontier) if frontier.any? && opened?
 
           if @aim[:place] && @aim[:place] != @place
@@ -371,7 +370,7 @@ module Koholint
           path_to = ->(cell) { @planner.path(from: @cell, to: cell) }
           safe_to = ->(cell) { @planner.path(from: @cell, to: cell, cross_margin: false) }
           untried(@cell, path_to).any? || clearable(@cell, safe_to).any? ||
-            ((opened? || untried(@cell, nil).any?) && gather(@cell, safe_to) { |cell, direction| frontier_kind(cell, direction) unless object_cells.include?(neighbour(cell, direction)) }.any?)
+            ((opened? || untried(@cell, nil).any?) && gather(@cell, safe_to) { |cell, direction| frontier_kind(cell, direction) unless object_cells.include?(Geometry.step(cell, direction)) }.any?)
         end
 
         def object_cells = @clearing ? @clearing.cells.keys : []
@@ -383,8 +382,8 @@ module Koholint
           cells = @clearing ? @clearing.cells.keys - @walls - @failed : []
           return [] if cells.empty?
 
-          gather(from, path_to) { |cell, direction| frontier_kind(cell, direction) if cells.include?(neighbour(cell, direction)) }
-            .select { |candidate| leads_on?(neighbour(*candidate.values_at(:cell, :direction)), cells, path_to) }
+          gather(from, path_to) { |cell, direction| frontier_kind(cell, direction) if cells.include?(Geometry.step(cell, direction)) }
+            .select { |candidate| leads_on?(Geometry.step(*candidate.values_at(:cell, :direction)), cells, path_to) }
         end
 
         # Objects are cut only on the way to an untried exit or door or to an unknown cell that is not one, past cells no path reaches.
@@ -393,8 +392,8 @@ module Koholint
           patch.each do |cell|
             return true if untried_door?([cell[0] - 1, cell[1]])
 
-            DIRECTIONS.each do |direction|
-              ahead = neighbour(cell, direction)
+            Geometry::DIRECTIONS.each do |direction|
+              ahead = Geometry.step(cell, direction)
               return true if ahead.nil? ? exit_kind(cell, direction) : unknown?(ahead, direction, cells)
               next if ahead.nil? || patch.include?(ahead)
 
@@ -418,7 +417,7 @@ module Koholint
             first ||= hop
             via = hop[:via]
             found = if via.is_a?(Array) then doors(path_to, @doors | [via]) { |door| door == via }
-                    else gather(from, path_to) { |cell, direction| :exit if direction == via && neighbour(cell, direction).nil? }
+                    else gather(from, path_to) { |cell, direction| :exit if direction == via && Geometry.step(cell, direction).nil? }
                     end
             if found.any?
               @route = { goal: hop[:goal], next: hop[:next] }
@@ -433,14 +432,14 @@ module Koholint
           @dead_end = true if first
           side = @log&.pocket_side(@place, from) or return []
 
-          gather(from, path_to) { |cell, direction| :exit if direction == side && neighbour(cell, direction).nil? }
+          gather(from, path_to) { |cell, direction| :exit if direction == side && Geometry.step(cell, direction).nil? }
         end
 
         def gather(from, path_to)
           (0...Geometry::ROWS).to_a.product((0...Geometry::COLS).to_a).flat_map do |cell|
             next [] unless cell == from || @known.known?(cell)
 
-            DIRECTIONS.filter_map do |direction|
+            Geometry::DIRECTIONS.filter_map do |direction|
               kind = yield(cell, direction)
               next unless kind && open?(cell, direction)
 
@@ -465,19 +464,19 @@ module Koholint
         def order(found)
           door = @aim[:door] && [@aim[:door][0] + 1, @aim[:door][1]]
           found.sort_by do |c|
-            [door && c[:kind] == :door && c[:cell] == door ? 0 : 1, @hint.nil? || c[:direction] == @hint ? 0 : 1, c[:path].size, c[:kind] == :frontier ? 1 : 0, *c[:cell], DIRECTIONS.index(c[:direction])]
+            [door && c[:kind] == :door && c[:cell] == door ? 0 : 1, @hint.nil? || c[:direction] == @hint ? 0 : 1, c[:path].size, c[:kind] == :frontier ? 1 : 0, *c[:cell], Geometry::DIRECTIONS.index(c[:direction])]
           end
         end
 
         def exit_kind(cell, direction)
-          return nil if neighbour(cell, direction) || @log&.tried?(@place, cell, direction) || @log&.side_crossed?(@place, direction) ||
+          return nil if Geometry.step(cell, direction) || @log&.tried?(@place, cell, direction) || @log&.side_crossed?(@place, direction) ||
                         @exits.any? { |exit| exit[:outcome] == :left && exit[:direction] == direction }
 
           :exit
         end
 
         def frontier_kind(cell, direction)
-          ahead = neighbour(cell, direction) or return nil
+          ahead = Geometry.step(cell, direction) or return nil
           return nil if @doors.include?(ahead) || (direction == :up && @doors.include?(cell))
           return nil if direction == :up && [cell, ahead].any? { |at| @log&.door_edge?(@place, at) }
           return nil if @walked.include?(ahead) || [cell, ahead].any? { |at| @known.hole_margin.include?(at) }
@@ -492,13 +491,6 @@ module Koholint
             !Array(@triggers&.forbidden(@place, cell)).include?(direction)
         end
 
-        def neighbour(cell, direction)
-          dr, dc = Navigation::Planner::DELTAS.fetch(direction)
-          row = cell[0] + dr
-          col = cell[1] + dc
-          [row, col] if row.between?(0, Geometry::ROWS - 1) && col.between?(0, Geometry::COLS - 1)
-        end
-
         def target_summary
           return nil unless @target
 
@@ -509,7 +501,7 @@ module Koholint
       def name = 'explore'
 
       def params_schema
-        { type: 'object', title: name, properties: { direction: { type: 'string', enum: DIRECTIONS.map(&:to_s) } },
+        { type: 'object', title: name, properties: { direction: { type: 'string', enum: Geometry::DIRECTIONS.map(&:to_s) } },
           additionalProperties: false }
       end
 
@@ -518,7 +510,7 @@ module Koholint
         return {} unless params.key?(:direction)
 
         direction = params[:direction].respond_to?(:to_sym) ? params[:direction].to_sym : nil
-        raise ArgumentError, "explore: direction must be one of #{DIRECTIONS.join(', ')}" unless DIRECTIONS.include?(direction)
+        raise ArgumentError, "explore: direction must be one of #{Geometry::DIRECTIONS.join(', ')}" unless Geometry::DIRECTIONS.include?(direction)
 
         { direction: }
       end

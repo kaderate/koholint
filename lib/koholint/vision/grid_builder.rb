@@ -15,7 +15,6 @@ module Koholint
       LINK_SPRITE_TOLERANCE = 2
       # Link walks about 1 px per frame: 32 frames cross the 16 px to the next cell with a 2x margin.
       PROBE_HOLD_FRAMES = 32
-      STEPS = { up: [-1, 0], down: [1, 0], left: [0, -1], right: [0, 1] }.freeze
       OVERLAY_STUCK_FRAMES = 600
       HAZARD_MAX_CELLS = 8
 
@@ -44,7 +43,7 @@ module Koholint
       end
 
       def observe(emulator, state)
-        place = [state.room_id, state.map_id]
+        place = state.place
         snapshot = ScreenVision.snapshot(emulator, place:)
         if snapshot.overlay
           @previous = nil
@@ -75,14 +74,14 @@ module Koholint
       end
 
       def note_fall(state)
-        place = [state.room_id, state.map_id]
+        place = state.place
         cell = self.class.link_cell(state.x, state.y)
         return unless @last && cell && @last[:place] == place
 
         appearance = @last[:grid].appearance(*cell)
         return if Grid::ROWS.times.sum { |row| Grid::COLS.times.count { |col| @last[:grid].appearance(row, col) == appearance } } > HAZARD_MAX_CELLS
 
-        Beliefs::DIRECTIONS.each { |direction| record(appearance, direction, :no, state.frame, method: 'fall', source: 'fall') }
+        Geometry::VERTICAL_FIRST.each { |direction| record(appearance, direction, :no, state.frame, method: 'fall', source: 'fall') }
       end
 
       private
@@ -125,8 +124,7 @@ module Koholint
       # All probes share one no-input control: one inconclusive voids all. Link is free only if some direction moves him;
       # returns whether he was shown not free, so the same spot is not reprobed until he moves.
       def probe_neighbours(emulator, state, grid, cell)
-        neighbours = STEPS.to_h { |direction, (drow, dcol)| [direction, [cell[0] + drow, cell[1] + dcol]] }
-                          .select { |_, (row, col)| row.between?(0, Grid::ROWS - 1) && col.between?(0, Grid::COLS - 1) }
+        neighbours = Geometry::VERTICAL_FIRST.to_h { |direction| [direction, Geometry.step(cell, direction)] }.compact
         unknown = neighbours.select do |direction, target|
           %i[unknown stale].include?(grid.passable(*target, direction)) && ![:cell, [state.x, state.y]].include?(@discarded[direction])
         end
@@ -165,7 +163,7 @@ module Koholint
         after = self.class.link_cell(probe[:to][:x], probe[:to][:y]) or return
         return aligned?(start, cell, direction) && !sprite_ahead?(start, direction) ? :no : :misaligned if after == cell
 
-        drow, dcol = STEPS.fetch(direction)
+        drow, dcol = Geometry::DELTAS.fetch(direction)
         delta = [after[0] - cell[0], after[1] - cell[1]]
         cells = drow.zero? ? delta[1] * dcol : delta[0] * drow
         :yes if cells >= 1 && delta == [drow * cells, dcol * cells]
@@ -175,14 +173,14 @@ module Koholint
 
       # Only the strip Link would newly cover counts: the NPC next to the start already overlaps his own box.
       def sprite_ahead?(start, direction)
-        drow, dcol = STEPS.fetch(direction)
+        drow, dcol = Geometry::DELTAS.fetch(direction)
         left = start[:x] - 8 + (dcol * 16)
         top = start[:y] - 16 + (drow * 16)
         @ahead.any? { |x, y, w, h| x < left + 16 && left < x + w && y < top + 16 && top < y + h }
       end
 
       def aligned?(start, cell, direction)
-        Geometry.aligned?(start[:x], start[:y], cell, axis: STEPS.fetch(direction)[0].zero? ? :y : :x)
+        Geometry.aligned?(start[:x], start[:y], cell, axis: Geometry::DELTAS.fetch(direction)[0].zero? ? :y : :x)
       end
 
       def record(appearance, direction, result, frame, method: 'hold', source: 'probe')

@@ -53,12 +53,6 @@ module Koholint
       leads
     end
 
-    def self.normalize(text) = text.to_s.gsub(/\s+/, ' ').strip.downcase
-
-    def self.compact(text) = text.to_s.gsub(/\s+/, '').downcase
-
-    def self.clean(text, cap = nil) = text.to_s.gsub(/[[:cntrl:]]/, ' ').gsub(/\s+/, ' ').strip.then { |t| cap ? t[0, cap] : t }
-
     def self.write_world(dir)
       events = Trace.read(File.join(dir, 'trace.jsonl'))
       leads = from_events(events)
@@ -90,7 +84,7 @@ module Koholint
 
     # The places a lead's quote points to by a word it shares with a place name you gave: places named with it and places where a text using it was read.
     def region(lead)
-      words = ->(text) { self.class.normalize(text).scan(WORD).reject { |word| STOPWORDS.include?(word) } }
+      words = ->(text) { Dialogues.normalize(text).scan(WORD).reject { |word| STOPWORDS.include?(word) } }
       shared = words.(lead[:quote]) & @names.values.flat_map(&words)
       return [] if shared.empty?
 
@@ -153,7 +147,7 @@ module Koholint
     end
 
     def name_place(place, name)
-      name = self.class.clean(name, NAME_MAX)
+      name = Dialogues.clean(name, NAME_MAX)
       return unless place.is_a?(Array) && place.size == 2 && place.all?(Integer) && !name.empty? && @names[place] != name
 
       @names[place] = name
@@ -168,34 +162,34 @@ module Koholint
       found = where.match(PLACE_ID)
       return [found[1].to_i, found[2].to_i] if found
 
-      @names.find { |_, name| self.class.normalize(name) == self.class.normalize(where) }&.first
+      @names.find { |_, name| Dialogues.normalize(name) == Dialogues.normalize(where) }&.first
     end
 
     # A lead naming an item no text of the run has named and Link never held is general knowledge of the game: dropped and returned as leaked.
     def absorb(raw, transcription:, place:, source:)
-      haystacks = Array(transcription).map { |text| self.class.compact(text) }
+      haystacks = Array(transcription).map { |text| Dialogues.compact(text) }
       accepted = []
       leaked = []
       rejected = 0
       (raw.is_a?(Array) ? raw.first(LIMIT) : []).each do |entry|
         lead = entry.is_a?(Hash) ? entry.transform_keys(&:to_s) : {}
         quote, claim, importance = lead.values_at('quote', 'claim', 'importance')
-        key = self.class.compact(quote)
-        unless quote.is_a?(String) && claim.is_a?(String) && IMPORTANCE.include?(importance) && self.class.normalize(quote).length.between?(QUOTE_MIN, QUOTE_MAX) &&
-               haystacks.any? { |haystack| haystack.include?(key) } && !self.class.clean(claim).empty?
+        key = Dialogues.compact(quote)
+        unless quote.is_a?(String) && claim.is_a?(String) && IMPORTANCE.include?(importance) && Dialogues.normalize(quote).length.between?(QUOTE_MIN, QUOTE_MAX) &&
+               haystacks.any? { |haystack| haystack.include?(key) } && !Dialogues.clean(claim).empty?
           rejected += 1
           next
         end
-        next if @all.any? { |known| self.class.compact(known[:quote]) == key }
+        next if @all.any? { |known| Dialogues.compact(known[:quote]) == key }
 
         named = LeadCheck.named(claim:, where: lead['where'], texts: [*Array(transcription), *@read, *@all.map { |known| known[:quote] }], held: @held)
         if named.any?
-          leaked << { quote: self.class.clean(quote), claim: self.class.clean(claim, CLAIM_MAX), items: named }
+          leaked << { quote: Dialogues.clean(quote), claim: Dialogues.clean(claim, CLAIM_MAX), items: named }
           next
         end
 
-        added = { id: "lead-#{@all.size + 1}", place:, source:, quote: self.class.clean(quote), claim: self.class.clean(claim, CLAIM_MAX), importance: }
-        where = self.class.clean(lead['where'], WHERE_MAX)
+        added = { id: "lead-#{@all.size + 1}", place:, source:, quote: Dialogues.clean(quote), claim: Dialogues.clean(claim, CLAIM_MAX), importance: }
+        where = Dialogues.clean(lead['where'], WHERE_MAX)
         added[:where] = where unless where.empty?
         @all << added
         accepted << added
@@ -205,14 +199,14 @@ module Koholint
 
     # A text the game opened while Link pressed toward something: one lead per thing and text, a few per place.
     def contact(contact, text:, place:)
-      quote = self.class.clean(text, QUOTE_MAX)
+      quote = Dialogues.clean(text, QUOTE_MAX)
       thing = contact.slice(:object, :entity)
-      key = self.class.compact(quote)
-      return if self.class.normalize(quote).length < QUOTE_MIN || thing.empty?
+      key = Dialogues.compact(quote)
+      return if Dialogues.normalize(quote).length < QUOTE_MIN || thing.empty?
       return if @all.count { |known| known[:contact] && known[:place] == place } >= LIMIT
       return if @all.any? do |known|
         (known[:place] == place || known[:contact]&.slice(:object, :entity) == thing) &&
-          (key.include?(self.class.compact(known[:quote])) || self.class.compact(known[:quote]).include?(key))
+          (key.include?(Dialogues.compact(known[:quote])) || Dialogues.compact(known[:quote]).include?(key))
       end
 
       what = contact[:entity] ? "person #{contact[:entity]}" : "object #{contact[:object]}"
@@ -223,7 +217,7 @@ module Koholint
     end
 
     def change_goal(text, frame: nil, objectives: nil)
-      goal = text.is_a?(String) ? self.class.clean(text, GOAL_MAX) : ''
+      goal = text.is_a?(String) ? Dialogues.clean(text, GOAL_MAX) : ''
       return if goal.empty? || goal == @goal
 
       @goal_frame = frame

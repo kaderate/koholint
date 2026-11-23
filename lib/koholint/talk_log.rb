@@ -68,7 +68,7 @@ module Koholint
         until queue.empty?
           cell = queue.shift
           cells << cell
-          [[-1, 0], [1, 0], [0, -1], [0, 1]].each do |dr, dc|
+          Geometry::DELTAS.values_at(*Geometry::VERTICAL_FIRST).each do |dr, dc|
             near = [cell[0] + dr, cell[1] + dc]
             next if seen[near] || !sprites.include?(near)
 

@@ -36,6 +36,18 @@ class PlaceShotsTest < Minitest::Test
     end
   end
 
+  def test_a_place_left_before_the_settle_delay_is_captured_when_the_engine_reads_it_settled
+    Dir.mktmpdir do |dir|
+      shots = Koholint::PlaceShots.new(dir)
+      emulator = Fake.new(100)
+      shots.capture(emulator, state(frame: 100), settled: true)
+      assert_equal ['3-1.png'], Koholint::PlaceShots.names(dir)
+      emulator.frame = 101
+      shots.capture(emulator, state(frame: 101, dialog_state: 1, room_id: 4), settled: true)
+      assert_equal ['3-1.png'], Koholint::PlaceShots.names(dir)
+    end
+  end
+
   def test_skips_loading_dialogue_and_menu_phases
     Dir.mktmpdir do |dir|
       shots = Koholint::PlaceShots.new(dir)

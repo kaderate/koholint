@@ -11,7 +11,7 @@ module Koholint
     KINDS = %w[npc enemy object creature unknown].freeze
     NOT_PEOPLE = %w[creature unknown].freeze
     OBJECT_KINDS = %w[sign object door chest stone].freeze
-    FACES = %w[up down left right].freeze
+    FACES = Geometry::DIRECTIONS.map(&:to_s).freeze
     DEFAULT_PATH = File.expand_path('../../data/entities.json', __dir__)
     ADDRESSES = Addresses.load.slice(:entity_x, :entity_y, :entity_status, :entity_state, :entity_type, :entity_health, :room_objects).freeze
     ROOM_ROW_STRIDE = 16

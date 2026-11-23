@@ -15,8 +15,6 @@ module Koholint
   # in a throwaway fork by existing skills only, with no model call; the arrival and the way back are recorded as exit edges with their context.
   module Bench
     ROOT = File.join(Config::ROOT, 'tmp', 'bench', 'runs')
-    SIDES = %i[up down left right].freeze
-    OPPOSITE = { up: :down, down: :up, left: :right, right: :left }.freeze
     STANDS = 10
     CROSS_CELLS = 2
     TRIAL_FRAMES = 3000
@@ -45,7 +43,7 @@ module Koholint
         return answer({ skill: 'advance_dialogue', params: {} }) if state.dialog_open?
         return answer({ skill: 'wait', params: { frames: SETTLE_FRAMES } }) unless state.phase(booted: true) == :playing
 
-        place = [state.room_id, state.map_id]
+        place = state.place
         @origin ||= place
         @health ||= state.health
         return answer(stop(:wrong_start)) unless @origin == @place
@@ -58,7 +56,7 @@ module Koholint
       def after_action(choice:, outcome:, state:, **)
         return unless @origin && %w[goto walk].include?(choice[:skill].to_s)
 
-        place = [state.room_id, state.map_id]
+        place = state.place
         @phase = case @phase
                  when :approach then place == @origin && outcome[:stopped_by].to_s == 'done' ? :cross : :approach
                  when :cross then place == @origin ? :approach : :landed
@@ -78,7 +76,7 @@ module Koholint
           return finish_off_border unless scrolled?(state.cell)
 
           @phase = :back
-          { skill: 'walk', params: { direction: OPPOSITE.fetch(@direction).to_s, cells: CROSS_CELLS } }
+          { skill: 'walk', params: { direction: Geometry::OPPOSITE.fetch(@direction).to_s, cells: CROSS_CELLS } }
         else finish(place, state)
         end
       end
@@ -141,7 +139,7 @@ module Koholint
       state = state_at(events, start[:frame])
       context = Exits.context(state)
       link = Geometry.cell_for(state['x'], state['y']) || [3, 4]
-      ways = SIDES.map { |side| [side, border(side, link)] } + doors(events, place, start[:frame]).map { |door| [door, [[door[0] + 1, door[1]]]] }
+      ways = Geometry::VERTICAL_FIRST.map { |side| [side, border(side, link)] } + doors(events, place, start[:frame]).map { |door| [door, [[door[0] + 1, door[1]]]] }
       results = ways.to_h do |way, stands|
         trial = trial(run, start[:frame], place, way, stands, root:)
         record(data, place, way, context, start, trial, run)
@@ -176,7 +174,7 @@ module Koholint
       Exits.record(data, place:, way: key, context:, trial: source.merge('to' => arrival[:to], 'landing' => arrival[:landing], 'off_border' => (true if arrival[:off_border])).compact, refutes:)
       back = trial[:back] or return
 
-      reverse = way.is_a?(Array) ? 'down' : OPPOSITE.fetch(way).to_s
+      reverse = way.is_a?(Array) ? 'down' : Geometry::OPPOSITE.fetch(way).to_s
       refuted = { 'to' => place, 'source' => 'reverse' } if back[:to] != place
       Exits.record(data, place: arrival[:to], way: reverse, context:, trial: source.merge('via' => key, 'to' => back[:to], 'landing' => back[:landing], 'from_landing' => arrival[:landing]),
                          refutes: refuted)
