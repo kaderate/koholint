@@ -11,7 +11,6 @@ module Koholint
       CENTRING_FRAMES = 16
       CENTRING_STILL = 3
       EDGE_FRAMES = 120
-      DIRECTIONS = %i[up right down left].freeze
 
       attr_reader :frames, :stopped_by
       attr_writer :triggers
@@ -71,7 +70,7 @@ module Koholint
       def waits_through_doors? = false
 
       def note_exit(state, buttons)
-        direction = (Array(buttons) & DIRECTIONS).first
+        direction = (Array(buttons) & Geometry::DIRECTIONS).first
         row, col = state.cell
         @exit = { row:, col:, direction: } if direction && row && room(state) == room(@start)
       end
@@ -110,14 +109,14 @@ module Koholint
       def trigger_input
         return nil unless @stopped_by == :dialogue && !@start.dialog_open?
 
-        directions = Array(@trigger_input) & DIRECTIONS
+        directions = Array(@trigger_input) & Geometry::DIRECTIONS
         directions.empty? ? nil : directions
       end
 
       def forbidden_at(state)
         return [] unless @triggers && state.cell
 
-        @triggers.forbidden([state.room_id, state.map_id], state.cell)
+        @triggers.forbidden(state.place, state.cell)
       end
 
       def finish(reason)
@@ -188,7 +187,7 @@ module Koholint
         [Geometry.aligned?(state.x, state.y, cell), { dx:, dy: }]
       end
 
-      def room(state) = [state.room_id, state.map_id]
+      def room(state) = state.place
 
       def moved_cells(state)
         from = @start.cell

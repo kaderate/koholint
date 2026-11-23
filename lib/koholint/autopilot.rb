@@ -100,7 +100,7 @@ module Koholint
     def try_choice(state:, objective:, entities:, tried:)
       return unless state.cell && !objective&.dig(:target) && !hold_reason(state:, objective:, caps: false)
 
-      here = [state.room_id, state.map_id]
+      here = state.place
       @tries = 0 unless @try_place == here
       @try_place = here
       return if @tries >= TRY_LIMIT
@@ -137,7 +137,7 @@ module Koholint
       return if state.health < FIGHT_FLOOR || state.health < @hp - FIGHT_DROP
       return if @fight >= FIGHT_LIMIT || state.frame - @since >= FIGHT_FRAMES
 
-      here = @struck[:place] == [state.room_id, state.map_id]
+      here = @struck[:place] == state.place
       struck = here ? @struck[:types] : []
       row, col = state.cell
       target = Array(entities).select { |entity| entity[:cell] && !(here && entity[:slot] == @struck[:slot]) }

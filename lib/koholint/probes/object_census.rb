@@ -60,7 +60,7 @@ module Koholint
 
           STANDING.each do |side, (drow, dcol)|
             stand = [row + drow, col + dcol]
-            next unless stand[0].between?(0, Geometry::ROWS - 1) && stand[1].between?(0, Geometry::COLS - 1)
+            next unless Geometry.in_grid?(stand)
 
             tested[id] += 1
             hit = read_at(base, stand, side) or next

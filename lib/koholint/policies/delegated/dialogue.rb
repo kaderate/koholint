@@ -15,7 +15,7 @@ module Koholint
           return unless @sequence
 
           stale = state.phase != :dialogue && state.frame - @sequence[:last] > STALE_SEQUENCE_FRAMES
-          @sequence = nil if stale || @sequence[:place] != [state.room_id, state.map_id]
+          @sequence = nil if stale || @sequence[:place] != state.place
         end
 
         def reopen_wait(decision_point, state)
@@ -40,7 +40,7 @@ module Koholint
           end
           rgb = context[:dialogue_rgb]&.call or return
           unless @sequence
-            @sequence = { pages: [], rows: [], start: state.frame, place: [state.room_id, state.map_id], source: @talk_source, contact: @contact }
+            @sequence = { pages: [], rows: [], start: state.frame, place: state.place, source: @talk_source, contact: @contact }
             @contact = nil
             @objectives.touch(frame: state.frame)
           end
@@ -65,7 +65,7 @@ module Koholint
           text = Dialogues.text(pages)
           @objectives.note_text(text)
           source = @images || @reading ? @read_at[:source] : @talk_source
-          place = @images || @reading ? @read_at[:place] : [state.room_id, state.map_id]
+          place = @images || @reading ? @read_at[:place] : state.place
           @leads.note_read(text, place:)
           conversation = @read_at[:conversation] if @images || @reading
           first = [transcription].flatten(1).compact.first
@@ -78,7 +78,7 @@ module Koholint
         def notes_for(output, transcription, state)
           goal = @leads.change_goal(output['goal'], frame: state.frame, objectives: @objectives.finished)
           notes = goal ? { goal: } : {}
-          here = [state.room_id, state.map_id]
+          here = state.place
           name = @leads.name_place(here, output['place_name']) if output['place_name'].is_a?(String) && state.phase(booted: true) != :loading
           notes[:place_name] = { place: here, name: } if name
           read = @images || @reading
@@ -86,7 +86,7 @@ module Koholint
           return notes unless output.key?('leads') || contact
 
           pages = [transcription].flatten(1).compact
-          place = @read_at && read ? @read_at[:place] : [state.room_id, state.map_id]
+          place = @read_at && read ? @read_at[:place] : state.place
           source = @images ? @read_at[:source] : @talk_source
           texts = pages.map { |page| page[:text] }
           leads, rejected, leaked = output.key?('leads') ? @leads.absorb(output['leads'], transcription: [texts.join(' '), Dialogues.text(texts)], place:, source:) : [[], 0, []]

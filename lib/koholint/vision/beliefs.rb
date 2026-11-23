@@ -1,10 +1,10 @@
+require 'koholint/geometry'
 require 'koholint/vision/capabilities'
 
 module Koholint
   module Vision
     class Beliefs
       RESULTS = %i[yes no].freeze
-      DIRECTIONS = %i[up down left right].freeze
 
       def self.from_events(events)
         new.tap do |beliefs|
@@ -36,8 +36,8 @@ module Koholint
         raise ArgumentError, "result must be :yes or :no, got #{result.inspect}" unless RESULTS.include?(result)
         raise ArgumentError, "action must be a Symbol, got #{action.inspect}" unless action.is_a?(Symbol)
         raise ArgumentError, "frame must be an Integer, got #{frame.inspect}" unless frame.is_a?(Integer)
-        unless direction.nil? || DIRECTIONS.include?(direction)
-          raise ArgumentError, "direction must be one of #{DIRECTIONS.join('/')} or nil, got #{direction.inspect}"
+        unless direction.nil? || Geometry::DIRECTIONS.include?(direction)
+          raise ArgumentError, "direction must be one of #{Geometry::DIRECTIONS.join('/')} or nil, got #{direction.inspect}"
         end
 
         @evidence[[appearance, action]] << { appearance:, action:, direction:, result:, method:, context:, frame:, source: }.freeze

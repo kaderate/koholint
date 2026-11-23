@@ -60,7 +60,7 @@ class GridTest < Minitest::Test
   end
 
   def fall(beliefs, frame)
-    Koholint::Vision::Beliefs::DIRECTIONS.each do |direction|
+    Koholint::Geometry::VERTICAL_FIRST.each do |direction|
       beliefs.record(appearance: 'hole', action: :walk, direction:, result: :no, method: 'fall',
                      context: Koholint::Vision::Capabilities.new, frame:, source: 'fall')
     end

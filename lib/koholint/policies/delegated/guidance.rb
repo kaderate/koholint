@@ -25,7 +25,7 @@ module Koholint
 
         def route_line(state)
           goal = objective_place
-          here = [state.room_id, state.map_id]
+          here = state.place
           return if goal.nil? || goal == here
 
           exit = ->(via) { via.is_a?(Array) ? "door above (#{via[0] + 1},#{via[1]})" : via.to_s }
@@ -42,12 +42,12 @@ module Koholint
           return unless choice[:skill].to_s == 'explore' && choice[:params].to_h.empty?
 
           place = objective_place
-          aim = follow_choice(state)&.dig(:aim) || ({ place: } if place && place != [state.room_id, state.map_id])
+          aim = follow_choice(state)&.dig(:aim) || ({ place: } if place && place != state.place)
           context[:aim] = aim if aim
         end
 
         def alerts(state, objective: false)
-          place = [state.room_id, state.map_id]
+          place = state.place
           lines = []
           if (loop = @loop_watch.hint)
             lines << "LOOP: #{loop[:place].join('-')} was entered #{LoopWatch::ENTRIES} times in #{loop[:span]} frames without reaching a new place " \
@@ -95,7 +95,7 @@ module Koholint
         # texts in front of it, once per context and set of texts read there: no new text, no new paid ask. An objective of the model's own
         # is left alone.
         def note_puzzle_entry(state)
-          place = [state.room_id, state.map_id]
+          place = state.place
           @puzzle_ask = nil unless @puzzle_ask&.dig(:place) == place
           return unless state.phase(booted: true) == :playing && puzzle_open?(place)
           return if @objectives.current && !@objectives.current[:autopilot]
@@ -165,7 +165,7 @@ module Koholint
           door = @autopilot.door_choice(state:, doors: objects_now.select { |object| object[:kind].to_s == 'door' }.map { |object| object[:cell] })
           return door.tap { @autopilot_acting = true } if door
 
-          place = [state.room_id, state.map_id]
+          place = state.place
           trial = @autopilot.try_choice(state:, objective: @objectives.current, entities: entities_now, tried: ->(type) { @explore_log.met?(place, type) })
           return trial.tap { @autopilot_acting = true } if trial
 
@@ -178,7 +178,7 @@ module Koholint
 
         def follow_choice(state)
           target = @objectives.current&.dig(:target) or return
-          here = target[:place] == [state.room_id, state.map_id]
+          here = target[:place] == state.place
           case target[:kind]
           when 'exit' then { choice: { skill: 'explore', params: { direction: target[:direction] } } } if here
           when 'door' then { choice: EXPLORE, aim: { door: target[:cell] } } if here
@@ -197,7 +197,7 @@ module Koholint
           hint = @loop_watch.pending_hint
           return if hint.nil? || @sequence || !%i[choose_skill choose_objective].include?(decision_point.name) || @puzzle_ask || model_hold?(state)
 
-          place = [state.room_id, state.map_id]
+          place = state.place
           looped = hint[:places].map { |at| at.split('-').map(&:to_i) }
           route = @explore_log.route(place, skip: looped)
           unless route || @explore_log.untried?(place)
@@ -220,7 +220,7 @@ module Koholint
         end
 
         def zero_cap(decision_point, state, context)
-          place = [state.room_id, state.map_id]
+          place = state.place
           return unless decision_point.name == :choose_skill && !@sequence && @zero_watch.due?(place)
 
           skill, stop, count, mark = @zero_watch.streak.values_at(:skill, :stop, :count, :mark)
@@ -244,7 +244,7 @@ module Koholint
           return unless @autopilot && decision_point.name == :choose_objective && !@puzzle_ask
           return if @autopilot.objective_hold(state:, last: @objectives.history.last)
 
-          place = [state.room_id, state.map_id]
+          place = state.place
           return unless @explore_log.work?(place) || @explore_log.route(place)
           return if unmet_person?(state, place)
 
@@ -266,7 +266,7 @@ module Koholint
 
         # Untried exits or clearable objects left in a surveyed place come before talking to people again.
         def revisit_danger?(state)
-          place = [state.room_id, state.map_id]
+          place = state.place
           hemmed?(state) || (@explore_log.surveyed?(place) && @explore_log.untried?(place))
         end
 

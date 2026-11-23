@@ -21,7 +21,7 @@ module Koholint
           option, text = state.mode.choices.first
           unless @over
             @notes << { kind: 'death', detail: "game over: #{text}" }
-            @deaths[[state.room_id, state.map_id]] += 1
+            @deaths[state.place] += 1
           end
           @over = @died = @locked_wait = true
           { choice: { skill: 'choose_option', params: { option: } }, justification: "game over: #{text} (picked by the harness)", confidence: 1.0,
@@ -50,10 +50,10 @@ module Koholint
           return if @hemmed && @hemmed[:waits] < HEMMED_WAIT_LIMIT && hemmed?(state)
           return if state.dialog_open? || @locks.size < HEMMED_ATTEMPTS || @locks.filter_map { |l| l[:direction] }.uniq.size < HEMMED_DIRECTIONS
 
-          @hemmed = { pos: @locks.first[:pos], place: [state.room_id, state.map_id], waits: 0, attempts: @locks.count { |l| l[:direction] } }
+          @hemmed = { pos: @locks.first[:pos], place: state.place, waits: 0, attempts: @locks.count { |l| l[:direction] } }
         end
 
-        def hemmed?(state) = !!@hemmed && !state.dialog_open? && [state.x, state.y] == @hemmed[:pos] && [state.room_id, state.map_id] == @hemmed[:place]
+        def hemmed?(state) = !!@hemmed && !state.dialog_open? && [state.x, state.y] == @hemmed[:pos] && state.place == @hemmed[:place]
 
         def release_hemmed(state)
           return unless @hemmed && !state.loading?

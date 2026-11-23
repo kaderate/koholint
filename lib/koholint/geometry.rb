@@ -7,6 +7,10 @@ module Koholint
     COLS = 10
     CELL = 16
     ALIGN_TOLERANCE = 4
+    DELTAS = { up: [-1, 0], right: [0, 1], down: [1, 0], left: [0, -1] }.freeze
+    DIRECTIONS = DELTAS.keys.freeze
+    VERTICAL_FIRST = %i[up down left right].freeze
+    OPPOSITE = { up: :down, down: :up, left: :right, right: :left }.freeze
     DEFAULT_PATH = File.expand_path('../../data/geometry.json', __dir__)
 
     module_function
@@ -16,7 +20,15 @@ module Koholint
 
       row = (y - 8) / CELL
       col = x / CELL
-      [row, col] if row.between?(0, ROWS - 1) && col.between?(0, COLS - 1)
+      [row, col] if in_grid?([row, col])
+    end
+
+    def in_grid?(cell) = cell[0].between?(0, ROWS - 1) && cell[1].between?(0, COLS - 1)
+
+    def step(cell, direction)
+      dr, dc = DELTAS[direction]
+      to = [cell[0] + dr, cell[1] + dc] if dr
+      to if to && in_grid?(to)
     end
 
     def center_of(row, col) = [(col * CELL) + 8, (row * CELL) + 16]
@@ -40,16 +52,14 @@ module Koholint
       end
     end
 
-    SIDE_STEPS = { up: [-1, 0], down: [1, 0], left: [0, -1], right: [0, 1] }.freeze
-
     # The screen next to a place across a side, where the measured map layout applies; a hypothesis to compare a first crossing with, never a route.
     def neighbour(place, side)
       layout = @neighbour ||= fact(:overworld_neighbour)
       room, map = place
-      step = SIDE_STEPS[side.to_s.to_sym]
-      return nil unless step && layout['maps'].include?(map)
+      delta = DELTAS[side.to_s.to_sym]
+      return nil unless delta && layout['maps'].include?(map)
 
-      dr, dc = step
+      dr, dc = delta
 
       width = layout['width']
       row = (room / width) + dr

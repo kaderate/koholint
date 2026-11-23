@@ -3,7 +3,6 @@ require 'koholint/skills/execution'
 module Koholint
   module Skills
     class Step
-      DIRECTIONS = %i[up right down left].freeze
       MAX_PIXELS = 16
       STILL_FRAMES = 8
       FRAME_LIMIT = 80
@@ -57,7 +56,7 @@ module Koholint
 
       def params_schema
         { type: 'object', title: name,
-          properties: { direction: { type: 'string', enum: DIRECTIONS.map(&:to_s) },
+          properties: { direction: { type: 'string', enum: Geometry::DIRECTIONS.map(&:to_s) },
                         pixels: { type: 'integer', minimum: 1, maximum: MAX_PIXELS } },
           required: %w[direction pixels], additionalProperties: false }
       end
@@ -65,7 +64,7 @@ module Koholint
       def normalize(params)
         params = Skills.symbolize(params, %i[direction pixels])
         direction = params[:direction].respond_to?(:to_sym) ? params[:direction].to_sym : nil
-        raise ArgumentError, "step: direction must be one of #{DIRECTIONS.join(', ')}" unless DIRECTIONS.include?(direction)
+        raise ArgumentError, "step: direction must be one of #{Geometry::DIRECTIONS.join(', ')}" unless Geometry::DIRECTIONS.include?(direction)
         raise ArgumentError, "step: pixels must be 1..#{MAX_PIXELS}" unless params[:pixels].is_a?(Integer) && params[:pixels].between?(1, MAX_PIXELS)
 
         { direction:, pixels: params[:pixels] }

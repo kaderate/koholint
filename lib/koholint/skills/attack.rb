@@ -17,7 +17,6 @@ module Koholint
       FAR = 2 * Geometry::CELL
       CONTACT_SLACK = 2
       BACKOFF_STILL = 4
-      OPPOSITE = { up: :down, down: :up, left: :right, right: :left }.freeze
 
       class Run < Goto::Run
         def initialize(cell:, context:, **rest)
@@ -77,9 +76,9 @@ module Koholint
           return beside(from) if (from[0] - @enemy[:cell][0]).abs + (from[1] - @enemy[:cell][1]).abs <= 1
 
           zones = Array(@danger&.call)
-          options = Navigation::Planner::DELTAS.values.filter_map do |dr, dc|
+          options = Geometry::DELTAS.values.filter_map do |dr, dc|
             cell = [@enemy[:cell][0] + dr, @enemy[:cell][1] + dc]
-            next unless cell[0].between?(0, Geometry::ROWS - 1) && cell[1].between?(0, Geometry::COLS - 1)
+            next unless Geometry.in_grid?(cell)
 
             path = @planner.path(from:, to: cell)
             [[zones.include?(cell) ? 1 : 0, path.size], cell, path] if path
@@ -138,13 +137,13 @@ module Koholint
           cross = horizontal ? dy : dx
           move = if cross.abs > REACH[:cross] then horizontal ? (cross.positive? ? :down : :up) : (cross.positive? ? :right : :left)
                  elsif along > REACH[:along] then facing
-                 elsif along < closest then OPPOSITE.fetch(facing)
-                 elsif @facing != facing then along > closest ? facing : OPPOSITE.fetch(facing)
+                 elsif along < closest then Geometry::OPPOSITE.fetch(facing)
+                 elsif @facing != facing then along > closest ? facing : Geometry::OPPOSITE.fetch(facing)
                  end
           return begin_swing unless move
           return finish(:out_of_reach) if (@lineup += 1) > LINEUP_FRAMES
 
-          note_backoff(state, along < closest && move == OPPOSITE.fetch(facing), horizontal)
+          note_backoff(state, along < closest && move == Geometry::OPPOSITE.fetch(facing), horizontal)
           @facing = move
           [move]
         end

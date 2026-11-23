@@ -1,8 +1,10 @@
+require 'koholint/geometry'
+
 module Koholint
   module Vision
     class Grid
-      ROWS = 8
-      COLS = 10
+      ROWS = Geometry::ROWS
+      COLS = Geometry::COLS
       SPRITE_WIDTH = 8
       SPRITE_HEIGHT = 16
 
@@ -40,7 +42,7 @@ module Koholint
       # A hole pulls Link in from the cell beside it when his sprite overlaps its edge.
       def hole_margin
         @hole_margin ||= holes.flat_map { |row, col| [[row - 1, col], [row + 1, col], [row, col - 1], [row, col + 1]] }
-                              .select { |row, col| row.between?(0, ROWS - 1) && col.between?(0, COLS - 1) }.uniq - holes
+                              .select { |row, col| Geometry.in_grid?([row, col]) }.uniq - holes
       end
 
       private
@@ -53,7 +55,7 @@ module Koholint
       end
 
       def check(row, col)
-        raise ArgumentError, "cell out of range: #{row}, #{col}" unless row.between?(0, ROWS - 1) && col.between?(0, COLS - 1)
+        raise ArgumentError, "cell out of range: #{row}, #{col}" unless Geometry.in_grid?([row, col])
       end
     end
   end

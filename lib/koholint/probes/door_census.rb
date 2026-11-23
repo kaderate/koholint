@@ -47,7 +47,7 @@ module Koholint
 
             auto = true
           end
-          return arrival(copy) if [state.room_id, state.map_id] != from && state.room_transition.to_i.zero?
+          return arrival(copy) if state.place != from && state.room_transition.to_i.zero?
           return nil if !auto && (i >= WALK_FRAMES || state.room_transition.to_i.positive? || (state.cell && state.cell[0] < cell[0]))
 
           copy.step(auto ? [] : [:up])

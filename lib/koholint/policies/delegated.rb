@@ -55,7 +55,7 @@ module Koholint
       LOCKED_WAIT_LIMIT_FRAMES = 900
       SETTLE_FRAMES = 30
       HEMMED_WAIT_LIMIT = 1800 / HEMMED_WAIT[:params][:frames]
-      HEMMED_PROBES = %w[up right down left].freeze
+      HEMMED_PROBES = Geometry::DIRECTIONS.map(&:to_s).freeze
       HEMMED_PROBE_PIXELS = 2
       SCREEN_SKILLS = { menu: %w[menu_move menu_assign close_menu press wait], map: %w[close_map press wait], save: %w[choose_option press wait],
                         game_over: %w[choose_option press wait], unknown: %w[press wait] }.freeze
@@ -67,7 +67,6 @@ module Koholint
       STUCK_STOPS = %w[no_frontier no_path blocked stalled].freeze
       STUCK_AT = 6
       ZERO_WAIT = { skill: 'wait', params: { frames: 120 } }.freeze
-      FALL_MOTION = 6
       EXPLORE = { skill: 'explore', params: {} }.freeze
       AUTO_OBJECTIVE = { title: 'Explore the nearest untried exits (picked by the harness)', predicate: { kind: 'new_place' } }.freeze
 
@@ -131,8 +130,8 @@ module Koholint
 
       def observe(state, frame:)
         unless state.loading?
-          @ledger.reset_unless([state.room_id, state.map_id])
-          @triggers.reset_unless([state.room_id, state.map_id])
+          @ledger.reset_unless(state.place)
+          @triggers.reset_unless(state.place)
         end
         @screen_since = nil unless screen(state)
         release_hemmed(state)
@@ -164,7 +163,7 @@ module Koholint
         @zero_watch.news! if news
         notes = @revisit.notes + @notes
         @notes = []
-        puzzles = @explore_log.new_puzzles(place: [state.room_id, state.map_id], cell: state.cell)
+        puzzles = @explore_log.new_puzzles(place: state.place, cell: state.cell)
         result = result.merge(puzzles:) unless puzzles.empty?
         notes.empty? ? result : result.merge(notables: notes)
       end
@@ -251,7 +250,7 @@ module Koholint
         return unless choice.key?(:skill)
 
         @autopilot&.acted(skill: choice[:skill], outcome:) unless @revisit_acting
-        @zero_watch.note(place: Ledger.place_of(outcome[:from]) || [state.room_id, state.map_id], skill: choice[:skill], stop: outcome[:stopped_by], frames: outcome[:frames],
+        @zero_watch.note(place: Ledger.place_of(outcome[:from]) || state.place, skill: choice[:skill], stop: outcome[:stopped_by], frames: outcome[:frames],
                          cells: outcome[:cells_walked], to: Ledger.place_of(outcome[:to]))
         @frame = frame
         @page += 1 if choice[:skill] == 'advance_dialogue'
@@ -307,7 +306,7 @@ module Koholint
       def subset(registry, names) = Skills::Registry.new((names & registry.names).map { |name| registry.fetch(name) })
 
       def remember_grid(state, context)
-        place = [state.room_id, state.map_id]
+        place = state.place
         @last_grid = nil unless @last_place == place
         @last_place = place
         @last_grid = context[:grid] if context[:grid]
@@ -325,7 +324,7 @@ module Koholint
 
       def start_objective(choice, state, context, because = nil)
         predicate = Objectives.normalize(choice[:predicate])
-        place = [state.room_id, state.map_id]
+        place = state.place
         if predicate[:kind].to_s == 'leave_place' && predicate[:place] != place
           raise Refusal, "leave_place must name the current place #{place.inspect}, not #{predicate[:place].inspect}"
         end
@@ -356,7 +355,7 @@ module Koholint
       end
 
       def build_candidates(state, context)
-        place = [state.room_id, state.map_id]
+        place = state.place
         signs = objects_now
         if state.phase(booted: true) == :playing
           @cards[place] = { people: @entities.select { |entity| entity[:kind].to_s == 'npc' && entity[:cell] }.map { |entity| entity.slice(:type, :cell) },
@@ -398,7 +397,7 @@ module Koholint
                                        attempts: @objectives.attempts_for_prompt, manual: @manual, last_results: @last_results, ledger: @ledger, refusals: @refusals, plan: @plan,
                                        triggers: @triggers, talk_log: @talk_log, signs: objects_now, locked: (@hemmed[:attempts] if @hemmed && hemmed?(state)),
                                        locked_frames: (locked_frames(state) if Modes::HELD.include?(state.phase)), goal: goal_line, leads: @leads.with_status, stamp: stamp(state),
-                                       place_name: @leads.name_of([state.room_id, state.map_id]), candidates: (Candidates.lines(@candidates) if decision_point.name == :choose_objective),
+                                       place_name: @leads.name_of(state.place), candidates: (Candidates.lines(@candidates) if decision_point.name == :choose_objective),
                                        learned: (@learned if decision_point.name == :choose_skill),
                                        resolve: @leads.method(:place_for), hp_lost: @hp_lost, died: @died, alerts: alerts(state, objective: decision_point.name == :choose_objective), route: route_line(state))
         @hp_lost = 0

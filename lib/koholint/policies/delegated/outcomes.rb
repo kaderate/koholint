@@ -25,9 +25,9 @@ module Koholint
         end
 
         def note_stuck(outcome, state)
-          return if state.link_motion_state.to_i == FALL_MOTION
+          return if state.falling?
 
-          place = [state.room_id, state.map_id]
+          place = state.place
           @stuck = { place:, cells: Set.new, count: 0 } unless @stuck && @stuck[:place] == place
           cells = %i[from to].filter_map { |key| Ledger.pick(outcome, key) }.select { |at| Ledger.place_of(at) == place }
                              .map { |at| [Ledger.pick(at, :row), Ledger.pick(at, :col)] }
@@ -46,7 +46,7 @@ module Koholint
         def note_loop(state, frame)
           return unless state.game_mode == PLAY_MODE
 
-          @loop_watch.observe(place: [state.room_id, state.map_id], frame:)
+          @loop_watch.observe(place: state.place, frame:)
           @notes.concat(@loop_watch.notes)
           @loop_watch.notes.clear
         end
@@ -65,19 +65,18 @@ module Koholint
 
         def feed_ledger(choice, outcome, state, frame, objective: true)
           from = outcome[:from].is_a?(Hash) ? outcome[:from] : {}
-          place = from[:room] && from[:map] ? [from[:room], from[:map]] : [state.room_id, state.map_id]
+          place = from[:room] && from[:map] ? [from[:room], from[:map]] : state.place
           Ledger.edges_of(outcome).each { |edge| @ledger.record(place:, blocked_at: edge) }
           blocked_at = outcome[:blocked_at]
           if blocked_at && objective
             track { @objectives.note_blocked(blocked_at:, target: @objectives.current&.dig(:predicate), frame:) } if @objectives.current
           end
           note_entered(choice, outcome, place)
-          @ledger.reset_unless([state.room_id, state.map_id]) unless state.loading?
+          @ledger.reset_unless(state.place) unless state.loading?
         end
 
         def place_of(outcome, key, state)
-          from = outcome[key].is_a?(Hash) ? outcome[key] : {}
-          from[:room] && from[:map] ? [from[:room], from[:map]] : [state.room_id, state.map_id]
+          (Ledger.place_of(outcome[key]) if outcome[key].is_a?(Hash)) || state.place
         end
 
         def feed_triggers(choice, outcome, state)
@@ -96,12 +95,10 @@ module Koholint
         # The thing in the cell Link pressed toward when the game opened a text: a catalogued npc on it, else its object, unless Link has
         # stood on that object here (floor). The room object table holds an id in every cell.
         def note_contact(place, cell, input)
-          delta = Navigation::Planner::DELTAS[input&.to_sym] if input
-          return unless cell && delta
+          target = Geometry.step(cell, input.to_sym) if cell && input
+          return unless target
 
-          row = cell[0] + delta[0]
-          col = cell[1] + delta[1]
-          return unless row.between?(0, Geometry::ROWS - 1) && col.between?(0, Geometry::COLS - 1)
+          row, col = target
 
           person = entities_now.find { |entity| entity[:cell] == [row, col] && entity[:kind].to_s == 'npc' }
           objects = @room_objects_reader&.call
@@ -133,7 +130,7 @@ module Koholint
 
           if choice[:skill] == 'walk'
             direction = (choice[:params][:direction] || choice[:params]['direction'])&.to_sym
-            delta = Navigation::Planner::DELTAS[direction] or return
+            delta = Geometry::DELTAS[direction] or return
             cell = [from[:row], from[:col]]
             outcome[:moved_cells].to_i.times do
               @ledger.entered(place:, cell:, direction:)
