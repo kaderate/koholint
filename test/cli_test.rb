@@ -177,6 +177,13 @@ class CliTest < Minitest::Test
     assert_equal 2, cli('watch', 'x', '--port', 'abc')[0]
   end
 
+  def test_census_probes_need_a_run_and_integer_frames
+    %w[entities objects doors sword].each do |kind|
+      assert_equal 2, cli('census', kind, 'runs/x')[0]
+      assert_equal 2, cli('census', kind, 'runs/x', 'twelve')[0]
+    end
+  end
+
   def test_census_needs_boot_or_a_run_and_frames
     assert_equal 2, cli('census')[0]
     assert_equal 2, cli('census', 'runs/x')[0]

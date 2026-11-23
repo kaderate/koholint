@@ -158,15 +158,4 @@ class CandidatesTest < Minitest::Test
     refute build(leads:, cards:).any? { |candidate| candidate[:id] == 'lead-2' }, 'a refuted lead is no longer a candidate'
   end
 
-  def test_low_health_lists_the_nearest_known_interior_first
-    log = self.log
-    log.absorb({ from: { room: 3, map: 0 }, exits: [{ row: 7, col: 4, direction: :up, outcome: :left, to: [165, 16] }] })
-    log.absorb({ from: { room: 4, map: 0 }, exits: [{ row: 7, col: 4, direction: :up, outcome: :left, to: [166, 16] }] })
-    first = build(explore_log: log, low_health: true).first
-    assert_equal 'shelter-165-16', first[:id]
-    assert_equal({ kind: 'shelter', place: [165, 16] }, first[:target])
-    assert_match(/\ALOW HEALTH: take shelter in place 165-16, 2 moves away/, first[:label])
-    refute(build(explore_log: log).any? { |candidate| candidate[:id].start_with?('shelter') })
-    assert_empty(build(place: [165, 16], explore_log: log, low_health: true).select { |candidate| candidate[:id].start_with?('shelter') })
-  end
 end

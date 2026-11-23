@@ -62,10 +62,10 @@ module Koholint
       @readiness = Readiness.new
       @readiness.observe(previous) if previous
       @keyframes = Keyframes.new(File.join(run.dir, 'keyframes'))
-      @builder = Vision::GridBuilder.new(trace: run.trace, beliefs: known_beliefs(run)) if grid
+      events = Trace.read(File.join(run.dir, 'trace.jsonl'))
+      @builder = Vision::GridBuilder.new(trace: run.trace, beliefs: Vision::Beliefs.from_events(events)) if grid
       @shots = PlaceShots.new(run.dir)
       @ram_hash = Digest::SHA256.hexdigest(@emulator.cartridge_ram)
-      events = Trace.read(File.join(run.dir, 'trace.jsonl'))
       @played = GameState.played?(events)
       @card_place = carded_place(events)
       @items = ItemWatch.from_events(events)
@@ -75,7 +75,7 @@ module Koholint
 
     def request_stop
       @budget.stop!
-      @policy.cancel if @policy.respond_to?(:cancel)
+      @policy.cancel
     end
 
     def run
@@ -95,8 +95,6 @@ module Koholint
 
     private
 
-    def known_beliefs(run) = Vision::Beliefs.from_events(Trace.read(File.join(run.dir, 'trace.jsonl')))
-
     def iterate
       state, waited = await_ready(Perception.read(@emulator))
       return if @budget.exhausted
@@ -112,12 +110,12 @@ module Koholint
       end
       note_place(state, grid)
       note_chests(state)
-      @policy.observe(state, frame: state.frame) if @policy.respond_to?(:observe)
+      @policy.observe(state, frame: state.frame)
       return if @budget.exhausted
 
       context = context_for(grid, state)
-      @policy.prepare(context) if @policy.respond_to?(:prepare)
-      decision_point = @policy.respond_to?(:decision_point_for) ? @policy.decision_point_for(state) : @decision_point
+      @policy.prepare(context)
+      decision_point = @policy.decision_point_for(state) || @decision_point
       activity(:deciding, 'deciding what to do', decision_point: decision_point.name.to_s)
       result = @policy.decide(decision_point, state, context)
       @budget.tick(cost: result[:cost_usd].to_f)
@@ -138,7 +136,7 @@ module Koholint
         activity(:acting, "acting: #{choice[:skill]}", skill: choice[:skill], params: choice[:params])
         outcome = execute(choice, state, chosen.registry, context)
         @run.trace.emit(:action, frame: @emulator.frame, skill: choice[:skill], params: choice[:params], result: outcome)
-        @policy.after_action(choice:, outcome:, state: Perception.read(@emulator), frame: @emulator.frame) if @policy.respond_to?(:after_action)
+        @policy.after_action(choice:, outcome:, state: Perception.read(@emulator), frame: @emulator.frame)
       elsif chosen.name != :choose_objective
         activity(:acting, 'acting: press', skill: 'press', params: choice)
         frames = press(choice)
@@ -149,7 +147,7 @@ module Koholint
 
     def offered(chosen)
       return chosen.options if chosen.options
-      return [] unless chosen.name == :choose_objective && @policy.respond_to?(:offered_candidates)
+      return [] unless chosen.name == :choose_objective
 
       @policy.offered_candidates
     end
@@ -162,7 +160,7 @@ module Koholint
       @card_place = place
       card = PlaceCard.build(place:, entities: Entities.read(@emulator), objects: Entities.objects(@emulator), grid:)
       @run.trace.emit(:place_card, frame: state.frame, **card)
-      @policy.note_card(card) if @policy.respond_to?(:note_card)
+      @policy.note_card(card)
     end
 
     # A chest closed at the last ready look at this place and open now was opened in between.

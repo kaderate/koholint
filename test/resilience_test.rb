@@ -62,7 +62,7 @@ class ResilienceTest < Minitest::Test
 
   def test_exception_in_policy_still_takes_the_stop_path
     skip_without_rom!
-    boom = Class.new { def decide(*) = raise('policy exploded') }.new
+    boom = Class.new(Koholint::Policies::Base) { def decide(*) = raise('policy exploded') }.new
     with_run do |_dir, run|
       error = assert_raises(RuntimeError) { Koholint::Engine.new(run: run, policy: boom, budget: Koholint::Budget.new).run }
       assert_equal 'policy exploded', error.message

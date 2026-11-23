@@ -5,6 +5,7 @@ require 'koholint/dialogues'
 require 'koholint/engine'
 require 'koholint/exits'
 require 'koholint/geometry'
+require 'koholint/policies/base'
 require 'koholint/run'
 require 'koholint/skills/registry'
 require 'koholint/summary'
@@ -22,7 +23,7 @@ module Koholint
     SETTLE_FRAMES = 10
 
     # Walks to the nearest border cell of a side that goto reaches, walks out, then walks back the opposite way from the landing.
-    class ExitTrial
+    class ExitTrial < Policies::Base
       attr_reader :arrival, :back, :outcome
 
       def initialize(registry:, place:, stands:, direction:, budget:, door: false)

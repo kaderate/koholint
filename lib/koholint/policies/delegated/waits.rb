@@ -1,6 +1,8 @@
+require 'koholint/policies/base'
+
 module Koholint
   module Policies
-    class Delegated
+    class Delegated < Base
       module Waits
         private
 
@@ -13,8 +15,7 @@ module Koholint
 
         def screen_wait(state)
           @locked_wait = true
-          { choice: SCREEN_WAIT, justification: "#{state.mode.name}: waiting for the screen to settle", confidence: 1.0, agent: 'delegated',
-            latency_ms: 0, cost_usd: 0.0, fallback: false, prompt: nil, image: nil }
+          DecisionPoint.harness_choice(SCREEN_WAIT, "#{state.mode.name}: waiting for the screen to settle")
         end
 
         def game_over_continue(state)
@@ -24,8 +25,7 @@ module Koholint
             @deaths[state.place] += 1
           end
           @over = @died = @locked_wait = true
-          { choice: { skill: 'choose_option', params: { option: } }, justification: "game over: #{text} (picked by the harness)", confidence: 1.0,
-            agent: 'delegated', latency_ms: 0, cost_usd: 0.0, fallback: false, prompt: nil, image: nil }
+          DecisionPoint.harness_choice({ skill: 'choose_option', params: { option: } }, "game over: #{text} (picked by the harness)")
         end
 
         def note_lock(choice, outcome, state)
@@ -97,8 +97,7 @@ module Koholint
 
         def locked_wait
           @locked_wait = true
-          { choice: LOCKED_WAIT, justification: 'locked: waiting for Link to be free', confidence: 1.0, agent: 'delegated', latency_ms: 0, cost_usd: 0.0,
-            fallback: false, prompt: nil, image: nil }
+          DecisionPoint.harness_choice(LOCKED_WAIT, 'locked: waiting for Link to be free')
         end
 
         # Scenes release Link for a few frames between two locks (3 in the sword scene of 242/0, 1 after the owl of 128/0, 1 to 12 all through the healing scene of 83/0), so locks less than SETTLE_FRAMES apart are one scene and a release is trusted only after a wait as long as the scene so far, up to SETTLE_FRAMES.
@@ -107,8 +106,7 @@ module Koholint
         def settle_wait(state)
           @locked_wait = true
           frames = @settle_until - state.frame
-          { choice: { skill: 'wait', params: { frames:, until_held: true } }, justification: "locked: Link was just released, waiting #{frames} frames in case the scene goes on",
-            confidence: 1.0, agent: 'delegated', latency_ms: 0, cost_usd: 0.0, fallback: false, prompt: nil, image: nil }
+          DecisionPoint.harness_choice({ skill: 'wait', params: { frames:, until_held: true } }, "locked: Link was just released, waiting #{frames} frames in case the scene goes on")
         end
 
         # Each wait is followed by a 2-pixel step, so a hold that ends unseen (the healing scene of 83/0 ends about 50 frames after its
@@ -118,14 +116,12 @@ module Koholint
           if @hemmed[:probe]
             @hemmed[:probe] = false
             direction = HEMMED_PROBES[@hemmed[:waits] % HEMMED_PROBES.size]
-            return { choice: { skill: 'step', params: { direction:, pixels: HEMMED_PROBE_PIXELS } }, justification: "deterministic hemmed-in probe: a #{HEMMED_PROBE_PIXELS}-pixel step #{direction} to see whether Link is free again",
-                     confidence: 1.0, agent: 'delegated', latency_ms: 0, cost_usd: 0.0, fallback: false, prompt: nil, image: nil }
+            return DecisionPoint.harness_choice({ skill: 'step', params: { direction:, pixels: HEMMED_PROBE_PIXELS } }, "deterministic hemmed-in probe: a #{HEMMED_PROBE_PIXELS}-pixel step #{direction} to see whether Link is free again")
           end
           @hemmed[:waits] += 1
           @hemmed[:probe] = @hemmed[:waits] < HEMMED_WAIT_LIMIT
           @locks.clear if @hemmed[:waits] >= HEMMED_WAIT_LIMIT
-          { choice: HEMMED_WAIT, justification: 'deterministic hemmed-in wait: blocked in several directions without movement at the same position',
-            confidence: 1.0, agent: 'delegated', latency_ms: 0, cost_usd: 0.0, fallback: false, prompt: nil, image: nil }
+          DecisionPoint.harness_choice(HEMMED_WAIT, 'deterministic hemmed-in wait: blocked in several directions without movement at the same position')
         end
       end
     end

@@ -36,7 +36,7 @@ class StartGameTest < Minitest::Test
   end
 
   def test_ready_policy_hands_over_only_after_two_boot_ticks_at_the_same_position
-    inner = Class.new do
+    inner = Class.new(Koholint::Policies::Base) do
       attr_reader :observed
 
       def observe(state, **) = (@observed = state.x)
@@ -195,7 +195,7 @@ class StartGameTest < Minitest::Test
 
   def menu(frame: 0) = Koholint::GameState.new(frame:, hp: 24, x: 80, y: 60, game_mode: 0x0C, game_submode: 5, milestone: :none)
 
-  class AgentPolicy
+  class AgentPolicy < Koholint::Policies::Base
     attr_reader :calls
 
     def decision_point_for(_state) = Koholint::DecisionPoint.move

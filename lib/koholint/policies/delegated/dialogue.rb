@@ -1,6 +1,8 @@
+require 'koholint/policies/base'
+
 module Koholint
   module Policies
-    class Delegated
+    class Delegated < Base
       module Dialogue
         def continue_dialogue(result, state)
           return result unless @flushing && state.dialog_open?
@@ -24,8 +26,7 @@ module Koholint
           @sequence[:waited] = true
           @waiting = true
           @objectives.touch(frame: state.frame)
-          { choice: REOPEN_WAIT, justification: 'automatic dialogue advance: waiting for the dialogue to reopen', confidence: 1.0, agent: 'delegated',
-            latency_ms: 0, cost_usd: 0.0, fallback: false, prompt: nil, image: nil }
+          DecisionPoint.harness_choice(REOPEN_WAIT, 'automatic dialogue advance: waiting for the dialogue to reopen')
         end
 
         def automatic_advance(decision_point, state, context)
@@ -50,8 +51,7 @@ module Koholint
           @sequence[:rows] << Vision::DialogueShot.text_rows(rgb)
           @auto = true
           announce(:acting, "automatic dialogue advance, page #{@page + 1}", state, skill: ADVANCE[:skill], page: @page + 1)
-          { choice: ADVANCE, justification: 'automatic dialogue advance', confidence: 1.0, agent: 'delegated', latency_ms: 0, cost_usd: 0.0,
-            fallback: false, prompt: nil, image: nil }
+          DecisionPoint.harness_choice(ADVANCE, 'automatic dialogue advance')
         end
 
         def sequence_full?(state)

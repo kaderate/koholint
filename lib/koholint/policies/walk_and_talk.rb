@@ -1,8 +1,9 @@
 require 'koholint/decision'
+require 'koholint/policies/base'
 
 module Koholint
   module Policies
-    class WalkAndTalk
+    class WalkAndTalk < Base
       CYCLE_FRAMES = 30
       TALK_EVERY = 10
 

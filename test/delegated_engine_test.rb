@@ -168,7 +168,7 @@ class DelegatedEngineTest < Minitest::Test
     end
   end
 
-  class Spy
+  class Spy < Koholint::Policies::Base
     attr_reader :observed, :cancelled
 
     def initialize = (@observed = []; @cancelled = false)
@@ -222,7 +222,7 @@ class DelegatedEngineTest < Minitest::Test
     end
   end
 
-  class TitledMacroPolicy
+  class TitledMacroPolicy < Koholint::Policies::Base
     def decision_point_for(_state) = Koholint::DecisionPoint.macro(:test)
 
     def decide(*)
@@ -240,7 +240,7 @@ class DelegatedEngineTest < Minitest::Test
     end
   end
 
-  class RefusingPolicy
+  class RefusingPolicy < Koholint::Policies::Base
     def initialize(script) = (@script = script.dup; @point = Koholint::DecisionPoint.choose_skill(Koholint::Skills::Registry.default))
     def decision_point_for(_state) = @point
 

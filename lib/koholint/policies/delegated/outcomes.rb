@@ -1,6 +1,8 @@
+require 'koholint/policies/base'
+
 module Koholint
   module Policies
-    class Delegated
+    class Delegated < Base
       module Outcomes
         FLOOR_SHARE = 0.1
 

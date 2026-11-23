@@ -19,6 +19,8 @@ require 'koholint/vision/beliefs'
 require 'koholint/vision/capabilities'
 require 'koholint/vision/dialogue_shot'
 require 'koholint/vision/grid'
+require 'koholint/policies/base'
+require 'koholint/policies/memory'
 require 'koholint/policies/delegated/dialogue'
 require 'koholint/policies/delegated/guidance'
 require 'koholint/policies/delegated/outcomes'
@@ -26,7 +28,7 @@ require 'koholint/policies/delegated/waits'
 
 module Koholint
   module Policies
-    class Delegated
+    class Delegated < Base
       include Dialogue
       include Guidance
       include Outcomes
@@ -70,20 +72,19 @@ module Koholint
       EXPLORE = { skill: 'explore', params: {} }.freeze
       AUTO_OBJECTIVE = { title: 'Explore the nearest untried exits (picked by the harness)', predicate: { kind: 'new_place' } }.freeze
 
-      def initialize(client:, registry:, objectives:, manual: '', on_step: nil, on_activity: nil, ledger: nil, triggers: nil, talk_log: nil, leads: nil, explore_log: nil, revisit: nil,
-                     budget: nil, autopilot: nil, cards: {}, loop_watch: nil, zero_watch: nil, exits: nil)
+      def initialize(client:, registry:, objectives:, memory: Memory.new, manual: '', on_step: nil, on_activity: nil, revisit: nil, budget: nil, autopilot: nil, exits: nil)
         @exits = exits
-        @cards = cards.dup
-        @loop_watch = loop_watch || LoopWatch.new
-        @zero_watch = zero_watch || ZeroWatch.new
+        @cards = memory.cards.dup
+        @loop_watch = memory.loop_watch
+        @zero_watch = memory.zero_watch
         @candidates = []
         @budget = budget
         @autopilot = autopilot
-        @explore_log = explore_log || ExploreLog.new
-        @leads = leads || Leads.new
-        @ledger = ledger || Ledger.new
-        @triggers = triggers || Triggers.new
-        @talk_log = talk_log || TalkLog.new
+        @explore_log = memory.explore_log
+        @leads = memory.leads
+        @ledger = memory.ledger
+        @triggers = memory.triggers
+        @talk_log = memory.talk_log
         @revisit = revisit || Revisit.new(talk_log: @talk_log)
         @entities = []
         @refusals = []
@@ -366,7 +367,7 @@ module Koholint
                             chests: signs.select { |object| object[:reachable] }.map { |object| object[:cell] } }
         end
         @candidates = Candidates.build(place:, grid: context[:grid], explore_log: @explore_log, talk_log: @talk_log, leads: @leads, cards: @cards,
-                                       entities: @entities, signs:, stamp: stamp(state), link: state.cell, low_health: false)
+                                       entities: @entities, signs:, stamp: stamp(state), link: state.cell)
         @candidates.each { |candidate| offer_puzzle(candidate[:target][:place]) if candidate[:id].start_with?('puzzle-') }
         @candidates
       end
