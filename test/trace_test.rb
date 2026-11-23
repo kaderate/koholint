@@ -24,8 +24,7 @@ class TraceTest < Minitest::Test
   VISION_FIELDS = {
     screen: { place: [1, 2], terrain_hash: 'h', objects_hash: 'o', grid: [], static_sprites: [] },
     screen_changed: { place: [1, 2], cells: [] },
-    affordance: { appearance: 'a1', action: 'walk', direction: nil, result: 'no', method: 'probe', context: [], source: 'x' },
-    grid_contradiction: { place: [1, 2], row: 0, col: 0, direction: 'up', believed: 'yes', observed: 'no' }
+    affordance: { appearance: 'a1', action: 'walk', direction: nil, result: 'no', method: 'probe', context: [], source: 'x' }
   }.freeze
 
   def test_vision_events_reject_each_missing_field

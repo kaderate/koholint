@@ -63,7 +63,6 @@ module Koholint
         grid = Grid.new(cells: grid_of(snapshot), static_sprites: statics.map { |s| s.transform_keys(&:to_s) }, beliefs: @beliefs,
                         capabilities: @capabilities)
         cell = self.class.link_cell(state.x, state.y)
-        check_contradiction(state.frame, place, cell)
         spot = [place, state.x, state.y]
         scope = [place, cell, snapshot.terrain_hash, @capabilities]
         @discarded = { scope: } unless @discarded[:scope] == scope
@@ -121,18 +120,6 @@ module Koholint
         cells = before && ScreenDiff.between(before, snapshot)
         @trace.emit(:screen_changed, frame:, place: snapshot.place, cells:) if cells && !cells.empty?
         @emitted = { snapshot:, statics: }
-      end
-
-      def check_contradiction(frame, place, cell)
-        return unless @last && cell && @last[:place] == place
-
-        delta = [cell[0] - @last[:cell][0], cell[1] - @last[:cell][1]]
-        direction = STEPS.key(delta) or return
-        believed = @last[:grid].passable(*cell, direction)
-        return unless believed == :no
-
-        @trace.emit(:grid_contradiction, frame:, place:, row: cell[0], col: cell[1], direction: direction.to_s, believed: believed.to_s,
-                                         observed: 'entered')
       end
 
       # All probes share one no-input control: one inconclusive voids all. Link is free only if some direction moves him;

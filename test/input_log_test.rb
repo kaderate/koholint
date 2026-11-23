@@ -1,6 +1,5 @@
 require_relative 'test_helper'
 require 'tmpdir'
-require 'zlib'
 require 'koholint/input_log'
 
 class InputLogTest < Minitest::Test
@@ -99,19 +98,6 @@ class InputLogTest < Minitest::Test
     end
   end
 
-  def test_version_1_files_still_load
-    with_path do |path|
-      packed = [[1 << BUTTONS.index(:a), 7], [0, 2]].map { |m, c| [m, c].pack('CV') }.join
-      File.binwrite(path, [1].pack('C') + Zlib::Deflate.deflate(packed))
-      log = Koholint::InputLog.load(path)
-      assert_equal 9, log.frames
-      log.append([])
-      log.flush
-      assert_equal 2, File.binread(path).getbyte(0)
-      assert_equal 10, Koholint::InputLog.load(path).frames
-    end
-  end
-
   module CallRecorder
     EVENTS = []
 
@@ -130,9 +116,9 @@ class InputLogTest < Minitest::Test
 
   def test_rewrite_fsyncs_the_tmp_file_before_renaming_it
     with_path do |path|
-      packed = [[1 << BUTTONS.index(:a), 7], [0, 2]].map { |m, c| [m, c].pack('CV') }.join
-      File.binwrite(path, [1].pack('C') + Zlib::Deflate.deflate(packed))
       log = Koholint::InputLog.load(path)
+      7.times { log.append([:a]) }
+      2.times { log.append([]) }
       CallRecorder::EVENTS.clear
       File.prepend(CallRecorder)
       File.singleton_class.prepend(RenameRecorder)

@@ -2,9 +2,6 @@ require 'koholint/geometry'
 require 'koholint/modes'
 
 module Koholint
-  GRID_ROWS = 8
-  GRID_COLS = 10
-
   # Values and meaning: notes of game_mode and game_submode in data/addresses.json and the catalogue data/modes.json.
   PLAY_MODE = 0x0B
   PLAY_SETTLED_SUBMODE = 7
@@ -25,8 +22,6 @@ module Koholint
 
     # Health once the pending damage has drained: the game lowers hp by one unit every 2 frames after a hit (data/addresses.json, pending_damage).
     def health = hp.to_i - pending_damage.to_i
-
-    def low_health? = max_hp.to_i.positive? && hp.to_i.positive? && hp.to_i * 3 <= max_hp.to_i
 
     def dialog_open? = dialog_state.to_i.positive?
 

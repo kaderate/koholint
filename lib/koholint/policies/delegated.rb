@@ -82,7 +82,7 @@ module Koholint
         @autopilot = autopilot
         @explore_log = explore_log || ExploreLog.new
         @leads = leads || Leads.new
-        @ledger = hook_doubt(ledger || Ledger.new)
+        @ledger = ledger || Ledger.new
         @triggers = triggers || Triggers.new
         @talk_log = talk_log || TalkLog.new
         @revisit = revisit || Revisit.new(talk_log: @talk_log)

@@ -298,15 +298,7 @@
     return str.length > max ? str.slice(0, max - 1) + '…' : str;
   }
 
-  function formatObjective(s) {
-    var st = s.status || {};
-    if (!st.objective) return 'none';
-    return truncate(st.objective_title || st.objective, 40);
-  }
-
   function formatDollars(value) { return '$' + (typeof value === 'number' ? value : 0).toFixed(2); }
-
-  function formatCalls(s) { return (s.status && s.status.calls) || 0; }
 
   function formatEventPretty(e) {
     var head = 'f' + e.frame + ' · ';
@@ -355,12 +347,6 @@
   function normalizeMode(mode) { return mode === 'json' ? 'json' : 'pretty'; }
 
   function nextMode(mode) { return normalizeMode(mode) === 'json' ? 'pretty' : 'json'; }
-
-  function formatHearts(s) {
-    var hearts = s.status.hearts, max = s.status.max_hearts;
-    if (hearts === null || hearts === undefined || !max) return '-';
-    return hearts + '/' + max;
-  }
 
   var CELL = 48;
   var COLORS = {
@@ -449,26 +435,12 @@
     return Math.max(0, Math.min(100, Math.round(spent / cap * 100)));
   }
 
-  function formatBudgetLine(b, latency) {
-    b = b || {};
-    var line = formatDollars(b.spent) + (typeof b.cap === 'number' ? ' / ' + formatDollars(b.cap) : '') + ' · ' + plural(b.calls || 0, 'call');
-    if (latency && typeof latency.median_ms === 'number') line += ' · median ' + formatElapsed(latency.median_ms);
-    if (latency && typeof latency.last_ms === 'number') line += ' · last ' + formatElapsed(latency.last_ms);
-    return line;
-  }
-
   function latestReasoning(list) {
     for (var i = list.length - 1; i >= 0; i--) {
       var e = list[i];
       if (e.type === 'decision' && e.agent === 'claude' && typeof e.justification === 'string' && e.justification.trim()) return e;
     }
     return null;
-  }
-
-  function reasoningHead(e) {
-    var line = 'f' + e.frame + ' · ' + (e.agent || '?') + ' decides ' + formatDecisionChoice(e.choice);
-    if (typeof e.confidence === 'number') line += ' (' + Math.round(e.confidence * 100) + '%)';
-    return line;
   }
 
   function objectiveView(status) {
@@ -489,19 +461,6 @@
     };
   }
 
-  function npcText(npc) {
-    if (!npc || typeof npc !== 'object' || !Number.isInteger(npc.talk)) return '';
-    var line = 'talk ' + npc.talk + ' · ' + (npc.new_text ? 'new text' : 'nothing new');
-    return typeof npc.state === 'string' ? line + ' · ' + npc.state : line;
-  }
-
-  function dialoguesView(list) {
-    return (Array.isArray(list) ? list : []).filter(function (d) { return d && typeof d.text === 'string'; }).map(function (d) {
-      var from = d.source && Number.isInteger(d.source.row) ? ' · from ' + formatCell(d.source) : '';
-      return { head: 'f' + d.frame + ' · ' + formatPlace(d.place) + from, npc: npcText(d.npc), text: d.text };
-    });
-  }
-
   function effectiveActivity(a, manifestStatus) {
     if (!a || typeof a !== 'object') return { kind: 'idle', label: 'No live activity for this run', detail: {} };
     if (a.kind !== 'stopped' && manifestStatus && manifestStatus !== 'running') {
@@ -509,32 +468,6 @@
     }
     return a;
   }
-
-  function barText(value) {
-    if (value === null || value === undefined) return '-';
-    return typeof value === 'object' ? JSON.stringify(value) : String(value);
-  }
-
-  function lastNotable(list) {
-    for (var i = (list || []).length - 1; i >= 0; i--) {
-      var e = list[i];
-      if (e && (e.type === 'objective' || e.type === 'dialogue')) return truncate(formatEventPretty(e), 80);
-    }
-    return '-';
-  }
-
-  var BAR_ITEMS = [
-    { group: 'harness', name: 'flow', value: function (s) { return s.status.flow_version; } },
-    { group: 'harness', name: 'health', value: function (s) { return s.status.health; } },
-    { group: 'harness', name: 'frame', value: function (s) { return s.replay.frame; } },
-    { group: 'harness', name: 'lag', value: function (s) { return s.replay.lag; } },
-    { group: 'harness', name: 'sync', value: function (s) { return s.replay.sync; } },
-    { group: 'harness', name: 'budget', value: function (s) { return s.status.budget; } },
-    { group: 'harness', name: 'manifest', value: function (s) { return s.status.manifest_status; } },
-    { group: 'game', name: 'hearts', value: formatHearts },
-    { group: 'game', name: 'objective', value: formatObjective },
-    { group: 'game', name: 'last', value: function (s) { return lastNotable(s.events); } }
-  ];
 
   function runFromLocation(pathname, search) {
     var match = /^\/run\/([^\/]+)$/.exec(pathname || '');
@@ -557,14 +490,6 @@
     if (replay.paused) return 'Replay paused at ' + at;
     if (Number.isInteger(replay.journal_frames) && replay.frame >= replay.journal_frames) return 'Replay finished at ' + at;
     return 'Replay playing at ' + (replay.speed || 1) + 'x, ' + at;
-  }
-
-  function barItems(state) {
-    return BAR_ITEMS.map(function (item) {
-      var value;
-      try { value = barText(item.value(state)); } catch (e) { value = '-'; }
-      return { group: item.group, name: item.name, text: value };
-    });
   }
 
   function compareHref(ids) {
@@ -624,59 +549,6 @@
         label: 'f' + m.frame + ' · ' + String(m.label || m.kind)
       };
     });
-  }
-
-  function seriesPoints(series, frames, maxUsd, width, height) {
-    if (!Array.isArray(series) || !(frames > 0) || !(maxUsd > 0)) return '';
-    return series.filter(function (p) { return Array.isArray(p) && typeof p[0] === 'number' && typeof p[1] === 'number'; }).map(function (p) {
-      var x = Math.round(Math.min(p[0] / frames, 1) * width * 10) / 10;
-      var y = Math.round((height - Math.min(p[1] / maxUsd, 1) * height) * 10) / 10;
-      return x + ',' + y;
-    }).join(' ');
-  }
-
-  function lastValue(series) {
-    return Array.isArray(series) && series.length && Array.isArray(series[series.length - 1]) ? Number(series[series.length - 1][1]) || 0 : 0;
-  }
-
-  function chartScale(stats) {
-    stats = stats || {};
-    var ref = stats.reference && typeof stats.reference === 'object' ? stats.reference : null;
-    var frames = Math.max(Number(stats.frames) || 0, ref ? Number(ref.frames) || 0 : 0, 1);
-    var usd = Math.max(lastValue(stats.series), ref ? lastValue(ref.series) : 0, 0.01);
-    return { frames: frames, usd: usd };
-  }
-
-  function splitView(bySkill) {
-    var entries = bySkill && typeof bySkill === 'object' ? Object.keys(bySkill) : [];
-    var rows = entries.map(function (skill) {
-      var v = bySkill[skill] || {};
-      return { skill: skill, usd: typeof v.usd === 'number' ? v.usd : 0, calls: Number.isInteger(v.calls) ? v.calls : 0 };
-    }).sort(function (a, b) { return b.usd - a.usd || (a.skill < b.skill ? -1 : 1); });
-    var total = rows.reduce(function (sum, r) { return sum + r.usd; }, 0);
-    return rows.map(function (r) {
-      return { skill: r.skill, color: skillColor(r.skill), percent: total > 0 ? Math.round(r.usd / total * 1000) / 10 : 0,
-               text: r.skill + ' $' + r.usd.toFixed(3) + ' · ' + plural(r.calls, 'call') };
-    });
-  }
-
-  function usageRows(stats) {
-    stats = stats || {};
-    var u = stats.usage && typeof stats.usage === 'object' ? stats.usage : {};
-    var d = stats.decisions && typeof stats.decisions === 'object' ? stats.decisions : {};
-    var rows = [];
-    var leads = u.leads && typeof u.leads === 'object' ? u.leads : {};
-    rows.push('decisions: ' + (d.paid || 0) + ' paid, ' + (d.free || 0) + ' free');
-    rows.push('goal changes: ' + (u.goal_changes || 0));
-    rows.push('leads: ' + ['high', 'normal', 'low'].map(function (t) { return t + ' ' + (leads[t] || 0); }).join(', '));
-    rows.push('because used: ' + (u.because_used || 0));
-    var kinds = u.objectives_by_kind && typeof u.objectives_by_kind === 'object' ? u.objectives_by_kind : {};
-    Object.keys(kinds).sort().forEach(function (kind) { rows.push('objective ' + kind + ': ' + kinds[kind]); });
-    if (typeof u.talks === 'number') rows.push('talks: ' + u.talks + ' (' + (u.talks_to_known || 0) + ' to known)');
-    if (typeof u.lead_rejected === 'number' && u.lead_rejected) rows.push('leads rejected: ' + u.lead_rejected);
-    if (typeof u.not_ready_frames === 'number' && u.not_ready_frames) rows.push('not ready: ' + u.not_ready_frames + ' frames (' + (u.not_ready_waits || 0) + ' waits over 5)');
-    if (typeof u.autopilot_decisions === 'number' && u.autopilot_decisions) rows.push('autopilot explores: ' + u.autopilot_decisions + ' (longest chain ' + (u.chain_max || 0) + ')');
-    return rows;
   }
 
   var NODE_W = 96, NODE_H = 86, NODE_GAP_X = 8, NODE_GAP_Y = 8;

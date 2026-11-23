@@ -100,32 +100,20 @@ module Koholint
 
         raise Error, "no input journal at #{@dir}" unless File.file?(@journal_path)
 
-        @version = File.binread(@journal_path, 1)&.getbyte(0)
-        case @version
-        when InputLog::FORMAT_VERSION
-          @offset = 1
-          refresh_journal
-        when InputLog::LEGACY_VERSION
-          load_legacy
-        else raise Error, "unsupported input journal version #{@version.inspect} at #{@dir}"
-        end
+        version = File.binread(@journal_path, 1)&.getbyte(0)
+        raise Error, "unsupported input journal version #{version.inspect} at #{@dir}" unless version == InputLog::FORMAT_VERSION
+
+        @offset = 1
+        refresh_journal
       rescue JSON::ParserError
         raise Error, "garbled manifest at #{@dir}"
       end
 
       def refresh_journal
-        return true unless @version == InputLog::FORMAT_VERSION
-
         fresh, @offset = InputLog.read_from(@journal_path, @offset)
         @entries.concat(fresh)
         @total += fresh.sum(&:last)
         true
-      end
-
-      def load_legacy
-        masks = InputLog.load(@journal_path).each_frame.map { |buttons| buttons.sum { |b| 1 << InputLog::BUTTONS.index(b) } }
-        @entries = masks.chunk_while { |a, b| a == b }.map { |run| [run.first, run.size] }
-        @total = masks.size
       end
 
       def start(from)
