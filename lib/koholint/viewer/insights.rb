@@ -22,7 +22,6 @@ module Koholint
       MARKERS = 300
       BUCKETS = 150
       LABEL = 160
-      SERIES = 200
       FPS = 60
       HEALTH_POINTS = 400
       DIALOGUE_GROUPS = 60
@@ -238,24 +237,6 @@ module Koholint
         text = text.to_s.gsub(/\s+/, ' ').strip
         text.length > LABEL ? "#{text[0, LABEL - 1]}…" : text
       end
-
-      def cost(trace)
-        calls = trace.select { |e| Summary.model_call?(e) }
-        total = 0.0
-        points = [[0, 0.0]] + calls.map { |e| [e['frame'].to_i, (total += e['cost_usd'].to_f).round(6)] }
-        decisions = trace.select { |e| e['type'] == 'decision' }
-        { series: sample(points), by_skill: Summary.cost_by_skill(calls), total: total.round(6),
-          decisions: { paid: calls.size, free: decisions.size - calls.size } }
-      end
-
-      def sample(points)
-        return points if points.size <= SERIES
-
-        step = (points.size - 1) / (SERIES - 1).to_f
-        (0...SERIES).map { |i| points[(i * step).round] }
-      end
-
-      def stats(trace) = cost(trace).merge(usage: Summary.usage(trace))
 
       def mode(trace)
         perception = trace.reverse_each.find { |e| e['type'] == 'perception' && e['state'].is_a?(Hash) } or return { phase: 'unknown', name: nil }

@@ -1,11 +1,9 @@
-require 'zlib'
 require 'koholint'
 require 'koholint/emulator'
 
 module Koholint
   class InputLog
     FORMAT_VERSION = 2
-    LEGACY_VERSION = 1
     ENTRY_SIZE = 5
     BUTTONS = Emulator::BUTTONS
 
@@ -91,20 +89,12 @@ module Koholint
 
     def read_existing
       data = File.binread(@path)
-      case data.getbyte(0)
-      when FORMAT_VERSION then load_entries(data.byteslice(1..), disk: true)
-      when LEGACY_VERSION then load_entries(inflate(data.byteslice(1..)), disk: false)
-      else raise Error, "unsupported input log version #{data.getbyte(0).inspect}"
-      end
+      raise Error, "unsupported input log version #{data.getbyte(0).inspect}" unless data.getbyte(0) == FORMAT_VERSION
+
+      load_entries(data.byteslice(1..))
     end
 
-    def inflate(compressed)
-      Zlib::Inflate.inflate(compressed)
-    rescue Zlib::Error
-      raise Error, "input log #{@path} is corrupt"
-    end
-
-    def load_entries(raw, disk:)
+    def load_entries(raw)
       entries = raw.scan(/.{5}/m).map { |entry| entry.unpack('CV') }
       entries.each do |mask, count|
         if @runs.last && @runs.last[0] == mask
@@ -114,8 +104,6 @@ module Koholint
         end
         @frames += count
       end
-      return unless disk
-
       @rewrite = false
       @disk_entries = entries.size
     end

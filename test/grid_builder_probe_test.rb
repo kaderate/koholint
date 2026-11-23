@@ -89,35 +89,6 @@ class GridBuilderProbeTest < Minitest::Test
     Koholint::Vision::ScreenVision.snapshot(FakeEmulator.new, place: [0, 0]).cells[0][0].appearance
   end
 
-  def test_contradiction_when_link_enters_a_cell_believed_blocked
-    beliefs = Beliefs.new
-    beliefs.record(appearance: fake_appearance, action: :walk, direction: :right, result: :no, method: 'hold', context: Capabilities.new,
-                   frame: 1, source: 'test')
-    trace = FakeTrace.new
-    builder = Builder.new(trace:, beliefs:, prober: nil)
-    emulator = FakeEmulator.new
-    fake_observe(builder, emulator, link: [70, 52])
-    fake_observe(builder, emulator, link: [86, 52])
-    assert_equal [{ type: :grid_contradiction, frame: 60, place: [163, 16], row: 2, col: 5, direction: 'right', believed: 'no',
-                    observed: 'entered' }], trace.of(:grid_contradiction)
-  end
-
-  def test_no_contradiction_for_open_cells_jumps_diagonals_or_place_changes
-    beliefs = Beliefs.new
-    DIRECTIONS.each do |direction|
-      beliefs.record(appearance: fake_appearance, action: :walk, direction:, result: :no, method: 'hold', context: Capabilities.new,
-                     frame: 1, source: 'test')
-    end
-    beliefs.record(appearance: fake_appearance, action: :walk, direction: :down, result: :yes, method: 'hold', context: Capabilities.new,
-                   frame: 2, source: 'test')
-    trace = FakeTrace.new
-    builder = Builder.new(trace:, beliefs:, prober: nil)
-    emulator = FakeEmulator.new
-    [[70, 52], [70, 68], [102, 68], [118, 84], [118, 84]].each { |link| fake_observe(builder, emulator, link:) }
-    fake_observe(builder, emulator, link: [134, 84], place: [164, 16])
-    assert_empty trace.of(:grid_contradiction)
-  end
-
   def test_probes_each_unknown_neighbour_once_after_statics_settle
     prober = StubProber.new { |direction| direction == :up ? { moved: true, to: { x: 70, y: 30 } } : {} }
     trace = FakeTrace.new

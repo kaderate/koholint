@@ -15,7 +15,7 @@ module Koholint
       MAX_LINE = 8192
       MAX_HEADERS = 100
       MAX_BODY = 32_768
-      INSIGHTS = { '/map.json' => :map, '/timeline.json' => :timeline, '/stats.json' => :stats, '/cockpit.json' => :cockpit }.freeze
+      INSIGHTS = { '/map.json' => :map, '/timeline.json' => :timeline, '/cockpit.json' => :cockpit }.freeze
       READ_TIMEOUT = 5
 
       attr_reader :listener
@@ -186,11 +186,10 @@ module Koholint
       end
 
       def insight(kind, run)
-        return explorer.insight(run, kind).merge(kind == :stats ? { reference: explorer.reference(run_dir(run)) } : {}) if run
+        return explorer.insight(run, kind) if run
         raise Explorer::NotFound, 'no live run' unless @run_dir
 
-        value = Feed.insight(kind, @run_dir, @follower)
-        kind == :stats ? value.merge(reference: @explorer&.reference(@run_dir)) : value
+        Feed.insight(kind, @run_dir, @follower)
       end
 
       def screen(place, run)

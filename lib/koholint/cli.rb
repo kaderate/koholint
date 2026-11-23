@@ -28,8 +28,8 @@ require 'koholint/viewer'
 
 module Koholint
   module CLI
-    USAGE = 'usage: koholint run|resume <run_dir>|fork <run_dir> --at-frame N|branch <run_dir> --at FRAME|CHECKPOINT|verify <run_dir>|summary <run_dir>|screens <run_dir>|watch <run_dir>|' \
-            'archive|star <run_dir> WHY|prune-heavy|census boot|<run_dir> FRAME...|entities <run_dir> FRAME...|objects <run_dir> FRAME...|doors <run_dir> FRAME...|sword <run_dir> FRAME...|ready <run_dir>|npcs|' \
+    USAGE = 'usage: koholint run|resume <run_dir>|fork <run_dir> --at-frame N|branch <run_dir> --at FRAME|CHECKPOINT|verify <run_dir>|summary <run_dir>|watch <run_dir>|' \
+            'archive|star <run_dir> WHY|prune-heavy|census boot|<run_dir> FRAME...|entities <run_dir> FRAME...|objects <run_dir> FRAME...|doors <run_dir> FRAME...|sword <run_dir> FRAME...|ready <run_dir>|' \
             'ab-plan <run_dir> --at-frame N|ab-report PREFIX|check-leads <run_dir>...|learn <run_dir> [--limit N --object ID]|bench exits <run_dir> [--place R/M --at-frame N]|capability list|publish ID WHY|retire ID WHY ' \
             '[--frames N --minutes N --steps N --dollars X --root DIR --runs-root DIR --tag NAME --realtime --grid --port N --host H --from live|start|DIR ' \
             '--speed X --agent --autopilot on|off --capabilities on|off --exits on|off --model M --max-dollars X --claude-command PATH --keep-viewer --commit --full --keep N --yes --arms A,B --forks N --crawl N]'.freeze
@@ -132,13 +132,6 @@ module Koholint
         require 'koholint/bench'
         place = options[:place]&.split('/')&.map(&:to_i)
         Bench.exits(parent_run(run_dir(args)), place:, at: options[:at_frame], root: options.fetch(:root, Bench::ROOT), out:)
-      when 'npcs'
-        require 'koholint/npc_catalogue'
-        out.print NpcCatalogue.markdown(options.fetch(:root, 'runs'))
-        0
-      when 'screens'
-        PlaceShots.backfill(run_dir(args), out:)
-        0
       when 'verify' then verify(Run.open(run_dir(args), flow_version: flow), out)
       when 'summary'
         out.puts JSON.pretty_generate(Summary.for(Run.open(run_dir(args), flow_version: flow)))

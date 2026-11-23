@@ -36,10 +36,7 @@ module Koholint
       room && map ? [room, map] : nil
     end
 
-    attr_accessor :on_doubt
-
-    def initialize(on_doubt: nil)
-      @on_doubt = on_doubt
+    def initialize
       @counts = Hash.new(0)
     end
 
@@ -51,7 +48,6 @@ module Koholint
 
       key = edge(place, [row, col], direction)
       @counts[key] += 1
-      @on_doubt&.call(place:, cell: [row, col], direction: key.last, count: @counts[key]) if @counts[key] == DOUBT_AT
     end
 
     def entered(place:, cell:, direction:) = @counts.delete(edge(place, cell, direction))

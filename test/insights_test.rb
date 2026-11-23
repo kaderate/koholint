@@ -151,21 +151,6 @@ class InsightsTest < Minitest::Test
     assert_equal timeline[:markers].map { |m| m[:frame] }.sort, timeline[:markers].map { |m| m[:frame] }
   end
 
-  def test_cost_series_is_cumulative_by_model_call_and_bounded
-    decision = ->(frame, agent, cost, skill) { { 'type' => 'decision', 'frame' => frame, 'agent' => agent, 'cost_usd' => cost, 'prompt_sha' => 'x', 'choice' => { 'skill' => skill } } }
-    trace = [decision.call(10, 'claude', 0.5, 'walk'), decision.call(20, 'start_game', 0, nil), decision.call(30, 'claude', 0.25, 'talk_to')]
-    cost = Insights.cost(trace)
-    assert_equal [[0, 0.0], [10, 0.5], [30, 0.75]], cost[:series]
-    assert_equal({ 'talk_to' => { calls: 1, usd: 0.25 }, 'walk' => { calls: 1, usd: 0.5 } }, cost[:by_skill])
-    assert_equal({ paid: 2, free: 1 }, cost[:decisions])
-    many = (1..1000).map { |i| decision.call(i, 'claude', 0.001, 'walk') }
-    series = Insights.cost(many)[:series]
-    assert_equal Insights::SERIES, series.size
-    assert_equal [1000, 1.0], series.last
-    stats = Insights.stats(trace)
-    assert_equal %i[goal_changes leads lead_rejected objectives_by_kind because_used talks talks_to_known dialogues not_ready_frames not_ready_waits deaths damage_events stuck_events autopilot_decisions chain_max], stats[:usage].keys
-  end
-
   def test_mode_and_alerts_come_from_the_shown_trace
     trace = [{ 'type' => 'perception', 'frame' => 1, 'state' => PLAY }]
     assert_equal({ phase: 'playing', name: 'play', frame: 1 }, Insights.mode(trace).slice(:phase, :name, :frame))

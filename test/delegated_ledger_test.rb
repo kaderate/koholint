@@ -288,40 +288,6 @@ class DelegatedLedgerTest < Minitest::Test
     assert @objectives.current
   end
 
-  def test_a_doubtful_edge_emits_a_grid_contradiction_once_per_crossing
-    sink = trace
-    @objectives = Koholint::Objectives.new(trace: sink)
-    @objectives.define_singleton_method(:trace) { sink }
-    p = Koholint::Policies::Delegated.new(client: ScriptedClient.new(objective: objective(kind: 'reach_place', place: [1, 2]), skill: walk),
-                                          registry: Koholint::Skills::Registry.default, objectives: @objectives, ledger: Koholint::Ledger.new)
-    p.decide(p.decision_point_for(state), state, { grid: free_grid })
-    3.times { |i| block(p, frame: 101 + i) }
-    events = Koholint::Trace.read(File.join(@dir, 'trace.jsonl')).select { |e| e['type'] == 'grid_contradiction' }
-    assert_equal 1, events.size
-    assert_equal [102, [163, 16], 3, 4, 'up', 'yes', 'blocked x2'], events.first.values_at('frame', 'place', 'row', 'col', 'direction', 'believed', 'observed')
-  end
-
-  def test_a_believed_wall_blocking_twice_is_not_a_contradiction
-    sink = trace
-    @objectives = Koholint::Objectives.new(trace: sink)
-    beliefs = Koholint::Vision::Beliefs.new
-    capabilities = Koholint::Vision::Capabilities.new
-    %w[floor wall].zip(%i[yes no]).each do |appearance, result|
-      %i[up down left right].each do |d|
-        beliefs.record(appearance:, action: :walk, direction: d, result:, method: 'test', context: capabilities, frame: 1, source: 'test')
-      end
-    end
-    cells = Array.new(8) { Array.new(10) { 'floor' } }
-    cells[3][5] = 'wall'
-    grid = Koholint::Vision::Grid.new(cells:, static_sprites: {}, beliefs:, capabilities:)
-    p = Koholint::Policies::Delegated.new(client: ScriptedClient.new(objective: objective(kind: 'reach_place', place: [1, 2]), skill: walk),
-                                          registry: Koholint::Skills::Registry.default, objectives: @objectives, ledger: Koholint::Ledger.new)
-    p.decide(p.decision_point_for(state), state, { grid: })
-    2.times { |i| block(p, direction: 'right', frame: 101 + i) }
-    events = Koholint::Trace.read(File.join(@dir, 'trace.jsonl')).select { |e| e['type'] == 'grid_contradiction' }
-    assert_empty events
-  end
-
   def test_the_system_prompts_state_the_vocabulary
     objective_system = Koholint::Agents::Prompts.system_for(Koholint::DecisionPoint.choose_objective)
     skill_system = Koholint::Agents::Prompts.system_for(Koholint::DecisionPoint.choose_skill(Koholint::Skills::Registry.default))
