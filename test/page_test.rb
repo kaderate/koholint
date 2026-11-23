@@ -527,12 +527,14 @@ class PageTest < Minitest::Test
              { quote: 'z', importance: 'high', status: 'open', first: { run: 'r3', frame: 1 }, runs: 1, tried: 0, achieved: 0 }]
     rows = atlas_eval("leadRows(#{JSON.generate(leads)})")
     assert_equal %w[z a b], rows.map { |row| row['cells'][2] }
-    assert_equal ['testée', 'haute', 'a', 'c', 'C16', 'r2, frame 9', '2', '1 atteint sur 3'], rows[1]['cells']
+    assert_equal ['testée', 'haute', 'a', 'modèle : c', 'C16', 'r2, frame 9', '2', '1 atteint sur 3'], rows[1]['cells']
+    assert_equal 'moteur : x', atlas_eval("leadRows([{ quote: 'q', claim: 'x', contact: true, first: { run: 'r', frame: 1 }, runs: 1, tried: 0, achieved: 0 }])[0].cells[3]")
   end
 
   def test_atlas_flow_rows_give_the_cost_per_new_screen
     flows = [{ flow: 'flow-3', runs: 2, frames: 100, dollars: 3, calls: 9, screens: %w[B10 B11], interiors: [], texts: 4, leads: 1, items: ['shield'] },
              { flow: 'flow-4', runs: 1, frames: 50, dollars: 1, calls: 2, screens: [], interiors: ['163/16'], texts: 0, leads: 0, items: [] }]
+    assert_equal 'hérité (parent non lu)', atlas_eval("flowRows([{ flow: 'inherited', runs: 0, frames: 0, dollars: 0, screens: ['A1'] }])[0][0]")
     assert_equal [['flow-3', '2', '100', '$3.00', '2 (B10, B11)', '0', '4', '1', 'shield', '$1.50'], ['flow-4', '1', '50', '$1.00', '0', '163/16', '0', '0', '—', '—']],
                  atlas_eval("flowRows(#{JSON.generate(flows)})")
   end
