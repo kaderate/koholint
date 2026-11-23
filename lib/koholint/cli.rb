@@ -190,6 +190,8 @@ module Koholint
       out.puts "places: #{totals[:overworld]} overworld screens, #{totals[:interiors]} interiors; #{totals[:texts]} texts read; #{totals[:deaths]} deaths; " \
                "items #{totals[:items].map { |name, count| "#{name} x#{count}" }.join(', ').then { |text| text.empty? ? 'none' : text }}; #{totals[:puzzles]} puzzles"
       out.puts "cost: $#{format('%.2f', totals[:dollars])} over #{totals[:frames]} frames, #{totals[:calls]} model calls (each fork from its fork frame)"
+      facts = atlas[:facts].flat_map { |file| file[:rows] }
+      out.puts "facts: #{facts.size} entries in #{atlas[:facts].size} data files, #{facts.count { |row| row[:status] == 'verified' }} verified"
       out.puts "wrote #{Atlas::OUT}"
       0
     end

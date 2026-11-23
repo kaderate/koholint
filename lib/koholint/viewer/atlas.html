@@ -55,6 +55,13 @@
   .scroll td.q { min-width: 18em; }
   .s-open { color: var(--warn); } .s-tested { color: var(--acc); } .s-refuted { color: var(--bad); }
   .note { padding: 0 16px 6px; color: var(--mut); font-size: 12px; }
+  #facts details { margin: 0 16px 8px; background: var(--panel); border: 1px solid var(--line); border-radius: 10px; }
+  #facts summary { padding: 6px 12px; cursor: pointer; }
+  #facts table { border-collapse: collapse; width: 100%; font-size: 12.5px; }
+  #facts th, #facts td { padding: 4px 10px; border-top: 1px solid #22262e; text-align: left; vertical-align: top; overflow-wrap: anywhere; }
+  #facts th { color: var(--mut); font-weight: 600; font-size: 11.5px; }
+  .f-verified, .f-operational, .f-validated { color: var(--acc); } .f-hypothesis, .f-observed, .f-inconclusive, .f-incomplete, .f-mixed { color: var(--warn); }
+  .f-rejected, .f-unreached, .f-contradicted, .f-deprecated, .f-error { color: var(--bad); }
 </style>
 </head>
 <body>
@@ -72,6 +79,9 @@
 <h2>Progrès par flow</h2>
 <div class="note">Ce que les runs de chaque version du jeu de règles ont atteint en premier parmi les runs lus, depuis la frame de fork de chaque run ; ce qu'un fork dont le parent n'est pas lu tient d'avant sa frame de fork est compté à part, sans coût.</div>
 <div class="scroll"><table><thead><tr><th>flow</th><th>runs</th><th>frames</th><th>coût</th><th>écrans nouveaux</th><th>intérieurs nouveaux</th><th>textes nouveaux</th><th>pistes nouvelles</th><th>objets</th><th>$ par écran nouveau</th></tr></thead><tbody id="flows"></tbody></table></div>
+<h2>Faits mesurés (data/)</h2>
+<div class="note" id="fact-rules"></div>
+<div id="facts"></div>
 <script>
 (function () {
   // pure:begin
@@ -175,6 +185,31 @@
         screens ? screens + ' (' + f.screens.join(', ') + ')' : '0', (f.interiors || []).length ? f.interiors.join(', ') : '0',
         String(f.texts || 0), String(f.leads || 0), (f.items || []).join(', ') || '—', screens ? '$' + (f.dollars / screens).toFixed(2) : '—'];
     });
+  }
+
+  function factSummary(file) {
+    if (file.skipped) return file.file + ' — non lu par l\'atlas';
+    if (file.error) return file.file + ' — illisible : ' + file.error;
+    var counts = Object.keys(file.statuses || {}).map(function (status) { return (status === '-' ? 'sans statut' : status) + ' ' + file.statuses[status]; }).join(', ');
+    return file.file + ' — ' + plural((file.rows || []).length, 'entrée') + (counts ? ' · ' + counts : '');
+  }
+
+  function factRules(rules) {
+    rules = rules || {};
+    return 'Les faits typés du dépôt, tels qu\'écrits avec leur provenance : « verified » demande au moins ' + rules.verified + ' vérifications indépendantes, une capacité « validated » ou « operational » ' +
+      rules.places + ' lieux de succès, une sortie « verified » ' + rules.lineages + ' lignées. Les vérifs d\'une capacité sont dérivées (ses lieux de succès). Cliquer un fichier pour le détail.';
+  }
+
+  function factStatus(row) {
+    var subs = row.subfacts || [];
+    var text = (row.status || '—') + subs.map(function (s) { return ' · ' + s.name + ' : ' + (s.status || '—'); }).join('');
+    var mixed = subs.some(function (s) { return s.status !== row.status; });
+    return { text: text, cls: row.status ? (mixed ? 'f-mixed' : 'f-' + row.status) : null };
+  }
+
+  function factCells(row) {
+    var checks = row.verified_count === null || row.verified_count === undefined ? '—' : String(row.verified_count) + (row.derived ? ' (dérivé)' : '');
+    return [row.label || '—', factStatus(row).text, checks, row.source || '—', row.note || '—'];
   }
 
   function screenUrl(place) { return place.screen ? '/screens/' + encodeURIComponent(place.key) + '.png?run=' + encodeURIComponent(place.screen) : null; }
@@ -292,6 +327,26 @@
     });
   }
 
+  function renderFacts(files) {
+    var box = document.getElementById('facts');
+    box.textContent = '';
+    files.forEach(function (file) {
+      var details = el('details');
+      details.appendChild(el('summary', file.error ? 'f-error' : null, factSummary(file)));
+      var table = el('table');
+      var head = el('tr');
+      ['fait', 'statut', 'vérifs', 'provenance', 'note'].forEach(function (name) { head.appendChild(el('th', null, name)); });
+      table.appendChild(head);
+      (file.rows || []).forEach(function (row) {
+        var tr = el('tr');
+        factCells(row).forEach(function (text, i) { tr.appendChild(el('td', i === 1 ? factStatus(row).cls : null, text)); });
+        table.appendChild(tr);
+      });
+      details.appendChild(table);
+      box.appendChild(details);
+    });
+  }
+
   function render(atlas) {
     places = indexPlaces(atlas.places || []);
     document.getElementById('scope').textContent = scopeText(atlas);
@@ -302,6 +357,8 @@
     renderInteriors();
     fillRows('leads', leadRows(atlas.leads));
     fillRows('flows', flowRows(atlas.flows));
+    document.getElementById('fact-rules').textContent = factRules(atlas.fact_rules);
+    renderFacts(atlas.facts || []);
   }
 
   fetch('/atlas.json').then(function (response) {

@@ -539,6 +539,19 @@ class PageTest < Minitest::Test
                  atlas_eval("flowRows(#{JSON.generate(flows)})")
   end
 
+  def test_atlas_facts_read_as_a_summary_and_plain_cells
+    file = { file: 'data/items.json', statuses: { 'verified' => 2, '-' => 1 }, rows: [1, 2, 3] }
+    assert_equal 'data/items.json — 3 entrées · verified 2, sans statut 1', atlas_eval("factSummary(#{JSON.generate(file)})")
+    assert_equal ['1 sword', 'verified', '2', 'probe', '—'], atlas_eval("factCells({ label: '1 sword', status: 'verified', verified_count: 2, source: 'probe', note: null })")
+    assert_equal ['a', '—', '—', '—', '—'], atlas_eval("factCells({ label: 'a' })")
+    assert_equal '2 (dérivé)', atlas_eval("factCells({ label: 'c', status: 'operational', verified_count: 2, derived: true })[2]")
+    status = atlas_eval("factStatus({ status: 'verified', subfacts: [{ name: 'sword_hits', status: 'hypothesis' }] })")
+    assert_equal({ 'text' => 'verified · sword_hits : hypothesis', 'cls' => 'f-mixed' }, status)
+    assert_equal 'data/x.json — illisible : boom', atlas_eval("factSummary({ file: 'data/x.json', error: 'boom' })")
+    assert_equal 'data/m.json — non lu par l\'atlas', atlas_eval("factSummary({ file: 'data/m.json', skipped: true })")
+    assert_match(/au moins 2 vérifications.* 3 lieux de succès.* 4 lignées/, atlas_eval('factRules({ verified: 2, places: 3, lineages: 4 })'))
+  end
+
   def test_atlas_kpis_read_the_totals
     atlas = { runs: 2, roots: ['runs'], last_run: 'r2', unreadable: 0, totals: { overworld: 55, interiors: 12, texts: 75, deaths: 8, items: { shield: 2 }, puzzles: 1, dollars: 47.614, calls: 10, frames: 99 } }
     assert_equal ['55 / 256', '12', '75', '8', 'shield ×2', '1', '$47.61'], atlas_eval("kpis(#{JSON.generate(atlas)}).map(function (k) { return k.value; })")

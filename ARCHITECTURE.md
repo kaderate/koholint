@@ -310,7 +310,12 @@ first reading, the runs that read it (a fork reads only its own segment's leads 
 followed it and those achieved, and its best status over the runs (`Leads#status`: tested, then refuted, then open). Flows: per
 `flow_version`, the runs, own frames, dollars and calls, and the screens, interiors, texts, leads and items those runs reached first
 among the runs read (by run id, which is chronological), from each fork frame; what a fork whose parent is not read reached before
-its fork frame goes to an `inherited` row with no cost. Contact leads carry the engine's claim, not the model's. Totals: runs, unreadable runs, frames, dollars, model calls, screens, interiors, distinct
+its fork frame goes to an `inherited` row with no cost. Contact leads carry the engine's claim, not the model's. Facts (`Atlas.facts`):
+one row per entry of the typed files of `data/` (addresses, entities, items, modes, place kinds, geometry, exit edges and benches,
+capabilities, checkpoints) with its status, check count, provenance and note as written there, and the nested confidences of an
+entry (an entity's `sword_hits`) beside its status; a capability's check count is derived, its success places
+(`Capabilities.success_places`). A file that does not parse or has another shape is listed with its error, and other JSON files of
+`data/` as skipped. Totals: runs, unreadable runs, frames, dollars, model calls, screens, interiors, distinct
 texts, deaths, items, puzzles. `koholint atlas [--root DIR]...` writes `tmp/atlas.json` (default root `runs`; a root with no run is
 an error); the viewer's `/atlas` page and `/atlas.json` read the runs root and keep one digest of plain data per run directory,
 rebuilt when its trace's size or mtime changes.
