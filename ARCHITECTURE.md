@@ -223,7 +223,11 @@ types with no try that no card saw as an enemy or creature (`unknown_untried`), 
 (same row for left and right) or through a door, never the first place change after a death (a respawn), the overworld screen an
 interior opens from, items gained, puzzles, and the latest run with its screenshot. A `place_name` is kept only with a text read at
 that place, at or before it, that carries one of its words of 4 letters or more (accents and case folded); the others are counted as
-withheld, since the model writes names. Totals: runs, unreadable runs, frames, dollars, model calls, screens, interiors, distinct
+withheld, since the model writes names. Leads: one per quote (`Dialogues.key`), with the claim, importance and place label of its
+first reading, the runs that read it (a fork reads only its own segment's leads when its parent is read), the objectives that
+followed it and those achieved, and its best status over the runs (`Leads#status`: tested, then refuted, then open). Flows: per
+`flow_version`, the runs, own frames, dollars and calls, and the screens, interiors, texts, leads and items those runs reached first
+among the runs read (by run id, which is chronological). Totals: runs, unreadable runs, frames, dollars, model calls, screens, interiors, distinct
 texts, deaths, items, puzzles. `koholint atlas [--root DIR]...` writes `tmp/atlas.json` (default root `runs`; a root with no run is
 an error); the viewer's `/atlas` page and `/atlas.json` read the runs root and keep one digest of plain data per run directory,
 rebuilt when its trace's size or mtime changes.s

@@ -3,6 +3,7 @@ require 'zlib'
 require 'koholint'
 require 'koholint/archive'
 require 'koholint/dialogues'
+require 'koholint/leads'
 require 'koholint/place_card'
 require 'koholint/place_kinds'
 require 'koholint/summary'
@@ -17,6 +18,7 @@ module Koholint
     WAYS = { 1 => 'right', -1 => 'left', 16 => 'down', -16 => 'up' }.freeze
     ENTITIES = %w[people enemies unknown creatures].freeze
     NAME_WORD = 4
+    STATUSES = %w[open refuted tested].freeze
 
     module_function
 
@@ -125,7 +127,22 @@ module Koholint
         end
         run_frames = [run_frames, frame - fork].max if frame >= fork
       end
-      { run:, frames: run_frames, dollars:, calls:, places: }
+      { run:, flow: Summary.read_json(File.join(dir, 'manifest.json'))['flow_version'], frames: run_frames, dollars:, calls:, places:, leads: leads(events, since:, run:) }
+    end
+
+    # Each lead the run holds, keyed by its quote: read here when its event is from `since` on; status and attempts from the whole run.
+    def leads(events, since:, run:)
+      read = events.select { |event| event['type'] == 'lead' }.to_h { |event| [event['id'], event['frame'].to_i] }
+      Leads.from_events(events).with_status.filter_map do |lead|
+        quote = lead[:quote].to_s
+        next if quote.strip.empty?
+
+        frame = read[lead[:id]]
+        attempts = lead[:evidence].select { |attempt| attempt[:frame].to_i >= since }
+        { key: Dialogues.key(quote), quote:, claim: lead[:claim], importance: lead[:importance], place: lead[:place].is_a?(Array) ? label(lead[:place]) : nil,
+          status: lead[:status], read: frame && frame >= since ? { run:, frame: } : nil,
+          tried: attempts.size, achieved: attempts.count { |attempt| attempt[:outcome] == 'achieved' } }
+      end
     end
 
     # Overworld screens that are not neighbours (a warp, or a row wrap from P to A) are not a way.
@@ -185,6 +202,7 @@ module Koholint
                     screen: shots.find { |dir| File.file?(File.join(dir, 'screens', "#{entry[:key]}.png")) }&.then { |dir| File.basename(dir) })
       end
       texts = list.flat_map { |entry| entry[:texts].map { |text| Dialogues.key(text[:text]) } }.uniq
+      leads = merge_leads(digests)
       items = list.flat_map { |entry| entry[:items] }
       {
         roots:, runs: digests.size, unreadable:, last_run: digests.map { |digest| digest[:run] }.max,
@@ -193,8 +211,43 @@ module Koholint
                   overworld: list.count { |entry| entry[:grid] }, interiors: list.count { |entry| !entry[:grid] }, texts: texts.size,
                   deaths: list.sum { |entry| entry[:deaths] }, items: items.group_by { |item| item[:name] }.transform_values(&:size),
                   puzzles: list.sum { |entry| entry[:puzzles].size }, names_withheld: list.sum { |entry| entry[:names_withheld] } },
-        places: list
+        places: list,
+        leads:,
+        flows: flows(digests, list, leads)
       }
+    end
+
+    def merge_leads(digests)
+      found = {}
+      digests.sort_by { |digest| digest[:run] }.each do |digest|
+        digest[:leads].each do |lead|
+          entry = found[lead[:key]] ||= lead.except(:key, :read, :tried, :achieved).merge(first: nil, runs: 0, tried: 0, achieved: 0)
+          entry[:first] ||= lead[:read]
+          entry[:runs] += 1 if lead[:read]
+          entry[:tried] += lead[:tried]
+          entry[:achieved] += lead[:achieved]
+          entry[:status] = lead[:status] if STATUSES.index(lead[:status]).to_i > STATUSES.index(entry[:status]).to_i
+        end
+      end
+      found.values.select { |lead| lead[:first] }
+    end
+
+    # Per flow version: the runs, their own frames, cost and calls, and what they reached first in the runs read.
+    def flows(digests, places, leads)
+      flow_of = digests.to_h { |digest| [digest[:run], digest[:flow].to_s] }
+      rows = digests.group_by { |digest| digest[:flow].to_s }.to_h do |flow, group|
+        [flow, { flow:, runs: group.size, frames: group.sum { |digest| digest[:frames] }, dollars: group.sum { |digest| digest[:dollars] }.round(2),
+                 calls: group.sum { |digest| digest[:calls] }, screens: [], interiors: [], texts: 0, items: [], leads: 0 }]
+      end
+      places.each do |place|
+        rows[flow_of[place[:first][:run]]][place[:grid] ? :screens : :interiors] << place[:label]
+        place[:texts].each { |text| rows[flow_of[text[:run]]][:texts] += 1 if flow_of[text[:run]] }
+      end
+      places.flat_map { |place| place[:items] }.sort_by { |item| [item[:run], item[:frame]] }.uniq { |item| item[:name] }.each do |item|
+        rows[flow_of[item[:run]]][:items] << item[:name]
+      end
+      leads.each { |lead| rows[flow_of[lead[:first][:run]]][:leads] += 1 }
+      rows.values.sort_by { |row| [row[:flow][/\d+/].to_i, row[:flow]] }
     end
   end
 end

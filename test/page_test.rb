@@ -521,6 +521,22 @@ class PageTest < Minitest::Test
     assert_nil atlas_eval("screenUrl({ key: '1-0' })")
   end
 
+  def test_atlas_leads_sort_by_importance_then_status_and_read_as_text
+    leads = [{ quote: 'b', importance: 'normal', status: 'open', first: { run: 'r1', frame: 5 }, runs: 1, tried: 0, achieved: 0 },
+             { quote: 'a', claim: 'c', importance: 'high', status: 'tested', place: 'C16', first: { run: 'r2', frame: 9 }, runs: 2, tried: 3, achieved: 1 },
+             { quote: 'z', importance: 'high', status: 'open', first: { run: 'r3', frame: 1 }, runs: 1, tried: 0, achieved: 0 }]
+    rows = atlas_eval("leadRows(#{JSON.generate(leads)})")
+    assert_equal %w[z a b], rows.map { |row| row['cells'][2] }
+    assert_equal ['testée', 'haute', 'a', 'c', 'C16', 'r2, frame 9', '2', '1 atteint sur 3'], rows[1]['cells']
+  end
+
+  def test_atlas_flow_rows_give_the_cost_per_new_screen
+    flows = [{ flow: 'flow-3', runs: 2, frames: 100, dollars: 3, calls: 9, screens: %w[B10 B11], interiors: [], texts: 4, leads: 1, items: ['shield'] },
+             { flow: 'flow-4', runs: 1, frames: 50, dollars: 1, calls: 2, screens: [], interiors: ['163/16'], texts: 0, leads: 0, items: [] }]
+    assert_equal [['flow-3', '2', '100', '$3.00', '2 (B10, B11)', '0', '4', '1', 'shield', '$1.50'], ['flow-4', '1', '50', '$1.00', '0', '163/16', '0', '0', '—', '—']],
+                 atlas_eval("flowRows(#{JSON.generate(flows)})")
+  end
+
   def test_atlas_kpis_read_the_totals
     atlas = { runs: 2, roots: ['runs'], last_run: 'r2', unreadable: 0, totals: { overworld: 55, interiors: 12, texts: 75, deaths: 8, items: { shield: 2 }, puzzles: 1, dollars: 47.614, calls: 10, frames: 99 } }
     assert_equal ['55 / 256', '12', '75', '8', 'shield ×2', '1', '$47.61'], atlas_eval("kpis(#{JSON.generate(atlas)}).map(function (k) { return k.value; })")
