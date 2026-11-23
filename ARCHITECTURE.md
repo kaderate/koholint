@@ -220,7 +220,7 @@ from that call does not hold it. When a chain stopped `new_place` or `known_plac
 untried exits and the caps allow it, and (flow-52) no person on screen was never tried (no talk attempt with its type here): such a person is the first candidate of the model's objective choice (run `20261113-160556-fef5` kept exploring past the never-tried type 49 at (5,5) of 242/0 and left). Results of autopilot decisions are marked `(autopilot)` in the context's results and attempts. Autopilot explores are objective attempts like any other (loop and stall
 abandonment still apply) and leave the engine's consecutive failure and refusal counters untouched; `--autopilot off`
 (manifest `autopilot`) disables it),
-`policies/walk_and_talk.rb` and `start_game.rb` (deterministic baselines and the intro). In `delegated.rb` an invalid
+`policies/walk_and_talk.rb` and `start_game.rb` (deterministic baselines and the intro; `StartGame` wraps the policy of every CLI run and forwards `observe`, `after_action`, `note_card` and `offered_candidates` to it, so a live run feeds place cards and traces the offered candidates as a resumed one rebuilds them). In `delegated.rb` an invalid
 answer falls back deterministically, 5 consecutive fallbacks stop the run; an engine exception before the
 agent call is an `engine_error` fallback counted apart and stops as `engine_errors`. Phases come from the mode
 catalogue (see Game modes): the boot script owns `boot` and `loading`; once the run has played (a `perception` in play
