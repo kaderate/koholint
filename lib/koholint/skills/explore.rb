@@ -64,7 +64,7 @@ module Koholint
           @ledger = context[:ledger]
           @talk_log = context[:talk_log]
           @log = context[:explore_log]
-          @walked = (@log ? @log.walked(@place) | @log.stood(@place) : []) | [@start.cell].compact
+          @walked = ((@log ? @log.walked(@place) | @log.stood(@place) : []) - stone_cells(context)) | [@start.cell].compact
           @fresh = @log && !@log.surveyed?(@place)
           grid = context[:grid]
           @known = grid && Known.new(grid, @walked)
@@ -147,6 +147,12 @@ module Koholint
             return heading(buttons) if buttons
             return stop_now(@stop) if @stop
           end
+        end
+
+        # The room puts its stones back on re-entry, so a stone's cell walked after an earlier push is a stone again.
+        def stone_cells(context)
+          objects = context[:room_objects]&.call or return []
+          objects.each_with_index.flat_map { |row, r| row.each_index.select { |c| Entities.object_catalogue.dig(row[c], :kind) == :stone }.map { |c| [r, c] } }
         end
 
         def stop_now(reason)

@@ -110,11 +110,7 @@ module Koholint
         end
       end
 
-      def ahead_of(cell, direction)
-        dr, dc = Geometry::DELTAS.fetch(direction) { return nil }
-        ahead = cell && [cell[0] + dr, cell[1] + dc]
-        ahead if ahead && ahead[0].between?(0, Geometry::ROWS - 1) && ahead[1].between?(0, Geometry::COLS - 1)
-      end
+      def ahead_of(cell, direction) = cell && Geometry.step(cell, direction)
 
       # A stone ahead slides only after a measured hold, so a moving skill keeps pressing that long before it reads blocked.
       def still_limit(state, direction, base)

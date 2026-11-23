@@ -2,6 +2,7 @@ require_relative 'test_helper'
 require 'koholint/agents/context'
 require 'koholint/autopilot'
 require 'koholint/entities'
+require 'koholint/explore_log'
 require 'koholint/game_state'
 require 'koholint/navigation/planner'
 require 'koholint/skills/registry'
@@ -191,6 +192,25 @@ class StonesTest < Minitest::Test
     assert_equal :pushed, result[:stopped_by], result.inspect
     assert_equal({ row: 3, col: 4, direction: :down }, result[:pushed])
     assert_equal FIXED, room.objects[4][4]
+  end
+
+  def test_explore_holds_its_outward_step_into_a_stone_frontier_until_it_slides
+    rows = with(CLOSED, [3, 4], 's')
+    room = Room.new(rows, start: at([2, 4]))
+    result, = play('explore', {}, room, rows)
+    assert_equal({ kind: :frontier, row: 2, col: 4, direction: :down }, result[:target])
+    assert_equal :pushed, result[:stopped_by], result.inspect
+    assert_equal({ row: 3, col: 4, direction: :down }, result[:pushed])
+  end
+
+  def test_a_stone_cell_walked_before_the_room_put_it_back_is_a_frontier_again
+    rows = with(CLOSED, [3, 4], 's', [2, 4], '#')
+    room = Room.new(rows, start: at([4, 4]))
+    log = Koholint::ExploreLog.new
+    log.absorb({ from: { room: 1, map: 0 }, crossed: [[4, 4, :up]] })
+    assert_includes log.walked([1, 0]), [3, 4]
+    run = Koholint::Skills::Registry.default.start('explore', state(room), {}, { grid: MapGrid.new(rows), room_objects: room.reader, explore_log: log })
+    assert_equal :frontier, run.send(:frontier_kind, [3, 3], :right)
   end
 
   def test_a_stone_with_floor_beyond_is_a_frontier
