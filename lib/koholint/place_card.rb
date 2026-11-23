@@ -21,6 +21,7 @@ module Koholint
         objects: of.('object').map { |entity| { cell: entity[:cell], type: entity[:type] } } +
           objects.select { |object| object[:kind].to_s == 'object' }.map { |object| object.slice(:cell, :object) },
         doors: objects.select { |object| object[:kind].to_s == 'door' }.map { |object| { cell: object[:cell], object: object[:object], verified: object[:verified] == true } },
+        chests: objects.select { |object| object[:kind].to_s == 'chest' }.map { |object| { cell: object[:cell], open: object[:open] == true } },
         exits: exits(grid) }
     end
 
@@ -35,10 +36,14 @@ module Koholint
       end.to_h
     end
 
+    # Chests come back closed as the last card saw them, less those opened since; their reachability is checked again on arrival.
     def latest(events)
+      opened = events.select { |event| event['type'] == 'chest_opened' }
       events.select { |event| event['type'] == 'place_card' && event['place'].is_a?(Array) }.to_h do |event|
+        later = opened.select { |open| open['place'] == event['place'] && open['frame'] >= event['frame'] }.map { |open| open['cell'] }
+        chests = Array(event['chests']).reject { |chest| chest['open'] }.map { |chest| chest['cell'] } - later
         [event['place'], { people: Array(event['people']).map { |person| { type: person['type'], cell: person['cell'] } },
-                           signs: Array(event['signs']).map { |sign| { cell: sign['cell'] } } }]
+                           signs: Array(event['signs']).map { |sign| { cell: sign['cell'] } }, chests: }]
       end
     end
 
@@ -66,7 +71,7 @@ module Koholint
       items = events.select { |event| event['type'] == 'item_gained' && event['place'] }.group_by { |event| event['place'] }
       cards.group_by { |event| event['place'] }.to_h do |place, seen|
         last = seen.last
-        card = last.slice('people', 'enemies', 'creatures', 'unknown', 'signs', 'objects', 'doors', 'exits')
+        card = last.slice('people', 'enemies', 'creatures', 'unknown', 'signs', 'objects', 'doors', 'chests', 'exits')
         types = Array(card['unknown']).map { |entity| entity['type'] }.uniq
         card['unknown_types'] = types.map { |type| { 'type' => type, **tries[[place, type]].transform_keys(&:to_s) } } unless types.empty?
         card['items_gained'] = items[place].map { |event| event['name'] || event['item'] } if items[place]

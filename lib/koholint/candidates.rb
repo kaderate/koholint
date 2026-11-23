@@ -15,8 +15,9 @@ module Koholint
       named = ->(where) { leads.name_of(where) }
       people = people_here(place, entities, talk_log, stamp)
       leaving = puzzles(place, hops, explore_log, leads, named) + exits(place, grid, explore_log) + doors(place, signs, explore_log, link) + places(place, hops, explore_log, named) +
-                people_away(place, hops, cards, talk_log, named, stamp) + signs_away(place, hops, cards, talk_log, named) + lead_places(place, hops, leads, named)
-      [(shelter(place, hops, named) if low_health)].compact + people + signs_here(place, signs, talk_log) + unidentified(place, grid, entities, talk_log, link) +
+                people_away(place, hops, cards, talk_log, named, stamp) + signs_away(place, hops, cards, talk_log, named) + chests_away(place, hops, cards, named) +
+                lead_places(place, hops, leads, named)
+      [(shelter(place, hops, named) if low_health)].compact + people + signs_here(place, signs, talk_log) + chests_here(place, signs) + unidentified(place, grid, entities, talk_log, link) +
         warn(leaving, people)
     end
 
@@ -81,6 +82,15 @@ module Koholint
       end
     end
 
+    # A closed chest is offered only while a route reaches the cell below it (reachable, set by the policy from the current grid).
+    def chests_here(place, objects)
+      objects.select { |object| object[:kind].to_s == 'chest' && !object[:open] && object[:reachable] == true }.map do |chest|
+        row, col = chest[:cell]
+        { id: "chest-#{row}-#{col}", label: "open the chest at (#{row},#{col}): walk up into it from (#{row + 1},#{col}) and press A, never opened",
+          title: "Open the chest at (#{row},#{col})", predicate: { kind: 'new_text' }, target: { kind: 'chest', place:, cell: [row, col] } }
+      end
+    end
+
     # Uncatalogued entities and sprites holding no entity may answer A like a person (the sword of 242/0 before its census).
     def unidentified(place, grid, entities, talk_log, link)
       things = entities.select { |entity| entity[:kind].to_s == 'unknown' && entity[:cell] }.uniq { |entity| entity[:type] }
@@ -126,6 +136,15 @@ module Koholint
 
           { id: "sign-#{where.join('-')}-#{cell.join('-')}", label: "read the sign at (#{cell.join(',')}) in #{describe(where, named)}, #{moves(hops[where])}, not read yet",
             title: "Go read the sign in #{describe(where, named)}"[0, 80], predicate: { kind: 'new_text' }, target: { kind: 'sign', place: where, cell:, remote: true } }
+        end
+      end.first(PER_KIND)
+    end
+
+    def chests_away(place, hops, cards, named)
+      away(place, hops).flat_map do |where|
+        Array(cards.dig(where, :chests)).map do |cell|
+          { id: "chest-#{where.join('-')}-#{cell.join('-')}", label: "open the chest at (#{cell.join(',')}) in #{describe(where, named)}, #{moves(hops[where])}, never opened",
+            title: "Go open the chest in #{describe(where, named)}"[0, 80], predicate: { kind: 'new_text' }, target: { kind: 'chest', place: where, cell:, remote: true } }
         end
       end.first(PER_KIND)
     end
