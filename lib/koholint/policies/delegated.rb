@@ -109,6 +109,7 @@ module Koholint
         @notes = []
         @hp_lost = 0
         @deaths = Hash.new(0)
+        @chest_failures = Set.new
         @screen_points = SCREEN_SKILLS.transform_values { |names| DecisionPoint.choose_skill(subset(registry, names)) }
       end
 
@@ -141,6 +142,7 @@ module Koholint
         note_damage(state)
         note_loop(state, frame)
         @revisit.observe(state)
+        note_open_chest(state)
         track { @objectives.update(state, frame:) }
         note_puzzle_entry(state)
       end
@@ -273,6 +275,7 @@ module Koholint
         @last_results.shift while @last_results.size > RESULT_LIMIT
         note_lock(choice, outcome, state)
         note_talk_source(choice, outcome)
+        note_chest_attempt(choice, outcome, state)
         feed_ledger(choice, outcome, state, frame, objective: !revisiting)
         opened = feed_triggers(choice, outcome, state)
         feed_talk_log(choice, outcome, state)
@@ -357,10 +360,11 @@ module Koholint
 
       def build_candidates(state, context)
         place = [state.room_id, state.map_id]
-        signs = objects_now
+        signs = objects_for(state)
         if state.phase(booted: true) == :playing
           @cards[place] = { people: @entities.select { |entity| entity[:kind].to_s == 'npc' && entity[:cell] }.map { |entity| entity.slice(:type, :cell) },
-                            signs: signs.select { |object| object[:kind].to_s == 'sign' }.map { |object| object.slice(:cell) } }
+                            signs: signs.select { |object| object[:kind].to_s == 'sign' }.map { |object| object.slice(:cell) },
+                            chests: signs.select { |object| object[:reachable] }.map { |object| object[:cell] } }
         end
         @candidates = Candidates.build(place:, grid: context[:grid], explore_log: @explore_log, talk_log: @talk_log, leads: @leads, cards: @cards,
                                        entities: @entities, signs:, stamp: stamp(state), link: state.cell, low_health: false)
@@ -396,7 +400,7 @@ module Koholint
         @candidates = decision_point.name == :choose_objective ? build_candidates(state, context) : []
         @prompt = Agents::Context.build(state:, grid: grid_for(state, context), objective: @objectives.current, history: @objectives.history, entities: @entities,
                                        attempts: @objectives.attempts_for_prompt, manual: @manual, last_results: @last_results, ledger: @ledger, refusals: @refusals, plan: @plan,
-                                       triggers: @triggers, talk_log: @talk_log, signs: objects_now, locked: (@hemmed[:attempts] if @hemmed && hemmed?(state)),
+                                       triggers: @triggers, talk_log: @talk_log, signs: objects_for(state), locked: (@hemmed[:attempts] if @hemmed && hemmed?(state)),
                                        locked_frames: (locked_frames(state) if Modes::HELD.include?(state.phase)), goal: goal_line, leads: @leads.with_status, stamp: stamp(state),
                                        place_name: @leads.name_of([state.room_id, state.map_id]), candidates: (Candidates.lines(@candidates) if decision_point.name == :choose_objective),
                                        learned: (@learned if decision_point.name == :choose_skill),
@@ -459,6 +463,41 @@ module Koholint
       end
 
       def objects_now = @objects_reader ? Array(@objects_reader.call) : []
+
+      # Closed chests carry whether a route on the current grid reaches the cell below them, from where they open; a chest whose
+      # opening failed on this visit of the place is no longer reachable work until the next visit.
+      def objects_for(state)
+        place = [state.room_id, state.map_id]
+        grid = @last_grid if @last_place == place
+        objects_now.map do |object|
+          next object unless object[:kind].to_s == 'chest' && !object[:open]
+
+          below = [object[:cell][0] + 1, object[:cell][1]]
+          failed = @chest_failures.include?([place, object[:cell], @explore_log.visits(place)])
+          object.merge(reachable: !failed && (state.cell == below || (!grid.nil? && !state.cell.nil? &&
+            !Navigation::Planner.new(grid:, ledger: @ledger, place:, triggers: @triggers).path(from: state.cell, to: below).nil?)))
+        end
+      end
+
+      def chest_open?(cell) = objects_now.any? { |object| object[:kind].to_s == 'chest' && object[:open] && object[:cell] == cell }
+
+      def note_open_chest(state)
+        target = @objectives.current&.dig(:target)
+        return unless target && target[:kind].to_s == 'chest' && target[:place] == [state.room_id, state.map_id] && chest_open?(target[:cell])
+
+        @objectives.note_chest_open(place: target[:place], cell: target[:cell])
+      end
+
+      # Any talk_to aimed at a chest takes it off the away list; one that drew no response leaves it closed for this visit.
+      def note_chest_attempt(choice, outcome, state)
+        return unless choice[:skill] == 'talk_to'
+
+        place = [state.room_id, state.map_id]
+        cell = [Ledger.pick(choice[:params], :row), Ledger.pick(choice[:params], :col)]
+        chest = objects_now.find { |object| object[:kind].to_s == 'chest' && object[:cell] == cell } or return
+        @cards[place][:chests] -= [cell] if @cards.dig(place, :chests)
+        @chest_failures << [place, cell, @explore_log.visits(place)] unless chest[:open] || outcome[:talked] == true
+      end
 
       def grid_for(_state, _context)
         @last_grid || Vision::Grid.new(cells: Array.new(Vision::Grid::ROWS) { Array.new(Vision::Grid::COLS) }, static_sprites: [],

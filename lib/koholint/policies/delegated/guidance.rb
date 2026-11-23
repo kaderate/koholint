@@ -182,7 +182,7 @@ module Koholint
           case target[:kind]
           when 'exit' then { choice: { skill: 'explore', params: { direction: target[:direction] } } } if here
           when 'door' then { choice: EXPLORE, aim: { door: target[:cell] } } if here
-          when 'person', 'sign', 'examine'
+          when 'person', 'sign', 'chest', 'examine'
             return ({ choice: EXPLORE, aim: { place: target[:place] } } if target[:remote] || @objectives.current.dig(:predicate, :kind).to_s == 'reach_place') unless here
 
             cell = target[:kind] == 'person' ? entities_now.find { |entity| entity[:type] == target[:type] && entity[:cell] }&.dig(:cell) : target[:cell]
@@ -273,18 +273,18 @@ module Koholint
         def revisit_candidate(state)
           return unless @entities_reader
 
-          @revisit.candidate(state:, entities: entities_now, signs: objects_now, stamp: stamp(state), budget_low: revisit_low?, danger: revisit_danger?(state))
+          @revisit.candidate(state:, entities: entities_now, signs: objects_for(state), stamp: stamp(state), budget_low: revisit_low?, danger: revisit_danger?(state))
         end
 
         def revisit_choice(decision_point, state)
           return unless decision_point.name == :choose_skill && !@sequence
 
-          action = @revisit.next_action(state:, entities: entities_now, signs: objects_now, stamp: stamp(state), budget_low: revisit_low?, danger: revisit_danger?(state))
+          action = @revisit.next_action(state:, entities: entities_now, signs: objects_for(state), stamp: stamp(state), budget_low: revisit_low?, danger: revisit_danger?(state))
           return unless action
 
           @revisit_acting = true
           npc = action[:npc]
-          what = npc ? "revisit npc: entity type #{npc[:type]} at (#{npc[:cell][0]},#{npc[:cell][1]})" : "engage sign at (#{action[:sign][:cell][0]},#{action[:sign][:cell][1]})"
+          what = npc ? "revisit npc: entity type #{npc[:type]} at (#{npc[:cell][0]},#{npc[:cell][1]})" : "#{action[:sign][:chest] ? 'open chest' : 'engage sign'} at (#{action[:sign][:cell][0]},#{action[:sign][:cell][1]})"
           { choice: action.slice(:skill, :params), justification: "#{what}, round #{action[:round]}",
             confidence: 1.0, agent: 'delegated', latency_ms: 0, cost_usd: 0.0, fallback: false, prompt: nil, image: nil }
         end

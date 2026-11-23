@@ -122,6 +122,18 @@ class CandidatesTest < Minitest::Test
     refute(found.any? { |candidate| candidate[:label].include?('unexhausted') })
   end
 
+  def test_a_closed_chest_is_offered_only_while_a_route_reaches_the_cell_below_it
+    chests = [{ kind: 'chest', cell: [3, 4], object: 160, reachable: true }, { kind: 'chest', cell: [5, 6], object: 160, reachable: false },
+              { kind: 'chest', cell: [1, 1], object: 161, open: true }]
+    found = build(signs: chests).select { |c| c[:id].start_with?('chest') }
+    assert_equal %w[chest-3-4], found.map { |c| c[:id] }
+    assert_equal({ kind: 'chest', place: HERE, cell: [3, 4] }, found[0][:target])
+    assert_equal({ kind: 'new_text' }, found[0][:predicate])
+    assert_match(/walk up into it from \(4,4\) and press A/, found[0][:label])
+    away = build(cards: { [3, 0] => { chests: [[2, 2]] } }).find { |c| c[:id] == 'chest-3-0-2-2' }
+    assert_equal({ kind: 'chest', place: [3, 0], cell: [2, 2], remote: true }, away[:target])
+  end
+
   def test_people_and_signs_of_other_places_and_lead_places_use_names_and_routes
     leads = Koholint::Leads.new
     leads.name_place([3, 0], 'Beach')
