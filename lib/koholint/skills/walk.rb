@@ -4,7 +4,6 @@ require 'koholint/skills/execution'
 module Koholint
   module Skills
     class Walk
-      DIRECTIONS = %i[up right down left].freeze
       MAX_CELLS = 5
       STILL_FRAMES = 8
       FRAMES_PER_CELL = 90
@@ -30,7 +29,7 @@ module Koholint
 
         def input_for(state)
           track(state) if @frames.positive?
-          return finish(:room_change) if room(state) != room(@start)
+          return finish(:room_change) if state.place != @start.place
           return finish(:damage) if state.health < @start.health
           return finish(:dialogue) if state.dialog_open? && !@start.dialog_open?
           return finish(:done) if moved_cells(state) >= @cells
@@ -44,7 +43,7 @@ module Koholint
         def danger_ahead?(state)
           return false unless @danger && state.cell
 
-          dr, dc = Navigation::Planner::DELTAS.fetch(@direction)
+          dr, dc = Geometry::DELTAS.fetch(@direction)
           ahead = [state.cell[0] + dr, state.cell[1] + dc]
           zones = Array(@danger.call)
           zones.include?(ahead) && !(zones.include?(state.cell) && @away.call(state.cell, ahead))
@@ -61,7 +60,7 @@ module Koholint
 
       def params_schema
         { type: 'object', title: name,
-          properties: { direction: { type: 'string', enum: DIRECTIONS.map(&:to_s) },
+          properties: { direction: { type: 'string', enum: Geometry::DIRECTIONS.map(&:to_s) },
                         cells: { type: 'integer', minimum: 1, maximum: MAX_CELLS } },
           required: %w[direction cells], additionalProperties: false }
       end
@@ -69,7 +68,7 @@ module Koholint
       def normalize(params)
         params = Skills.symbolize(params, %i[direction cells])
         direction = params[:direction].respond_to?(:to_sym) ? params[:direction].to_sym : nil
-        raise ArgumentError, "walk: direction must be one of #{DIRECTIONS.join(', ')}" unless DIRECTIONS.include?(direction)
+        raise ArgumentError, "walk: direction must be one of #{Geometry::DIRECTIONS.join(', ')}" unless Geometry::DIRECTIONS.include?(direction)
         raise ArgumentError, "walk: cells must be 1..#{MAX_CELLS}" unless params[:cells].is_a?(Integer) && params[:cells].between?(1, MAX_CELLS)
 
         { direction:, cells: params[:cells] }

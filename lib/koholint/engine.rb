@@ -30,7 +30,6 @@ module Koholint
     STUCK_BOOT_ANY_FRAMES = 3600
     STUCK_UNKNOWN_FRAMES = 600
     NOT_READY_STUCK_FRAMES = 600
-    FALL_MOTION = 6
     NOT_READY_NOTABLE_FRAMES = 5
 
     def self.resume(run_path, budget:, policy: nil, policy_factory: nil, flow_version: Koholint::FLOW_VERSION, **options)
@@ -156,7 +155,7 @@ module Koholint
     end
 
     def note_place(state, grid)
-      place = [state.room_id, state.map_id]
+      place = state.place
       return unless state.phase(booted: true) == :playing
       return if place == @card_place
 
@@ -170,7 +169,7 @@ module Koholint
     def note_chests(state)
       return unless state.phase(booted: true) == :playing && Readiness.signals_ready?(state)
 
-      place = [state.room_id, state.map_id]
+      place = state.place
       chests = Entities.objects(@emulator).select { |object| object[:kind] == :chest }
       if @closed_chests&.first == place
         chests.select { |chest| chest[:open] && @closed_chests.last.include?(chest[:cell]) }
@@ -215,7 +214,7 @@ module Koholint
 
     def emit_dialogue(transcription, state)
       [transcription].flatten(1).compact.each do |entry|
-        @run.trace.emit(:dialogue, frame: entry[:frame] || state.frame, place: entry[:place] || [state.room_id, state.map_id], text: entry[:text],
+        @run.trace.emit(:dialogue, frame: entry[:frame] || state.frame, place: entry[:place] || state.place, text: entry[:text],
                                    source: 'agent', page: entry[:page], **entry.slice(:conversation, :speaker, :cached))
       end
     end
@@ -306,7 +305,7 @@ module Koholint
       @readiness.observe(state)
       gains = @items.observe(state)
       gains.each { |gain| @run.trace.emit(:item_gained, frame: state.frame, **gain) }
-      place = [state.room_id, state.map_id]
+      place = state.place
       new_place = state.phase(booted: true) == :playing && Readiness.signals_ready?(state) && @places.add?(place)
       moment = { reason: gains.any? ? 'item_gained' : 'new_place', **(new_place ? { place: } : {}) } if gains.any? || new_place
       after_frame(moment)
@@ -325,8 +324,8 @@ module Koholint
         end
         break if @budget.exhausted
 
-        @builder&.note_fall(state) if state.link_motion_state == FALL_MOTION && !falling
-        falling = state.link_motion_state == FALL_MOTION
+        @builder&.note_fall(state) if state.falling? && !falling
+        falling = state.falling?
         reasons[reason] += 1
         state = step([])
         waited += 1

@@ -8,7 +8,6 @@ module Koholint
   class ExploreLog
     TRIED_AT = 2
     CUT_VISITS = 4
-    OPPOSITE = { up: :down, down: :up, left: :right, right: :left }.freeze
 
     def self.from_events(events)
       log = new
@@ -121,7 +120,7 @@ module Koholint
         Ledger.pick(use, :effect) ? @failed[place].delete(cell) : (@failed[place] << cell).uniq!
       end
       Array(Ledger.pick(result, :crossed)).each do |row, col, direction|
-        delta = Navigation::Planner::DELTAS[direction.to_s.to_sym] or next
+        delta = Geometry::DELTAS[direction.to_s.to_sym] or next
         walk(place, [row, col])
         walk(place, [row + delta[0], col + delta[1]])
       end
@@ -150,7 +149,7 @@ module Koholint
       return if Ledger.pick(exit, :kind).to_s == 'door' || Ledger.pick(exit, :walk_in)
 
       note_arrival(to, cell, direction.to_sym)
-      assume_edge(to, OPPOSITE.fetch(direction.to_sym), place) if OPPOSITE.key?(direction.to_sym) && !surprised
+      assume_edge(to, Geometry::OPPOSITE.fetch(direction.to_sym), place) if Geometry::OPPOSITE.key?(direction.to_sym) && !surprised
     end
 
     def note(result, frame: nil)
@@ -189,7 +188,7 @@ module Koholint
     # Cells Link entered with any skill, which no object fills.
     def note_stood(place, result)
       Array(Ledger.pick(result, :crossed)).each do |row, col, direction|
-        delta = Navigation::Planner::DELTAS[direction.to_s.to_sym] or next
+        delta = Geometry::DELTAS[direction.to_s.to_sym] or next
         @stood[place] |= [[row, col], [row + delta[0], col + delta[1]]]
       end
     end
@@ -221,7 +220,7 @@ module Koholint
       Geometry::ROWS.times.to_a.product(Geometry::COLS.times.to_a).filter_map do |cell|
         record = @looks[grid.dig(*cell)]
         next unless record && record[:wins] > record[:losses] && !walked.include?(cell) && !@failed.fetch(place, []).include?(cell)
-        next unless Navigation::Planner::DELTAS.values.any? { |dr, dc| walked.include?([cell[0] + dr, cell[1] + dc]) }
+        next unless Geometry::DELTAS.values.any? { |dr, dc| walked.include?([cell[0] + dr, cell[1] + dc]) }
 
         { cell:, look: grid.dig(*cell), source: record[:first], wins: record[:wins], losses: record[:losses] }
       end
@@ -238,17 +237,17 @@ module Koholint
 
       exit = Ledger.pick(result, :exit)
       direction = (exit ? Ledger.pick(exit, :direction) : (Ledger.pick(Ledger.pick(result, :params) || {}, :direction) if STRAIGHT.include?(skill)))&.to_s&.to_sym
-      return unless OPPOSITE.key?(direction)
+      return unless Geometry::OPPOSITE.key?(direction)
 
       cell = cell_of(exit) if exit
-      dr, dc = Navigation::Planner::DELTAS[direction]
+      dr, dc = Geometry::DELTAS[direction]
       ahead = [cell[0] + dr, cell[1] + dc] if cell&.all?(Integer)
-      return take_exit(from, ExploreLog.door_exit(cell, ahead, @surveys.dig(from, :doors) || [], to)) if ahead && ahead[0].between?(0, Geometry::ROWS - 1) && ahead[1].between?(0, Geometry::COLS - 1)
+      return take_exit(from, ExploreLog.door_exit(cell, ahead, @surveys.dig(from, :doors) || [], to)) if ahead && Geometry.in_grid?(ahead)
 
       surprised = observe_edge(from, direction, to)
       crossed(from, direction, to, door: exit && Ledger.pick(exit, :walk_in))
       # A door walk (a house left by its bottom edge) loads the next place instead of scrolling: it says nothing of the side Link arrives by.
-      assume_edge(to, OPPOSITE.fetch(direction), from) unless (exit && Ledger.pick(exit, :walk_in)) || surprised
+      assume_edge(to, Geometry::OPPOSITE.fetch(direction), from) unless (exit && Ledger.pick(exit, :walk_in)) || surprised
     end
 
     # A tie goes to the latest destination.
@@ -401,7 +400,7 @@ module Koholint
         return hops_to(seen, state) if place != from && (goal ? place == goal : work?(place) && !skip.include?(place))
 
         ways(place).each do |key, to|
-          ahead = [to, OPPOSITE[key]]
+          ahead = [to, Geometry::OPPOSITE[key]]
           next if seen.key?(ahead) || pocket?(to, key) || (place == from && avoid.include?(key)) || beyond?(tier, place, key) ||
                   (cut?(place, came, key) && !lifted.include?([place, came, key]))
 
@@ -424,9 +423,9 @@ module Koholint
     # whose route has no reachable exit on two visits (an enemy may block it once), shows the landing is a closed pocket: routes must not
     # enter it, and Link leaves a landing suspected or known as one the way he came.
     def note_arrival(to, cell, direction)
-      return unless OPPOSITE.key?(direction)
+      return unless Geometry::OPPOSITE.key?(direction)
 
-      @arrivals[[to, OPPOSITE.fetch(direction)]] = case direction
+      @arrivals[[to, Geometry::OPPOSITE.fetch(direction)]] = case direction
                                                    when :up then [Geometry::ROWS - 1, cell[1]]
                                                    when :down then [0, cell[1]]
                                                    when :left then [cell[0], Geometry::COLS - 1]
@@ -446,7 +445,7 @@ module Koholint
 
     def pocket_side(place, cell) = @pockets[[place, cell]] || (landing_side(place, cell) if @suspects.key?([place, cell]))
 
-    def pocket?(to, key) = key.is_a?(Symbol) && OPPOSITE.key?(key) && !@through.include?([to, OPPOSITE.fetch(key)]) && @pockets.key?([to, @arrivals[[to, OPPOSITE.fetch(key)]]])
+    def pocket?(to, key) = key.is_a?(Symbol) && Geometry::OPPOSITE.key?(key) && !@through.include?([to, Geometry::OPPOSITE.fetch(key)]) && @pockets.key?([to, @arrivals[[to, Geometry::OPPOSITE.fetch(key)]]])
 
     # Leaving a place by another way than the side Link came in by proves that landing leads on: it is never a pocket.
     def crossed(place, way, to, door: false)
@@ -454,7 +453,7 @@ module Koholint
       @cut_off.delete([place, came, way])
       @spent_cuts.delete([place, came, way])
       @through << [place, came] if came && came != way && !@through.include?([place, came])
-      @entered[to] = (OPPOSITE[way] unless door)
+      @entered[to] = (Geometry::OPPOSITE[way] unless door)
     end
 
     def landing_side(place, cell) = @arrivals.find { |(where, _), arrival| where == place && arrival == cell }&.dig(0, 1)
@@ -512,7 +511,7 @@ module Koholint
     def failed_clears(place) = @failed.fetch(place, []).dup
 
     def walk(place, cell)
-      return unless cell.all?(Integer) && cell[0].between?(0, Geometry::ROWS - 1) && cell[1].between?(0, Geometry::COLS - 1)
+      return unless cell.all?(Integer) && Geometry.in_grid?(cell)
 
       @walls[place].delete(cell)
       @walked[place] << cell unless @walked[place].include?(cell)

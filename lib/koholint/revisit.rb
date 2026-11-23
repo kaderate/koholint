@@ -38,7 +38,7 @@ module Koholint
       observe(state)
       return if budget_low || danger || !PHASES.include?(state.phase(booted: true)) || hurt?(state) || threatened?(state, entities)
 
-      place = [state.room_id, state.map_id]
+      place = state.place
       visit = visit_for(place)
       world = stamp
       stamp = cycle_of(stamp)
@@ -62,7 +62,7 @@ module Koholint
 
     def next_action(state:, entities:, stamp:, signs: [], budget_low: false, danger: false)
       close(:no_text) if @open
-      place = [state.room_id, state.map_id]
+      place = state.place
       visit = visit_for(place)
       target = candidate(state:, entities:, stamp:, signs:, budget_low:, danger:) or return
       stamp = cycle_of(stamp)

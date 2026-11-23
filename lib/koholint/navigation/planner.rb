@@ -3,11 +3,10 @@ require 'koholint/geometry'
 module Koholint
   module Navigation
     class Planner
-      DELTAS = { up: [-1, 0], right: [0, 1], down: [1, 0], left: [0, -1] }.freeze
       EXPLORE = %i[yes unknown stale].freeze
 
       def self.direction_between(from, to)
-        DELTAS.find { |_, (dr, dc)| [from[0] + dr, from[1] + dc] == to }&.first
+        Geometry::DELTAS.find { |_, (dr, dc)| [from[0] + dr, from[1] + dc] == to }&.first
       end
 
       def initialize(grid:, ledger:, place:, triggers: nil, mode: :explore, danger: nil, pushable: nil, contact: nil, away: nil)
@@ -52,7 +51,7 @@ module Koholint
           next if best[[cell, heading]] != [steps, turns]
           return rebuild(parents, [cell, heading]) if cell == to
 
-          DELTAS.each_key do |direction|
+          Geometry::DELTAS.each_key do |direction|
             target = step(cell, direction)
             next unless target && (target == to || (!margin.include?(target) && (!zones.include?(target) || away?(cell, target, zones))))
             next unless walkable?(cell, target, direction, allowed, doubt, forbid, push)
@@ -74,7 +73,7 @@ module Koholint
         return 'no current cell' unless inside?(from) && inside?(to)
         return 'target is current cell' if from == to
         return 'target covered by an object' if @grid.static_sprite(*to)
-        return 'target believed blocked' if DELTAS.each_key.all? { |direction| @grid.passable(*to, direction) == :no }
+        return 'target believed blocked' if Geometry::DELTAS.each_key.all? { |direction| @grid.passable(*to, direction) == :no }
 
         free = path(from:, to:, doubt: false) || path(from:, to:, doubt: false, forbid: false)
         unless free
@@ -103,10 +102,10 @@ module Koholint
       # Inside a zone Link may still move, as long as no step heads toward an enemy.
       def away?(cell, target, zones) = @away && zones.include?(cell) && @away.call(cell, target)
 
-      def inside?(cell) = cell.is_a?(Array) && cell[0].between?(0, Geometry::ROWS - 1) && cell[1].between?(0, Geometry::COLS - 1)
+      def inside?(cell) = cell.is_a?(Array) && Geometry.in_grid?(cell)
 
       def step(cell, direction)
-        dr, dc = DELTAS.fetch(direction)
+        dr, dc = Geometry::DELTAS.fetch(direction)
         target = [cell[0] + dr, cell[1] + dc]
         target if inside?(target)
       end

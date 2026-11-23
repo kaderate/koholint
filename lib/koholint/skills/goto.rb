@@ -53,7 +53,7 @@ module Koholint
           grid = context[:grid]
           return nil unless grid
 
-          Navigation::Planner.new(grid:, ledger: context[:ledger], place: [@start.room_id, @start.map_id], triggers: context[:triggers], danger: danger_of(context), pushable: pushable_of(context), contact: contact_of(context), away: away_of(context))
+          Navigation::Planner.new(grid:, ledger: context[:ledger], place: @start.place, triggers: context[:triggers], danger: danger_of(context), pushable: pushable_of(context), contact: contact_of(context), away: away_of(context))
         end
 
         def cross_margin? = true
@@ -90,7 +90,7 @@ module Koholint
           return finish(@idle_reason) if @idle_reason
           return idle(:no_path) unless @path
           return idle(:done) if @path.size < 2 && @frames.zero?
-          return finish(:room_change) if room(state) != room(@start)
+          return finish(:room_change) if state.place != @start.place
           return finish(:damage) if state.health < @start.health
           return finish(:dialogue) if state.dialog_open? && !@start.dialog_open?
           return recentre(state) if @recentre
@@ -122,7 +122,7 @@ module Koholint
             horizontal = %i[left right].include?(heading)
             dx, dy = Geometry.offset(state.x, state.y, state.cell)
             along, across = horizontal ? [dx, dy] : [dy, dx]
-            ahead = Navigation::Planner::DELTAS.fetch(heading)[horizontal ? 1 : 0]
+            ahead = Geometry::DELTAS.fetch(heading)[horizontal ? 1 : 0]
             direction = if (along * ahead).positive? then BACK.fetch(heading)
                         elsif !across.zero? then horizontal ? (across.positive? ? :up : :down) : (across.positive? ? :left : :right)
                         end

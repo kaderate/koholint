@@ -11,7 +11,7 @@ module Koholint
         choice = if (step % TALK_EVERY) == TALK_EVERY - 1
                    { buttons: [:a], frames: 2 }
                  else
-                   { buttons: [DecisionPoint::DIRECTIONS[step % DecisionPoint::DIRECTIONS.size]], frames: CYCLE_FRAMES }
+                   { buttons: [Geometry::DIRECTIONS[step % Geometry::DIRECTIONS.size]], frames: CYCLE_FRAMES }
                  end
         { choice: choice, justification: 'fixed cycle', confidence: 1.0, agent: 'walk_and_talk' }
       end

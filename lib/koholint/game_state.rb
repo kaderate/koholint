@@ -7,6 +7,7 @@ module Koholint
   PLAY_SETTLED_SUBMODE = 7
   # link_motion_state while a door walks Link in: he holds still about 18 frames, then the next place loads (run 20261112-103604-0c64, frames 71971-71990).
   DOOR_WALK_IN = 3
+  FALL_MOTION = 6
 
   GameState = Struct.new(:frame, :room_id, :map_id, :x, :y, :direction, :hp, :max_hp, :milestone,
                          :game_mode, :game_submode, :name_length, :dialog_state, :motion_blocked, :scene_state,
@@ -18,6 +19,8 @@ module Koholint
 
     def cell = self.class.cell_at(x, y)
 
+    def place = [room_id, map_id]
+
     def controllable? = hp.to_i.positive? && x.to_i.positive?
 
     # Health once the pending damage has drained: the game lowers hp by one unit every 2 frames after a hit (data/addresses.json, pending_damage).
@@ -28,6 +31,8 @@ module Koholint
     def loading? = game_mode == PLAY_MODE && game_submode != PLAY_SETTLED_SUBMODE
 
     def door_walk_in? = link_motion_state.to_i == DOOR_WALK_IN
+
+    def falling? = link_motion_state.to_i == FALL_MOTION
 
     def locked? = motion_blocked.to_i.positive?
 

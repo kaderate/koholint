@@ -1,3 +1,4 @@
+require 'koholint/geometry'
 require 'koholint/ledger'
 
 module Koholint
@@ -45,7 +46,7 @@ module Koholint
       from = Ledger.pick(result, :from)
       row = Ledger.pick(from, :row)
       col = Ledger.pick(from, :col)
-      return unless %w[up right down left].include?(input) && row && col
+      return unless Geometry::DIRECTIONS.map(&:to_s).include?(input) && row && col
 
       { place: Ledger.place_of(from), cell: [row, col], input: }
     end

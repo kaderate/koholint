@@ -4,8 +4,6 @@ module Koholint
   module Skills
     # Runs the published capability that clears the object ahead of Link when a moving skill is blocked by it, once per cell.
     class Clearing
-      DELTAS = { up: [-1, 0], right: [0, 1], down: [1, 0], left: [0, -1] }.freeze
-
       attr_reader :uses
 
       def self.of(context)
@@ -33,7 +31,7 @@ module Koholint
 
       def start(state, direction)
         cell = state.cell
-        dr, dc = DELTAS.fetch(direction) { return nil }
+        dr, dc = Geometry::DELTAS.fetch(direction) { return nil }
         ahead = cell && [cell[0] + dr, cell[1] + dc]
         skill = ahead && cells[ahead]
         return nil unless skill && !@tried.include?(ahead)

@@ -29,7 +29,7 @@ module Koholint
       return nil unless state.room_id && state.map_id && state.phase(booted: true) == :playing && !state.dialog_open? &&
                     Modes.ready?(state)
 
-      place = [state.room_id, state.map_id]
+      place = state.place
       return nil if @captured[place]
 
       unless place == @place

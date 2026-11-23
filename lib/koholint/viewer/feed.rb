@@ -27,7 +27,6 @@ module Koholint
       GRID_CACHE = {}
       MAX_RUNS = 4
       GRID_TYPES = %w[screen affordance perception].freeze
-      DIRECTIONS = %i[up down left right].freeze
 
       module_function
 
@@ -197,7 +196,7 @@ module Koholint
 
       def usable_affordance?(event)
         event['action'].is_a?(String) && event.fetch('context', []).is_a?(Array) && %w[yes no].include?(event['result']) &&
-          [nil, *DIRECTIONS.map(&:to_s)].include?(event['direction'])
+          [nil, *Geometry::VERTICAL_FIRST.map(&:to_s)].include?(event['direction'])
       end
 
       def same_trace?(ref, trace) = (ref.__getobj__.equal?(trace) rescue false)
@@ -222,7 +221,7 @@ module Koholint
       end
 
       def cell_state(grid, row, col)
-        beliefs = DIRECTIONS.map { |direction| grid.passable(row, col, direction) }
+        beliefs = Geometry::VERTICAL_FIRST.map { |direction| grid.passable(row, col, direction) }
         yes = beliefs.include?(:yes)
         no = beliefs.include?(:no)
         return 'mixed' if yes && no

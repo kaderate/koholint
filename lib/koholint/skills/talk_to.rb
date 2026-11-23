@@ -87,7 +87,7 @@ module Koholint
           planner = super or return nil
           Array(context[:objects]&.call).select { |object| object[:kind].to_s == 'door' }.each do |door|
             Array(door[:faces]).each do |face|
-              dr, dc = Navigation::Planner::DELTAS.fetch(face.to_sym)
+              dr, dc = Geometry::DELTAS.fetch(face.to_sym)
               planner.avoid(door[:cell], face.to_sym)
               planner.avoid([door[:cell][0] - dr, door[:cell][1] - dc], face.to_sym)
             end
@@ -145,7 +145,7 @@ module Koholint
           log = context[:talk_log]
           return [] unless log && start
 
-          log.failed_sides([start.room_id, start.map_id], person)
+          log.failed_sides(start.place, person)
         end
 
         def retarget(state)
@@ -182,9 +182,9 @@ module Koholint
 
         def neighbours
           @cells.flat_map do |person|
-            Navigation::Planner::DELTAS.values.filter_map do |dr, dc|
+            Geometry::DELTAS.values.filter_map do |dr, dc|
               cell = [person[0] + dr, person[1] + dc]
-              cell if cell[0].between?(0, Geometry::ROWS - 1) && cell[1].between?(0, Geometry::COLS - 1) && !@cells.include?(cell) &&
+              cell if Geometry.in_grid?(cell) && !@cells.include?(cell) &&
                       !@grid&.static_sprite(*cell) && (@faces.empty? || @faces.include?(Navigation::Planner.direction_between(cell, person)))
             end
           end.uniq
@@ -261,7 +261,7 @@ module Koholint
         def input_for(state)
           return idle(:no_response) if @non_person && @frames.zero?
           return super if @phase == :walk
-          return finish(:room_change) if room(state) != room(@start)
+          return finish(:room_change) if state.place != @start.place
           return finish(:damage) if state.health < @start.health
 
           if @phase == :face
@@ -352,7 +352,7 @@ module Koholint
           return unless @entities && @standing
           return { type: @who[:type], slot: @who[:slot], kind: @who[:kind].to_s } if @who
 
-          delta = Navigation::Planner::DELTAS.fetch(@facing, [0, 0])
+          delta = Geometry::DELTAS.fetch(@facing, [0, 0])
           faced = [@standing[0] + delta[0], @standing[1] + delta[1]]
           found = @entities.call.select { |entity| entity[:cell] == faced && entity[:kind].to_s == 'npc' }.min_by { |entity| entity[:slot] }
           found&.slice(:type, :slot, :kind)&.transform_values { |v| v.is_a?(Symbol) ? v.to_s : v }

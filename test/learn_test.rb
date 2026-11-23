@@ -49,7 +49,7 @@ class LearnTest < Minitest::Test
     assert_equal [[6, 5], [6, 7]], found.first[:places].first[:cells]
     place = found.first[:places].first
     stand, direction = L.stands([6, 5], place).first
-    dr, dc = Koholint::Skills::Composite::DELTAS[direction]
+    dr, dc = Koholint::Geometry::DELTAS[direction]
     assert_equal 92, place[:grid].dig(stand[0] + dr, stand[1] + dc)
     assert_equal [37], L.candidates(gain:, sightings:, stood:, known: [], object: 37).map { |c| c[:object] }
     assert_equal [92], L.candidates(gain:, sightings:, stood:, known: [], limit: 1).map { |c| c[:object] }

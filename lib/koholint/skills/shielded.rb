@@ -1,4 +1,5 @@
 require 'delegate'
+require 'koholint/geometry'
 require 'koholint/items'
 require 'koholint/navigation/threat'
 
@@ -7,7 +8,6 @@ module Koholint
     # Holds the guarding item's button during the inputs of a moving skill while a threat is near; never touches the direction.
     class Shielded < SimpleDelegator
       MOVING = %w[walk goto explore step attack].freeze
-      DIRECTIONS = %i[up down left right].freeze
 
       def initialize(inner, entities:)
         super(inner)
@@ -17,7 +17,7 @@ module Koholint
 
       def next_input(state)
         buttons = super
-        return buttons unless buttons && buttons.intersect?(DIRECTIONS)
+        return buttons unless buttons && buttons.intersect?(Geometry::DIRECTIONS)
 
         button = Items.button_of(state, Items::SHIELD)
         return buttons unless button && !buttons.include?(button) && threatened?(state)

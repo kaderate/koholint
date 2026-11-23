@@ -133,7 +133,7 @@ module Koholint
       return nil if state.loading?
 
       playing = %i[playing locked dialogue].include?(state.phase)
-      place = [state.room_id, state.map_id]
+      place = state.place
       first_visit = playing && @visited.any? && !@visited.include?(place)
       @visited << place if playing && !@visited.include?(place)
       return nil unless @current

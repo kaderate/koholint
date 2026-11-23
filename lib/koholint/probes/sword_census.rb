@@ -40,7 +40,7 @@ module Koholint
       def report(emulator, run:, frame:)
         state = Perception.read(emulator)
         enemies = Entities.read(emulator).select { |entity| entity[:kind].to_s == 'enemy' }
-        { run:, frame:, place: [state.room_id, state.map_id], link: { x: state.x, y: state.y, hp: state.hp },
+        { run:, frame:, place: state.place, link: { x: state.x, y: state.y, hp: state.hp },
           sword: Items.button_of(state, Items::SWORD), enemies: enemies.map { |entity| probe(emulator, entity) } }
       end
 

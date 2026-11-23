@@ -11,7 +11,9 @@ class GridBuilderProbeTest < Minitest::Test
   Builder = Koholint::Vision::GridBuilder
   Capabilities = Koholint::Vision::Capabilities
   Beliefs = Koholint::Vision::Beliefs
-  State = Struct.new(:frame, :room_id, :map_id, :x, :y)
+  State = Struct.new(:frame, :room_id, :map_id, :x, :y) do
+    def place = [room_id, map_id]
+  end
   DIRECTIONS = %i[up down left right].freeze
 
   class FakeEmulator

@@ -6,8 +6,6 @@ module Koholint
   module Skills
     # A learned capability: existing skills run one after the other, each started through the registry so Shielded and triggers apply.
     class Composite
-      DIRECTIONS = %i[up right down left].freeze
-      DELTAS = { up: [-1, 0], right: [0, 1], down: [1, 0], left: [0, -1] }.freeze
       # Skills a capability may compose, with their frame caps; explore (unbounded) and the screen skills are left out.
       CAPS = { 'goto' => Execution::HARD_CAP, 'walk' => Execution::HARD_CAP, 'step' => Execution::HARD_CAP, 'wait' => Execution::HARD_CAP,
                'press' => Execution::HARD_CAP, 'advance_dialogue' => Execution::HARD_CAP, 'talk_to' => Execution::HARD_CAP,
@@ -75,7 +73,7 @@ module Koholint
         { type: 'object', title: name,
           properties: { row: { type: 'integer', minimum: 0, maximum: Geometry::ROWS - 1 },
                         col: { type: 'integer', minimum: 0, maximum: Geometry::COLS - 1 },
-                        direction: { type: 'string', enum: DIRECTIONS.map(&:to_s) } },
+                        direction: { type: 'string', enum: Geometry::DIRECTIONS.map(&:to_s) } },
           required: %w[row col direction], additionalProperties: false }
       end
 
@@ -85,7 +83,7 @@ module Koholint
         raise ArgumentError, "#{name}: col must be 0..#{Geometry::COLS - 1}" unless params[:col].is_a?(Integer) && params[:col].between?(0, Geometry::COLS - 1)
 
         direction = params[:direction].respond_to?(:to_sym) ? params[:direction].to_sym : nil
-        raise ArgumentError, "#{name}: direction must be one of #{DIRECTIONS.join(', ')}" unless DIRECTIONS.include?(direction)
+        raise ArgumentError, "#{name}: direction must be one of #{Geometry::DIRECTIONS.join(', ')}" unless Geometry::DIRECTIONS.include?(direction)
 
         { row: params[:row], col: params[:col], direction: }
       end
@@ -96,7 +94,7 @@ module Koholint
         steps = @entry['steps'].map do |step|
           { skill: step['skill'], params: step['params'].transform_values { |value| values.fetch(value, value) }, accept: step['accept'] }
         end
-        target = [params[:row], params[:col]].zip(DELTAS.fetch(params[:direction])).map(&:sum)
+        target = [params[:row], params[:col]].zip(Geometry::DELTAS.fetch(params[:direction])).map(&:sum)
         Run.new(skill: name, params:, state:, steps:, context:, target:, cap: max_frames, capability: { id: @entry['id'], version: @entry['version'] })
       end
     end

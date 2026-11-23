@@ -11,7 +11,9 @@ class GridBuilderTest < Minitest::Test
   LCDC = 0xFF40
   OAM = 0xFE00
   DIALOG = 0xC19F
-  State = Struct.new(:frame, :room_id, :map_id, :x, :y)
+  State = Struct.new(:frame, :room_id, :map_id, :x, :y) do
+    def place = [room_id, map_id]
+  end
 
   class FakeEmulator
     attr_accessor :frame

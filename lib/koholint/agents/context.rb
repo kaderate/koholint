@@ -11,8 +11,6 @@ module Koholint
   module Agents
     module Context
       LEGEND = 'Legend: . passable, # blocked, ? unknown, ! stale or doubtful, ~ one-way, o static object, @ Link'.freeze
-      DIRECTIONS = %i[up right down left].freeze
-      DELTAS = { up: [-1, 0], right: [0, 1], down: [1, 0], left: [0, -1] }.freeze
       RESULT_LIMIT = 6
       MANUAL_LIMIT = 3000
       KEEP_RESULTS = 3
@@ -29,7 +27,7 @@ module Koholint
       def self.build(state:, grid:, objective:, history:, attempts:, manual:, last_results:, max_chars: 9000, ledger: nil, refusals: [], plan: nil, triggers: nil, talk_log: nil, locked: nil, locked_frames: nil, goal: nil, leads: [], stamp: nil, entities: [], signs: [],
                      place_name: nil, candidates: nil, resolve: nil, hp_lost: 0, died: false, alerts: [], route: nil, learned: nil)
         link = state.cell
-        place = [state.room_id, state.map_id]
+        place = state.place
         results = last_results.last(RESULT_LIMIT).map { |r| r.transform_keys(&:to_sym) }
         fixed = [header(state, link, triggers, place, locked, locked_frames, place_name, hp_lost, died, alerts), grid_block(grid, link, ledger, place), neighbours(grid, link, results, ledger, place),
                  *things_block(grid, talk_log, place, stamp, entities, signs), objective_block(objective, attempts, plan, goal, route), *leads_block(leads, place, resolve),
@@ -179,7 +177,7 @@ module Koholint
       end
       private_class_method :grid_block
 
-      def self.beliefs_of(grid, row, col) = DIRECTIONS.map { |d| grid.passable(row, col, d) }
+      def self.beliefs_of(grid, row, col) = Geometry::DIRECTIONS.map { |d| grid.passable(row, col, d) }
 
       def self.symbol(grid, row, col, doubt = [])
         return 'o' if grid.static_sprite(row, col)
@@ -198,9 +196,9 @@ module Koholint
       def self.doubtful_cells(grid, ledger, place, link)
         return [] unless ledger && link
 
-        DIRECTIONS.filter_map do |d|
-          cell = [link[0] + DELTAS[d][0], link[1] + DELTAS[d][1]]
-          next unless cell[0].between?(0, Vision::Grid::ROWS - 1) && cell[1].between?(0, Vision::Grid::COLS - 1)
+        Geometry::DIRECTIONS.filter_map do |d|
+          cell = Geometry.step(link, d)
+          next unless cell
 
           cell if ledger.doubtful?(place, link, d) && grid.passable(*cell, d) == :yes
         end
@@ -210,13 +208,11 @@ module Koholint
       def self.neighbours(grid, link, results, ledger, place)
         return "Neighbours of Link:\n- Link is outside the 8x10 grid (doorway or screen edge): no neighbour cells" unless link
 
-        rows = DIRECTIONS.map do |direction|
-          row = link[0] + DELTAS[direction][0]
-          col = link[1] + DELTAS[direction][1]
-          unless row.between?(0, Vision::Grid::ROWS - 1) && col.between?(0, Vision::Grid::COLS - 1)
-            next "- #{direction}: edge of the screen"
-          end
+        rows = Geometry::DIRECTIONS.map do |direction|
+          cell = Geometry.step(link, direction)
+          next "- #{direction}: edge of the screen" unless cell
 
+          row, col = cell
           shown = symbol(grid, row, col, doubtful_cells(grid, ledger, place, link))
           times = ledger ? ledger.count(place, link, direction) : 0
           blocked = times.positive? ? ", blocked #{times} #{times == 1 ? 'time' : 'times'}" : ''

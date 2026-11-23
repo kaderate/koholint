@@ -43,7 +43,7 @@ module Koholint
         state = Perception.read(emulator)
         sprites = Vision::ScreenVision.sprites(emulator, emulator.read(Vision::ScreenVision::LCDC)).reject { |s| Vision::GridBuilder.link_sprite?(s, state) }
         entities = Entities.read(emulator, kinds: {})
-        { run:, frame:, place: [state.room_id, state.map_id], link: { x: state.x, y: state.y, cell: state.cell },
+        { run:, frame:, place: state.place, link: { x: state.x, y: state.y, cell: state.cell },
           entities: entities.map { |entity| probe(emulator, entity, sprites) },
           free_slots: free_slots(emulator, sprites),
           unmatched_sprites: sprites.reject { |s| entities.any? { |e| sprite_of?(s, e) } }.map { |s| s.slice(:x, :y) } }
