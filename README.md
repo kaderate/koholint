@@ -14,7 +14,7 @@
 - **Agents only at decision points.** The engine owns the loop, the budgets and the files; the agent picks objectives and skills (explore, walk, talk, attack, use an item) and the engine executes them frame by frame. That keeps a run cheap, bounded in time and money, and reproducible.
 - **No walkthrough.** The agent knows how Game Boy games work and how this one is played (controls, menus, map). Where to go and what to do is observed or read from in-game texts, and every game fact lives in typed data with provenance.
 - **It improves itself.** Runs emit symptoms and suggestions, offline commands propose, try and judge new *capabilities*, and a published capability becomes a skill the agent can use.
-- **Watch it think.** A built-in viewer shows the game screen, the agent's reasoning, the world map it builds, and the cost curve, live or as a replay.
+- **Watch it think.** A built-in viewer shows the game screen, the agent's reasoning, the world map it builds, and its spend against the budget, live or as a replay.
 
 ## Where it stands
 
