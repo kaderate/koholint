@@ -90,7 +90,7 @@ module Koholint
           return finish(@idle_reason) if @idle_reason
           return idle(:no_path) unless @path
           return idle(:done) if @path.size < 2 && @frames.zero?
-          return finish(:room_change) if room(state) != room(@start)
+          return finish(:room_change) if state.place != @start.place
           return finish(:damage) if state.health < @start.health
           return finish(:dialogue) if state.dialog_open? && !@start.dialog_open?
           return recentre(state) if @recentre

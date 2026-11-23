@@ -60,7 +60,7 @@ module Koholint
           super(**rest)
           @aim = context[:aim] || {}
           @hint = direction || @aim[:direction]
-          @place = room(@start)
+          @place = @start.place
           @ledger = context[:ledger]
           @talk_log = context[:talk_log]
           @log = context[:explore_log]
@@ -99,7 +99,7 @@ module Koholint
         end
 
         def result(state = @last)
-          merged = super.merge(place_changed: room(state) != @place, cells_walked: @cells_walked, legs: @legs, target: target_summary,
+          merged = super.merge(place_changed: state.place != @place, cells_walked: @cells_walked, legs: @legs, target: target_summary,
                                crossed: @crossed.map(&:dup), walls: @new_walls.map { |row, col| { row:, col: } }, blocked_edges: @blocked.map(&:dup), exits: @exits.map(&:dup),
                                offered: @offered.map { |row, col| { row:, col: } })
           merged[:clears] = @clearing.uses if @clearing&.uses&.any?
@@ -126,7 +126,7 @@ module Koholint
           @still = [state.x, state.y] == @position ? @still + 1 : 0
           @position = [state.x, state.y]
           return @clearing.step(state) if @clearing&.active? && !@leg
-          return depart(state) if room(state) != @place
+          return depart(state) if state.place != @place
           return harmed if state.health < @start.health
           return interrupted(state) if state.dialog_open?
           return entering if walking_in?(state)
@@ -183,7 +183,7 @@ module Koholint
         end
 
         def depart(state)
-          to = room(state)
+          to = state.place
           if @target && @target[:kind] == :door && (@outward || @entering.positive?)
             @exits << { row: @target[:cell][0], col: @target[:cell][1], direction: :up, outcome: :left, to:, kind: :door }
           elsif @cell && @heading && Geometry.step(@cell, @heading)

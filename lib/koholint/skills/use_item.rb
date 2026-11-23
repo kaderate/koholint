@@ -81,7 +81,7 @@ module Koholint
         end
         @raised += 1 if @held.positive? && state.shield_raised.to_i.positive?
         return finish(:dialogue) if state.dialog_open? && !@base.dialog_open?
-        return finish(:room_change) if room(state) != room(@base)
+        return finish(:room_change) if state.place != @base.place
         if @held < @hold
           @held += 1
           return [@button]

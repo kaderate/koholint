@@ -103,7 +103,7 @@ module Koholint
             return idle(:no_target) unless @enemy
           end
           return super if @phase == :walk
-          return finish(:room_change) if room(state) != room(@start)
+          return finish(:room_change) if state.place != @start.place
 
           strike(state)
         end

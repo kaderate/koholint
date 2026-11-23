@@ -9,6 +9,7 @@ module Koholint
     ALIGN_TOLERANCE = 4
     DELTAS = { up: [-1, 0], right: [0, 1], down: [1, 0], left: [0, -1] }.freeze
     DIRECTIONS = DELTAS.keys.freeze
+    # The grid builder's probes and fall records and the exit bench iterate in this order; DIRECTIONS would reorder their trace events.
     VERTICAL_FIRST = %i[up down left right].freeze
     OPPOSITE = { up: :down, down: :up, left: :right, right: :left }.freeze
     DEFAULT_PATH = File.expand_path('../../data/geometry.json', __dir__)

@@ -261,7 +261,7 @@ module Koholint
         def input_for(state)
           return idle(:no_response) if @non_person && @frames.zero?
           return super if @phase == :walk
-          return finish(:room_change) if room(state) != room(@start)
+          return finish(:room_change) if state.place != @start.place
           return finish(:damage) if state.health < @start.health
 
           if @phase == :face

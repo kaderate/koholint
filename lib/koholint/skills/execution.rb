@@ -57,7 +57,7 @@ module Koholint
       def result(state = @last)
         aligned, offset = alignment(state)
         { skill: @skill, params: @params, frames: @frames, from: place(@start), to: place(state),
-          moved_cells: moved_cells(state), room_changed: room(@start) != room(state), hp_delta: state.health - @start.health,
+          moved_cells: moved_cells(state), room_changed: @start.place != state.place, hp_delta: state.health - @start.health,
           dialog_before: @start.dialog_open?, dialog_after: state.dialog_open?, stopped_by: @stopped_by,
           aligned:, offset:, blocked_at: @blocked_at, trigger_input: trigger_input }.tap { |r| r[:exit] = @walked_in ? @exit.merge(walk_in: true) : @exit if r[:room_changed] && @exit }
       end
@@ -72,7 +72,7 @@ module Koholint
       def note_exit(state, buttons)
         direction = (Array(buttons) & Geometry::DIRECTIONS).first
         row, col = state.cell
-        @exit = { row:, col:, direction: } if direction && row && room(state) == room(@start)
+        @exit = { row:, col:, direction: } if direction && row && state.place == @start.place
       end
 
       # Stationary enemies the raised shield pushes aside (sea urchins) sit on cells their sprites make look like objects; only with the shield held.
@@ -147,7 +147,7 @@ module Koholint
 
       def centre(state)
         reason = @centring[:reason]
-        event = if room(state) != room(@start) then :room_change
+        event = if state.place != @start.place then :room_change
                 elsif state.health < @start.health then :damage
                 elsif state.dialog_open? && !@start.dialog_open? then :dialogue
                 end
@@ -187,7 +187,6 @@ module Koholint
         [Geometry.aligned?(state.x, state.y, cell), { dx:, dy: }]
       end
 
-      def room(state) = state.place
 
       def moved_cells(state)
         from = @start.cell

@@ -64,8 +64,7 @@ module Koholint
         end
 
         def feed_ledger(choice, outcome, state, frame, objective: true)
-          from = outcome[:from].is_a?(Hash) ? outcome[:from] : {}
-          place = from[:room] && from[:map] ? [from[:room], from[:map]] : state.place
+          place = place_of(outcome, :from, state)
           Ledger.edges_of(outcome).each { |edge| @ledger.record(place:, blocked_at: edge) }
           blocked_at = outcome[:blocked_at]
           if blocked_at && objective
