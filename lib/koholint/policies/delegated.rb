@@ -466,7 +466,7 @@ module Koholint
       # Closed chests carry whether a route on the current grid reaches the cell below them, from where they open; a chest whose
       # opening failed on this visit of the place is no longer reachable work until the next visit.
       def objects_for(state)
-        place = [state.room_id, state.map_id]
+        place = state.place
         grid = @last_grid if @last_place == place
         objects_now.map do |object|
           next object unless object[:kind].to_s == 'chest' && !object[:open]
@@ -482,7 +482,7 @@ module Koholint
 
       def note_open_chest(state)
         target = @objectives.current&.dig(:target)
-        return unless target && target[:kind].to_s == 'chest' && target[:place] == [state.room_id, state.map_id] && chest_open?(target[:cell])
+        return unless target && target[:kind].to_s == 'chest' && target[:place] == state.place && chest_open?(target[:cell])
 
         @objectives.note_chest_open(place: target[:place], cell: target[:cell])
       end
@@ -491,7 +491,7 @@ module Koholint
       def note_chest_attempt(choice, outcome, state)
         return unless choice[:skill] == 'talk_to'
 
-        place = [state.room_id, state.map_id]
+        place = state.place
         cell = [Ledger.pick(choice[:params], :row), Ledger.pick(choice[:params], :col)]
         chest = objects_now.find { |object| object[:kind].to_s == 'chest' && object[:cell] == cell } or return
         @cards[place][:chests] -= [cell] if @cards.dig(place, :chests)

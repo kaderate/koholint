@@ -169,7 +169,7 @@ module Koholint
     def note_chests(state)
       return unless state.phase(booted: true) == :playing && Readiness.signals_ready?(state)
 
-      place = [state.room_id, state.map_id]
+      place = state.place
       chests = Entities.objects(@emulator).select { |object| object[:kind] == :chest }
       if @closed_chests&.first == place
         chests.select { |chest| chest[:open] && @closed_chests.last.include?(chest[:cell]) }
