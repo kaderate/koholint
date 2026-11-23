@@ -28,7 +28,7 @@ class SkillsTest < Minitest::Test
   end
 
   def test_registry_names_and_unknown_skill
-    assert_equal %w[walk press advance_dialogue wait goto step talk_to explore open_menu close_menu open_map close_map menu_move menu_assign choose_option use_item guard attack], registry.names
+    assert_equal %w[walk press advance_dialogue wait goto step talk_to explore open_menu close_menu open_map close_map menu_move menu_assign choose_option use_item guard attack touch], registry.names
     assert_raises(ArgumentError) { registry.fetch('fly') }
     assert_raises(ArgumentError) { registry.start('fly', state, {}) }
   end
@@ -644,6 +644,23 @@ class SkillsTest < Minitest::Test
   def test_goto_params_are_validated
     [{ row: 8, col: 0 }, { row: 0, col: 10 }, { row: -1, col: 0 }, { row: 'a', col: 0 }, { row: 1 }, { row: 1, col: 1, x: 1 }].each do |bad|
       assert_raises(ArgumentError, bad.inspect) { registry.start('goto', state, bad, { grid: OpenGrid.new }) }
+    end
+  end
+
+  def test_touch_walks_onto_the_cell_and_reads_a_pickup_from_the_item_bytes_alone
+    execution = registry.start('touch', state, { row: 4, col: 8, type: 58 }, { grid: OpenGrid.new })
+    result, = simulate(execution, [88, 80])
+    assert_equal [:done, [4, 8], 58, false], [result[:stopped_by], result[:to].values_at(:row, :col), result[:target_type], result[:picked_up]]
+    assert_equal({ held: [], rupees: 0 }, result[:items_before])
+    richer = Koholint::GameState.new(frame: 0, room_id: 1, map_id: 0, x: 136, y: 80, hp: 24, dialog_state: 0, game_mode: 0x0B, game_submode: 7, milestone: :none, rupees: 5)
+    assert_equal [true, { held: [], rupees: 5 }], execution.result(richer).values_at(:picked_up, :items_after)
+    sword = Koholint::GameState.new(frame: 0, room_id: 1, map_id: 0, x: 136, y: 80, hp: 24, dialog_state: 0, game_mode: 0x0B, game_submode: 7, milestone: :none, item_a: 1)
+    assert_equal [true, { held: [1], rupees: 0 }], execution.result(sword).values_at(:picked_up, :items_after)
+  end
+
+  def test_touch_params_are_validated
+    [{ row: 4, col: 8 }, { row: 4, col: 8, type: 256 }, { row: 8, col: 0, type: 1 }, { row: 4, col: 8, type: 1, x: 1 }].each do |bad|
+      assert_raises(ArgumentError, bad.inspect) { registry.start('touch', state, bad, { grid: OpenGrid.new }) }
     end
   end
 

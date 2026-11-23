@@ -90,6 +90,27 @@ class PlaceCardTest < Minitest::Test
     end
   end
 
+  def test_touches_are_counted_per_type_and_a_pickup_type_is_verified_only_from_two_places
+    Dir.mktmpdir do |dir|
+      trace = Koholint::Trace.new(File.join(dir, 'trace.jsonl'))
+      touch = ->(frame, room, picked) { trace.emit(:action, frame:, skill: 'touch', params: { row: 1, col: 4, type: 47 }, result: { stopped_by: 'done', target_type: 47, from: { room:, map: 0 }, picked_up: picked, items_before: { held: [], rupees: 0 }, items_after: { held: [], rupees: picked ? 1 : 0 } }) }
+      trace.emit(:place_card, frame: 10, **card)
+      touch.(50, 162, false)
+      touch.(60, 162, true)
+      Koholint::Leads.write_world(dir)
+      world = JSON.parse(File.read(File.join(dir, 'world.json')))
+      assert_equal [{ 'type' => 47, 'tries' => 0, 'answered' => 0, 'moved' => false, 'touched' => 2, 'picked_up' => 1 }], world.dig('places', '162-0', 'unknown_types')
+      assert_equal [[47, 'observed', 1]], world['pickups'].map { |entry| entry.values_at('type', 'confidence', 'verified_count') }
+      assert_equal [{ 'place' => [162, 0], 'frame' => 60, 'cell' => [1, 4], 'items_before' => { 'held' => [], 'rupees' => 0 }, 'items_after' => { 'held' => [], 'rupees' => 1 } }], world['pickups'].first['touches']
+      touch.(70, 162, true)
+      Koholint::Leads.write_world(dir)
+      assert_equal 'observed', JSON.parse(File.read(File.join(dir, 'world.json')))['pickups'].first['confidence'], 'one place twice is one check'
+      touch.(80, 163, true)
+      Koholint::Leads.write_world(dir)
+      assert_equal [['verified', 2]], JSON.parse(File.read(File.join(dir, 'world.json')))['pickups'].map { |entry| entry.values_at('confidence', 'verified_count') }
+    end
+  end
+
   def test_world_tries_are_stored_once_per_type_and_moved_only_when_talk_to_chased_it
     Dir.mktmpdir do |dir|
       trace = Koholint::Trace.new(File.join(dir, 'trace.jsonl'))

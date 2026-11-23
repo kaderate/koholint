@@ -16,6 +16,7 @@ module Koholint
     CHOICE = { skill: 'explore', params: {} }.freeze
     FIGHT_LIMIT = 8
     TRY_LIMIT = 6
+    NOTHING = %w[no_response no_path frame_cap blocked target_free].freeze
     FIGHT_FRAMES = 900
     FIGHT_REACH = 2
     FIGHT_FLOOR = 16
@@ -40,6 +41,8 @@ module Koholint
       @aimed = Set.new
       @tries = 0
       @try_place = nil
+      @trial = nil
+      @touchable = []
     end
 
     def model_called(state:, objective:, news: false)
@@ -69,6 +72,11 @@ module Koholint
       @walled |= [outcome[:params][:direction].to_s] if skill.to_s == 'walk' && outcome.is_a?(Hash) && outcome[:params].is_a?(Hash) && walled?(outcome)
       explored = skill.to_s == 'explore' && outcome.is_a?(Hash)
       @stop = stop_after(skill.to_s, outcome.is_a?(Hash) ? outcome[:stopped_by].to_s : nil)
+      trial = @trying && @trial
+      @trial = nil
+      if trial && skill.to_s == 'talk_to' && outcome.is_a?(Hash) && NOTHING.include?(outcome[:stopped_by].to_s)
+        @touchable << trial.merge(type: trial[:type] || outcome[:target_type])
+      end
       @trying = false
       @untried = Array(outcome[:untried_objects]).map { |cell| [cell[:row], cell[:col]] } if explored
       @goto_done = skill.to_s == 'goto' ? outcome.is_a?(Hash) && outcome[:stopped_by].to_s == 'done' : skill.to_s == 'wait' && @goto_done
@@ -101,8 +109,7 @@ module Koholint
       return unless state.cell && !objective&.dig(:target) && !hold_reason(state:, objective:, caps: false)
 
       here = state.place
-      @tries = 0 unless @try_place == here
-      @try_place = here
+      visit(here)
       return if @tries >= TRY_LIMIT
 
       struck = @struck[:place] == here ? @struck[:types] : []
@@ -114,11 +121,36 @@ module Koholint
       cell, type = nearest
       @untried.delete(cell)
       @aimed << [here, type] if type
+      @trial = { place: here, type:, cell: [cell[0], cell[1]] }
       @trying = true
       @tries += 1
       what = type ? "entity type #{type}" : 'object'
       { choice: { skill: 'talk_to', params: { row: cell[0], col: cell[1] } }, justification: "autopilot: try the never-tried #{what} at (#{cell.join(',')})",
         confidence: 1.0, agent: 'delegated', latency_ms: 0, cost_usd: 0.0, fallback: false, autopilot: true, prompt: nil, image: nil }
+    end
+
+    # A still uncatalogued entity whose try gave nothing is walked onto once per visit, nearest first: touch reads the item bytes to tell a pickup.
+    # Still means it is still in the cell the try aimed at and not catalogued as moving; tries and touches share TRY_LIMIT.
+    def touch_choice(state:, objective:, entities:)
+      return unless state.cell && !objective&.dig(:target) && !hold_reason(state:, objective:, caps: false)
+
+      here = state.place
+      visit(here)
+      return if @tries >= TRY_LIMIT
+
+      struck = @struck[:place] == here ? @struck[:types] : []
+      row, col = state.cell
+      still = @touchable.reject { |trial| trial[:type].nil? || struck.include?(trial[:type]) }.filter_map do |trial|
+        entity = Array(entities).find { |each| each[:kind].to_s == 'unknown' && each[:type] == trial[:type] && each[:cell] == trial[:cell] && each[:moves] != true }
+        [trial, entity[:cell]] if entity
+      end
+      trial, cell = still.min_by { |_, (r, c)| [(r - row).abs + (c - col).abs, r, c] } || (return nil)
+      @touchable.delete(trial)
+      @trying = true
+      @tries += 1
+      { choice: { skill: 'touch', params: { row: cell[0], col: cell[1], type: trial[:type] } },
+        justification: "autopilot: walk onto the still entity type #{trial[:type]} at (#{cell.join(',')}), whose try gave nothing", confidence: 1.0,
+        agent: 'delegated', latency_ms: 0, cost_usd: 0.0, fallback: false, autopilot: true, prompt: nil, image: nil }
     end
 
     def next_choice(state:, objective:, follow: nil, danger: false)
@@ -189,6 +221,14 @@ module Koholint
     end
 
     private
+
+    def visit(here)
+      return if @try_place == here
+
+      @tries = 0
+      @touchable = []
+      @try_place = here
+    end
 
     def common_hold(state, news: true)
       return 'new lead or goal' if news && @news

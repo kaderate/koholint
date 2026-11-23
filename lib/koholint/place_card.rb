@@ -47,21 +47,38 @@ module Koholint
       end
     end
 
-    # Every talk_to aimed at an entity type in a place: how many, how many opened a dialogue, and whether talk_to had to chase it.
+    # Every talk_to aimed at an entity type in a place: how many, how many opened a dialogue, and whether talk_to had to chase it; and every touch, how many picked something up.
     def tries(events)
       found = Hash.new { |hash, key| hash[key] = { tries: 0, answered: 0, moved: false } }
       events.each do |event|
-        next unless event['type'] == 'action' && event['skill'] == 'talk_to' && event['result'].is_a?(Hash)
+        next unless event['type'] == 'action' && %w[talk_to touch].include?(event['skill']) && event['result'].is_a?(Hash)
 
         result = event['result']
         from = result['from'] or next
         type = result['target_type'] || result.dig('entity', 'type') or next
         tried = found[[[from['room'], from['map']], type]]
+        if event['skill'] == 'touch'
+          tried[:touched] = tried[:touched].to_i + 1
+          tried[:picked_up] = tried[:picked_up].to_i + (result['picked_up'] == true ? 1 : 0)
+          next
+        end
+
         tried[:tries] += 1
         tried[:answered] += 1 if result['talked'] == true
         tried[:moved] ||= result['tracked'].to_i.positive?
       end
       found
+    end
+
+    # The entity types a touch picked something up from, with each touch as provenance: observed from one place, verified from 2.
+    def pickups(events)
+      touches = events.select { |event| event['type'] == 'action' && event['skill'] == 'touch' && event.dig('result', 'picked_up') == true && event.dig('result', 'from') }
+      touches.group_by { |event| event['result']['target_type'] }.map do |type, seen|
+        at = ->(event) { event['result']['from'].values_at('room', 'map') }
+        places = seen.map(&at).uniq
+        { 'type' => type, 'confidence' => places.size >= 2 ? 'verified' : 'observed', 'verified_count' => places.size,
+          'touches' => seen.map { |event| { 'place' => at.(event), 'frame' => event['frame'], 'cell' => event['params'].values_at('row', 'col'), **event['result'].slice('items_before', 'items_after') } } }
+      end
     end
 
     def world(events, names: {})
