@@ -119,7 +119,8 @@ The skills, protocols and harness behaviours the agent works with. Versioned wit
   keep pressing that long before they report `blocked`, wait for it to land and stop `pushed`; routes and explore frontiers cross a stone only in a
   direction it slides, and the things on screen list such stones. Object 166 is a stone that does not move, and the room puts stones back on re-entry.
   Within a place, explore takes a side known only as the assumed way back (flow-78) after the place's other reachable untried exits, doors and frontiers;
-  it is still a frontier, taken when nothing else here is reachable, before a route to another place.
+  it is still a frontier, taken when nothing else here is reachable, before a route to another place. An explore that stops `no_frontier`
+  in at most one frame is answered by the harness at the next decision, not after three, since from the same cell it would find none again.
 - flow-81: a closed treasure chest (object 160) is untried work like an unread sign, but only while a route on the current grid reaches the cell below it:
   the revisit opens it with `talk_to` (walk up into it from below, then A; no model call, 2 rounds per chest), it is a `chest-R-C` objective candidate
   (`chest-R-M-R-C` for a place where one was seen reachable), and the things on screen list each chest as open or closed with the cell to open it from
