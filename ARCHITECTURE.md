@@ -57,7 +57,7 @@ model. Unknown cells are unknown, not walls.
 **Navigation and skills** — `geometry.rb` holds the cell grid, pixel offsets and the one direction vocabulary
 (`DIRECTIONS`/`DELTAS`/`OPPOSITE`, `VERTICAL_FIRST` for the order some probes keep, `in_grid?`, `step`).
 `navigation/planner.rb` plans shortest paths over known cells around danger, holes and doubtful edges; `navigation/threat.rb`
-is the threat interface. `skills/` holds the deterministic skills behind `skills/registry.rb`: `walk`, `goto`, `step`,
+is the threat interface; `navigation/stones.rb` searches the pushes that open a cell in a room of sliding stones. `skills/` holds the deterministic skills behind `skills/registry.rb`: `walk`, `goto`, `step`,
 `talk_to`, `attack`, `explore`, `touch` (harness only), `press`, `advance_dialogue`, `wait`, the screen skills of `screens.rb`,
 `use_item` and `guard`, the `shielded` wrapper, `clearing` (operational capabilities used by the moving skills) and
 `composite` (learned capabilities). Every skill reports how it stopped (`done`, `blocked`, `no_path`, …).

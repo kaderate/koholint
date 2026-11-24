@@ -23,6 +23,13 @@ class StonesTest < Minitest::Test
   end
 
   # Link moves a pixel a frame; a held stone slides when its far cell is floor, as measured in 171/10 (data/entities.json).
+  # The screen as the room draws it now: a slid stone's cell shows floor.
+  class LiveGrid
+    def initialize(room, rows) = (@room = room; @rows = rows)
+    def static_sprite(_row, _col) = nil
+    def passable(row, col, _direction) = @rows[row][col] == '#' || @room.stone?([row, col]) ? :no : :yes
+  end
+
   class Room
     attr_reader :objects, :x, :y, :room_id
 
@@ -91,8 +98,8 @@ class StonesTest < Minitest::Test
     Koholint::GameState.new(frame: 0, room_id: room.room_id, map_id: 0, x: room.x, y: room.y, hp: 24, dialog_state: 0, game_mode: 0x0B, game_submode: 7, milestone: :none)
   end
 
-  def play(skill, params, room, rows, limit: 600, **context)
-    run = Koholint::Skills::Registry.default.start(skill, state(room), params, { grid: MapGrid.new(rows), room_objects: room.reader, **context })
+  def play(skill, params, room, rows, limit: 600, grid: MapGrid.new(rows), **context)
+    run = Koholint::Skills::Registry.default.start(skill, state(room), params, { grid:, room_objects: room.reader, **context })
     inputs = []
     limit.times do
       buttons = run.next_input(state(room)) or break
@@ -230,5 +237,31 @@ class StonesTest < Minitest::Test
 
   def test_a_push_keeps_the_autopilot_exploring
     assert_includes Koholint::Autopilot::BENIGN, 'pushed'
+  end
+  JAM = ['##########', '#.....#..#', '#.....#..#', '#....s....', '#.....#..#', '#.....#..#', '##########', '##########'].freeze
+
+  def test_the_search_pushes_a_stone_aside_where_pushing_it_on_would_jam_the_corridor
+    floor = ->(cell, _direction) { JAM[cell[0]][cell[1]] == '.' }
+    plans = Koholint::Navigation::Stones.plans(link: [3, 1], stones: [[3, 5]], fixed: [], step: ->(_from, to, direction) { floor.(to, direction) }, slide: floor)
+    push = plans.fetch([3, 9]).first
+    assert_includes %i[up down], push[:direction], 'pushed right it lands in the corridor and walls it'
+    assert_equal [3, 5], push[:stone]
+    assert_equal 1, plans.fetch([3, 9]).size
+    refute plans.key?([3, 4]), 'a cell Link reaches already needs no push'
+  end
+
+  def test_explore_opens_an_untried_exit_with_the_pushes_the_search_found_and_leaves_by_it
+    room = Room.new(JAM, start: at([3, 1]), exits: [[[3, 9], :right]])
+    results = []
+    6.times do
+      break if room.room_id == 2
+
+      result, = play('explore', {}, room, JAM, limit: 1500, grid: LiveGrid.new(room, JAM))
+      results << result
+    end
+    assert_equal 2, room.room_id, results.map { |r| r.slice(:stopped_by, :target, :pushed) }.inspect
+    assert_equal :push, results.first.dig(:target, :kind)
+    assert_includes [room.objects[2][5], room.objects[4][5]], FIXED
+    assert_equal FLOOR, room.objects[3][6]
   end
 end

@@ -38,6 +38,8 @@ module Koholint
         search(from:, to:, mode:, doubt:, forbid:, zones: kept, margin: cross_margin ? [] : margin, push: pushable) if pushable.any?
       end
 
+      def step?(from, to, direction) = walkable?(from, to, direction, %i[yes], true, true)
+
       def search(from:, to:, mode:, doubt:, forbid:, zones:, margin: [], push: [])
         return nil unless inside?(from) && inside?(to)
         return [from] if from == to

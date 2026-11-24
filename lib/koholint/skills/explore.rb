@@ -1,5 +1,6 @@
 require 'koholint/skills/goto'
 require 'koholint/explore_log'
+require 'koholint/navigation/stones'
 require 'koholint/talk_log'
 
 module Koholint
@@ -68,8 +69,9 @@ module Koholint
           @fresh = @log && !@log.surveyed?(@place)
           grid = context[:grid]
           @known = grid && Known.new(grid, @walked)
-          @planner = @known && Navigation::Planner.new(grid: @known, ledger: @ledger, place: @place, triggers: context[:triggers], mode: :free_only, danger: danger_of(context), pushable: pushable_of(context), contact: contact_of(context), away: away_of(context))
+          @planner = @known && Navigation::Planner.new(grid: @known, ledger: @ledger, place: @place, triggers: context[:triggers], mode: :free_only, danger: danger_of(context), pushable: pushable_of(context, stones: false), contact: contact_of(context), away: away_of(context))
           @pushable = Array(pushable_of(context)&.call)
+          @grid = grid
           @clearing = Clearing.of(context)
           @room_objects = context[:room_objects]
           @objects = grid ? TalkLog.objects(grid) : []
@@ -353,6 +355,9 @@ module Koholint
           back, local = untried(from, path_to).partition { |candidate| way_back?(candidate) }
           return order(local) if local.any?
 
+          pushed = pushes(untried(from, nil).reject { |candidate| way_back?(candidate) })
+          return order(pushed) if pushed.any?
+
           return order(frontier) if frontier.any? && (@fresh || untried(from, nil).any? || @log&.untried?(@place))
           return order(back) if back.any?
 
@@ -422,9 +427,9 @@ module Koholint
           while (hop = @log&.route(@place, goal: (@aim[:place] if @aim[:place] != @place), avoid:))
             first ||= hop
             via = hop[:via]
-            found = if via.is_a?(Array) then doors(path_to, @doors | [via]) { |door| door == via }
-                    else gather(from, path_to) { |cell, direction| :exit if direction == via && Geometry.step(cell, direction).nil? }
-                    end
+            way = ->(path) { via.is_a?(Array) ? doors(path, @doors | [via]) { |door| door == via } : gather(from, path) { |cell, direction| :exit if direction == via && Geometry.step(cell, direction).nil? } }
+            found = way.(path_to)
+            found = pushes(way.(nil)) if found.empty?
             if found.any?
               @route = { goal: hop[:goal], next: hop[:next] }
               inferred = @log.surveyed_untried?(hop[:goal]) ? [] : @log.inferred_clearable(hop[:goal])
@@ -439,6 +444,27 @@ module Koholint
           side = @log&.pocket_side(@place, from) or return []
 
           gather(from, path_to) { |cell, direction| :exit if direction == side && Geometry.step(cell, direction).nil? }
+        end
+
+        # An exit or door that only pushes open: the first of the fewest pushes that open it, from a stand Link walks to without pushing.
+        def pushes(found)
+          found.filter_map do |candidate|
+            push = stone_plans[candidate[:cell]]&.first or next
+            path = @planner.path(from: @attempt_from, to: push[:stand]) or next
+            { kind: :push, cell: push[:stand], direction: push[:direction], path:, opens: candidate.slice(:kind, :cell, :direction) }
+          end
+        end
+
+        def stone_plans
+          objects = @room_objects&.call
+          return {} unless objects && @grid && @attempt_from
+
+          @stone_plans ||= {}
+          @stone_plans[[@attempt_from, objects]] ||= begin
+            cells = objects.each_with_index.flat_map { |row, r| row.each_index.filter_map { |c| [r, c] if Entities.object_catalogue.dig(row[c], :kind) == :stone } }
+            stones, fixed = cells.partition { |cell| Entities.object_catalogue.dig(objects.dig(*cell), :push) }
+            stones.empty? ? {} : Navigation::Stones.plans(link: @attempt_from, stones:, fixed:, step: @planner.method(:step?), slide: ->(cell, direction) { lands?(objects, @grid, cell, direction) })
+          end
         end
 
         def gather(from, path_to)
