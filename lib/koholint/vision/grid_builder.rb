@@ -1,4 +1,5 @@
 require 'koholint/calibration/walk_probe'
+require 'koholint/entities'
 require 'koholint/game_state'
 require 'koholint/geometry'
 require 'koholint/vision/beliefs'
@@ -60,7 +61,7 @@ module Koholint
         statics = @statics.map { |(x, y), pattern| { x:, y:, pattern: } }.sort_by { |s| [s[:y], s[:x]] }
         emit(state.frame, snapshot, statics) if changed?(snapshot, statics)
         grid = Grid.new(cells: grid_of(snapshot), static_sprites: statics.map { |s| s.transform_keys(&:to_s) }, beliefs: @beliefs,
-                        capabilities: @capabilities)
+                        capabilities: @capabilities, hole_objects: Entities.objects(emulator).select { |object| object[:kind] == :hole }.map { |object| object[:cell] })
         cell = self.class.link_cell(state.x, state.y)
         spot = [place, state.x, state.y]
         scope = [place, cell, snapshot.terrain_hash, @capabilities]

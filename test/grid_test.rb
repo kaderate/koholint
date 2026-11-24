@@ -2,6 +2,7 @@ require_relative 'test_helper'
 require 'koholint/vision/grid'
 require 'koholint/vision/beliefs'
 require 'koholint/vision/capabilities'
+require 'koholint/entities'
 
 class GridTest < Minitest::Test
   def grid(sprites, beliefs: Koholint::Vision::Beliefs.new)
@@ -92,5 +93,20 @@ class GridTest < Minitest::Test
     walk(beliefs, 40)
     refute holed(beliefs).hole?(5, 6)
     assert_empty holed(beliefs).hole_margin
+  end
+
+  def test_a_cell_whose_room_object_is_a_hole_is_a_hole_with_a_margin_whatever_its_look
+    beliefs = Koholint::Vision::Beliefs.new
+    grid = Koholint::Vision::Grid.new(cells: Array.new(8) { Array.new(10) { 'floor' } }, static_sprites: [], beliefs:,
+                                      capabilities: Koholint::Vision::Capabilities.new, hole_objects: [[1, 4]])
+    assert grid.hole?(1, 4)
+    refute grid.hole?(1, 3)
+    assert_equal :no, grid.passable(1, 4, :down)
+    assert_equal [[0, 4], [1, 3], [1, 5], [2, 4]].sort, grid.hole_margin.sort
+  end
+
+  def test_the_catalogue_lists_the_hole_objects
+    holes = Koholint::Entities.object_catalogue.select { |_, entry| entry[:kind] == :hole }.keys
+    assert_equal [174, 175], holes.sort
   end
 end

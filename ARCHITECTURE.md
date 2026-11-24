@@ -50,7 +50,8 @@ enemies, creatures, unknown entities, signs, objects, doors, chests, exits). `wo
 the talk log.
 
 **Vision** (`vision/`) — what RAM does not give. `screen_vision` and `screen_snapshot` read the screen; `grid_builder` probes
-neighbouring cells (the only place that snapshots and restores the emulator) and builds the collision `grid`; `beliefs` and
+neighbouring cells (the only place that snapshots and restores the emulator) and builds the collision `grid`, where a cell whose
+room object is catalogued as a hole is a hole whatever its look; `beliefs` and
 `world` accumulate per-place knowledge; `capabilities` records what Link can do; `dialogue_shot` crops dialogue boxes for the
 model. Unknown cells are unknown, not walls.
 
