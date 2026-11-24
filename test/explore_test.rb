@@ -146,7 +146,10 @@ class ExploreTest < Minitest::Test
     events << { 'type' => 'place_card', 'place' => [2, 0], 'unknown' => [{ 'type' => 9, 'cell' => [3, 3] }] }
     assert_nil Koholint::ExploreLog.from_events(events).route([1, 0]), 'type 9 is catalogued since the card'
     events << { 'type' => 'place_card', 'place' => [2, 0], 'unknown' => [{ 'type' => 79, 'cell' => [3, 3] }, { 'type' => 79, 'cell' => [4, 3] }] }
+    refute Koholint::ExploreLog.from_events(events).work?([2, 0]), 'one look cannot tell a still thing from a roaming one'
+    events << { 'type' => 'place_card', 'place' => [2, 0], 'unknown' => [{ 'type' => 99, 'cell' => [5, 5] }, { 'type' => 79, 'cell' => [4, 3] }] }
     log = Koholint::ExploreLog.from_events(events)
+    assert_equal [79], log.unmet([2, 0]), 'type 99 roams in by the second look'
     assert_equal [2, 0], log.route([1, 0])[:goal]
     assert log.work?([2, 0])
     refute log.untried?([2, 0])
@@ -1151,5 +1154,54 @@ class ExploreTest < Minitest::Test
     assert_equal [172, 10], Koholint::ExploreLog.from_events(stalled.(2)).route([171, 10], goal: [172, 10])[:next], 'two calls of one visit may meet a passing block'
     log = Koholint::ExploreLog.from_events(stalled.(3))
     assert_equal [[80, 0], [171, 10], [172, 10]], log.path([171, 10], goal: [172, 10]).map { |hop| hop[:to] }, 'round through the door, whose landing reaches it'
+  end
+end
+class ExploreCutCallsTest < Minitest::Test
+  DOOR = [[80, 0], [2, 8]].freeze
+
+  def explore(frame, from, to, exit = nil, unreachable = nil)
+    map = ->(room) { room == 80 ? 0 : 10 }
+    { 'type' => 'action', 'frame' => frame, 'skill' => 'explore',
+      'result' => { 'from' => { 'room' => from[0], 'map' => map.(from[0]), 'row' => from[1], 'col' => from[2] },
+                    'to' => { 'room' => to[0], 'map' => map.(to[0]), 'row' => to[1], 'col' => to[2] },
+                    'exits' => exit ? [exit.merge('outcome' => 'left', 'to' => [to[0], map.(to[0])])] : [], 'unreachable' => unreachable }.compact }
+  end
+
+  def through_the_door(frame)
+    [explore(frame, [171, 5, 6], [80, 7, 5], { 'row' => 7, 'col' => 5, 'direction' => 'down', 'walk_in' => true }),
+     explore(frame + 1, [80, 2, 8], [171, 7, 5], { 'row' => 3, 'col' => 8, 'direction' => 'up', 'kind' => 'door' })]
+  end
+
+  def stalled(frame, count) = Array.new(count) { |n| explore(frame + n, [171, 5, 6], [171, 5, 6], nil, ['right']) }
+
+  def test_a_crossing_lifts_a_cut_by_calls_and_starts_its_count_over
+    events = [explore(1, [171, 2, 8], [172, 2, 0], { 'row' => 2, 'col' => 9, 'direction' => 'right' }),
+              explore(2, [172, 2, 0], [171, 2, 9], { 'row' => 2, 'col' => 0, 'direction' => 'left' })] +
+             through_the_door(3) + stalled(5, 3)
+    assert Koholint::ExploreLog.from_events(events).cut?([171, 10], DOOR, :right), 'three calls of one visit'
+    events << explore(8, [171, 2, 8], [172, 2, 0], { 'row' => 2, 'col' => 9, 'direction' => 'right' })
+    refute Koholint::ExploreLog.from_events(events).cut?([171, 10], DOOR, :right), 'the crossing from that landing lifts it'
+    events += [explore(9, [172, 2, 0], [171, 2, 9], { 'row' => 2, 'col' => 0, 'direction' => 'left' })] + through_the_door(10) + stalled(12, 1)
+    refute Koholint::ExploreLog.from_events(events).cut?([171, 10], DOOR, :right), 'one later finding does not cut it again'
+  end
+
+  def test_calls_of_different_visits_add_up_only_through_the_two_visit_rule
+    events = [explore(1, [171, 2, 8], [172, 2, 0], { 'row' => 2, 'col' => 9, 'direction' => 'right' }),
+              explore(2, [172, 2, 0], [171, 2, 9], { 'row' => 2, 'col' => 0, 'direction' => 'left' })] +
+             through_the_door(3) + stalled(5, 2)
+    log = Koholint::ExploreLog.from_events(events)
+    refute log.cut?([171, 10], DOOR, :right)
+    assert_equal 2, log.instance_variable_get(:@cut_calls)[[[171, 10], DOOR, :right]].last
+    log = Koholint::ExploreLog.from_events(events + through_the_door(7) + stalled(9, 1))
+    assert_equal 1, log.instance_variable_get(:@cut_calls)[[[171, 10], DOOR, :right]].last, 'the count starts over on a new visit'
+  end
+
+  def test_a_place_reached_without_a_crossing_from_where_link_was_is_a_landing_of_its_own
+    events = [explore(1, [171, 2, 8], [172, 2, 0], { 'row' => 2, 'col' => 9, 'direction' => 'right' }),
+              explore(2, [172, 2, 0], [171, 2, 9], { 'row' => 2, 'col' => 0, 'direction' => 'left' }),
+              explore(3, [171, 2, 9], [172, 2, 0], { 'row' => 2, 'col' => 9, 'direction' => 'right' })] + stalled(4, 3)
+    log = Koholint::ExploreLog.from_events(events)
+    assert log.cut?([171, 10], :landed, :right), 'Link left off in 172/10 and the next result starts in 171/10'
+    refute log.cut?([171, 10], :right, :right)
   end
 end

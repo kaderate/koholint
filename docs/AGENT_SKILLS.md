@@ -79,12 +79,12 @@ The skills, protocols and harness behaviours the agent works with. Versioned wit
   change the dialogue stamp, so they do not reopen people.
   flow-59: a lead whose claim or `where` names a catalogued item (name or alias) that neither any text the run has read (earlier texts, the whole
   transcription, earlier lead quotes) nor any item Link has ever held (`Items.held_ids`, cumulative) names is dropped (`LeadCheck.named`, the rule `check-leads` applies to traces) and recorded as a `lead_leak` notable, so it never reaches a prompt. flow-86: a claim naming a person, a role or a thing
-  (`data/vocabulary.json`) that no text read names is withheld: the lead stays, and its quote is shown in place of the claim.
+  (`data/vocabulary.json`) that no text read names is withheld: the lead stays, and its quote is shown in place of the claim and of its `where` (only the place id the `where` resolves to, if any).
 - At `choose_objective` the context lists candidate objectives with ids (`candidates.rb`): untried exits by side (`exit-up`) and doors
   (`door-R-C`) of this place (flow-84: a side known only as the way back you came in by says so and comes after them), people (`person-tT`, listed first) and unread signs (`sign-R-C`) here worth a visit, known places with untried exits
   (`place-R-M`), people and unread signs of other known places (from their place cards; flow-62: a person exhausted
   under other held items or another milestone is offered again, once; flow-86: an unidentified thing never tried, seen still in one cell
-  on two looks while Link held other items, is offered among them as `examine-R-M-tT`, and a place whose only work is such a thing is a place with work)
+  on two looks while Link held other items, is offered among them as `examine-R-M-tT`, and a place whose only work is such a thing, still on its last two looks, is a place with work; a roaming one is not)
   and places tied to a lead by its `where`; flow-86: every person who asked for something (a lead marked `need`) and has not
   answered with a new text since, once Link holds other items than at the last talk with them (`need-tT` here, `need-R-M-tT` away, all of them),
   (`lead-N`), nearest first by moves over exits explore took (flow-69: never through a pocket, so a place routes cannot reach
@@ -138,6 +138,10 @@ The skills, protocols and harness behaviours the agent works with. Versioned wit
   are answered by the harness: it explores toward the nearest place with untried work, else toward the reachable place entered least,
   else waits. The autopilot also goes on exploring after a dialogue that brought no new lead or goal, after an arrival while
   the objective's target cannot be followed from here, and steps up through a door when your `goto` ended on the cell right below it.
+- flow-86: a place reached without a crossing from where Link was (a continue after a game over, a jump) is entered by a landing of its own
+  (`:landed`), never by the stale entry of an earlier visit. A way explore finds unreachable from a landing is cut from that landing when it is
+  found on two visits, or on `CUT_CALLS` (3) calls within one visit; the count starts over on each new visit and when Link crosses that way from
+  that landing, which also lifts the cut. A cut lasts for the context (items and milestone) otherwise.
 - flow-79: an uncatalogued entity (kind unknown) on screen whose type no `talk_to` ever aimed at in this place, and the objects an
   `untried_object` stop named, are tried once by the autopilot with `talk_to` (nearest first, no model call, at most 6 per visit, outside the chain caps) before it
   explores on; results show as `(autopilot) talk_to`. A place whose last card lists such an entity counts as untried work for explore's

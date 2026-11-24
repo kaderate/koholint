@@ -123,7 +123,7 @@ module Koholint
       end
 
       def note_card(card)
-        @explore_log.card(card[:place], Array(card[:unknown]).map { |entity| entity[:type] })
+        @explore_log.card(card[:place], Array(card[:unknown]))
         before = @cards[card[:place]] || {}
         @cards[card[:place]] = before.merge(unknown: PlaceCard.stillness(before[:unknown], card[:unknown]), held: @held)
       end

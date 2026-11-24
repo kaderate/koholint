@@ -3,6 +3,7 @@ require 'koholint/exits'
 require 'koholint/geometry'
 require 'koholint/ledger'
 require 'koholint/navigation/planner'
+require 'koholint/place_card'
 
 module Koholint
   class ExploreLog
@@ -13,7 +14,7 @@ module Koholint
       log = new
       events.each do |event|
         log.screen(event['place'], event['grid']) if event['type'] == 'screen'
-        log.card(event['place'], Array(event['unknown']).map { |entity| entity['type'] }) if event['type'] == 'place_card'
+        log.card(event['place'], Array(event['unknown']).map { |entity| { type: entity['type'], cell: entity['cell'] } }) if event['type'] == 'place_card'
         if event['type'] == 'decision'
           log.in_context(Exits.context(event['input'])) if event['input']
           Array(event['puzzles_offered']).each { |place| log.restore_offer(place, Exits.context(event['input'] || {})) }
@@ -65,6 +66,7 @@ module Koholint
       @cut_seen = {}
       @cut_calls = {}
       @unmet = {}
+      @things = {}
       @met = Set.new
       @spent_cuts = Set.new
     end
@@ -169,9 +171,10 @@ module Koholint
       note_met(from, result) if from
     end
 
-    # The uncatalogued entity types the last card of each place listed; a type no talk_to aimed at there is untried work.
-    def card(place, types)
-      @unmet[place] = types.uniq
+    # The uncatalogued things the last card of each place listed; a type the last two cards saw still in one cell and no talk_to aimed at there is untried work.
+    def card(place, things)
+      @things[place] = PlaceCard.stillness(@things[place], things)
+      @unmet[place] = @things[place].select { |thing| thing[:still] }.map { |thing| thing[:type] }.uniq
     end
 
     def met?(place, type) = @met.include?([place, type])
@@ -453,8 +456,8 @@ module Koholint
     # Leaving a place by another way than the side Link came in by proves that landing leads on: it is never a pocket.
     def crossed(place, way, to, door: false)
       came = @entered[place]
-      @cut_off.delete([place, came, way])
-      @spent_cuts.delete([place, came, way])
+      [@cut_off, @spent_cuts].each { |cuts| cuts.delete([place, came, way]) }
+      [@cut_seen, @cut_calls].each { |seen| seen.delete([place, came, way]) }
       @through << [place, came] if came && came != way && !@through.include?([place, came])
       @door_ways << [place, way] if door
       @entered[to] = entry(place, way)
@@ -475,13 +478,16 @@ module Koholint
       end
     end
 
-    # A way no path reaches from where Link entered, on two visits or on CUT_CALLS calls of one visit, is not routed through from that landing
-    # again in this context; a landing without a crossing (a continue after a game over) is a landing of its own.
+    # A way no path reaches from where Link entered, on two visits or on CUT_CALLS calls of one visit (the count starts over on each visit and
+    # with a crossing from that landing), is not routed through from that landing again in this context; a landing without a crossing (a continue
+    # after a game over) is a landing of its own.
     # Found unreachable again while cut, after a route lifted it, the cut is spent and no route lifts it again in this episode.
     def cut_off(place, side, via)
       key = [place, side, via]
       return @spent_cuts << key if cut?(*key)
-      calls = (@cut_calls[key] = @cut_calls.fetch(key, 0) + 1)
+      visit, calls = @cut_calls[key]
+      calls = visit == @visits[place] ? calls + 1 : 1
+      @cut_calls[key] = [@visits[place], calls]
       return unless again?(@cut_seen, key, place) || calls >= CUT_CALLS
 
       @spent_cuts.delete(key)

@@ -30,7 +30,9 @@ class EngineStartGameTest < Minitest::Test
 
   def test_a_live_run_feeds_the_place_card_to_the_explore_log_through_start_game
     @engine.send(:note_place, playing, nil)
-    assert_equal [250], @log.unmet([5, 0])
+    @engine.instance_variable_set(:@card_place, nil)
+    @engine.send(:note_place, playing, nil)
+    assert_equal [250], @log.unmet([5, 0]), 'still in its cell on the second arrival'
   end
 
   def test_a_live_run_traces_the_objective_candidates_offered_through_start_game

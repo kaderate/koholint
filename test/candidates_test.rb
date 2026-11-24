@@ -63,8 +63,10 @@ class CandidatesTest < Minitest::Test
     explore_log = log
     explore_log.absorb({ from: { room: 3, map: 0 }, survey: { sides: {}, doors: [], pending: false } })
     refute(build(explore_log:).any? { |c| c[:id] == 'place-3-0' })
-    explore_log.card([3, 0], [64])
-    assert_match(/go to place 3-0, 1 move away: it has a thing never tried \(type 64\)/, build(explore_log:).find { |c| c[:id] == 'place-3-0' }[:label])
+    explore_log.card([3, 0], [{ type: 64, cell: [3, 4] }, { type: 99, cell: [2, 2] }])
+    refute(build(explore_log:).any? { |c| c[:id] == 'place-3-0' }, 'one look')
+    explore_log.card([3, 0], [{ type: 64, cell: [3, 4] }, { type: 99, cell: [5, 6] }])
+    assert_match(/go to place 3-0, 1 move away: it has a thing never tried \(type 64\)$/, build(explore_log:).find { |c| c[:id] == 'place-3-0' }[:label])
   end
 
   def asking(leads, talk_log, place, type, stamp, text: 'Il me faut une chose de la forêt, tu sais.')
