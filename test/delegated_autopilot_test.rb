@@ -700,5 +700,7 @@ class DelegatedAutopilotTest < Minitest::Test
     p.observe(state(item_a: 1, item_b: 4, inventory: [12]), frame: 100)
     p.note_card({ place: [172, 10], unknown: [{ type: 155, cell: [3, 4], moves: nil }] })
     assert_equal({ people: [], unknown: [{ type: 155, cell: [3, 4] }], held: [1, 4, 12] }, p.instance_variable_get(:@cards)[[172, 10]])
+    p.note_card({ place: [172, 10], unknown: [{ type: 155, cell: [3, 4], moves: nil }] })
+    assert_equal [{ type: 155, cell: [3, 4], still: true }], p.instance_variable_get(:@cards)[[172, 10]][:unknown], 'the second look in the same cell'
   end
 end

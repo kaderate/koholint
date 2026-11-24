@@ -124,7 +124,8 @@ module Koholint
 
       def note_card(card)
         @explore_log.card(card[:place], Array(card[:unknown]).map { |entity| entity[:type] })
-        @cards[card[:place]] = (@cards[card[:place]] || {}).merge(unknown: Array(card[:unknown]).map { |entity| entity.slice(:type, :cell) }, held: @held)
+        before = @cards[card[:place]] || {}
+        @cards[card[:place]] = before.merge(unknown: PlaceCard.stillness(before[:unknown], card[:unknown]), held: @held)
       end
 
       def decision_point_for(state)
@@ -368,11 +369,9 @@ module Koholint
         place = state.place
         signs = objects_for(state)
         if state.phase(booted: true) == :playing
-          @cards[place] = { people: @entities.select { |entity| entity[:kind].to_s == 'npc' && entity[:cell] }.map { |entity| entity.slice(:type, :cell) },
-                            signs: signs.select { |object| object[:kind].to_s == 'sign' }.map { |object| object.slice(:cell) },
-                            chests: signs.select { |object| object[:reachable] }.map { |object| object[:cell] },
-                            unknown: @entities.select { |entity| entity[:kind].to_s == 'unknown' && entity[:cell] }.map { |entity| entity.slice(:type, :cell) },
-                            held: stamp(state)[1] }
+          @cards[place] = (@cards[place] || {}).merge(people: @entities.select { |entity| entity[:kind].to_s == 'npc' && entity[:cell] }.map { |entity| entity.slice(:type, :cell) },
+                                                      signs: signs.select { |object| object[:kind].to_s == 'sign' }.map { |object| object.slice(:cell) },
+                                                      chests: signs.select { |object| object[:reachable] }.map { |object| object[:cell] })
         end
         @candidates = Candidates.build(place:, grid: context[:grid], explore_log: @explore_log, talk_log: @talk_log, leads: @leads, cards: @cards,
                                        entities: @entities, signs:, stamp: stamp(state), link: state.cell)

@@ -52,8 +52,14 @@ module Koholint
         chests = Array(event['chests']).reject { |chest| chest['open'] }.map { |chest| chest['cell'] } - later
         cards[event['place']] = { people: Array(event['people']).map { |person| { type: person['type'], cell: person['cell'] } },
                                   signs: Array(event['signs']).map { |sign| { cell: sign['cell'] } }, chests:,
-                                  unknown: Array(event['unknown']).map { |thing| { type: thing['type'], cell: thing['cell'] } }, held: }
+                                  unknown: stillness(cards.dig(event['place'], :unknown), Array(event['unknown']).map { |thing| { type: thing['type'], cell: thing['cell'] } }), held: }
       end
+    end
+
+    # A thing is still once two looks at the place saw its type in the same cell: people stand where they live, roaming things move on.
+    def stillness(before, now)
+      seen = Array(before).map { |thing| thing.values_at(:type, :cell) }
+      Array(now).map { |thing| thing.slice(:type, :cell).merge(**(seen.include?(thing.values_at(:type, :cell)) ? { still: true } : {})) }
     end
 
     # Every talk_to aimed at an entity type in a place: how many, how many opened a dialogue, and whether talk_to had to chase it; and every touch, how many picked something up.

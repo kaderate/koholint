@@ -55,6 +55,14 @@ class PlaceCardTest < Minitest::Test
     assert_equal({ unknown: [{ type: 64, cell: [3, 4] }], held: [1, 4] }, Koholint::PlaceCard.latest(events)[[1, 0]].slice(:unknown, :held))
   end
 
+  # 162/14 in the 45ba lineage: type 64 stood at (3,4) on both cards (83405, 83580); a roaming type is seen elsewhere the second time.
+  def test_a_thing_is_still_once_two_cards_of_the_place_saw_its_type_in_the_same_cell
+    look = ->(frame, things) { { 'type' => 'place_card', 'frame' => frame, 'place' => [162, 14], 'unknown' => things.map { |type, cell| { 'type' => type, 'cell' => cell, 'moves' => nil } } } }
+    events = [look.(83405, [[64, [3, 4]], [20, [4, 2]]]), look.(83580, [[64, [3, 4]], [20, [5, 6]]])]
+    assert_equal [{ type: 64, cell: [3, 4], still: true }, { type: 20, cell: [5, 6] }], Koholint::PlaceCard.latest(events)[[162, 14]][:unknown]
+    assert_equal [{ type: 64, cell: [3, 4] }], Koholint::PlaceCard.latest(events.first(1))[[162, 14]][:unknown].first(1), 'one look tells nothing'
+  end
+
   def test_unknown_passability_gives_no_exit
     assert_equal({}, Koholint::PlaceCard.build(place: PLACE, entities: [], objects: [], grid: grid(false))[:exits])
     assert_equal({}, Koholint::PlaceCard.build(place: PLACE, entities: [], objects: [], grid: nil)[:exits])

@@ -131,12 +131,12 @@ module Koholint
       end.first(PER_KIND)
     end
 
-    # An uncatalogued thing never tried, seen while Link held other items than now, may answer what he holds now: offered like a stale person.
+    # An uncatalogued thing never tried, seen still in its cell while Link held other items than now, may answer what he holds now: offered like a stale person.
     def things_away(where, hops, cards, talk_log, named, stamp)
       held = cards.dig(where, :held)
       return [] unless stamp && held && held != Array(stamp)[1]
 
-      Array(cards.dig(where, :unknown)).uniq { |thing| thing[:type] }.filter_map do |thing|
+      Array(cards.dig(where, :unknown)).select { |thing| thing[:still] }.uniq { |thing| thing[:type] }.filter_map do |thing|
         next if Entities.catalogue.key?(thing[:type]) || talk_log.attempts(where, [[:entity, thing[:type]]]).positive?
 
         what = "the unidentified thing (type #{thing[:type]})"
