@@ -274,4 +274,19 @@ class LeadsTest < Minitest::Test
                 transcription: 'Vas-y avec la Clé cachée dans la Forêt.', place: [128, 0], source: nil)
     refute kept.all.first.key?(:withheld), 'a name the text gives in its own language is read'
   end
+
+  def test_a_withheld_lead_hides_its_where_and_keeps_only_the_place_it_resolves_to
+    text = 'Apporte ça ici, veux-tu?'
+    leads = Koholint::Leads.new
+    accepted, = leads.absorb([{ 'quote' => text, 'claim' => 'someone wants an item brought', 'where' => "witch's hut", 'importance' => 'high' }],
+                             transcription: text, place: [80, 0], source: nil)
+    lead = accepted.first
+    assert_equal %w[witch], lead[:withheld]
+    shown = Koholint::Agents::Context.send(:leads_block, [lead], [80, 0]).join
+    refute_match(/witch|hut/i, shown)
+    assert_includes shown, "\"#{text}\""
+    resolved = Koholint::Agents::Context.send(:leads_block, [lead], [80, 0], ->(_) { [162, 14] }).join
+    refute_match(/witch|hut/i, resolved)
+    assert_includes resolved, '(place 162-14)'
+  end
 end
