@@ -1,4 +1,5 @@
 require 'koholint/entities'
+require 'koholint/leads'
 require 'koholint/place_card'
 require 'koholint/place_kinds'
 require 'koholint/talk_log'
@@ -193,7 +194,7 @@ module Koholint
         next unless where && where != place && !leads.settled?(lead)
 
         route = hops[where] ? moves(hops[where]) : 'no known route'
-        { id: lead[:id], label: "go to #{describe(where, named)} (#{lead[:importance]} lead: #{lead[:claim]}), #{route}",
+        { id: lead[:id], label: "go to #{describe(where, named)} (#{lead[:importance]} lead: #{Leads.shown_claim(lead)}), #{route}",
           title: "Go to #{describe(where, named)}"[0, 80], predicate: { kind: 'reach_place', place: where }, target: { kind: 'lead', place: where, lead: lead[:id] } }
       end.first(PER_KIND)
     end

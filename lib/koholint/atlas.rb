@@ -23,7 +23,7 @@ module Koholint
     STATUSES = %w[open refuted tested].freeze
     INHERITED = 'inherited'.freeze
     DATA = File.expand_path('../../data', __dir__)
-    FACTS = %w[addresses entities items modes place_kinds geometry exits capabilities checkpoints].freeze
+    FACTS = %w[addresses entities items modes place_kinds geometry exits capabilities checkpoints vocabulary].freeze
     VERIFIED_AT = 2
 
     module_function
@@ -99,6 +99,7 @@ module Koholint
       when 'items' then "#{entry['id']} #{entry['name']}"
       when 'modes' then "#{entry['name']} (#{entry['kind']})"
       when 'place_kinds' then "#{entry['kind']} (maps #{Array(entry['map_ids']).join(', ')})"
+      when 'vocabulary' then "#{entry['name']} (#{entry['kind']})"
       end
     end
 

@@ -145,8 +145,19 @@ module Koholint
       lead[:contact] = contact.transform_keys(&:to_sym) if contact.is_a?(Hash)
       lead[:source] = lead[:source].transform_keys(&:to_sym) if lead[:source].is_a?(Hash)
       lead[:need] = true if Ledger.pick(event, :need) == true
-      @all << lead unless known?(lead[:id])
+      return if known?(lead[:id])
+
+      withhold(lead, [lead[:quote], *@read, *@all.map { |known| known[:quote] }])
+      @all << lead
     end
+
+    # The claim of a lead naming what no text read names is never shown: its quote stands in its place.
+    def withhold(lead, texts)
+      names = LeadCheck.unread(claim: lead[:claim], where: lead[:where], texts:)
+      lead[:withheld] = names if names.any?
+    end
+
+    def self.shown_claim(lead) = lead[:withheld] ? "« #{lead[:quote]} »" : lead[:claim]
 
     def name_place(place, name)
       name = Dialogues.clean(name, NAME_MAX)
@@ -194,6 +205,7 @@ module Koholint
         where = Dialogues.clean(lead['where'], WHERE_MAX)
         added[:where] = where unless where.empty?
         added[:need] = true if lead['need'] == true && source.is_a?(Hash) && source[:entity]
+        withhold(added, [*Array(transcription), *@read, *@all.map { |known| known[:quote] }])
         @all << added
         accepted << added
       end

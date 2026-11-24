@@ -1,6 +1,7 @@
 require_relative 'test_helper'
 require 'tmpdir'
 require 'json'
+require 'koholint/agents/context'
 require 'koholint/leads'
 require 'koholint/dialogues'
 require 'koholint/trace'
@@ -249,5 +250,28 @@ class LeadsTest < Minitest::Test
               'quote' => text, 'claim' => 'the speaker asks for a thing', 'importance' => 'high', 'need' => true }
     resumed = Koholint::Leads.from_events([event]).all.first
     assert_equal [true, 64], [resumed[:need], resumed.dig(:source, :entity)]
+  end
+
+  # lead-26 of g184-1 (frame 91633, A6): the text names the mushroom found, the claim adds who it is for.
+  def test_a_claim_naming_a_role_no_text_read_names_is_withheld_and_the_quote_shown_instead
+    quote = 'Tu as trouvé le Champignon!'
+    claim = 'Link found the Mushroom, a trade item that can be taken to the witch.'
+    text = "Tu as trouvé le Champignon! Un arôme subtil exalte ton sens de l'odorat."
+    leads = Koholint::Leads.new
+    accepted, = leads.absorb([{ 'quote' => quote, 'claim' => claim, 'importance' => 'normal' }], transcription: text, place: [80, 0], source: nil)
+    assert_equal %w[witch trade], accepted.first[:withheld]
+    events = [{ 'type' => 'dialogue', 'frame' => 91353, 'place' => [80, 0], 'text' => text, 'page' => 1 },
+              { 'type' => 'lead', 'frame' => 91633, 'id' => 'lead-26', 'place' => [80, 0], 'source' => nil, 'quote' => quote, 'claim' => claim, 'importance' => 'normal' }]
+    resumed = Koholint::Leads.from_events(events)
+    lead = resumed.with_status.first
+    assert_equal %w[witch trade], lead[:withheld], 'a lead recorded before the guard is withheld on resume'
+    assert_equal "« #{quote} »", Koholint::Leads.shown_claim(lead)
+    shown = Koholint::Agents::Context.send(:leads_block, [lead], [80, 0]).join
+    refute_match(/witch|trade|Mushroom/, shown)
+    assert_includes shown, "\"#{quote}\""
+    kept = Koholint::Leads.new
+    kept.absorb([{ 'quote' => 'Vas-y avec la Clé cachée dans la Forêt.', 'claim' => 'A key is hidden in the Forest', 'importance' => 'high' }],
+                transcription: 'Vas-y avec la Clé cachée dans la Forêt.', place: [128, 0], source: nil)
+    refute kept.all.first.key?(:withheld), 'a name the text gives in its own language is read'
   end
 end

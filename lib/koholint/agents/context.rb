@@ -271,7 +271,8 @@ module Koholint
             "#{try[:objective]} \"#{try[:title]}\" #{try[:outcome]}#{" in #{try[:place].join('-')}" if try[:place]} at frame #{try[:frame]}"
           end
           status = tries.empty? ? '' : " #{lead[:status]}: #{tries.join('; ')}"
-          "- [#{lead[:id]} #{lead[:importance]}#{status}] #{lead[:claim]}#{where} — \"#{quote}\""
+          text = lead[:withheld] ? "\"#{quote}\"#{where}" : "#{lead[:claim]}#{where} — \"#{quote}\""
+          "- [#{lead[:id]} #{lead[:importance]}#{status}] #{text}"
         end
         return [] if lines.empty?
 
