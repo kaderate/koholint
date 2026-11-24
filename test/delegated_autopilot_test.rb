@@ -599,6 +599,22 @@ class DelegatedAutopilotTest < Minitest::Test
     assert_nil p.send(:follow_choice, state(room_id: 9))
   end
 
+  def test_a_picked_examine_candidate_starts_its_objective_and_is_followed_with_a_talk
+    sprite = Koholint::Vision::Grid.new(cells: Array.new(8) { Array.new(10) { 'floor' } }, static_sprites: [{ 'x' => 72, 'y' => 48, 'pattern' => 'p', 'height' => 16 }],
+                                        beliefs: Koholint::Vision::Beliefs.new, capabilities: Koholint::Vision::Capabilities.new)
+    client = ScriptedClient.new(objective: ok('candidate' => 'examine-2-4', 'plan' => 'x', 'goal' => 'g'))
+    p = autopiloted(client, revisit: QuietRevisit.new(talk_log: Koholint::TalkLog.new))
+    picked = p.decide(p.decision_point_for(state), state, { grid: sprite })
+    refute picked[:fallback], picked[:justification]
+    assert_includes client.calls.first[:prompt], '- examine-2-4: examine the unidentified object at (2,4)'
+    assert_equal({ kind: 'examine', place: [163, 16], cell: [2, 4] }, @objectives.current[:target])
+    started = Koholint::Trace.read(File.join(@dir, 'trace.jsonl')).find { |e| e['type'] == 'objective' && e['status'] == 'started' }
+    assert_equal({ 'kind' => 'examine', 'place' => [163, 16], 'cell' => [2, 4] }, started&.dig('target'))
+    talk = p.decide(p.decision_point_for(state), state, { grid: sprite })
+    assert_equal({ skill: 'talk_to', params: { row: 2, col: 4 } }, talk[:choice])
+    assert talk[:autopilot]
+  end
+
   def test_a_sign_of_another_place_is_walked_to_and_read_before_its_objective_ends
     p = autopiloted(ScriptedClient.new(objective: []))
     here = [state.room_id, state.map_id]

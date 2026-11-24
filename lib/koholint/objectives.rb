@@ -11,6 +11,7 @@ module Koholint
       'new_place' => %i[],
       'new_text' => %i[]
     }.freeze
+    TARGET_KINDS = %w[exit door person sign chest examine place lead].freeze
 
     ATTEMPT_LIMIT = 10
     UNREACHABLE_PAIRS = 6
