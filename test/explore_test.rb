@@ -1013,18 +1013,33 @@ class ExploreTest < Minitest::Test
     assert_equal [[18, 0], [19, 0]], log.path([17, 0], goal: [19, 0]).map { |hop| hop[:to] }
   end
 
-  def test_a_cut_way_expires_after_a_few_more_visits
+  def test_a_cut_way_stays_cut_however_many_visits_pass
     log = Koholint::ExploreLog.new
     walk = ->(from, to, direction) { log.note({ skill: 'walk', params: { direction: }, from: { room: from, map: 0, row: 3, col: 5 }, to: { room: to, map: 0, row: 3, col: 5 } }) }
     cut_between(log, walk)
-    (Koholint::ExploreLog::CUT_VISITS - 1).times do
+    10.times do
       walk.(17, 18, 'right')
       walk.(18, 17, 'left')
     end
     assert_nil log.path([17, 0], goal: [19, 0])
-    walk.(17, 18, 'right')
-    walk.(18, 17, 'left')
-    assert_equal [[18, 0], [19, 0]], log.path([17, 0], goal: [19, 0]).map { |hop| hop[:to] }
+  end
+
+  def test_a_way_unreachable_from_a_door_landing_is_cut_for_that_landing_and_ends_the_shuttle_through_it
+    explore = lambda do |frame, from, to, exit, unreachable = nil|
+      { 'type' => 'action', 'frame' => frame, 'skill' => 'explore',
+        'result' => { 'from' => { 'room' => from[0], 'map' => 10, 'row' => from[1], 'col' => from[2] }, 'to' => { 'room' => to[0], 'map' => to[0] == 80 ? 0 : 10, 'row' => to[1], 'col' => to[2] },
+                      'exits' => [exit.merge('outcome' => 'left', 'to' => [to[0], to[0] == 80 ? 0 : 10])], 'unreachable' => unreachable }.compact }
+    end
+    out = ->(frame, unreachable = nil) { explore.(frame, [171, 5, 6], [80, 7, 5], { 'row' => 7, 'col' => 5, 'direction' => 'down', 'walk_in' => true }, unreachable) }
+    into = ->(frame) { explore.(frame, [80, 2, 8], [171, 7, 5], { 'row' => 3, 'col' => 8, 'direction' => 'up', 'kind' => 'door' }).tap { |event| event['result']['from']['map'] = 0 } }
+    events = [explore.(1, [171, 2, 8], [172, 2, 0], { 'row' => 2, 'col' => 9, 'direction' => 'right' }),
+              explore.(2, [172, 2, 0], [171, 2, 9], { 'row' => 2, 'col' => 0, 'direction' => 'left' }), out.(3), into.(4)]
+    assert_equal [171, 10], Koholint::ExploreLog.from_events(events).route([80, 0], goal: [172, 10])[:next]
+    once = events + [out.(5, ['right']), into.(6)]
+    assert_equal [171, 10], Koholint::ExploreLog.from_events(once).route([80, 0], goal: [172, 10])[:next], 'an enemy may block the way once'
+    log = Koholint::ExploreLog.from_events(once + [out.(7, ['right']), into.(8)])
+    assert_nil log.route([80, 0], goal: [172, 10]), 'through the door, the way on is never reached'
+    assert_nil log.route([171, 10], goal: [172, 10])
   end
 
   def test_a_rebuilt_log_reopens_cuts_at_the_context_change_the_trace_records

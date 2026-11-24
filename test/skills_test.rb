@@ -648,43 +648,80 @@ class SkillsTest < Minitest::Test
   end
 
   def touch_state(x, y, frame, fields)
-    Koholint::GameState.new(frame:, room_id: 1, map_id: 0, x:, y:, hp: 24, dialog_state: 0, game_mode: 0x0B, game_submode: 7, milestone: :none, **fields)
+    Koholint::GameState.new(**{ frame:, room_id: 1, map_id: 0, x:, y:, hp: 24, dialog_state: 0, game_mode: 0x0B, game_submode: 7, milestone: :none }.merge(fields))
   end
 
-  # Drives a touch to (4,8) from (4,5); fields.(frame, frames_on_target) gives the item bytes and dialogue state of each frame.
-  def touch(fields)
+  # Drives a touch of the thing at (4,8) from (4,5): the thing's cell is solid, so Link stops against it.
+  # fields.(frame, frames_held) gives the item bytes and dialogue state of each frame; frames_held counts frames pressed into the thing.
+  def touch(fields, solid: [[4, 8]])
     x = 88
     y = 80
-    on = 0
+    held = 0
     execution = registry.start('touch', touch_state(x, y, 0, fields.(0, 0)), { row: 4, col: 8, type: 58 }, { grid: OpenGrid.new })
     600.times do |frame|
-      on += 1 if Koholint::Geometry.cell_for(x, y) == [4, 8]
-      buttons = execution.next_input(touch_state(x, y, frame, fields.(frame, on))) or break
+      buttons = execution.next_input(touch_state(x, y, frame, fields.(frame, held))) or break
       dx, dy = { up: [0, -1], down: [0, 1], left: [-1, 0], right: [1, 0] }.fetch(buttons.first, [0, 0])
+      ahead = Koholint::Geometry.cell_for(x + dx + (7 * dx), y + dy + (7 * dy))
+      if solid.include?(ahead)
+        held += 1
+        next
+      end
+
       x += dx
       y += dy
     end
     execution.result
   end
 
-  def test_touch_reads_a_pickup_between_arrival_and_the_game_settling_on_the_cell
-    result = touch(->(_, on) { on > 3 ? { rupees: 5 } : {} })
-    assert_equal [:done, [4, 8], 58, true, true], [result[:stopped_by], result[:to].values_at(:row, :col), result[:target_type], result[:settled], result[:picked_up]]
+  def test_touch_holds_into_the_thing_from_the_nearest_side_and_reads_a_pickup_once_the_game_settles
+    result = touch(->(_, held) { held > 3 ? { rupees: 5 } : {} })
+    assert_equal [:done, [4, 7], 58, %w[], true, true], [result[:stopped_by], result[:to].values_at(:row, :col), result[:target_type], result[:sides], result[:settled], result[:picked_up]]
     assert_equal [{ held: [], rupees: 0 }, { held: [], rupees: 5 }], result.values_at(:items_before, :items_after)
-    assert_equal [false, { held: [], rupees: 0 }], touch(->(*) { {} }).values_at(:picked_up, :items_after)
   end
 
   def test_a_byte_the_walk_changed_on_the_way_is_no_pickup
     result = touch(->(frame, _) { frame > 2 ? { item_a: 1, rupees: 3 } : {} })
-    assert_equal [true, false], result.values_at(:settled, :picked_up)
+    assert_equal [:no_contact, false], result.values_at(:stopped_by, :settled)
+    refute result.key?(:picked_up)
     assert_equal({ held: [1], rupees: 3 }, result[:items_before])
   end
 
-  def test_a_text_on_the_cell_ends_the_touch_unsettled_with_its_arrival_bytes_for_the_harness_to_judge
-    result = touch(->(_, on) { on > 3 ? { dialog_state: 1 } : {} })
-    assert_equal [:dialogue, false, { held: [], rupees: 0 }], result.values_at(:stopped_by, :settled, :items_before)
+  def test_a_byte_changed_on_the_walk_to_the_next_side_is_no_pickup
+    seen = []
+    walked = false
+    result = touch(lambda do |_, held|
+      seen << held
+      walked ||= held.positive? && seen.last(4).uniq.size == 1
+      walked ? { rupees: 7 } : {}
+    end)
+    assert_equal [:no_contact, { held: [], rupees: 7 }], result.values_at(:stopped_by, :items_before), 'the baseline is taken again on arrival at each side'
     refute result.key?(:picked_up)
-    assert_kind_of Integer, result[:arrival_frame]
+  end
+
+  def test_a_room_change_during_a_hold_ends_the_touch
+    left = nil
+    result = touch(->(frame, held) { held > 3 ? (left ||= frame) && { room_id: 2 } : {} })
+    assert_equal [:room_change, %w[right]], result.values_at(:stopped_by, :sides)
+    assert_operator result[:frames], :<=, left, 'the hold stops on the frame the place changes'
+  end
+
+  def test_a_thing_that_answers_nothing_is_held_from_every_reachable_side_then_given_up
+    result = touch(->(*) { {} })
+    assert_equal [:no_contact, %w[right up down left]], result.values_at(:stopped_by, :sides), 'nearest side first, then the shorter paths'
+    assert_operator result[:frames], :<=, Koholint::Skills::Execution::HARD_CAP
+  end
+
+  def test_a_scene_or_a_text_on_contact_ends_the_touch_unsettled_with_its_arrival_bytes_for_the_harness_to_judge
+    result = touch(->(_, held) { held > 6 ? { link_frozen: 104 } : {} })
+    assert_equal [:scene, false, { held: [], rupees: 0 }, %w[right]], result.values_at(:stopped_by, :settled, :items_before, :sides)
+    refute result.key?(:picked_up)
+    assert_equal :dialogue, touch(->(_, held) { held > 3 ? { dialog_state: 1 } : {} })[:stopped_by]
+  end
+
+  def test_a_touch_with_no_reachable_side_is_no_path_with_its_cause
+    execution = registry.start('touch', state, { row: 4, col: 8, type: 58 }, { grid: OpenGrid.new(walls: [[3, 8], [5, 8], [4, 7], [4, 9]]) })
+    nil while execution.next_input(state)
+    assert_equal ['no_path', 'no cell next to the thing is reachable'], execution.result.values_at(:stopped_by, :cause).map(&:to_s)
   end
 
   def test_touch_params_are_validated

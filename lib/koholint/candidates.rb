@@ -14,7 +14,8 @@ module Koholint
       hops = explore_log.hops(place)
       named = ->(where) { leads.name_of(where) }
       people = people_here(place, entities, talk_log, stamp)
-      leaving = puzzles(place, hops, explore_log, leads, named) + exits(place, grid, explore_log) + doors(place, signs, explore_log, link) + places(place, hops, explore_log, named) +
+      back, fresh = exits(place, grid, explore_log, named).partition { |exit| explore_log.side_left?(place, exit.dig(:target, :direction)) }
+      leaving = puzzles(place, hops, explore_log, leads, named) + fresh + doors(place, signs, explore_log, link) + back + places(place, hops, explore_log, named) +
                 people_away(place, hops, cards, talk_log, named, stamp) + signs_away(place, hops, cards, talk_log, named) + chests_away(place, hops, cards, named) +
                 lead_places(place, hops, leads, named)
       people + signs_here(place, signs, talk_log) + chests_here(place, signs) + unidentified(place, grid, entities, talk_log, link) +
@@ -36,11 +37,14 @@ module Koholint
 
     def find(candidates, id) = candidates.find { |candidate| candidate[:id] == id.to_s.strip }
 
-    def exits(place, grid, explore_log)
+    # A side known only as the way back, assumed and never crossed, says so: explore takes it after the place's other work.
+    def exits(place, grid, explore_log, named = ->(_) {})
       PlaceCard.exits(grid).filter_map do |side, cells|
         next if explore_log.side_crossed?(place, side) || cells.all? { |cell| explore_log.tried?(place, cell, side) }
 
-        { id: "exit-#{side}", label: "leave by the #{side} side (open border cells #{cells.map { |r, c| "(#{r},#{c})" }.join(' ')})",
+        to = explore_log.ways(place)[side.to_sym] if explore_log.side_left?(place, side)
+        back = to ? ", the way back to #{describe(to, named)} you came in by (assumed, never crossed)" : ''
+        { id: "exit-#{side}", label: "leave by the #{side} side (open border cells #{cells.map { |r, c| "(#{r},#{c})" }.join(' ')})#{back}",
           title: "Leave by the #{side} side", predicate: { kind: 'leave_place', place: }, target: { kind: 'exit', place:, direction: side.to_s } }
       end
     end

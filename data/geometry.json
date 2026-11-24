@@ -13,6 +13,11 @@
     "verified_count": 1,
     "provenance": "ROM probe 2026-11-05 on a restored copy of keyframe 32400 of run 20261104-153743-acc2 (room 165/16, Link at y 64 on row 3 above the one-cell stairs at (4,3), tiles 78 78 78 78, between ledge cells of tiles 29 29 39 39): holding down from x 53..60 entered the stairs (the game slides Link to x 56 or 57, then 0.5 px per frame on the stairs), from x 52 (offset -4) Link did not move in 90 frames. Offsets are x minus the cell centre (col * 16 + 8)."
   },
+  "swing_still": {
+    "value": { "frames": 5 },
+    "verified_count": 2,
+    "provenance": "button probe 2026-11-24 (~/.capy/work/challenge3c/still84.rb) on emulator copies of two states, run 20261124-142701-18db frame 92413 (room 80/0, Link at (44,45)) and run 20261114-084732-45ba frame 90581 (room 171/10, Link at (148,64)): talk_to's A rhythm (A for 3 of every 12 frames, 48 frames), then a direction held toward free floor, each of up, down, left and right after 0, 1 and 2 idle frames; Link's position stayed unchanged for 4 frames in 22 of 23 trials and 5 in one (right, shift 2), and down at 171/10 is a wall. With no A before, he moved on the first frame of the hold in all 4 directions at 92413."
+  },
   "talk_reach": {
     "value": { "up": 19, "down": 20, "left": 15, "right": 16 },
     "verified_count": 2,
