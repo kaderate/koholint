@@ -692,4 +692,13 @@ class DelegatedAutopilotTest < Minitest::Test
     assert_equal 'explore', held[:choice][:skill]
     assert_includes held[:justification], 'replaces the model'
   end
+
+  def test_a_place_card_noted_on_arrival_keeps_its_uncatalogued_things_with_the_items_held_now
+    seen = { [172, 10] => { people: [], unknown: [{ type: 155, cell: [3, 3] }], held: [1, 4] } }
+    p = Koholint::Policies::Delegated.new(client: ScriptedClient.new, registry: Koholint::Skills::Registry.default, objectives: Koholint::Objectives.new(trace:), manual: '',
+                                          memory: Koholint::Policies::Memory.new(cards: seen))
+    p.observe(state(item_a: 1, item_b: 4, inventory: [12]), frame: 100)
+    p.note_card({ place: [172, 10], unknown: [{ type: 155, cell: [3, 4], moves: nil }] })
+    assert_equal({ people: [], unknown: [{ type: 155, cell: [3, 4] }], held: [1, 4, 12] }, p.instance_variable_get(:@cards)[[172, 10]])
+  end
 end

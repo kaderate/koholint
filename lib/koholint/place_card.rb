@@ -1,3 +1,4 @@
+require 'koholint/dialogues'
 require 'koholint/geometry'
 require 'koholint/items'
 require 'koholint/talk_log'
@@ -38,13 +39,20 @@ module Koholint
     end
 
     # Chests come back closed as the last card saw them, less those opened since; their reachability is checked again on arrival.
+    # Uncatalogued things keep the items Link held when the card saw them.
     def latest(events)
       opened = events.select { |event| event['type'] == 'chest_opened' }
-      events.select { |event| event['type'] == 'place_card' && event['place'].is_a?(Array) }.to_h do |event|
+      held = nil
+      events.each_with_object({}) do |event, cards|
+        state = event['state'] if event['type'] == 'perception'
+        held = Dialogues.items(state['inventory'], state['item_a'], state['item_b']) if state
+        next unless event['type'] == 'place_card' && event['place'].is_a?(Array)
+
         later = opened.select { |open| open['place'] == event['place'] && open['frame'] >= event['frame'] }.map { |open| open['cell'] }
         chests = Array(event['chests']).reject { |chest| chest['open'] }.map { |chest| chest['cell'] } - later
-        [event['place'], { people: Array(event['people']).map { |person| { type: person['type'], cell: person['cell'] } },
-                           signs: Array(event['signs']).map { |sign| { cell: sign['cell'] } }, chests: }]
+        cards[event['place']] = { people: Array(event['people']).map { |person| { type: person['type'], cell: person['cell'] } },
+                                  signs: Array(event['signs']).map { |sign| { cell: sign['cell'] } }, chests:,
+                                  unknown: Array(event['unknown']).map { |thing| { type: thing['type'], cell: thing['cell'] } }, held: }
       end
     end
 

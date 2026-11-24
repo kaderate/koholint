@@ -81,7 +81,9 @@ The skills, protocols and harness behaviours the agent works with. Versioned wit
 - At `choose_objective` the context lists candidate objectives with ids (`candidates.rb`): untried exits by side (`exit-up`) and doors
   (`door-R-C`) of this place (flow-84: a side known only as the way back you came in by says so and comes after them), people (`person-tT`, listed first) and unread signs (`sign-R-C`) here worth a visit, known places with untried exits
   (`place-R-M`), people and unread signs of other known places (from their place cards; flow-62: a person exhausted
-  under other held items or another milestone is offered again, once) and places tied to a lead by its `where`
+  under other held items or another milestone is offered again, once; flow-86: an unidentified thing never tried, seen there while
+  Link held other items, is offered among them as `examine-R-M-tT`, and a place whose only work is such a thing is a place with work)
+  and places tied to a lead by its `where`
   (`lead-N`), nearest first by moves over exits explore took (flow-69: never through a pocket, so a place routes cannot reach
   is not offered; a sign elsewhere is a `new_text` objective the autopilot walks to and reads, done only when that sign's text is read, not on arrival or on
   another text met on the way). The agent answers with `candidate` (or still a free title and predicate);

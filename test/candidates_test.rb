@@ -42,6 +42,31 @@ class CandidatesTest < Minitest::Test
     assert_empty away.(after)
   end
 
+  def test_a_thing_never_tried_seen_while_link_held_other_items_is_offered_away_nearest_first_until_tried
+    talk_log = Koholint::TalkLog.new
+    catalogued = Koholint::Entities.catalogue.keys.first
+    cards = { [3, 0] => { people: [{ type: 70, cell: [1, 1] }] },
+              [4, 0] => { people: [], unknown: [{ type: 64, cell: [3, 4] }, { type: catalogued, cell: [5, 5] }], held: [1, 4] } }
+    stamp = ->(items) { Koholint::Dialogues.stamp(milestone: :sword, items:, leads: 0) }
+    away = ->(items) { build(cards:, talk_log:, stamp: stamp.(items)).select { |c| c[:id].start_with?('person-', 'examine-') } }
+    assert_equal %w[person-3-0-t70], away.([1, 4]).map { |c| c[:id] }, 'seen with the items held now, it is not offered'
+    found = away.([1, 4, 12])
+    assert_equal %w[person-3-0-t70 examine-4-0-t64], found.map { |c| c[:id] }, 'nearest first, and a catalogued type never'
+    assert_equal({ kind: 'person', place: [4, 0], type: 64, cell: [3, 4] }, found[1][:target])
+    assert_equal({ kind: 'reach_place', place: [4, 0] }, found[1][:predicate])
+    assert_match(/2 moves away, never tried; Link holds other items than when it was seen/, found[1][:label])
+    talk_log.record(place: [4, 0], row: 3, col: 4, talked: false, entity: 64)
+    assert_equal %w[person-3-0-t70], away.([1, 4, 12]).map { |c| c[:id] }
+  end
+
+  def test_a_surveyed_place_with_a_thing_never_tried_is_a_place_with_work
+    explore_log = log
+    explore_log.absorb({ from: { room: 3, map: 0 }, survey: { sides: {}, doors: [], pending: false } })
+    refute(build(explore_log:).any? { |c| c[:id] == 'place-3-0' })
+    explore_log.card([3, 0], [64])
+    assert_match(/go to place 3-0, 1 move away: it has a thing never tried \(type 64\)/, build(explore_log:).find { |c| c[:id] == 'place-3-0' }[:label])
+  end
+
   def log
     log = Koholint::ExploreLog.new
     log.absorb({ from: { room: 1, map: 0 }, exits: [{ row: 0, col: 5, direction: :up, outcome: :left, to: [3, 0] }] })

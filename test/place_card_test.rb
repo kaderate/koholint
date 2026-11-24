@@ -48,6 +48,13 @@ class PlaceCardTest < Minitest::Test
     assert_equal [], cards[[2, 0]][:chests]
   end
 
+  def test_latest_cards_keep_the_uncatalogued_things_with_the_items_held_when_the_card_saw_them
+    events = [{ 'type' => 'perception', 'frame' => 5, 'state' => { 'inventory' => [0], 'item_a' => 1, 'item_b' => 4 } },
+              { 'type' => 'place_card', 'frame' => 10, 'place' => [1, 0], 'unknown' => [{ 'type' => 64, 'cell' => [3, 4], 'moves' => nil }] },
+              { 'type' => 'perception', 'frame' => 20, 'state' => { 'inventory' => [12], 'item_a' => 1, 'item_b' => 4 } }]
+    assert_equal({ unknown: [{ type: 64, cell: [3, 4] }], held: [1, 4] }, Koholint::PlaceCard.latest(events)[[1, 0]].slice(:unknown, :held))
+  end
+
   def test_unknown_passability_gives_no_exit
     assert_equal({}, Koholint::PlaceCard.build(place: PLACE, entities: [], objects: [], grid: grid(false))[:exits])
     assert_equal({}, Koholint::PlaceCard.build(place: PLACE, entities: [], objects: [], grid: nil)[:exits])

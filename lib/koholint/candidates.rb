@@ -1,3 +1,4 @@
+require 'koholint/entities'
 require 'koholint/place_card'
 require 'koholint/place_kinds'
 require 'koholint/talk_log'
@@ -103,8 +104,9 @@ module Koholint
     end
 
     def places(place, hops, explore_log, named)
-      away(place, hops).select { |where| explore_log.untried?(where) }.first(PER_KIND).map do |where|
-        { id: "place-#{where.join('-')}", label: "go to #{describe(where, named)}, #{moves(hops[where])}: it has untried exits or doors",
+      away(place, hops).select { |where| explore_log.work?(where) }.first(PER_KIND).map do |where|
+        work = explore_log.untried?(where) ? 'untried exits or doors' : "a thing never tried (type #{explore_log.unmet(where).join(', type ')})"
+        { id: "place-#{where.join('-')}", label: "go to #{describe(where, named)}, #{moves(hops[where])}: it has #{work}",
           title: "Go to #{describe(where, named)}"[0, 80], predicate: { kind: 'reach_place', place: where }, target: { kind: 'place', place: where } }
       end
     end
@@ -120,8 +122,23 @@ module Koholint
           { id: "person-#{where.join('-')}-t#{person[:type]}", label: "talk to #{who} in #{describe(where, named)}, #{moves(hops[where])}, #{why}",
             title: "Go talk to #{who}"[0, 80], predicate: { kind: 'reach_place', place: where },
             target: { kind: 'person', place: where, type: person[:type], cell: person[:cell] } }
-        end
+        end + things_away(where, hops, cards, talk_log, named, stamp)
       end.first(PER_KIND)
+    end
+
+    # An uncatalogued thing never tried, seen while Link held other items than now, may answer what he holds now: offered like a stale person.
+    def things_away(where, hops, cards, talk_log, named, stamp)
+      held = cards.dig(where, :held)
+      return [] unless stamp && held && held != Array(stamp)[1]
+
+      Array(cards.dig(where, :unknown)).uniq { |thing| thing[:type] }.filter_map do |thing|
+        next if Entities.catalogue.key?(thing[:type]) || talk_log.attempts(where, [[:entity, thing[:type]]]).positive?
+
+        what = "the unidentified thing (type #{thing[:type]})"
+        { id: "examine-#{where.join('-')}-t#{thing[:type]}", label: "examine #{what} in #{describe(where, named)}, #{moves(hops[where])}, never tried; Link holds other items than when it was seen",
+          title: "Go examine #{what}"[0, 80], predicate: { kind: 'reach_place', place: where },
+          target: { kind: 'person', place: where, type: thing[:type], cell: thing[:cell] } }
+      end
     end
 
     def signs_away(place, hops, cards, talk_log, named)
