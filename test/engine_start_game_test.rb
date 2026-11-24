@@ -19,7 +19,7 @@ class EngineStartGameTest < Minitest::Test
     reader.define_singleton_method(:read) { |addr| slot.fetch(addr, 0) }
     @log = Koholint::ExploreLog.new
     @delegated = Koholint::Policies::Delegated.new(client: ScriptedClient.new, registry: Koholint::Skills::Registry.default, objectives: Koholint::Objectives.new(trace: Trace.new([])),
-                                                   manual: 'notes', explore_log: @log)
+                                                   manual: 'notes', memory: Koholint::Policies::Memory.new(explore_log: @log))
     @engine = Koholint::Engine.allocate
     @engine.instance_variable_set(:@emulator, reader)
     @engine.instance_variable_set(:@run, Struct.new(:trace).new(Trace.new([])))

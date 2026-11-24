@@ -130,7 +130,7 @@ class DelegatedAutopilotTest < Minitest::Test
     log.absorb({ from: { room: 147, map: 16 }, exits: [{ row: 3, col: 0, direction: :left, outcome: :left, to: [146, 16] }] })
     client = ScriptedClient.new(objective: objective(kind: 'reach_place', place: [146, 16]), default: ok('skill' => 'explore', 'params' => {}))
     @objectives = Koholint::Objectives.new(trace: trace)
-    p = Koholint::Policies::Delegated.new(client:, registry: Koholint::Skills::Registry.default, objectives: @objectives, manual: '', explore_log: log)
+    p = Koholint::Policies::Delegated.new(client:, registry: Koholint::Skills::Registry.default, objectives: @objectives, manual: '', memory: Koholint::Policies::Memory.new(explore_log: log))
     decide(p)
     context = { grid: }
     p.decide(p.decision_point_for(state), state, context)
@@ -189,7 +189,7 @@ class DelegatedAutopilotTest < Minitest::Test
     leads.restore({ 'id' => 'lead-20', 'place' => [128, 0], 'quote' => 'Vas-y avec la Clé cachée dans la Forêt.', 'claim' => 'a key', 'importance' => 'high' })
     leads.note_read('Hé hé! Tu vas te perdre dans la Forêt.', place: [81, 0])
     @objectives = Koholint::Objectives.new(trace: trace)
-    Koholint::Policies::Delegated.new(client:, registry: Koholint::Skills::Registry.default, objectives: @objectives, manual: '', explore_log:, leads:)
+    Koholint::Policies::Delegated.new(client:, registry: Koholint::Skills::Registry.default, objectives: @objectives, manual: '', memory: Koholint::Policies::Memory.new(explore_log:, leads:))
   end
 
   def puzzle_crossings
@@ -351,7 +351,7 @@ class DelegatedAutopilotTest < Minitest::Test
     log.absorb({ from: { room: 164, map: 16 }, exits: [{ row: 3, col: 9, direction: :right, outcome: :left, to: [163, 16] }], survey: { sides: { right: [{ row: 3, col: 9 }] }, doors: [] } })
     client = ScriptedClient.new(objective: objective(kind: 'reach_place', place: [146, 16]), default: explore)
     @objectives = Koholint::Objectives.new(trace: trace)
-    p = Koholint::Policies::Delegated.new(client:, registry: Koholint::Skills::Registry.default, objectives: @objectives, manual: '', explore_log: log)
+    p = Koholint::Policies::Delegated.new(client:, registry: Koholint::Skills::Registry.default, objectives: @objectives, manual: '', memory: Koholint::Policies::Memory.new(explore_log: log))
     results = [163, 164, 163, 164, 163, 164, 163, 164, 163, 164, 163, 164, 163, 164].each_with_index.map do |room, i|
       now = state(frame: 100 + (i * 150), room_id: room)
       p.observe(now, frame: now.frame)
@@ -368,7 +368,7 @@ class DelegatedAutopilotTest < Minitest::Test
     log = Koholint::ExploreLog.new
     @objectives = Koholint::Objectives.new(trace: trace)
     p = Koholint::Policies::Delegated.new(client: ScriptedClient.new(objective: new_place, default: explore), registry: Koholint::Skills::Registry.default, objectives: @objectives,
-                                          manual: '', explore_log: log, exits:)
+                                          manual: '', exits:, memory: Koholint::Policies::Memory.new(explore_log: log))
     now = state(room_id: 81, map_id: 0)
     p.decide(p.decision_point_for(now), now, { grid: })
     assert_equal 'depends_on_context', log.bench_of([81, 0])['status']
@@ -384,7 +384,7 @@ class DelegatedAutopilotTest < Minitest::Test
     log.absorb({ from: { room: 164, map: 16 }, exits: [{ row: 3, col: 9, direction: :right, outcome: :left, to: [163, 16] }], survey: { sides: { right: [{ row: 3, col: 9 }] }, doors: [] } })
     client = ScriptedClient.new(objective: objective(kind: 'reach_place', place: [146, 16]), default: explore)
     @objectives = Koholint::Objectives.new(trace: trace)
-    p = Koholint::Policies::Delegated.new(client:, registry: Koholint::Skills::Registry.default, objectives: @objectives, manual: '', explore_log: log)
+    p = Koholint::Policies::Delegated.new(client:, registry: Koholint::Skills::Registry.default, objectives: @objectives, manual: '', memory: Koholint::Policies::Memory.new(explore_log: log))
     results = [163, 164, 163, 164, 163, 164, 163, 164, 163, 163].each_with_index.map do |room, i|
       now = state(frame: 100 + (i * 300), room_id: room)
       p.observe(now, frame: now.frame)
@@ -407,7 +407,7 @@ class DelegatedAutopilotTest < Minitest::Test
     log.absorb({ from: { room: 165, map: 16 }, exits: [{ row: 7, col: 5, direction: :down, outcome: :left, to: [163, 16] }], survey: { sides: { down: [{ row: 7, col: 5 }] }, doors: [] } })
     client = ScriptedClient.new(objective: new_place, default: walk)
     @objectives = Koholint::Objectives.new(trace: trace)
-    p = Koholint::Policies::Delegated.new(client:, registry: Koholint::Skills::Registry.default, objectives: @objectives, manual: '', explore_log: log)
+    p = Koholint::Policies::Delegated.new(client:, registry: Koholint::Skills::Registry.default, objectives: @objectives, manual: '', memory: Koholint::Policies::Memory.new(explore_log: log))
     broken = [165, 163, 164, 163, 164, 163, 164, 163, 164, 163, 164, 163, 164, 163, 164, 163, 164].each_with_index.filter_map do |room, i|
       now = state(frame: 100 + (i * 200), room_id: room)
       p.observe(now, frame: now.frame)

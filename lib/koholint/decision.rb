@@ -15,6 +15,11 @@ module Koholint
 
     attr_reader :name, :options, :output_schema, :registry
 
+    def self.harness_choice(choice, justification, autopilot: false)
+      { choice:, justification:, confidence: 1.0, agent: 'delegated', latency_ms: 0, cost_usd: 0.0, fallback: false, **(autopilot ? { autopilot: true } : {}),
+        prompt: nil, image: nil }
+    end
+
     def self.move
       options = Geometry::DIRECTIONS.map { |direction| { buttons: [direction], frames: 30 } } + [{ buttons: [:a], frames: 2 }]
       new(name: :move, options: options, output_schema: %i[buttons frames])

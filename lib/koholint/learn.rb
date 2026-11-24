@@ -8,6 +8,7 @@ require 'koholint/game_state'
 require 'koholint/items'
 require 'koholint/ledger'
 require 'koholint/navigation/planner'
+require 'koholint/policies/base'
 require 'koholint/replay'
 require 'koholint/run'
 require 'koholint/skills/registry'
@@ -34,7 +35,7 @@ module Koholint
     EFFECT = "walking into the target cell is blocked before the item is used and enters it after, and the cell's object id changes"
 
     # Runs the composite once, reading the target cell's object id before and after it, then stops the engine.
-    class Trial
+    class Trial < Policies::Base
       attr_reader :before, :after, :outcome
 
       def initialize(registry:, choice:, target:, budget:, place: nil, walls: [])

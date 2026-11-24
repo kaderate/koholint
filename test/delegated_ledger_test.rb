@@ -57,7 +57,7 @@ class DelegatedLedgerTest < Minitest::Test
     2.times { ledger.record(place: PLACE, blocked_at: { row: 3, col: 4, direction: :right }) }
     cells[2][4] = cells[4][4] = cells[3][3] = 'mystery'
     p = Koholint::Policies::Delegated.new(client: ScriptedClient.new(objective: reach_cell(3, 5)), registry: Koholint::Skills::Registry.default,
-                                          objectives: Koholint::Objectives.new(trace:), ledger:)
+                                          objectives: Koholint::Objectives.new(trace:), memory: Koholint::Policies::Memory.new(ledger:))
     refute p.decide(p.decision_point_for(state), state, { grid: free_grid(cells:) })[:fallback]
   end
 
@@ -260,7 +260,7 @@ class DelegatedLedgerTest < Minitest::Test
     @objectives = NoPathObjectives.new(trace:)
     log = Koholint::ExploreLog.new
     p = Koholint::Policies::Delegated.new(client: ScriptedClient.new(objective: reach_cell(1, 9), skill: walk), registry: Koholint::Skills::Registry.default,
-                                          objectives: @objectives, explore_log: log)
+                                          objectives: @objectives, memory: Koholint::Policies::Memory.new(explore_log: log))
     context = { grid: unknown_grid }
     p.decide(p.decision_point_for(state), state, context)
     assert_same log, context[:explore_log]

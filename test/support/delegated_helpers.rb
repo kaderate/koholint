@@ -62,7 +62,7 @@ module DelegatedHelpers
 
   def policy(client, triggers: nil, **opts)
     @objectives = Koholint::Objectives.new(trace: trace, **opts)
-    Koholint::Policies::Delegated.new(client:, registry: Koholint::Skills::Registry.default, objectives: @objectives, manual: 'notes', triggers:)
+    Koholint::Policies::Delegated.new(client:, registry: Koholint::Skills::Registry.default, objectives: @objectives, manual: 'notes', memory: Koholint::Policies::Memory.new(triggers:))
   end
 
   def decide(policy, state = self.state)

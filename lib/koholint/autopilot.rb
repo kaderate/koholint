@@ -1,4 +1,5 @@
 require 'set'
+require 'koholint/decision'
 require 'koholint/navigation/threat'
 require 'koholint/perception'
 
@@ -125,8 +126,7 @@ module Koholint
       @trying = true
       @tries += 1
       what = type ? "entity type #{type}" : 'object'
-      { choice: { skill: 'talk_to', params: { row: cell[0], col: cell[1] } }, justification: "autopilot: try the never-tried #{what} at (#{cell.join(',')})",
-        confidence: 1.0, agent: 'delegated', latency_ms: 0, cost_usd: 0.0, fallback: false, autopilot: true, prompt: nil, image: nil }
+      DecisionPoint.harness_choice({ skill: 'talk_to', params: { row: cell[0], col: cell[1] } }, "autopilot: try the never-tried #{what} at (#{cell.join(',')})", autopilot: true)
     end
 
     # A still uncatalogued entity whose try gave nothing is walked onto once per visit, nearest first: touch reads the item bytes to tell a pickup.
@@ -148,9 +148,8 @@ module Koholint
       @touchable.delete(trial)
       @trying = true
       @tries += 1
-      { choice: { skill: 'touch', params: { row: cell[0], col: cell[1], type: trial[:type] } },
-        justification: "autopilot: walk onto the still entity type #{trial[:type]} at (#{cell.join(',')}), whose try gave nothing", confidence: 1.0,
-        agent: 'delegated', latency_ms: 0, cost_usd: 0.0, fallback: false, autopilot: true, prompt: nil, image: nil }
+      DecisionPoint.harness_choice({ skill: 'touch', params: { row: cell[0], col: cell[1], type: trial[:type] } },
+                                   "autopilot: walk onto the still entity type #{trial[:type]} at (#{cell.join(',')}), whose try gave nothing", autopilot: true)
     end
 
     def next_choice(state:, objective:, follow: nil, danger: false)
@@ -159,8 +158,7 @@ module Koholint
       @chain += 1 unless @stop == 'known_place'
       @stop = nil
       what = follow ? "follow the objective target with #{follow[:skill]}" : 'explore again'
-      { choice: follow || CHOICE, justification: "autopilot: #{what} (#{@chain}/#{@chain_limit})", confidence: 1.0, agent: 'delegated',
-        latency_ms: 0, cost_usd: 0.0, fallback: false, autopilot: true, prompt: nil, image: nil }
+      DecisionPoint.harness_choice(follow || CHOICE, "autopilot: #{what} (#{@chain}/#{@chain_limit})", autopilot: true)
     end
 
     # After an attack that killed or lost its target, strike the nearest other enemy (or a type struck here before) without a call.
@@ -178,9 +176,7 @@ module Koholint
                               .min_by { |entity| [(entity[:cell][0] - row).abs + (entity[:cell][1] - col).abs, entity[:slot]] } or return
       @fight += 1
       @attack_stop = nil
-      { choice: { skill: 'attack', params: { row: target[:cell][0], col: target[:cell][1] } },
-        justification: "autopilot: keep fighting, type #{target[:type]} at (#{target[:cell].join(',')}) (#{@fight}/#{FIGHT_LIMIT})", confidence: 1.0,
-        agent: 'delegated', latency_ms: 0, cost_usd: 0.0, fallback: false, autopilot: true, prompt: nil, image: nil }
+      DecisionPoint.harness_choice({ skill: 'attack', params: { row: target[:cell][0], col: target[:cell][1] } }, "autopilot: keep fighting, type #{target[:type]} at (#{target[:cell].join(',')}) (#{@fight}/#{FIGHT_LIMIT})", autopilot: true)
     end
 
     # At one heart or less with an enemy within a cell of its touch, step away from every such enemy before the model decides.
@@ -195,9 +191,7 @@ module Koholint
                       .max_by { |_, (dx, dy)| near.map { |threat| Navigation::Threat.distance(threat, state.x + (dx * Geometry::CELL), state.y + (dy * Geometry::CELL)) }.min }
                       &.first or return
       @disengaged += 1
-      { choice: { skill: 'walk', params: { direction: direction.to_s, cells: 1 } },
-        justification: "autopilot: disengage at #{state.health} hp, step #{direction} away from #{near.map { |threat| threat[:type] }.join(', ')} (#{@disengaged}/#{DISENGAGE_LIMIT})",
-        confidence: 1.0, agent: 'delegated', latency_ms: 0, cost_usd: 0.0, fallback: false, autopilot: true, prompt: nil, image: nil }
+      DecisionPoint.harness_choice({ skill: 'walk', params: { direction: direction.to_s, cells: 1 } }, "autopilot: disengage at #{state.health} hp, step #{direction} away from #{near.map { |threat| threat[:type] }.join(', ')} (#{@disengaged}/#{DISENGAGE_LIMIT})", autopilot: true)
     end
 
     # After a goto that ended on the cell right below a door, step through the door without a call.
@@ -208,8 +202,7 @@ module Koholint
       return unless Array(doors).include?([row - 1, col])
 
       @goto_done = false
-      { choice: DOOR_STEP, justification: "autopilot: step up through the door at (#{row - 1},#{col}) the goto ended below", confidence: 1.0,
-        agent: 'delegated', latency_ms: 0, cost_usd: 0.0, fallback: false, autopilot: true, prompt: nil, image: nil }
+      DecisionPoint.harness_choice(DOOR_STEP, "autopilot: step up through the door at (#{row - 1},#{col}) the goto ended below", autopilot: true)
     end
 
     def objective_hold(state:, last:)

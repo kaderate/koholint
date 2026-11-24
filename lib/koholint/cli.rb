@@ -37,6 +37,11 @@ module Koholint
     DEFAULT_MODEL = 'sonnet'.freeze
     DEFAULT_MAX_DOLLARS = 1.5
 
+    CENSUS = { 'entities' => ['entity_census', :EntityCensus, 'entities <run_dir> FRAME...'],
+               'objects' => ['object_census', :ObjectCensus, 'objects <run_dir> FRAME... [--crawl N]', true],
+               'doors' => ['door_census', :DoorCensus, 'doors <run_dir> FRAME...'],
+               'sword' => ['sword_census', :SwordCensus, 'sword <run_dir> FRAME...'] }.freeze
+
     module_function
 
     def run(argv, out: $stdout, err: $stderr, viewer: method(:spawn_viewer))
@@ -257,11 +262,8 @@ module Koholint
     end
 
     def census(args, out, crawl: 0)
-      return census_entities(args.drop(1), out) if args.first == 'entities'
+      return census_probe(args.first, args.drop(1), out, crawl:) if CENSUS.key?(args.first)
       return census_ready(args.drop(1), out) if args.first == 'ready'
-      return census_objects(args.drop(1), out, crawl:) if args.first == 'objects'
-      return census_doors(args.drop(1), out) if args.first == 'doors'
-      return census_sword(args.drop(1), out) if args.first == 'sword'
 
       require 'koholint/probes/mode_census'
       raise OptionParser::MissingArgument, 'boot or <run_dir> FRAME...' unless args.first == 'boot' || args.size > 1
@@ -274,41 +276,13 @@ module Koholint
       raise OptionParser::InvalidArgument, e.message
     end
 
-    def census_entities(args, out)
-      require 'koholint/probes/entity_census'
-      raise OptionParser::MissingArgument, 'entities <run_dir> FRAME...' unless args.size > 1
+    def census_probe(kind, args, out, crawl:)
+      file, name, usage, crawls = CENSUS.fetch(kind)
+      require "koholint/probes/#{file}"
+      raise OptionParser::MissingArgument, usage unless args.size > 1
 
-      Probes::EntityCensus.census(run_dir(args), args.drop(1).map { |frame| Integer(frame) }).each { |path| out.puts "census #{path}" }
-      0
-    rescue ArgumentError => e
-      raise OptionParser::InvalidArgument, e.message
-    end
-
-    def census_objects(args, out, crawl:)
-      require 'koholint/probes/object_census'
-      raise OptionParser::MissingArgument, 'objects <run_dir> FRAME... [--crawl N]' unless args.size > 1
-
-      Probes::ObjectCensus.census(run_dir(args), args.drop(1).map { |frame| Integer(frame) }, crawl:).each { |path| out.puts "census #{path}" }
-      0
-    rescue ArgumentError => e
-      raise OptionParser::InvalidArgument, e.message
-    end
-
-    def census_doors(args, out)
-      require 'koholint/probes/door_census'
-      raise OptionParser::MissingArgument, 'doors <run_dir> FRAME...' unless args.size > 1
-
-      Probes::DoorCensus.census(run_dir(args), args.drop(1).map { |frame| Integer(frame) }).each { |path| out.puts "census #{path}" }
-      0
-    rescue ArgumentError => e
-      raise OptionParser::InvalidArgument, e.message
-    end
-
-    def census_sword(args, out)
-      require 'koholint/probes/sword_census'
-      raise OptionParser::MissingArgument, 'sword <run_dir> FRAME...' unless args.size > 1
-
-      Probes::SwordCensus.census(run_dir(args), args.drop(1).map { |frame| Integer(frame) }).each { |path| out.puts "census #{path}" }
+      frames = args.drop(1).map { |frame| Integer(frame) }
+      Probes.const_get(name).census(run_dir(args), frames, **(crawls ? { crawl: } : {})).each { |path| out.puts "census #{path}" }
       0
     rescue ArgumentError => e
       raise OptionParser::InvalidArgument, e.message
@@ -347,8 +321,8 @@ module Koholint
         events = events_for(run)
         autopilot = Autopilot.new unless run.manifest['autopilot'] == false
         learned = run.manifest['capabilities'] == false ? [] : Capabilities.operational.map { |entry| Skills::Composite.new(entry) }
-        delegated = Policies::Delegated.new(client:, autopilot:, registry: Skills::Registry.default(extra: learned), objectives: objectives_for(run, events), ledger: ledger_for(run, events),
-                                            triggers: Triggers.from_events(events), talk_log: TalkLog.from_events(events), explore_log: ExploreLog.from_events(events), leads: Leads.from_events(events), manual:, on_step: budget.method(:step_done), budget:, cards: PlaceCard.latest(events), loop_watch: LoopWatch.from_events(events), zero_watch: ZeroWatch.from_events(events),
+        delegated = Policies::Delegated.new(client:, autopilot:, registry: Skills::Registry.default(extra: learned), objectives: objectives_for(run, events),
+                                            memory: Policies::Memory.from_events(events), manual:, on_step: budget.method(:step_done), budget:,
                                             exits: (Exits.load if run.exits?), on_activity: run.method(:write_activity))
         Policies::StartGame.new(delegated, ready: ->(state) { %i[playing dialogue].include?(state.phase) }, probe:, played: GameState.played?(events))
       end
@@ -359,8 +333,6 @@ module Koholint
     end
 
     def events_for(run) = Trace.read(File.join(run.dir, 'trace.jsonl'))
-
-    def ledger_for(run, events = events_for(run)) = Ledger.from_events(events)
 
     def executable?(command)
       return File.executable?(command) && !File.directory?(command) if command.include?(File::SEPARATOR)

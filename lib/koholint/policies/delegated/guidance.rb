@@ -1,8 +1,9 @@
 require 'digest'
+require 'koholint/policies/base'
 
 module Koholint
   module Policies
-    class Delegated
+    class Delegated < Base
       module Guidance
         STAND_SKILLS = %w[guard wait].freeze
         STAND_MARGIN = 32
@@ -190,7 +191,7 @@ module Koholint
 
             cell = target[:kind] == 'person' ? entities_now.find { |entity| entity[:type] == target[:type] && entity[:cell] }&.dig(:cell) : target[:cell]
             { choice: { skill: 'talk_to', params: { row: cell[0], col: cell[1] } } } if cell
-          when 'place', 'lead', 'shelter' then { choice: EXPLORE, aim: { place: target[:place] } } unless here
+          when 'place', 'lead' then { choice: EXPLORE, aim: { place: target[:place] } } unless here
           end
         end
 
@@ -218,8 +219,7 @@ module Koholint
           what = if away then "no place has untried work: explore toward #{goal.join('-')}, the reachable place entered least"
                  else "explore #{route ? "toward #{goal.join('-')}" : 'here'}, the nearest place with untried work outside the loop"
                  end
-          { choice:, justification: "#{LoopWatch::BREAK} #{hint[:places].join(', ')}: #{what}",
-            confidence: 1.0, agent: 'delegated', latency_ms: 0, cost_usd: 0.0, fallback: false, autopilot: true, prompt: nil, image: nil }
+          DecisionPoint.harness_choice(choice, "#{LoopWatch::BREAK} #{hint[:places].join(', ')}: #{what}", autopilot: true)
         end
 
         def zero_cap(decision_point, state, context)
@@ -239,8 +239,7 @@ module Koholint
                  elsif away then "no place has untried work: explore toward #{goal.join('-')}, the reachable place entered least"
                  else "wait #{ZERO_WAIT[:params][:frames]} frames before asking again"
                  end
-          { choice:, justification: "#{skill} ended #{stop} #{mark} #{count} times here: #{what}",
-            confidence: 1.0, agent: 'delegated', latency_ms: 0, cost_usd: 0.0, fallback: false, autopilot: true, prompt: nil, image: nil }
+          DecisionPoint.harness_choice(choice, "#{skill} ended #{stop} #{mark} #{count} times here: #{what}", autopilot: true)
         end
 
         def auto_objective(decision_point, state)
@@ -253,8 +252,7 @@ module Koholint
 
           @objectives.start(frame: state.frame, **AUTO_OBJECTIVE, autopilot: true)
           @autopilot.adopt(@objectives.current)
-          { choice: AUTO_OBJECTIVE.dup, justification: 'autopilot: the last explore chain reached a place and achieved its objective; keep exploring', confidence: 1.0,
-            agent: 'delegated', latency_ms: 0, cost_usd: 0.0, fallback: false, autopilot: true, prompt: nil, image: nil }
+          DecisionPoint.harness_choice(AUTO_OBJECTIVE.dup, 'autopilot: the last explore chain reached a place and achieved its objective; keep exploring', autopilot: true)
         end
 
         # A person here never tried is offered first at the model's objective choice, which keeping on exploring would skip.
@@ -288,8 +286,7 @@ module Koholint
           @revisit_acting = true
           npc = action[:npc]
           what = npc ? "revisit npc: entity type #{npc[:type]} at (#{npc[:cell][0]},#{npc[:cell][1]})" : "#{action[:sign][:chest] ? 'open chest' : 'engage sign'} at (#{action[:sign][:cell][0]},#{action[:sign][:cell][1]})"
-          { choice: action.slice(:skill, :params), justification: "#{what}, round #{action[:round]}",
-            confidence: 1.0, agent: 'delegated', latency_ms: 0, cost_usd: 0.0, fallback: false, prompt: nil, image: nil }
+          DecisionPoint.harness_choice(action.slice(:skill, :params), "#{what}, round #{action[:round]}")
         end
 
         def override_for_revisit(result, decision_point, state)

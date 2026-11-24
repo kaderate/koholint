@@ -17,7 +17,7 @@ class RevisitPolicyTest < Minitest::Test
     @objectives = Koholint::Objectives.new(trace:)
     @talk_log = Koholint::TalkLog.new
     @people = entities
-    Koholint::Policies::Delegated.new(client: @client, registry: Koholint::Skills::Registry.default, objectives: @objectives, manual: 'notes', talk_log: @talk_log)
+    Koholint::Policies::Delegated.new(client: @client, registry: Koholint::Skills::Registry.default, objectives: @objectives, manual: 'notes', memory: Koholint::Policies::Memory.new(talk_log: @talk_log))
   end
 
   def context(page = nil) = { grid:, dialogue_shot: -> { SHOT }, dialogue_rgb: -> { page || PAGE }, entities: -> { @people } }

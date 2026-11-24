@@ -115,4 +115,14 @@ class DecisionTest < Minitest::Test
     end
     assert_raises(Koholint::DecisionPoint::Invalid) { point.validate({ 'skill' => 5, 'params' => {} }) }
   end
+
+  def test_a_harness_choice_has_the_fixed_keys_in_order
+    plain = Koholint::DecisionPoint.harness_choice({ skill: 'wait', params: { frames: 5 } }, 'why')
+    assert_equal %i[choice justification confidence agent latency_ms cost_usd fallback prompt image], plain.keys
+    assert_equal({ choice: { skill: 'wait', params: { frames: 5 } }, justification: 'why', confidence: 1.0, agent: 'delegated', latency_ms: 0, cost_usd: 0.0,
+                   fallback: false, prompt: nil, image: nil }, plain)
+    auto = Koholint::DecisionPoint.harness_choice({ skill: 'explore', params: {} }, 'why', autopilot: true)
+    assert_equal %i[choice justification confidence agent latency_ms cost_usd fallback autopilot prompt image], auto.keys
+    assert auto[:autopilot]
+  end
 end

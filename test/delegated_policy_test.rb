@@ -1097,7 +1097,7 @@ class DelegatedPolicyTest < Minitest::Test
     because = ->(id) { ok('title' => 'go', 'predicate' => { 'kind' => 'new_place' }, 'because' => id) }
     client = ScriptedClient.new(objective: [because.call('lead-1'), because.call('lead-7')])
     @objectives = Koholint::Objectives.new(trace:)
-    p = Koholint::Policies::Delegated.new(client:, registry: Koholint::Skills::Registry.default, objectives: @objectives, leads: known)
+    p = Koholint::Policies::Delegated.new(client:, registry: Koholint::Skills::Registry.default, objectives: @objectives, memory: Koholint::Policies::Memory.new(leads: known))
     decide(p)
     @objectives.abandon(frame: 101, reason: 'test')
     decide(p)
@@ -1110,7 +1110,7 @@ class DelegatedPolicyTest < Minitest::Test
     known = Koholint::Leads.from_events([{ 'type' => 'lead', 'id' => 'lead-1', 'place' => [1, 2], 'source' => nil, 'quote' => 'q', 'claim' => 'c', 'importance' => 'high' }])
     client = ScriptedClient.new(objective: [ok('title' => 'go', 'predicate' => { 'kind' => 'new_place' }, 'because' => 'lead-1')] * 3)
     @objectives = Koholint::Objectives.new(trace:)
-    p = Koholint::Policies::Delegated.new(client:, registry: Koholint::Skills::Registry.default, objectives: @objectives, leads: known)
+    p = Koholint::Policies::Delegated.new(client:, registry: Koholint::Skills::Registry.default, objectives: @objectives, memory: Koholint::Policies::Memory.new(leads: known))
     2.times do |n|
       decide(p, state(frame: 100 + n))
       @objectives.abandon(frame: 150 + n, reason: 'test')

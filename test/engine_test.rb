@@ -147,7 +147,7 @@ class EngineTest < Minitest::Test
     end
   end
 
-  class ScriptedPolicy
+  class ScriptedPolicy < Koholint::Policies::Base
     def initialize(choices, registry = Koholint::Skills::Registry.default)
       @choices = choices.dup
       @registry = registry
@@ -311,7 +311,7 @@ class EngineTest < Minitest::Test
     end
   end
 
-  class BootForever
+  class BootForever < Koholint::Policies::Base
     def decision_point_for(_state) = Koholint::DecisionPoint.macro(:boot)
     def decide(*) = { choice: { buttons: [], frames: 5 }, agent: 'start_game' }
   end
@@ -364,7 +364,7 @@ class EngineTest < Minitest::Test
     end
   end
 
-  class AgentForever
+  class AgentForever < Koholint::Policies::Base
     def decision_point_for(_state) = Koholint::DecisionPoint.macro(:boot)
     def decide(*) = { choice: { buttons: [], frames: 5 }, agent: 'claude' }
   end
@@ -398,7 +398,7 @@ class EngineTest < Minitest::Test
     end
   end
 
-  class Recorder
+  class Recorder < Koholint::Policies::Base
     attr_reader :decided, :observed
 
     def initialize = (@decided = []) && (@observed = [])

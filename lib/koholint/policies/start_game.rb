@@ -1,10 +1,11 @@
 require 'koholint/boot_script'
 require 'koholint/decision'
 require 'koholint/game_state'
+require 'koholint/policies/base'
 
 module Koholint
   module Policies
-    class StartGame
+    class StartGame < Base
       READY_TICK_LIMIT = 24
       PROBE_PLAYING_TICK_LIMIT = 120
       PROBE_OFF_AXIS_TOLERANCE = 2
@@ -42,22 +43,22 @@ module Koholint
         @ready_ticks += 1 if ready
         @handed ||= ready && (@position == [state.x, state.y] || @ready_ticks >= READY_TICK_LIMIT)
         @position = [state.x, state.y]
-        @after.observe(state, frame:) if @after.respond_to?(:observe)
+        @after.observe(state, frame:)
       end
 
-      def cancel = (@after.cancel if @after.respond_to?(:cancel))
+      def cancel = @after.cancel
 
       def decision_point_for(state)
         return DecisionPoint.macro(:boot) unless ready?(state)
 
-        @after.respond_to?(:decision_point_for) ? @after.decision_point_for(state) : DecisionPoint.move
+        @after.decision_point_for(state) || DecisionPoint.move
       end
 
-      def after_action(**result) = (@after.after_action(**result) if @after.respond_to?(:after_action))
+      def after_action(**result) = @after.after_action(**result)
 
-      def note_card(card) = (@after.note_card(card) if @after.respond_to?(:note_card))
+      def note_card(card) = @after.note_card(card)
 
-      def offered_candidates = @after.respond_to?(:offered_candidates) ? @after.offered_candidates : []
+      def offered_candidates = @after.offered_candidates
 
       def decide(decision_point, state, context)
         return @after.decide(decision_point, state, context) if ready?(state)
@@ -77,7 +78,7 @@ module Koholint
         end
         @stable = @position == position
         @position = position
-        @after.observe(state, frame:) if @after.respond_to?(:observe)
+        @after.observe(state, frame:)
       end
 
       def demonstrated_movement?(state)
