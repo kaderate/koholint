@@ -7,7 +7,7 @@ module Koholint
     class Invalid < Error; end
 
     DEFAULT_PATH = File.expand_path('../../data/items.json', __dir__)
-    CONFIDENCES = %w[hypothesis verified].freeze
+    CONFIDENCES = %w[hypothesis observed verified].freeze
     REQUIRED = %w[id name source confidence verified_count].freeze
     SLOTS = 10
     SHIELD = 4
@@ -27,9 +27,16 @@ module Koholint
       raise Invalid, "#{entry['name'] || entry.inspect}: missing #{missing.join(', ')}" unless missing.empty?
       raise Invalid, "#{entry['name']}: unknown confidence #{entry['confidence']}" unless CONFIDENCES.include?(entry['confidence'])
       raise Invalid, "#{entry['name']}: verified needs verified_count >= 2" if entry['confidence'] == 'verified' && entry['verified_count'] < 2
-      return unless entry.key?('aliases') && !(entry['aliases'].is_a?(Array) && entry['aliases'].all? { |name| name.is_a?(String) && !name.strip.empty? })
+      raise Invalid, "#{entry['name']}: aliases must be a list of names" if entry.key?('aliases') && !(entry['aliases'].is_a?(Array) && entry['aliases'].all? { |name| name.is_a?(String) && !name.strip.empty? })
 
-      raise Invalid, "#{entry['name']}: aliases must be a list of names"
+      validate_fact!(entry['pickups'], "#{entry['name']} pickups") if entry.key?('pickups')
+    end
+
+    # A fact about the item with its provenance: the pickups a gain was observed at, observed from one lineage and verified from two.
+    def validate_fact!(fact, label)
+      %w[value confidence verified_count source].each { |key| raise Invalid, "#{label}: missing #{key}" unless fact.is_a?(Hash) && fact.key?(key) }
+      raise Invalid, "#{label}: unknown confidence #{fact['confidence']}" unless CONFIDENCES.include?(fact['confidence'])
+      raise Invalid, "#{label}: verified needs verified_count >= 2" if fact['confidence'] == 'verified' && fact['verified_count'].to_i < 2
     end
 
     # Every name an item goes by: its catalogue name and its aliases (the game's own words, plurals, short forms).

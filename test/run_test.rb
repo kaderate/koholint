@@ -121,6 +121,8 @@ class RunTest < Minitest::Test
       run = Koholint::Run.create(root: dir, flow_version: 'f1', budget: {}, rom_path: rom, tag: 'exp', model: 'sonnet')
       assert_equal %w[exp sonnet], run.manifest.values_at('tag', 'model')
       assert_match(/\A\h{40}\z/, run.manifest['harness_sha'])
+      diff = `git -C #{File.expand_path('..', __dir__)} diff HEAD`
+      assert_equal diff.empty? ? false : Digest::SHA256.hexdigest(diff), run.manifest['harness_dirty']
       assert_equal Koholint::Agents::Prompts.digest, run.manifest['prompts_sha']
       assert_match(/\A\h{64}\z/, run.manifest['prompts_sha'])
       child = run.fork(at_frame: 0, flow_version: 'f1', rom_path: rom)

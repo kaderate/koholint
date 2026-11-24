@@ -7,7 +7,7 @@ module Koholint
   module Skills
     # Holds the guarding item's button during the inputs of a moving skill while a threat is near; never touches the direction.
     class Shielded < SimpleDelegator
-      MOVING = %w[walk goto explore step attack].freeze
+      MOVING = %w[walk goto explore step attack touch].freeze
 
       def initialize(inner, entities:)
         super(inner)

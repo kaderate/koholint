@@ -44,6 +44,78 @@ class AutopilotTest < Minitest::Test
     assert_equal({ skill: 'explore', params: {} }, pilot.next_choice(state: state(frame: 600), objective:)[:choice])
   end
 
+  def test_a_still_entity_whose_try_gave_nothing_is_walked_onto_once_per_visit
+    pilot = primed
+    never = ->(_) { false }
+    one = [{ kind: :unknown, type: 58, cell: [3, 2], x: 40, y: 64 }]
+    pilot.try_choice(state: state(frame: 400), objective:, entities: one, tried: never)
+    pilot.acted(skill: 'talk_to', outcome: { stopped_by: :frame_cap, target_type: 58 })
+    result = pilot.touch_choice(state: state(frame: 500), objective:, entities: one)
+    assert_equal({ skill: 'touch', params: { row: 3, col: 2, type: 58 } }, result[:choice])
+    assert_equal [0.0, true], result.values_at(:cost_usd, :autopilot)
+    pilot.acted(skill: 'touch', outcome: { stopped_by: :done })
+    assert_nil pilot.touch_choice(state: state(frame: 600), objective:, entities: one), 'once per visit'
+    assert_equal({ skill: 'explore', params: {} }, pilot.next_choice(state: state(frame: 600), objective:)[:choice], 'a touch is a benign stop')
+  end
+
+  def test_only_a_try_that_gave_nothing_and_left_the_thing_where_it_was_leads_to_a_touch
+    never = ->(_) { false }
+    at = { kind: :unknown, type: 58, cell: [3, 2], x: 40, y: 64 }
+    { done: [at], damage: [at], no_response: [at.merge(cell: [5, 5])], no_path: [at.merge(kind: :enemy)], blocked: [at.merge(moves: true)] }.each do |stop, now|
+      pilot = primed
+      pilot.try_choice(state: state(frame: 400), objective:, entities: [at], tried: never)
+      pilot.acted(skill: 'talk_to', outcome: { stopped_by: stop })
+      assert_nil pilot.touch_choice(state: state(frame: 500), objective:, entities: now), stop.to_s
+    end
+    pilot = primed
+    pilot.try_choice(state: state(frame: 400), objective:, entities: [at], tried: never)
+    pilot.acted(skill: 'talk_to', outcome: { stopped_by: :no_response })
+    assert_nil pilot.touch_choice(state: state(frame: 500, room_id: 164), objective:, entities: [at]), 'leaving forgets it'
+    assert_nil pilot.touch_choice(state: state(frame: 600), objective:, entities: [at]), 'and coming back does not bring it back'
+  end
+
+  def test_touches_and_tries_share_the_six_things_a_visit_allows
+    pilot = primed
+    never = ->(_) { false }
+    many = (90..99).map { |type| { kind: :unknown, type:, cell: [type % 8, 1] } }
+    count = 0
+    10.times do |i|
+      frame = 400 + (i * 10)
+      choice = pilot.try_choice(state: state(frame:), objective:, entities: many, tried: never)
+      count += 1 if choice
+      pilot.acted(skill: 'talk_to', outcome: { stopped_by: :no_response, target_type: 90 + i }) if choice
+      touch = pilot.touch_choice(state: state(frame: frame + 1), objective:, entities: many)
+      count += 1 if touch
+      pilot.acted(skill: 'touch', outcome: { stopped_by: :no_response }) if touch
+    end
+    assert_equal Koholint::Autopilot::TRY_LIMIT, count
+  end
+
+  def test_a_try_left_untouched_is_not_picked_up_once_the_visit_is_spent
+    pilot = primed
+    never = ->(_) { false }
+    at = { kind: :unknown, type: 58, cell: [3, 2] }
+    pilot.try_choice(state: state(frame: 400), objective:, entities: [at], tried: never)
+    pilot.acted(skill: 'talk_to', outcome: { stopped_by: :no_response, target_type: 58 })
+    assert_nil pilot.touch_choice(state: state(frame: 410), objective:, entities: []), 'it is off screen'
+    pilot.acted(skill: 'explore', outcome: { stopped_by: :untried_object, untried_objects: (1..5).map { |col| { row: 6, col: } } })
+    (1..5).each do |i|
+      pilot.try_choice(state: state(frame: 500 + i), objective:, entities: [], tried: never)
+      pilot.acted(skill: 'talk_to', outcome: { stopped_by: :no_response })
+    end
+    assert_nil pilot.touch_choice(state: state(frame: 600), objective:, entities: [at]), 'six tries are spent'
+  end
+
+  def test_a_try_on_an_object_cell_is_touched_once_the_result_names_the_type_standing_there
+    pilot = primed
+    never = ->(_) { false }
+    at = { kind: :unknown, type: 58, cell: [3, 2], x: 40, y: 64 }
+    pilot.acted(skill: 'explore', outcome: { stopped_by: :untried_object, untried_objects: [{ row: 3, col: 2 }] })
+    assert_equal({ skill: 'talk_to', params: { row: 3, col: 2 } }, pilot.try_choice(state: state(frame: 400), objective:, entities: [], tried: never)[:choice])
+    pilot.acted(skill: 'talk_to', outcome: { stopped_by: :frame_cap, target_type: 58 })
+    assert_equal({ skill: 'touch', params: { row: 3, col: 2, type: 58 } }, pilot.touch_choice(state: state(frame: 500), objective:, entities: [at])[:choice])
+  end
+
   def test_tries_are_bounded_per_visit_by_the_autopilot_itself_and_leave_the_chain_alone
     pilot = primed
     never = ->(_) { false }

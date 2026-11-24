@@ -34,6 +34,25 @@ class ItemsTest < Minitest::Test
     end
   end
 
+  def test_a_pickup_fact_needs_its_provenance_and_two_lineages_to_become_verified
+    entry = '[{"id": 12, "name": "magic powder", "source": "x", "confidence": "hypothesis", "verified_count": 0, "pickups": %s}]'
+    [['{"value": [{"place": [80, 0], "held": [1, 4, 12]}], "confidence": "verified", "verified_count": 1, "source": "x"}', /verified needs verified_count >= 2/],
+     ['{"value": [], "confidence": "observed", "verified_count": 1}', /missing source/],
+     ['{"value": [], "confidence": "seen", "verified_count": 1, "source": "x"}', /unknown confidence seen/]].each do |fact, message|
+      Tempfile.create(['items', '.json']) do |file|
+        file.write(format(entry, fact))
+        file.flush
+        assert_raises(Items::Invalid, fact) { Items.catalogue(file.path) }
+        assert_match message, assert_raises(Items::Invalid) { Items.catalogue(file.path) }.message
+      end
+    end
+    Tempfile.create(['items', '.json']) do |file|
+      file.write(format(entry, '{"value": [{"place": [80, 0], "held": [1, 4, 12]}], "confidence": "observed", "verified_count": 1, "source": "x"}'))
+      file.flush
+      assert_equal 'observed', Items.catalogue(file.path).fetch(12).dig('pickups', 'confidence')
+    end
+  end
+
   def test_held_items_cover_both_buttons_and_the_slots
     held = state(item_b: 4, inventory: [0, 0, 2, 0, 0, 0, 0, 0, 0, 0])
     assert_equal [4, 2], Items.held(held)
