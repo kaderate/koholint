@@ -69,6 +69,7 @@ module Koholint
       @things = {}
       @met = Set.new
       @spent_cuts = Set.new
+      @stone_rooms = Set.new
     end
 
     # The exit bench's measured edges and benches for the current context (Exits.for_context); they fill ways this run never crossed.
@@ -161,8 +162,11 @@ module Koholint
       %i[from to].each { |end_| (place = Ledger.place_of(Ledger.pick(result, end_))) && know(place) }
       from = Ledger.place_of(Ledger.pick(result, :from))
       to = Ledger.place_of(Ledger.pick(result, :to))
+      @stone_rooms << from if from && Ledger.pick(result, :pushed)
+      left = @at if @at && @at != (to || from)
       @entered[from] = :landed if from && @at && from != @at
       @at = to || from
+      uncut(left) if left && @stone_rooms.include?(left)
       @visits[to] += 1 if from && to && from != to
       @entered[to] = :landed if from && to && from != to
       note_crossing(result)
@@ -495,6 +499,12 @@ module Koholint
     end
 
     def cut?(place, side, via) = @cut_off.include?([place, side, via])
+
+    # A room where a stone was pushed puts its stones back on re-entry, so its cuts last only until Link leaves it.
+    def uncut(place)
+      [@cut_off, @spent_cuts].each { |cuts| cuts.delete_if { |key| key[0] == place } }
+      [@cut_seen, @cut_calls].each { |seen| seen.delete_if { |key, _| key[0] == place } }
+    end
 
     def again?(seen, key, place)
       return true if seen.key?(key) && seen[key] != @visits[place]
