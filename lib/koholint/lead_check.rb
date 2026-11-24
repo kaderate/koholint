@@ -1,3 +1,4 @@
+require 'json'
 require 'set'
 require 'koholint/dialogues'
 require 'koholint/items'
@@ -19,6 +20,27 @@ module Koholint
     end
 
     def mentions?(text, name) = text.match?(/(?<![[:alnum:]])#{Regexp.escape(name)}(?![[:alnum:]])/)
+
+    VOCABULARY = File.expand_path('../../data/vocabulary.json', __dir__)
+    KINDS = %w[person role thing].freeze
+
+    def vocabulary
+      @vocabulary ||= JSON.parse(File.read(VOCABULARY)).each do |entry|
+        raise Error, "vocabulary entry #{entry.inspect} needs a name, a kind (#{KINDS.join('|')}), aliases and a source" unless
+          entry['name'].is_a?(String) && KINDS.include?(entry['kind']) && entry['aliases'].is_a?(Array) && entry['source'].is_a?(String)
+      end.freeze
+    end
+
+    # A person, a role or a thing the claim names while no text read names it under any of its names: the claim is the model's
+    # knowledge of the game, so it is withheld and the quote shown in its place.
+    def unread(claim:, where:, texts:)
+      said = [claim, where].compact.join(' ').downcase
+      read = Array(texts).join("\n").downcase
+      vocabulary.select do |entry|
+        names = [entry['name'], *entry['aliases']].map(&:downcase)
+        names.any? { |name| mentions?(said, name) } && names.none? { |name| mentions?(read, name) }
+      end.map { |entry| entry['name'] }
+    end
 
     # Offline, the text read is the lead's quote and every dialogue text of the run up to it.
     def leaks(events)

@@ -1,6 +1,6 @@
 # Agent skills
 
-The skills, protocols and harness behaviours the agent works with. Versioned with the play flow (currently `flow-84`): update this page, not the README, when a flow changes. Layers and data flow are in [ARCHITECTURE.md](../ARCHITECTURE.md).
+The skills, protocols and harness behaviours the agent works with. Versioned with the play flow (currently `flow-86`): update this page, not the README, when a flow changes. Layers and data flow are in [ARCHITECTURE.md](../ARCHITECTURE.md).
 
 
 - Learned capabilities (`data/capabilities.json`, `bin/koholint capability list`): an `operational` entry is a composite of the skills below, offered in the skill schema and listed under "Learned skills" only while its trigger item is held (flow-49) and its object is on screen (today `sword_on_object_92 row col direction`: stand next to object 92, face it, use the sword, step into its cell). `explore` and `goto` also run it themselves when blocked facing such a cell, and the planner routes through those cells as a last resort. `learn` and `capability publish|retire` are offline commands.
@@ -66,7 +66,8 @@ The skills, protocols and harness behaviours the agent works with. Versioned wit
 - The agent writes a one-line `plan` that the next call sees; the live view shows its reasoning and plan under each
   decision.
 - The agent sets its own long-term `goal`, restates or revises it at every objective (the context says when it was set) and, in the call that transcribes a text (dialogue, sign, object), extracts up
-  to five leads (`quote`, `claim`, importance `high|normal|low|tip`, `tip` for how-to-play advice); a lead whose quote is not in that transcription is
+  to five leads (`quote`, `claim`, importance `high|normal|low|tip`, `tip` for how-to-play advice; flow-86: `need: true` when a person
+  asks Link for something, kept only for a person's text); a lead whose quote is not in that transcription is
   dropped. Both are trace events (`goal`, `lead`), shown in the context and the live view and written to `world.json`;
   an objective can cite the lead behind it (`because`). A lead may carry `where` (a place id such as `161-0` or a name the agent gave).
   A lead is `open` until an objective follows it, `tested` once one is achieved and `refuted` after 2 that failed (a loop, stall,
@@ -77,11 +78,15 @@ The skills, protocols and harness behaviours the agent works with. Versioned wit
   There is one such lead per thing and text (a text overlapping an earlier one about the same thing, or any lead already quoting it in that place, is dropped), at most 5 per place, and they never
   change the dialogue stamp, so they do not reopen people.
   flow-59: a lead whose claim or `where` names a catalogued item (name or alias) that neither any text the run has read (earlier texts, the whole
-  transcription, earlier lead quotes) nor any item Link has ever held (`Items.held_ids`, cumulative) names is dropped (`LeadCheck.named`, the rule `check-leads` applies to traces) and recorded as a `lead_leak` notable, so it never reaches a prompt.
+  transcription, earlier lead quotes) nor any item Link has ever held (`Items.held_ids`, cumulative) names is dropped (`LeadCheck.named`, the rule `check-leads` applies to traces) and recorded as a `lead_leak` notable, so it never reaches a prompt. flow-86: a claim naming a person, a role or a thing
+  (`data/vocabulary.json`) that no text read names is withheld: the lead stays, and its quote is shown in place of the claim and of its `where` (only the place id the `where` resolves to, if any).
 - At `choose_objective` the context lists candidate objectives with ids (`candidates.rb`): untried exits by side (`exit-up`) and doors
   (`door-R-C`) of this place (flow-84: a side known only as the way back you came in by says so and comes after them), people (`person-tT`, listed first) and unread signs (`sign-R-C`) here worth a visit, known places with untried exits
   (`place-R-M`), people and unread signs of other known places (from their place cards; flow-62: a person exhausted
-  under other held items or another milestone is offered again, once) and places tied to a lead by its `where`
+  under other held items or another milestone is offered again, once; flow-86: an unidentified thing never tried, seen still in one cell
+  on two looks while Link held other items, is offered among them as `examine-R-M-tT`, and a place whose only work is such a thing, still on its last two looks, is a place with work; a roaming one is not)
+  and places tied to a lead by its `where`; flow-86: every person who asked for something (a lead marked `need`) and has not
+  answered with a new text since, once Link holds other items than at the last talk with them (`need-tT` here, `need-R-M-tT` away, all of them),
   (`lead-N`), nearest first by moves over exits explore took (flow-69: never through a pocket, so a place routes cannot reach
   is not offered; a sign elsewhere is a `new_text` objective the autopilot walks to and reads, done only when that sign's text is read, not on arrival or on
   another text met on the way). The agent answers with `candidate` (or still a free title and predicate);
@@ -133,6 +138,10 @@ The skills, protocols and harness behaviours the agent works with. Versioned wit
   are answered by the harness: it explores toward the nearest place with untried work, else toward the reachable place entered least,
   else waits. The autopilot also goes on exploring after a dialogue that brought no new lead or goal, after an arrival while
   the objective's target cannot be followed from here, and steps up through a door when your `goto` ended on the cell right below it.
+- flow-86: a place reached without a crossing from where Link was (a continue after a game over, a jump) is entered by a landing of its own
+  (`:landed`), never by the stale entry of an earlier visit. A way explore finds unreachable from a landing is cut from that landing when it is
+  found on two visits, or on `CUT_CALLS` (3) calls within one visit; the count starts over on each new visit and when Link crosses that way from
+  that landing, which also lifts the cut. A cut lasts for the context (items and milestone) otherwise.
 - flow-79: an uncatalogued entity (kind unknown) on screen whose type no `talk_to` ever aimed at in this place, and the objects an
   `untried_object` stop named, are tried once by the autopilot with `talk_to` (nearest first, no model call, at most 6 per visit, outside the chain caps) before it
   explores on; results show as `(autopilot) talk_to`. A place whose last card lists such an entity counts as untried work for explore's

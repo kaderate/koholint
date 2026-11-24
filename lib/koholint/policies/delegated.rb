@@ -122,7 +122,11 @@ module Koholint
         offer_learned(context[:room_objects], context[:held]) if @composites.any? && context[:room_objects]
       end
 
-      def note_card(card) = @explore_log.card(card[:place], Array(card[:unknown]).map { |entity| entity[:type] })
+      def note_card(card)
+        @explore_log.card(card[:place], Array(card[:unknown]))
+        before = @cards[card[:place]] || {}
+        @cards[card[:place]] = before.merge(unknown: PlaceCard.stillness(before[:unknown], card[:unknown]), held: @held)
+      end
 
       def decision_point_for(state)
         return @screen_points.fetch(screen(state)) if screen(state)
@@ -138,6 +142,7 @@ module Koholint
           @triggers.reset_unless(state.place)
         end
         @screen_since = nil unless screen(state)
+        @held = Dialogues.items(state.inventory, state.item_a, state.item_b)
         release_hemmed(state)
         track_locked(state)
         @over = false unless screen(state) == :game_over
@@ -364,9 +369,9 @@ module Koholint
         place = state.place
         signs = objects_for(state)
         if state.phase(booted: true) == :playing
-          @cards[place] = { people: @entities.select { |entity| entity[:kind].to_s == 'npc' && entity[:cell] }.map { |entity| entity.slice(:type, :cell) },
-                            signs: signs.select { |object| object[:kind].to_s == 'sign' }.map { |object| object.slice(:cell) },
-                            chests: signs.select { |object| object[:reachable] }.map { |object| object[:cell] } }
+          @cards[place] = (@cards[place] || {}).merge(people: @entities.select { |entity| entity[:kind].to_s == 'npc' && entity[:cell] }.map { |entity| entity.slice(:type, :cell) },
+                                                      signs: signs.select { |object| object[:kind].to_s == 'sign' }.map { |object| object.slice(:cell) },
+                                                      chests: signs.select { |object| object[:reachable] }.map { |object| object[:cell] })
         end
         @candidates = Candidates.build(place:, grid: context[:grid], explore_log: @explore_log, talk_log: @talk_log, leads: @leads, cards: @cards,
                                        entities: @entities, signs:, stamp: stamp(state), link: state.cell)

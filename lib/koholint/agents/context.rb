@@ -266,12 +266,17 @@ module Koholint
         tips = newest.select { |lead| lead[:importance] == 'tip' }.first(TIP_LEADS)
         lines = (high + normal + tips).map do |lead|
           quote = lead[:quote].size > QUOTE_LIMIT ? "#{lead[:quote][0, QUOTE_LIMIT - 3]}..." : lead[:quote]
-          where = lead[:where] ? " (where: #{lead[:where]}#{(found = resolve&.call(lead)) ? ", place #{found.join('-')}" : ''})" : ''
+          found = lead[:where] && resolve&.call(lead)
+          where = if lead[:withheld] then found ? " (place #{found.join('-')})" : ''
+                  elsif lead[:where] then " (where: #{lead[:where]}#{", place #{found.join('-')}" if found})"
+                  else ''
+                  end
           tries = Array(lead[:evidence]).last(EVIDENCE_SHOWN).map do |try|
             "#{try[:objective]} \"#{try[:title]}\" #{try[:outcome]}#{" in #{try[:place].join('-')}" if try[:place]} at frame #{try[:frame]}"
           end
           status = tries.empty? ? '' : " #{lead[:status]}: #{tries.join('; ')}"
-          "- [#{lead[:id]} #{lead[:importance]}#{status}] #{lead[:claim]}#{where} — \"#{quote}\""
+          text = lead[:withheld] ? "\"#{quote}\"#{where}" : "#{lead[:claim]}#{where} — \"#{quote}\""
+          "- [#{lead[:id]} #{lead[:importance]}#{status}] #{text}"
         end
         return [] if lines.empty?
 

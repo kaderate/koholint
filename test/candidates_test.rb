@@ -42,6 +42,73 @@ class CandidatesTest < Minitest::Test
     assert_empty away.(after)
   end
 
+  def test_a_still_thing_never_tried_seen_while_link_held_other_items_is_offered_away_nearest_first_until_tried
+    talk_log = Koholint::TalkLog.new
+    catalogued = Koholint::Entities.catalogue.keys.first
+    cards = { [3, 0] => { people: [{ type: 70, cell: [1, 1] }], unknown: [{ type: 20, cell: [4, 2] }], held: [1, 4] },
+              [4, 0] => { people: [], unknown: [{ type: 64, cell: [3, 4], still: true }, { type: catalogued, cell: [5, 5], still: true }], held: [1, 4] } }
+    stamp = ->(items) { Koholint::Dialogues.stamp(milestone: :sword, items:, leads: 0) }
+    away = ->(items) { build(cards:, talk_log:, stamp: stamp.(items)).select { |c| c[:id].start_with?('person-', 'examine-') } }
+    assert_equal %w[person-3-0-t70], away.([1, 4]).map { |c| c[:id] }, 'seen with the items held now, it is not offered'
+    found = away.([1, 4, 12])
+    assert_equal %w[person-3-0-t70 examine-4-0-t64], found.map { |c| c[:id] }, 'nearest first, never a thing seen in one cell once, nor a catalogued type'
+    assert_equal({ kind: 'person', place: [4, 0], type: 64, cell: [3, 4] }, found[1][:target])
+    assert_equal({ kind: 'reach_place', place: [4, 0] }, found[1][:predicate])
+    assert_match(/2 moves away, never tried; Link holds other items than when it was seen/, found[1][:label])
+    talk_log.record(place: [4, 0], row: 3, col: 4, talked: false, entity: 64)
+    assert_equal %w[person-3-0-t70], away.([1, 4, 12]).map { |c| c[:id] }
+  end
+
+  def test_a_surveyed_place_with_a_thing_never_tried_is_a_place_with_work
+    explore_log = log
+    explore_log.absorb({ from: { room: 3, map: 0 }, survey: { sides: {}, doors: [], pending: false } })
+    refute(build(explore_log:).any? { |c| c[:id] == 'place-3-0' })
+    explore_log.card([3, 0], [{ type: 64, cell: [3, 4] }, { type: 99, cell: [2, 2] }])
+    refute(build(explore_log:).any? { |c| c[:id] == 'place-3-0' }, 'one look')
+    explore_log.card([3, 0], [{ type: 64, cell: [3, 4] }, { type: 99, cell: [5, 6] }])
+    assert_match(/go to place 3-0, 1 move away: it has a thing never tried \(type 64\)$/, build(explore_log:).find { |c| c[:id] == 'place-3-0' }[:label])
+  end
+
+  def asking(leads, talk_log, place, type, stamp, text: 'Il me faut une chose de la forêt, tu sais.')
+    talk_log.remember(place:, cell: [3, 4], text:, stamp:, entity: type)
+    leads.absorb([{ 'quote' => text, 'claim' => 'the speaker asks for a thing', 'importance' => 'high', 'need' => true }],
+                 transcription: text, place:, source: { row: 3, col: 4, entity: type })
+  end
+
+  def test_every_person_who_asked_for_something_is_offered_once_link_holds_other_items_until_a_new_text_answers
+    leads = Koholint::Leads.new
+    talk_log = Koholint::TalkLog.new
+    explore_log = Koholint::ExploreLog.new
+    places = [[3, 0], [4, 0], [5, 0], [6, 0], [7, 0]]
+    [HERE, *places].each_cons(2) { |from, to| explore_log.absorb({ from: { room: from[0], map: 0 }, exits: [{ row: 0, col: 5, direction: :up, outcome: :left, to: }] }) }
+    before = Koholint::Dialogues.stamp(milestone: :sword, items: [1, 4], leads: 0)
+    after = Koholint::Dialogues.stamp(milestone: :sword, items: [1, 4, 12], leads: 0)
+    places.each_with_index { |where, i| asking(leads, talk_log, where, 60 + i, before, text: "Il me faut une chose numéro #{i}, tu sais.") }
+    needs = ->(stamp) { build(leads:, talk_log:, explore_log:, stamp:).select { |c| c[:id].start_with?('need-') } }
+    assert_empty needs.(before), 'with the items held at the talk, nothing new to offer'
+    found = needs.(after)
+    assert_equal %w[need-3-0-t60 need-4-0-t61 need-5-0-t62 need-6-0-t63 need-7-0-t64], found.map { |c| c[:id] }, 'every need-speaker, not only 4'
+    assert_equal({ kind: 'person', place: [7, 0], type: 64, cell: [3, 4] }, found.last[:target])
+    assert_match(/5 moves away, who asked for something \(lead-5: « Il me faut une chose numéro 4, tu sais. »\)/, found.last[:label])
+    talk_log.remember(place: [3, 0], cell: [3, 4], text: 'Il me faut une chose numéro 0, tu sais.', stamp: after, entity: 60)
+    assert_equal 'need-4-0-t61', needs.(after).first[:id], 'talked to with the new items, offered again only after another change'
+    later = Koholint::Dialogues.stamp(milestone: :sword, items: [1, 4, 12, 2], leads: 0)
+    assert_equal 'need-3-0-t60', needs.(later).first[:id], 'the same text again leaves the need open'
+    talk_log.remember(place: [3, 0], cell: [3, 4], text: 'Oh merci, voilà pour toi!', stamp: later, entity: 60)
+    refute(needs.(Koholint::Dialogues.stamp(milestone: :sword, items: [1, 4, 12, 2, 5], leads: 0)).any? { |c| c[:id] == 'need-3-0-t60' }, 'a new text answers the need')
+  end
+
+  def test_a_need_speaker_here_comes_first_and_is_not_listed_twice
+    leads = Koholint::Leads.new
+    talk_log = Koholint::TalkLog.new
+    before = Koholint::Dialogues.stamp(milestone: :sword, items: [1, 4], leads: 0)
+    asking(leads, talk_log, HERE, 64, before)
+    entities = [{ type: 64, kind: 'npc', cell: [3, 4] }, { type: 70, kind: 'npc', cell: [5, 5] }]
+    ids = build(leads:, talk_log:, entities:, stamp: Koholint::Dialogues.stamp(milestone: :sword, items: [1, 4, 12], leads: 0)).map { |c| c[:id] }
+    assert_equal %w[need-t64 person-t70], ids.first(2)
+    refute_includes ids, 'person-t64'
+  end
+
   def log
     log = Koholint::ExploreLog.new
     log.absorb({ from: { room: 1, map: 0 }, exits: [{ row: 0, col: 5, direction: :up, outcome: :left, to: [3, 0] }] })

@@ -1,3 +1,5 @@
+require 'koholint/entities'
+require 'koholint/leads'
 require 'koholint/place_card'
 require 'koholint/place_kinds'
 require 'koholint/talk_log'
@@ -13,10 +15,14 @@ module Koholint
     def build(place:, grid:, explore_log:, talk_log:, leads:, cards: {}, entities: [], signs: [], stamp: nil, link: nil)
       hops = explore_log.hops(place)
       named = ->(where) { leads.name_of(where) }
-      people = people_here(place, entities, talk_log, stamp)
+      needs = needs(place, hops, leads, talk_log, named, stamp)
+      asked = needs.map { |need| need[:target].values_at(:place, :type) }
+      people = needs.select { |need| need[:target][:place] == place } + people_here(place, entities, talk_log, stamp).reject { |person| asked.include?([place, person[:target][:type]]) }
       back, fresh = exits(place, grid, explore_log, named).partition { |exit| explore_log.side_left?(place, exit.dig(:target, :direction)) }
       leaving = puzzles(place, hops, explore_log, leads, named) + fresh + doors(place, signs, explore_log, link) + back + places(place, hops, explore_log, named) +
-                people_away(place, hops, cards, talk_log, named, stamp) + signs_away(place, hops, cards, talk_log, named) + chests_away(place, hops, cards, named) +
+                needs.reject { |need| need[:target][:place] == place } +
+                people_away(place, hops, cards, talk_log, named, stamp).reject { |person| asked.include?(person[:target].values_at(:place, :type)) } +
+                signs_away(place, hops, cards, talk_log, named) + chests_away(place, hops, cards, named) +
                 lead_places(place, hops, leads, named)
       people + signs_here(place, signs, talk_log) + chests_here(place, signs) + unidentified(place, grid, entities, talk_log, link) +
         warn(leaving, people)
@@ -103,8 +109,9 @@ module Koholint
     end
 
     def places(place, hops, explore_log, named)
-      away(place, hops).select { |where| explore_log.untried?(where) }.first(PER_KIND).map do |where|
-        { id: "place-#{where.join('-')}", label: "go to #{describe(where, named)}, #{moves(hops[where])}: it has untried exits or doors",
+      away(place, hops).select { |where| explore_log.work?(where) }.first(PER_KIND).map do |where|
+        work = explore_log.untried?(where) ? 'untried exits or doors' : "a thing never tried (type #{explore_log.unmet(where).join(', type ')})"
+        { id: "place-#{where.join('-')}", label: "go to #{describe(where, named)}, #{moves(hops[where])}: it has #{work}",
           title: "Go to #{describe(where, named)}"[0, 80], predicate: { kind: 'reach_place', place: where }, target: { kind: 'place', place: where } }
       end
     end
@@ -120,8 +127,44 @@ module Koholint
           { id: "person-#{where.join('-')}-t#{person[:type]}", label: "talk to #{who} in #{describe(where, named)}, #{moves(hops[where])}, #{why}",
             title: "Go talk to #{who}"[0, 80], predicate: { kind: 'reach_place', place: where },
             target: { kind: 'person', place: where, type: person[:type], cell: person[:cell] } }
-        end
+        end + things_away(where, hops, cards, talk_log, named, stamp)
       end.first(PER_KIND)
+    end
+
+    # An uncatalogued thing never tried, seen still in its cell while Link held other items than now, may answer what he holds now: offered like a stale person.
+    def things_away(where, hops, cards, talk_log, named, stamp)
+      held = cards.dig(where, :held)
+      return [] unless stamp && held && held != Array(stamp)[1]
+
+      Array(cards.dig(where, :unknown)).select { |thing| thing[:still] }.uniq { |thing| thing[:type] }.filter_map do |thing|
+        next if Entities.catalogue.key?(thing[:type]) || talk_log.attempts(where, [[:entity, thing[:type]]]).positive?
+
+        what = "the unidentified thing (type #{thing[:type]})"
+        { id: "examine-#{where.join('-')}-t#{thing[:type]}", label: "examine #{what} in #{describe(where, named)}, #{moves(hops[where])}, never tried; Link holds other items than when it was seen",
+          title: "Go examine #{what}"[0, 80], predicate: { kind: 'reach_place', place: where },
+          target: { kind: 'person', place: where, type: thing[:type], cell: thing[:cell] } }
+      end
+    end
+
+    # Every person who asked for something and has not answered with a new text since, once Link holds other items than at the last talk;
+    # nothing matches what they asked for with what Link holds.
+    def needs(place, hops, leads, talk_log, named, stamp)
+      leads.open_needs(talk_log).filter_map do |lead|
+        where = lead[:place]
+        type = lead.dig(:source, :entity)
+        next unless (where == place || hops[where]) && talk_log.stale?(place: where, entity: type, stamp:)
+
+        who = talk_log.name_of(where, type) || "person (type #{type})"
+        cell = lead[:source].values_at(:row, :col)
+        asked = "who asked for something (#{lead[:id]}: « #{lead[:quote]} »), Link holds other items than at the last talk"
+        if where == place
+          { id: "need-t#{type}", who:, label: "talk again to #{who} at (#{cell.join(',')}), #{asked}", title: "Talk again to #{who}"[0, 80],
+            predicate: { kind: 'new_text' }, target: { kind: 'person', place:, type:, cell: } }
+        else
+          { id: "need-#{where.join('-')}-t#{type}", label: "talk again to #{who} in #{describe(where, named)}, #{moves(hops[where])}, #{asked}",
+            title: "Go talk again to #{who}"[0, 80], predicate: { kind: 'reach_place', place: where }, target: { kind: 'person', place: where, type:, cell: } }
+        end
+      end.uniq { |need| need[:id] }
     end
 
     def signs_away(place, hops, cards, talk_log, named)
@@ -151,7 +194,7 @@ module Koholint
         next unless where && where != place && !leads.settled?(lead)
 
         route = hops[where] ? moves(hops[where]) : 'no known route'
-        { id: lead[:id], label: "go to #{describe(where, named)} (#{lead[:importance]} lead: #{lead[:claim]}), #{route}",
+        { id: lead[:id], label: "go to #{describe(where, named)} (#{lead[:importance]} lead: #{Leads.shown_claim(lead)}), #{route}",
           title: "Go to #{describe(where, named)}"[0, 80], predicate: { kind: 'reach_place', place: where }, target: { kind: 'lead', place: where, lead: lead[:id] } }
       end.first(PER_KIND)
     end
