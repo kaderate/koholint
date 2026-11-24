@@ -6,6 +6,7 @@ module Koholint
     class TalkTo
       FACE_FRAMES = 16
       CONTACT_FRAMES = 3
+      CLOSE_FRAMES = Geometry.fact(:swing_still).fetch('frames') + 1
       FREE_PIXELS = 12
       PRESS_FRAMES = 3
       REPRESS_FRAMES = 12
@@ -370,7 +371,7 @@ module Koholint
           @closing[:still] = position == @closing[:last] ? @closing[:still] + 1 : 0
           @closing[:last] = position
           @closing[:frames] += 1
-          return [@facing] if @closing[:still] < CONTACT_FRAMES && @closing[:frames] < FACE_FRAMES
+          return [@facing] if @closing[:still] < CLOSE_FRAMES && @closing[:frames] < FACE_FRAMES
 
           @phase = :talk
           @response_frames = 0

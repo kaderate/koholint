@@ -211,6 +211,29 @@ class TalkToTest < Minitest::Test
     assert_includes inputs[first_a..], [:right]
   end
 
+  def test_the_closing_step_waits_out_the_still_frames_that_follow_a_and_still_reaches_contact
+    x, y = centre(4, 5)
+    person = person_at(*centre(4, 6))
+    contact = person[:x] - 14
+    execution = registry.start('talk_to', state(x:, y:), { row: 4, col: 6 }, { grid: FakeGrid.new, entities: -> { [person] } })
+    swing = Koholint::Geometry.fact(:swing_still).fetch('frames')
+    inputs = []
+    dialog = 0
+    stall = 0
+    300.times do
+      buttons = execution.next_input(state(x:, y:, dialog_state: dialog)) or break
+      stall = swing if buttons == [:right] && inputs.last != [:right] && inputs.include?([:a])
+      inputs << buttons
+      dialog = 3 if buttons == [:a] && x >= contact
+      next unless buttons == [:right]
+      next stall -= 1 if stall.positive?
+
+      x += 1 if x < contact
+    end
+    result = execution.result(state(x:, y:, dialog_state: dialog))
+    assert_equal [:done, true, contact], [result[:stopped_by], result[:talked], x], result.inspect
+  end
+
   def test_a_scene_that_starts_after_a_is_the_answer_of_the_person
     x, y = centre(4, 5)
     person = person_at(*centre(4, 6), type: 49)
