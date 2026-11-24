@@ -242,7 +242,7 @@ class StonesTest < Minitest::Test
 
   def test_the_search_pushes_a_stone_aside_where_pushing_it_on_would_jam_the_corridor
     floor = ->(cell, _direction) { JAM[cell[0]][cell[1]] == '.' }
-    plans = Koholint::Navigation::Stones.plans(link: [3, 1], stones: [[3, 5]], fixed: [], step: ->(_from, to, direction) { floor.(to, direction) }, slide: floor)
+    plans = Koholint::Navigation::Stones.plans(link: [3, 1], stones: [[3, 5]], fixed: [], step: ->(_from, to, direction) { floor.(to, direction) }, slide: floor)[:plans]
     push = plans.fetch([3, 9]).first
     assert_includes %i[up down], push[:direction], 'pushed right it lands in the corridor and walls it'
     assert_equal [3, 5], push[:stone]
@@ -263,5 +263,63 @@ class StonesTest < Minitest::Test
     assert_equal :push, results.first.dig(:target, :kind)
     assert_includes [room.objects[2][5], room.objects[4][5]], FIXED
     assert_equal FLOOR, room.objects[3][6]
+  end
+  class StuckRoom < Room
+    private
+
+    def push(_cell, _direction) = nil
+  end
+
+  def test_a_push_that_leaves_its_stone_in_place_is_not_planned_again_this_visit
+    room = StuckRoom.new(JAM, start: at([3, 1]))
+    log = Koholint::ExploreLog.new
+    failed = Array.new(3) do
+      result, = play('explore', {}, room, JAM, limit: 1500, grid: LiveGrid.new(room, JAM), explore_log: log)
+      log.note(result)
+      log.absorb(result)
+      result[:failed_push]
+    end
+    assert_equal({ row: 3, col: 5, direction: :up }, failed.first)
+    assert_includes log.failed_pushes([1, 0]), [[3, 5], :up]
+    refute_includes failed.drop(1), failed.first, failed.inspect
+  end
+
+  def test_a_landed_stone_blocks_its_cell
+    rows = ['##########', '##########', '##########', '#....s....', '##########', '##########', '##########', '##########']
+    floor = ->(cell, _direction) { rows[cell[0]][cell[1]] == '.' }
+    plans = Koholint::Navigation::Stones.plans(link: [3, 1], stones: [[3, 5]], fixed: [], step: ->(_from, to, direction) { floor.(to, direction) }, slide: floor)[:plans]
+    refute plans.key?([3, 9]), 'pushed on, the stone lands in the corridor and walls it'
+    assert plans.key?([3, 5])
+  end
+
+  def test_a_stone_slides_only_onto_a_cell_it_can_land_on
+    rows = ['##########', '##########', '######..##', '#.....s###', '##########', '##########', '##########', '##########']
+    floor = ->(cell, _direction) { rows[cell[0]][cell[1]] == '.' }
+    plans = Koholint::Navigation::Stones.plans(link: [3, 1], stones: [[3, 6]], fixed: [], step: ->(_from, to, direction) { floor.(to, direction) }, slide: floor)[:plans]
+    refute plans.key?([2, 7]), 'the wall beyond holds the stone'
+  end
+
+  def test_explore_takes_a_route_way_that_only_pushes_open
+    room = Room.new(JAM, start: at([3, 1]), exits: [[[3, 9], :right]])
+    log = Koholint::ExploreLog.new
+    log.absorb({ from: { room: 1, map: 0 }, survey: { sides: { right: [{ row: 3, col: 9 }] }, doors: [] },
+                 exits: [{ row: 3, col: 9, direction: :right, outcome: :left, to: [2, 0] }] })
+    result, = play('explore', {}, room, JAM, limit: 1500, grid: LiveGrid.new(room, JAM), explore_log: log)
+    assert_equal :push, result.dig(:target, :kind), result.inspect
+    assert_equal [2, 0], result.dig(:route, :goal)
+  end
+
+  def test_a_room_whose_exit_needs_a_push_still_has_work
+    room = Room.new(JAM, start: at([3, 1]))
+    run = Koholint::Skills::Explore.new.start(state(room), {}, { grid: LiveGrid.new(room, JAM), room_objects: room.reader })
+    run.instance_variable_set(:@pushable, [])
+    assert run.send(:pending?)
+  end
+  def test_a_push_ranks_by_the_exit_it_opens
+    room = Room.new(JAM, start: at([3, 1]))
+    run = Koholint::Skills::Explore.new.start(state(room), { direction: 'right' }, { grid: LiveGrid.new(room, JAM), room_objects: room.reader })
+    push = { kind: :push, cell: [4, 5], direction: :up, path: Array.new(6), opens: { kind: :exit, cell: [3, 9], direction: :right } }
+    frontier = { kind: :frontier, cell: [2, 2], direction: :up, path: Array.new(2) }
+    assert_equal [push, frontier], run.send(:order, [frontier, push]), 'the hint names the exit, not the push'
   end
 end

@@ -1236,3 +1236,14 @@ class ExploreStoneRoomTest < Minitest::Test
     assert kept.cut?([171, 10], DOOR, :right), 'a room without a push keeps its cut'
   end
 end
+class ExploreStoneRoomLoopTest < ExploreStoneRoomTest
+  def test_a_way_shut_for_another_reason_is_cut_again_at_once_and_a_visit_without_a_push_keeps_it
+    events = cut_then_leave({ 'row' => 5, 'col' => 7, 'direction' => 'right' })
+    refute Koholint::ExploreLog.from_events(events).cut?([171, 10], DOOR, :right), 'the visit pushed a stone'
+    events += [explore(10, [80, 2, 8], [171, 7, 5], { 'row' => 3, 'col' => 8, 'direction' => 'up', 'kind' => 'door' }),
+               explore(11, [171, 5, 6], [171, 5, 6], nil, ['right'])]
+    assert Koholint::ExploreLog.from_events(events).cut?([171, 10], DOOR, :right), 'found again on a later visit'
+    events << explore(12, [171, 7, 5], [80, 7, 5], { 'row' => 7, 'col' => 5, 'direction' => 'down', 'walk_in' => true })
+    assert Koholint::ExploreLog.from_events(events).cut?([171, 10], DOOR, :right), 'that visit pushed nothing'
+  end
+end

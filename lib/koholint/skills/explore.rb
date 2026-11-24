@@ -110,6 +110,8 @@ module Koholint
           merged[:route] = @route if @route
           merged[:unreachable] = @unreachable if @unreachable
           merged[:dead_end] = true if @dead_end
+          merged[:failed_push] = @failed_push if @failed_push
+          merged[:stone_search] = 'cut short' if @search_cut
           merged[:cause] = @fail_cause if @stopped_by == :blocked && @fail_cause
           merged[:untried_objects] = @untried.map { |row, col| { row:, col: } } if @stopped_by == :untried_object
           merged[:tried_exits] = @log ? @log.tried_exits(@place) : [] if @stopped_by == :no_frontier
@@ -316,6 +318,7 @@ module Koholint
           edge = { row: cell[0], col: cell[1], direction: }
           block(edge)
           @exits << edge.merge(outcome: :blocked) if %i[exit door].include?(@target[:kind])
+          @failed_push = { row: @target[:stone][0], col: @target[:stone][1], direction: } if @target[:kind] == :push
           return unless @target[:kind] == :frontier
 
           @new_walls << Geometry.step(cell, direction)
@@ -380,7 +383,7 @@ module Koholint
 
           path_to = ->(cell) { @planner.path(from: @cell, to: cell) }
           safe_to = ->(cell) { @planner.path(from: @cell, to: cell, cross_margin: false) }
-          untried(@cell, path_to).any? || clearable(@cell, safe_to).any? ||
+          untried(@cell, path_to).any? || clearable(@cell, safe_to).any? || pushes(untried(@cell, nil), @cell).any? ||
             ((opened? || untried(@cell, nil).any?) && gather(@cell, safe_to) { |cell, direction| frontier_kind(cell, direction) unless object_cells.include?(Geometry.step(cell, direction)) }.any?)
         end
 
@@ -447,23 +450,29 @@ module Koholint
         end
 
         # An exit or door that only pushes open: the first of the fewest pushes that open it, from a stand Link walks to without pushing.
-        def pushes(found)
+        def pushes(found, from = @attempt_from)
           found.filter_map do |candidate|
-            push = stone_plans[candidate[:cell]]&.first or next
-            path = @planner.path(from: @attempt_from, to: push[:stand]) or next
-            { kind: :push, cell: push[:stand], direction: push[:direction], path:, opens: candidate.slice(:kind, :cell, :direction) }
+            push = stone_plans(from)[candidate[:cell]]&.first or next
+            next unless open?(push[:stand], push[:direction])
+
+            path = @planner.path(from:, to: push[:stand]) or next
+            { kind: :push, cell: push[:stand], direction: push[:direction], stone: push[:stone], path:, opens: candidate.slice(:kind, :cell, :direction) }
           end
         end
 
-        def stone_plans
+        # A push that left its stone in place this visit is never planned again in it.
+        def stone_plans(from)
           objects = @room_objects&.call
-          return {} unless objects && @grid && @attempt_from
+          return {} unless objects && @grid && from
 
           @stone_plans ||= {}
-          @stone_plans[[@attempt_from, objects]] ||= begin
+          @stone_plans[[from, objects]] ||= begin
             cells = objects.each_with_index.flat_map { |row, r| row.each_index.filter_map { |c| [r, c] if Entities.object_catalogue.dig(row[c], :kind) == :stone } }
             stones, fixed = cells.partition { |cell| Entities.object_catalogue.dig(objects.dig(*cell), :push) }
-            stones.empty? ? {} : Navigation::Stones.plans(link: @attempt_from, stones:, fixed:, step: @planner.method(:step?), slide: ->(cell, direction) { lands?(objects, @grid, cell, direction) })
+            failed = @log ? @log.failed_pushes(@place) : []
+            found = stones.empty? ? { plans: {}, complete: true } : Navigation::Stones.plans(link: from, stones:, fixed:, step: @planner.method(:step?), slide: ->(cell, direction) { lands?(objects, @grid, cell, direction) }, refused: failed)
+            @search_cut = true unless found[:complete]
+            found[:plans]
           end
         end
 
@@ -496,7 +505,8 @@ module Koholint
         def order(found)
           door = @aim[:door] && [@aim[:door][0] + 1, @aim[:door][1]]
           found.sort_by do |c|
-            [door && c[:kind] == :door && c[:cell] == door ? 0 : 1, @hint.nil? || c[:direction] == @hint ? 0 : 1, c[:path].size, c[:kind] == :frontier ? 1 : 0, *c[:cell], Geometry::DIRECTIONS.index(c[:direction])]
+            aim = c[:opens] || c
+            [door && aim[:kind] == :door && aim[:cell] == door ? 0 : 1, @hint.nil? || aim[:direction] == @hint ? 0 : 1, c[:path].size, c[:kind] == :frontier ? 1 : 0, *c[:cell], Geometry::DIRECTIONS.index(c[:direction])]
           end
         end
 
