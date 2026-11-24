@@ -236,4 +236,18 @@ class LeadsTest < Minitest::Test
     assert_equal live.texts_at([81, 0]), resumed.texts_at([81, 0])
     assert_equal ["J'suis un raton-laveur espiègle. Et j'aime pas du tout c'qu'est poudreux..."], live.texts_at([81, 0]), 'overlapping windows join into one text'
   end
+
+  def test_a_need_is_typed_only_for_a_person_s_text_and_survives_a_resume
+    text = 'Il me faut une chose de la forêt, tu sais.'
+    lead = { 'quote' => text, 'claim' => 'the speaker asks for a thing', 'importance' => 'high', 'need' => true }
+    leads = Koholint::Leads.new
+    accepted, = leads.absorb([lead], transcription: text, place: [162, 14], source: { row: 3, col: 4, entity: 64 })
+    assert_equal [true, { row: 3, col: 4, entity: 64 }], accepted.first.values_at(:need, :source)
+    sign = Koholint::Leads.new
+    refute sign.absorb([lead], transcription: text, place: [162, 14], source: { row: 3, col: 4 })[0].first.key?(:need), 'a sign asks for nothing'
+    event = { 'type' => 'lead', 'frame' => 85609, 'id' => 'lead-1', 'place' => [162, 14], 'source' => { 'row' => 3, 'col' => 4, 'entity' => 64 },
+              'quote' => text, 'claim' => 'the speaker asks for a thing', 'importance' => 'high', 'need' => true }
+    resumed = Koholint::Leads.from_events([event]).all.first
+    assert_equal [true, 64], [resumed[:need], resumed.dig(:source, :entity)]
+  end
 end

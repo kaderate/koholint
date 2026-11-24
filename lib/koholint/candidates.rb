@@ -14,10 +14,14 @@ module Koholint
     def build(place:, grid:, explore_log:, talk_log:, leads:, cards: {}, entities: [], signs: [], stamp: nil, link: nil)
       hops = explore_log.hops(place)
       named = ->(where) { leads.name_of(where) }
-      people = people_here(place, entities, talk_log, stamp)
+      needs = needs(place, hops, leads, talk_log, named, stamp)
+      asked = needs.map { |need| need[:target].values_at(:place, :type) }
+      people = needs.select { |need| need[:target][:place] == place } + people_here(place, entities, talk_log, stamp).reject { |person| asked.include?([place, person[:target][:type]]) }
       back, fresh = exits(place, grid, explore_log, named).partition { |exit| explore_log.side_left?(place, exit.dig(:target, :direction)) }
       leaving = puzzles(place, hops, explore_log, leads, named) + fresh + doors(place, signs, explore_log, link) + back + places(place, hops, explore_log, named) +
-                people_away(place, hops, cards, talk_log, named, stamp) + signs_away(place, hops, cards, talk_log, named) + chests_away(place, hops, cards, named) +
+                needs.reject { |need| need[:target][:place] == place } +
+                people_away(place, hops, cards, talk_log, named, stamp).reject { |person| asked.include?(person[:target].values_at(:place, :type)) } +
+                signs_away(place, hops, cards, talk_log, named) + chests_away(place, hops, cards, named) +
                 lead_places(place, hops, leads, named)
       people + signs_here(place, signs, talk_log) + chests_here(place, signs) + unidentified(place, grid, entities, talk_log, link) +
         warn(leaving, people)
@@ -139,6 +143,27 @@ module Koholint
           title: "Go examine #{what}"[0, 80], predicate: { kind: 'reach_place', place: where },
           target: { kind: 'person', place: where, type: thing[:type], cell: thing[:cell] } }
       end
+    end
+
+    # Every person who asked for something and has not answered with a new text since, once Link holds other items than at the last talk;
+    # nothing matches what they asked for with what Link holds.
+    def needs(place, hops, leads, talk_log, named, stamp)
+      leads.open_needs(talk_log).filter_map do |lead|
+        where = lead[:place]
+        type = lead.dig(:source, :entity)
+        next unless (where == place || hops[where]) && talk_log.stale?(place: where, entity: type, stamp:)
+
+        who = talk_log.name_of(where, type) || "person (type #{type})"
+        cell = lead[:source].values_at(:row, :col)
+        asked = "who asked for something (#{lead[:id]}: « #{lead[:quote]} »), Link holds other items than at the last talk"
+        if where == place
+          { id: "need-t#{type}", who:, label: "talk again to #{who} at (#{cell.join(',')}), #{asked}", title: "Talk again to #{who}"[0, 80],
+            predicate: { kind: 'new_text' }, target: { kind: 'person', place:, type:, cell: } }
+        else
+          { id: "need-#{where.join('-')}-t#{type}", label: "talk again to #{who} in #{describe(where, named)}, #{moves(hops[where])}, #{asked}",
+            title: "Go talk again to #{who}"[0, 80], predicate: { kind: 'reach_place', place: where }, target: { kind: 'person', place: where, type:, cell: } }
+        end
+      end.uniq { |need| need[:id] }
     end
 
     def signs_away(place, hops, cards, talk_log, named)

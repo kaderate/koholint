@@ -74,7 +74,7 @@ module Koholint
                      items: { type: 'object',
                               properties: { quote: { type: 'string', minLength: 1 },
                                             claim: { type: 'string', minLength: 1 }, importance: { type: 'string', enum: Leads::IMPORTANCE },
-                                            where: { type: 'string', maxLength: Leads::WHERE_MAX } },
+                                            where: { type: 'string', maxLength: Leads::WHERE_MAX }, need: { type: 'boolean' } },
                               required: %w[quote claim importance], additionalProperties: false } }.freeze
     PLACE_SCHEMA = { type: 'array', items: { type: 'integer' }, minItems: 2, maxItems: 2 }.freeze
     FIELD_SCHEMAS = { place: PLACE_SCHEMA, row: { type: 'integer', minimum: 0, maximum: 7 },

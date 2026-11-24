@@ -66,7 +66,8 @@ The skills, protocols and harness behaviours the agent works with. Versioned wit
 - The agent writes a one-line `plan` that the next call sees; the live view shows its reasoning and plan under each
   decision.
 - The agent sets its own long-term `goal`, restates or revises it at every objective (the context says when it was set) and, in the call that transcribes a text (dialogue, sign, object), extracts up
-  to five leads (`quote`, `claim`, importance `high|normal|low|tip`, `tip` for how-to-play advice); a lead whose quote is not in that transcription is
+  to five leads (`quote`, `claim`, importance `high|normal|low|tip`, `tip` for how-to-play advice; flow-86: `need: true` when a person
+  asks Link for something, kept only for a person's text); a lead whose quote is not in that transcription is
   dropped. Both are trace events (`goal`, `lead`), shown in the context and the live view and written to `world.json`;
   an objective can cite the lead behind it (`because`). A lead may carry `where` (a place id such as `161-0` or a name the agent gave).
   A lead is `open` until an objective follows it, `tested` once one is achieved and `refuted` after 2 that failed (a loop, stall,
@@ -83,7 +84,8 @@ The skills, protocols and harness behaviours the agent works with. Versioned wit
   (`place-R-M`), people and unread signs of other known places (from their place cards; flow-62: a person exhausted
   under other held items or another milestone is offered again, once; flow-86: an unidentified thing never tried, seen there while
   Link held other items, is offered among them as `examine-R-M-tT`, and a place whose only work is such a thing is a place with work)
-  and places tied to a lead by its `where`
+  and places tied to a lead by its `where`; flow-86: every person who asked for something (a lead marked `need`) and has not
+  answered with a new text since, once Link holds other items than at the last talk with them (`need-tT` here, `need-R-M-tT` away, all of them),
   (`lead-N`), nearest first by moves over exits explore took (flow-69: never through a pocket, so a place routes cannot reach
   is not offered; a sign elsewhere is a `new_text` objective the autopilot walks to and reads, done only when that sign's text is read, not on arrival or on
   another text met on the way). The agent answers with `candidate` (or still a free title and predicate);

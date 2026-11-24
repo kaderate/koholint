@@ -143,6 +143,8 @@ module Koholint
       lead[:where] = where if where
       contact = Ledger.pick(event, :contact)
       lead[:contact] = contact.transform_keys(&:to_sym) if contact.is_a?(Hash)
+      lead[:source] = lead[:source].transform_keys(&:to_sym) if lead[:source].is_a?(Hash)
+      lead[:need] = true if Ledger.pick(event, :need) == true
       @all << lead unless known?(lead[:id])
     end
 
@@ -191,6 +193,7 @@ module Koholint
         added = { id: "lead-#{@all.size + 1}", place:, source:, quote: Dialogues.clean(quote), claim: Dialogues.clean(claim, CLAIM_MAX), importance: }
         where = Dialogues.clean(lead['where'], WHERE_MAX)
         added[:where] = where unless where.empty?
+        added[:need] = true if lead['need'] == true && source.is_a?(Hash) && source[:entity]
         @all << added
         accepted << added
       end
@@ -226,5 +229,16 @@ module Koholint
     end
 
     def known?(id) = @all.any? { |lead| lead[:id] == id }
+
+    # A person who asked for something stays a need-speaker until a later talk with them gives a text they had not said before.
+    def open_needs(talk_log)
+      @all.select do |lead|
+        next false unless lead[:need] && lead.dig(:source, :entity)
+
+        talks = talk_log.talks_with(lead[:place], lead.dig(:source, :entity))
+        asked = talks.index { |talk| talk[:key].include?(Dialogues.key(lead[:quote])) }
+        asked.nil? || talks.drop(asked + 1).each_with_index.none? { |talk, i| talks.first(asked + 1 + i).none? { |said| said[:key] == talk[:key] } }
+      end
+    end
   end
 end
