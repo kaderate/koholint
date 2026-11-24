@@ -323,7 +323,7 @@ class CliTest < Minitest::Test
       2.times { |n| run.trace.emit(:objective, frame: 8 + n, id: "obj-#{n + 1}", status: 'started', title: 't', predicate: { kind: 'new_place' }) }
       run.trace.emit(:objective, frame: 11, id: 'obj-1', status: 'achieved', title: 't', predicate: { kind: 'new_place' })
 
-      ledger = Koholint::CLI.ledger_for(run)
+      ledger = Koholint::Ledger.from_events(Koholint::Trace.read(File.join(run.dir, 'trace.jsonl')))
       assert ledger.doubtful?([1, 2], [2, 3], :up)
       assert_equal 2, ledger.count([1, 2], [2, 3], :up)
       objectives = Koholint::CLI.objectives_for(run)

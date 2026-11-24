@@ -148,9 +148,8 @@ module Koholint
       @touchable.delete(trial)
       @trying = true
       @tries += 1
-      { choice: { skill: 'touch', params: { row: cell[0], col: cell[1], type: trial[:type] } },
-        justification: "autopilot: walk onto the still entity type #{trial[:type]} at (#{cell.join(',')}), whose try gave nothing", confidence: 1.0,
-        agent: 'delegated', latency_ms: 0, cost_usd: 0.0, fallback: false, autopilot: true, prompt: nil, image: nil }
+      DecisionPoint.harness_choice({ skill: 'touch', params: { row: cell[0], col: cell[1], type: trial[:type] } },
+                                   "autopilot: walk onto the still entity type #{trial[:type]} at (#{cell.join(',')}), whose try gave nothing", autopilot: true)
     end
 
     def next_choice(state:, objective:, follow: nil, danger: false)

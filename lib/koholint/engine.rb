@@ -75,7 +75,7 @@ module Koholint
 
     def request_stop
       @budget.stop!
-      @policy.cancel
+      @policy&.cancel
     end
 
     def run

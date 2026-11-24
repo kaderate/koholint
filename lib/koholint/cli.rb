@@ -334,8 +334,6 @@ module Koholint
 
     def events_for(run) = Trace.read(File.join(run.dir, 'trace.jsonl'))
 
-    def ledger_for(run, events = events_for(run)) = Ledger.from_events(events)
-
     def executable?(command)
       return File.executable?(command) && !File.directory?(command) if command.include?(File::SEPARATOR)
 
