@@ -57,7 +57,7 @@ module Koholint
       events = Trace.read(File.join(dir, 'trace.jsonl'))
       leads = from_events(events)
       path = File.join(dir, 'world.json')
-      File.write("#{path}.tmp", "#{JSON.pretty_generate({ goal: leads.goal, leads: leads.with_status, places: PlaceCard.world(events, names: leads.names) })}\n")
+      File.write("#{path}.tmp", "#{JSON.pretty_generate({ goal: leads.goal, leads: leads.with_status, places: PlaceCard.world(events, names: leads.names), pickups: PlaceCard.pickups(events) })}\n")
       File.rename("#{path}.tmp", path)
     end
 

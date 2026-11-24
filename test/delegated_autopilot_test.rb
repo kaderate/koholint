@@ -482,7 +482,30 @@ class DelegatedAutopilotTest < Minitest::Test
                                                        from: { room: 163, map: 16, row: 3, col: 4 }, to: { room: 163, map: 16, row: 2, col: 3 } },
                    state: state(frame: 900), frame: 900)
     result = p.decide(p.decision_point_for(state(frame: 1000)), state(frame: 1000), ctx)
+    assert_equal ['delegated', { skill: 'touch', params: { row: 2, col: 2, type: 79 } }], result.values_at(:agent, :choice)
+    p.after_action(choice: result[:choice], outcome: { skill: 'touch', params: { row: 2, col: 2, type: 79 }, stopped_by: 'done', picked_up: false,
+                                                       from: { room: 163, map: 16, row: 3, col: 4 }, to: { room: 163, map: 16, row: 2, col: 2 } },
+                   state: state(frame: 1100), frame: 1100)
+    result = p.decide(p.decision_point_for(state(frame: 1200)), state(frame: 1200), ctx)
     assert_equal ['delegated', { skill: 'explore', params: {} }], result.values_at(:agent, :choice)
+    assert_equal 2, client.calls.size
+  end
+
+  def test_a_still_entity_whose_try_gave_nothing_is_touched_through_a_point_the_model_never_sees
+    client = ScriptedClient.new(objective: new_place, default: explore)
+    p = autopiloted(client)
+    ctx = { grid:, entities: -> { [{ kind: :unknown, type: 79, cell: [2, 2], slot: 3, x: 40, y: 48 }] } }
+    p.prepare(ctx)
+    p.note_card({ place: [163, 16], unknown: [{ type: 79, cell: [2, 2] }] })
+    tours(p, 2)
+    refute_includes p.decision_point_for(state(frame: 800)).registry.names, 'touch'
+    result = p.decide(p.decision_point_for(state(frame: 800)), state(frame: 800), ctx)
+    p.after_action(choice: result[:choice], outcome: { skill: 'talk_to', params: { row: 2, col: 2 }, stopped_by: 'frame_cap', talked: false, target_type: 79,
+                                                       from: { room: 163, map: 16, row: 3, col: 4 }, to: { room: 163, map: 16, row: 2, col: 3 } },
+                   state: state(frame: 900), frame: 900)
+    result = p.decide(p.decision_point_for(state(frame: 1000)), state(frame: 1000), ctx)
+    assert_equal ['delegated', true, { skill: 'touch', params: { row: 2, col: 2, type: 79 } }], result.values_at(:agent, :autopilot, :choice)
+    assert_equal({ skill: 'touch', params: { row: 2, col: 2, type: 79 } }, result[:decision_point].validate(result[:choice]))
     assert_equal 2, client.calls.size
   end
 

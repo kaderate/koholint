@@ -11,7 +11,7 @@ module Koholint
     MARK = 'in at most one frame'
     IDLE_MARK = 'walking no cell'
     IDLE = %w[no_frontier stalled].freeze
-    MOVES = %w[explore goto walk step wait].freeze
+    MOVES = %w[explore goto walk step wait touch].freeze
     FEW = 8
 
     attr_reader :key, :count

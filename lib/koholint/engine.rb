@@ -119,7 +119,7 @@ module Koholint
       activity(:deciding, 'deciding what to do', decision_point: decision_point.name.to_s)
       result = @policy.decide(decision_point, state, context)
       @budget.tick(cost: result[:cost_usd].to_f)
-      chosen = result[:fallback] && result[:decision_point] || decision_point
+      chosen = (result[:fallback] || result[:autopilot]) && result[:decision_point] || decision_point
       choice = chosen.validate(result[:choice])
       note_fallback(result)
       note_boot(result, state)

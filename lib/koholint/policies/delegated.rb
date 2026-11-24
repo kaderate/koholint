@@ -62,6 +62,7 @@ module Koholint
       SCREEN_SKILLS = { menu: %w[menu_move menu_assign close_menu press wait], map: %w[close_map press wait], save: %w[choose_option press wait],
                         game_over: %w[choose_option press wait], unknown: %w[press wait] }.freeze
       SCREEN_ONLY = %w[close_menu close_map menu_move menu_assign choose_option].freeze
+      AUTOPILOT_ONLY = %w[touch].freeze
       SCREEN_WAIT = { skill: 'wait', params: { frames: 5 } }.freeze
       SCREEN_WAIT_LIMIT_FRAMES = 300
       SPEAKER_LIMIT = Trace::SPEAKER_MAX
@@ -103,7 +104,8 @@ module Koholint
         @sequence = nil
         @agent_driven = false
         @locked_since = nil
-        @skill_point = DecisionPoint.choose_skill(subset(registry, registry.names - SCREEN_ONLY))
+        @skill_point = DecisionPoint.choose_skill(subset(registry, registry.names - SCREEN_ONLY - AUTOPILOT_ONLY))
+        @touch_point = DecisionPoint.choose_skill(subset(registry, AUTOPILOT_ONLY))
         @composites = registry.names.map { |name| registry.fetch(name) }.grep(Skills::Composite)
         @learned = []
         @notes = []
@@ -299,7 +301,7 @@ module Koholint
         cells = @composites.select { |skill| skill.usable?(held) }.to_h { |skill| [skill, grid.each_with_index.flat_map { |row, r| row.each_index.select { |c| row[c] == skill.entry['target']['object'] }.map { |c| [r, c] } }] }
         present = cells.select { |_, at| at.any? }
         @learned = present.map { |skill, at| "- #{skill.name} (row, col, direction): #{Capabilities.describe(skill.entry)}. Object #{skill.entry['target']['object']} here at #{at.map { |r, c| "(#{r},#{c})" }.join(', ')}; give the free cell next to it where Link stands and the direction facing it." }
-        names = @registry.names - SCREEN_ONLY - (@composites - present.keys).map(&:name)
+        names = @registry.names - SCREEN_ONLY - AUTOPILOT_ONLY - (@composites - present.keys).map(&:name)
         @skill_point = DecisionPoint.choose_skill(subset(@registry, names)) unless @skill_point.registry.names == (names & @registry.names)
       end
 

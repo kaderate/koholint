@@ -166,6 +166,9 @@ module Koholint
           door = @autopilot.door_choice(state:, doors: objects_now.select { |object| object[:kind].to_s == 'door' }.map { |object| object[:cell] })
           return door.tap { @autopilot_acting = true } if door
 
+          touch = @autopilot.touch_choice(state:, objective: @objectives.current, entities: entities_now)
+          return touch.merge(decision_point: @touch_point).tap { @autopilot_acting = true } if touch
+
           place = state.place
           trial = @autopilot.try_choice(state:, objective: @objectives.current, entities: entities_now, tried: ->(type) { @explore_log.met?(place, type) })
           return trial.tap { @autopilot_acting = true } if trial

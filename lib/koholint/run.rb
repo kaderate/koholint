@@ -30,7 +30,7 @@ module Koholint
       InputLog.new(File.join(dir, 'inputs.log')).flush
       manifest = { 'flow_version' => flow_version, 'rom_sha256' => rom_hash(rom_path), 'seed' => seed,
                    'budget' => JSON.parse(JSON.generate(budget)), 'status' => 'created', 'parent' => parent,
-                   'tag' => tag, 'harness_sha' => harness_sha, 'prompts_sha' => Agents::Prompts.digest, 'model' => model,
+                   'tag' => tag, 'harness_sha' => harness_sha, 'harness_dirty' => harness_dirty, 'prompts_sha' => Agents::Prompts.digest, 'model' => model,
                    'autopilot' => autopilot, 'capabilities' => capabilities, 'exits' => exits }
       new(dir, manifest).tap(&:write_manifest)
     end
@@ -54,6 +54,16 @@ module Koholint
     def self.harness_sha
       sha, status = Open3.capture2('git', '-C', File.expand_path('../..', __dir__), 'rev-parse', 'HEAD', err: File::NULL)
       status.success? ? sha.strip : nil
+    rescue SystemCallError
+      nil
+    end
+
+    # harness_sha names a commit; a run on a tree with uncommitted changes to tracked files records the SHA-256 of that diff, else false.
+    def self.harness_dirty
+      diff, status = Open3.capture2('git', '-C', File.expand_path('../..', __dir__), 'diff', 'HEAD', err: File::NULL)
+      return nil unless status.success?
+
+      diff.empty? ? false : Digest::SHA256.hexdigest(diff)
     rescue SystemCallError
       nil
     end
