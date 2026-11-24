@@ -101,7 +101,9 @@ The skills, protocols and harness behaviours the agent works with. Versioned wit
   uncatalogued screen gets `press` and `wait` and a `notable` `unknown_mode` in the trace; 600 frames on it stop the
   run as `unknown_mode_stuck`. Options that quit to the title are refused. The game-over screen is answered by the harness, free: it
   continues with the first option that does not quit (`notable` `death`); a health drop emits a `notable` `damage` and
-  the next prompt's health line shows the hearts lost since the last model call. Low health has one rule (flow-68: under `explore` above, and the disengage walk below); six fruitless results in one
+  the next prompt's health line shows the hearts lost since the last model call. Low health has one rule (flow-68): at one heart or less (`health <= HP_PER_HEART`) the autopilot holds (`low health`), so the model
+  takes every decision, and walk, goto and explore grow every enemy contact zone by a cell, crossed only as a last resort (the contact zone
+  never); the disengage walk below steps away from a near enemy. Six fruitless results in one
   place without a new cell emit a `notable` `stuck` and a `STUCK` reset hint; a known place entered 4 times within 3600 frames
   with no new place emits a `notable` `stuck` (`loop: ...`) and a `LOOP` hint until a new place; the harness then explores toward
   the nearest place with untried work outside the loop (flow-66: the loop's places are not aimed at, only crossed) or, when none is left, toward the reachable place entered least outside the loop.
@@ -121,7 +123,9 @@ The skills, protocols and harness behaviours the agent works with. Versioned wit
   by that budget ends with `... (cut)`.
 - flow-78: explore treats a side known only as the assumed way back (never crossed) as an untried exit; it cuts a clearable object
   only on the way to an untried exit or door or an unknown cell that is not an object, and a cell Link stood in on an earlier visit is
-  never a frontier. A way explore could not reach from the side Link came in by, on two visits, is no longer routed through from that side, until a new item or milestone or 4 more visits of the place.
+  never a frontier. A way explore could not reach from the side Link came in by, on two visits, is no longer routed through from that side: the cut lasts until a new item or milestone, or until a crossing from that side takes the way (flow-84: a cut no
+  longer expires after a number of visits, and a place entered through a door or a walk-in exit is entered by that way, so a way unreachable from that landing
+  is cut too; flow-86 below adds landings reached without a crossing and the count of calls within one visit).
 - flow-82: a stone (object 167) slides one cell when Link holds a direction into it for 32 frames and the cell beyond is floor; walk, goto and explore
   keep pressing that long before they report `blocked`, wait for it to land and stop `pushed`; routes and explore frontiers cross a stone only in a
   direction it slides, and the things on screen list such stones. Object 166 is a stone that does not move, and the room puts stones back on re-entry.

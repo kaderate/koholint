@@ -322,6 +322,7 @@ class DelegatedEngineTest < Minitest::Test
       assert_operator asked['frame'], :>=, opened['frame']
       waits = trace.select { |e| e['type'] == 'decision' && e['justification'] == 'locked: waiting for Link to be free' }
       assert_operator waits.size, :>, 0
+      assert_equal [], Koholint::Replay.verify(run, every: 600).reject(&:last)
     end
   end
 end

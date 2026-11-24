@@ -3,7 +3,7 @@
 A map of Koholint v2: what each layer is, which files hold it, and how data moves. Change it in the same commit as a change
 to a layer, a data flow or a run artifact. Keep it a map: how a skill or a harness rule behaves, flow by flow, belongs in
 `docs/AGENT_SKILLS.md`; measured facts belong in `data/` with their provenance; history belongs in git (the long form of this file
-is at 17c26b0). Design rationale: `docs/superpowers/specs/`. What remains: `ROADMAP.md`. Conventions: `AGENTS.md`.
+is at 32d43b3). Design rationale: `docs/superpowers/specs/`. What remains: `ROADMAP.md`. Conventions: `AGENTS.md`.
 
 ## Principle
 
