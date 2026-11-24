@@ -3,22 +3,64 @@ require 'koholint/skills/goto'
 
 module Koholint
   module Skills
-    # Walks onto a thing's cell; a pickup is read from the item bytes before and after, never assumed from the walk.
+    # Walks onto a thing's cell; a pickup is a change of the item bytes between arrival on the cell and the game settling there,
+    # so nothing the walk met on the way counts. A scene or a text that opens first ends the touch unsettled: the harness reads it.
     class Touch
+      SETTLE_STILL = 8
+      SETTLE_FRAMES = 60
+
       class Run < Goto::Run
         def initialize(type:, **rest)
           super(**rest)
           @type = type
+          @arrival = nil
+          @landing = nil
+        end
+
+        def next_input(state)
+          @arrival ||= { frame: state.frame, items: Touch.items(state) } if state.cell == @target && !@stopped_by
+          return land(state) if @landing
+
+          buttons = super
+          return buttons unless buttons.nil? && @stopped_by == :done && @arrival
+
+          @stopped_by = nil
+          @landing = { still: 0, frames: 0 }
+          land(state)
         end
 
         def result(state = @last)
-          before = Touch.items(@start)
-          after = Touch.items(state)
-          super.merge(target_type: @type, items_before: before, items_after: after, picked_up: before != after).compact
+          merged = super.merge(target_type: @type, items_after: Touch.items(state), settled: @landing&.dig(:still).to_i >= SETTLE_STILL)
+          return merged unless @arrival
+
+          merged.merge(arrival_frame: @arrival[:frame], items_before: @arrival[:items], **(merged[:settled] ? { picked_up: @arrival[:items] != merged[:items_after] } : {}))
+        end
+
+        private
+
+        def land(state)
+          @last = state
+          return nil if @stopped_by
+          return finish_landing(:scene) if state.scene?
+          return finish_landing(:dialogue) if state.dialog_open?
+
+          @landing[:still] = Touch.settled?(state) ? @landing[:still] + 1 : 0
+          @landing[:frames] += 1
+          return finish_landing(:done) if @landing[:still] >= SETTLE_STILL || @landing[:frames] >= SETTLE_FRAMES
+
+          @frames += 1
+          []
+        end
+
+        def finish_landing(reason)
+          @stopped_by = reason
+          nil
         end
       end
 
       def self.items(state) = { held: Items.held(state).uniq.sort, rupees: state.rupees.to_i }
+
+      def self.settled?(state) = !state.dialog_open? && state.link_frozen.to_i.zero? && state.controllable?
 
       def name = 'touch'
 

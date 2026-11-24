@@ -1,4 +1,5 @@
 require 'koholint/geometry'
+require 'koholint/items'
 require 'koholint/talk_log'
 require 'koholint/vision/grid'
 
@@ -51,33 +52,60 @@ module Koholint
     def tries(events)
       found = Hash.new { |hash, key| hash[key] = { tries: 0, answered: 0, moved: false } }
       events.each do |event|
-        next unless event['type'] == 'action' && %w[talk_to touch].include?(event['skill']) && event['result'].is_a?(Hash)
+        next unless event['type'] == 'action' && event['skill'] == 'talk_to' && event['result'].is_a?(Hash)
 
         result = event['result']
         from = result['from'] or next
         type = result['target_type'] || result.dig('entity', 'type') or next
         tried = found[[[from['room'], from['map']], type]]
-        if event['skill'] == 'touch'
-          tried[:touched] = tried[:touched].to_i + 1
-          tried[:picked_up] = tried[:picked_up].to_i + (result['picked_up'] == true ? 1 : 0)
-          next
-        end
-
         tried[:tries] += 1
         tried[:answered] += 1 if result['talked'] == true
         tried[:moved] ||= result['tracked'].to_i.positive?
       end
+      touches(events).each do |touch|
+        tried = found[[touch['place'], touch['type']]]
+        tried[:touched] = tried[:touched].to_i + 1
+        tried[:picked_up] = tried[:picked_up].to_i + (touch['picked_up'] ? 1 : 0)
+      end
       found
+    end
+
+    SETTLE_CAP = 900
+    AFTER_TOUCH = %w[advance_dialogue wait].freeze
+
+    # Every touch that reached its cell, judged on the item bytes between arrival and the game settling. A touch a scene or a text
+    # ended unsettled is judged on the first settled perception within SETTLE_CAP frames of arrival, before any skill other than
+    # the harness's own dialogue advances and waits; with none, it is undecided and picks nothing up.
+    def touches(events)
+      events.each_with_index.filter_map do |event, index|
+        result = event['result']
+        next unless event['type'] == 'action' && event['skill'] == 'touch' && result.is_a?(Hash) && result['items_before'] && result['from']
+
+        after = result['settled'] ? result['items_after'] : settled_items(events.drop(index + 1), result['arrival_frame'].to_i + SETTLE_CAP)
+        { 'place' => result['from'].values_at('room', 'map'), 'type' => result['target_type'], 'frame' => event['frame'], 'cell' => event['params'].values_at('row', 'col'),
+          'items_before' => result['items_before'], 'items_after' => after, 'picked_up' => !after.nil? && after != result['items_before'] }
+      end
+    end
+
+    def settled_items(later, until_frame)
+      later.each do |event|
+        break if event['frame'].to_i > until_frame || (event['type'] == 'action' && !AFTER_TOUCH.include?(event['skill']))
+        next unless event['type'] == 'perception'
+
+        state = event['state'] || {}
+        next unless state['dialog_state'].to_i.zero? && state['link_frozen'].to_i.zero? && state['game_mode'] == ItemWatch::PLAY_MODE
+
+        return { 'held' => [state['item_a'], state['item_b'], *Array(state['inventory']).first(Items::SLOTS)].map(&:to_i).reject(&:zero?).uniq.sort, 'rupees' => state['rupees'].to_i }
+      end
+      nil
     end
 
     # The entity types a touch picked something up from, with each touch as provenance: observed from one place, verified from 2.
     def pickups(events)
-      touches = events.select { |event| event['type'] == 'action' && event['skill'] == 'touch' && event.dig('result', 'picked_up') == true && event.dig('result', 'from') }
-      touches.group_by { |event| event['result']['target_type'] }.map do |type, seen|
-        at = ->(event) { event['result']['from'].values_at('room', 'map') }
-        places = seen.map(&at).uniq
+      touches(events).select { |touch| touch['picked_up'] }.group_by { |touch| touch['type'] }.map do |type, seen|
+        places = seen.map { |touch| touch['place'] }.uniq
         { 'type' => type, 'confidence' => places.size >= 2 ? 'verified' : 'observed', 'verified_count' => places.size,
-          'touches' => seen.map { |event| { 'place' => at.(event), 'frame' => event['frame'], 'cell' => event['params'].values_at('row', 'col'), **event['result'].slice('items_before', 'items_after') } } }
+          'touches' => seen.map { |touch| touch.slice('place', 'frame', 'cell', 'items_before', 'items_after') } }
       end
     end
 

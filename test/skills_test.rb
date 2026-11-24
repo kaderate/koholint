@@ -647,15 +647,44 @@ class SkillsTest < Minitest::Test
     end
   end
 
-  def test_touch_walks_onto_the_cell_and_reads_a_pickup_from_the_item_bytes_alone
-    execution = registry.start('touch', state, { row: 4, col: 8, type: 58 }, { grid: OpenGrid.new })
-    result, = simulate(execution, [88, 80])
-    assert_equal [:done, [4, 8], 58, false], [result[:stopped_by], result[:to].values_at(:row, :col), result[:target_type], result[:picked_up]]
-    assert_equal({ held: [], rupees: 0 }, result[:items_before])
-    richer = Koholint::GameState.new(frame: 0, room_id: 1, map_id: 0, x: 136, y: 80, hp: 24, dialog_state: 0, game_mode: 0x0B, game_submode: 7, milestone: :none, rupees: 5)
-    assert_equal [true, { held: [], rupees: 5 }], execution.result(richer).values_at(:picked_up, :items_after)
-    sword = Koholint::GameState.new(frame: 0, room_id: 1, map_id: 0, x: 136, y: 80, hp: 24, dialog_state: 0, game_mode: 0x0B, game_submode: 7, milestone: :none, item_a: 1)
-    assert_equal [true, { held: [1], rupees: 0 }], execution.result(sword).values_at(:picked_up, :items_after)
+  def touch_state(x, y, frame, fields)
+    Koholint::GameState.new(frame:, room_id: 1, map_id: 0, x:, y:, hp: 24, dialog_state: 0, game_mode: 0x0B, game_submode: 7, milestone: :none, **fields)
+  end
+
+  # Drives a touch to (4,8) from (4,5); fields.(frame, frames_on_target) gives the item bytes and dialogue state of each frame.
+  def touch(fields)
+    x = 88
+    y = 80
+    on = 0
+    execution = registry.start('touch', touch_state(x, y, 0, fields.(0, 0)), { row: 4, col: 8, type: 58 }, { grid: OpenGrid.new })
+    600.times do |frame|
+      on += 1 if Koholint::Geometry.cell_for(x, y) == [4, 8]
+      buttons = execution.next_input(touch_state(x, y, frame, fields.(frame, on))) or break
+      dx, dy = { up: [0, -1], down: [0, 1], left: [-1, 0], right: [1, 0] }.fetch(buttons.first, [0, 0])
+      x += dx
+      y += dy
+    end
+    execution.result
+  end
+
+  def test_touch_reads_a_pickup_between_arrival_and_the_game_settling_on_the_cell
+    result = touch(->(_, on) { on > 3 ? { rupees: 5 } : {} })
+    assert_equal [:done, [4, 8], 58, true, true], [result[:stopped_by], result[:to].values_at(:row, :col), result[:target_type], result[:settled], result[:picked_up]]
+    assert_equal [{ held: [], rupees: 0 }, { held: [], rupees: 5 }], result.values_at(:items_before, :items_after)
+    assert_equal [false, { held: [], rupees: 0 }], touch(->(*) { {} }).values_at(:picked_up, :items_after)
+  end
+
+  def test_a_byte_the_walk_changed_on_the_way_is_no_pickup
+    result = touch(->(frame, _) { frame > 2 ? { item_a: 1, rupees: 3 } : {} })
+    assert_equal [true, false], result.values_at(:settled, :picked_up)
+    assert_equal({ held: [1], rupees: 3 }, result[:items_before])
+  end
+
+  def test_a_text_on_the_cell_ends_the_touch_unsettled_with_its_arrival_bytes_for_the_harness_to_judge
+    result = touch(->(_, on) { on > 3 ? { dialog_state: 1 } : {} })
+    assert_equal [:dialogue, false, { held: [], rupees: 0 }], result.values_at(:stopped_by, :settled, :items_before)
+    refute result.key?(:picked_up)
+    assert_kind_of Integer, result[:arrival_frame]
   end
 
   def test_touch_params_are_validated

@@ -55,6 +55,22 @@ class PickupCheckTest < Minitest::Test
     end
   end
 
+  def test_two_runs_from_boot_are_two_lineages
+    Dir.mktmpdir do |root|
+      code, text = check(root, [run_dir(root, 'a'), run_dir(root, 'b')], confidence: 'verified', count: 2)
+      assert_equal 0, code
+      assert_includes text, '2 lineage(s) (a, b) holding [[1, 4, 12]], so the data may claim verified with verified_count 2'
+    end
+  end
+
+  def test_a_run_from_boot_beside_a_fork_is_its_own_lineage
+    Dir.mktmpdir do |root|
+      code, text = check(root, [run_dir(root, 'a'), run_dir(root, 'b', parent: 'ck')], confidence: 'verified', count: 2)
+      assert_equal 0, code
+      assert_includes text, '2 lineage(s) (a, ck)'
+    end
+  end
+
   def test_data_that_claims_more_than_the_runs_measured_exits_one
     Dir.mktmpdir do |root|
       code, text = check(root, [run_dir(root, 'a', parent: 'ck'), run_dir(root, 'b', parent: 'ck')], confidence: 'verified', count: 2)

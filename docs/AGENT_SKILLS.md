@@ -32,7 +32,7 @@ The skills, protocols and harness behaviours the agent works with. Versioned wit
   `talk_to row col` walks next to a person, faces them and presses A, trying other sides on no response; the person is
   the entity at or next to the cell, followed when it walks away, and may cover several cells; silent at talk reach, it
   tries once more pressed against the person. `touch row col type` (flow-83) is the harness's own: it walks onto the cell
-  and reports `picked_up` from the item bytes before and after; you are never offered it.
+  and reports `picked_up` from the item bytes between arrival and the game settling; you are never offered it.
 - A scripted scene (Link held by `link_frozen`, e.g. a character arriving to speak, or something Link touches) stops any
   skill with `scene`; the harness waits through it until Link is free, advances its dialogues (past the 40-page cap once) and,
   after any lock, waits as long as the lock (up to 30 frames) before asking the model; `wait frames until_free` ends
@@ -138,10 +138,12 @@ The skills, protocols and harness behaviours the agent works with. Versioned wit
   route, like an untried exit. `world.json` lists, per place, each unknown type's `tries`, `answered` (a dialogue opened) and `moved`
   (talk_to had to chase it) in `unknown_types`, and the `items_gained` there.
 - flow-83: a still uncatalogued entity whose `talk_to` try gave nothing (`no_response`, `no_path`, `frame_cap`, `blocked`,
-  `target_free`) and which stands at the very pixel the try found it at is walked onto once per visit by the harness
+  `target_free`) and which is still in the cell the try aimed at is walked onto once per visit by the harness
   (`touch`, nearest first, no model call, sharing the 6 tries per visit), because a thing that does not answer may still be
-  picked up. A pickup is read from the item bytes alone (the inventory and the rupee count): it opens a dialogue, stops
-  nothing else, and the harness explores on afterwards either way. `world.json` counts each type's `touched` and `picked_up`
+  picked up. A pickup is read from the item bytes alone (the inventory and the rupee count), between Link's arrival on the
+  cell and the game settling there (no text box, Link free and controllable; a scene or a text in between is read as usual and
+  the bytes are judged once it has settled, within 900 frames of arrival), so nothing met on the way counts. The harness
+  explores on afterwards either way. `world.json` counts each type's `touched` and `picked_up`
   in `unknown_types` and keeps a top-level `pickups`: every type a touch picked something up from, with each touch as
   provenance, `observed` from one place and `verified` from 2.
 - flow-77: entering a place with an open puzzle and texts read there, with no objective of yours current, ends the harness's own objective

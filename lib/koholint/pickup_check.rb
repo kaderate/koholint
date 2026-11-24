@@ -37,7 +37,7 @@ module Koholint
 
     def gains_of(dir)
       manifest = JSON.parse(File.read(File.join(dir, 'manifest.json')))
-      lineage = lineage_of(dir, manifest['parent'] && manifest.dig('parent', 'id'))
+      lineage = lineage_of(dir, manifest.dig('parent', 'id'))
       Trace.read(File.join(dir, 'trace.jsonl')).select { |event| event['type'] == 'item_gained' }.map do |event|
         { run: File.basename(dir), tag: manifest['tag'], item: event['item'], place: event['place'], frame: event['frame'], held: event['held'], lineage: }
       end
@@ -45,7 +45,7 @@ module Koholint
 
     # The oldest run this one measures from: a fork's parent run, a resumed run's checkpoint, else the run itself.
     def lineage_of(dir, id)
-      return id unless id
+      return File.basename(File.expand_path(dir)) unless id
 
       root = File.dirname(File.expand_path(dir))
       seen = Set.new
