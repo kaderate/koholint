@@ -69,7 +69,7 @@ class FollowerTest < Minitest::Test
 
   def test_picks_up_appended_journal_entries
     with_recorded_run do |run|
-      follower = Koholint::Viewer::Follower.new(run.dir, from: :start)
+      follower = Koholint::Viewer::Follower.new(run.dir)
       drain(follower)
       File.binwrite(journal(run), [0, 30].pack('CV'), mode: 'ab')
       assert_equal 630, follower.journal_frames
@@ -83,7 +83,7 @@ class FollowerTest < Minitest::Test
 
   def test_partial_trailing_entry_is_ignored
     with_recorded_run do |run|
-      follower = Koholint::Viewer::Follower.new(run.dir, from: :start)
+      follower = Koholint::Viewer::Follower.new(run.dir)
       drain(follower)
       File.binwrite(journal(run), [0, 30].pack('CV')[0, 3], mode: 'ab')
       assert_equal 0, follower.step_available
@@ -136,7 +136,7 @@ class FollowerTest < Minitest::Test
 
   def test_late_perception_at_the_current_frame_is_compared
     with_recorded_run do |run|
-      follower = Koholint::Viewer::Follower.new(run.dir, from: :start)
+      follower = Koholint::Viewer::Follower.new(run.dir)
       drain(follower)
       compared = follower.compared_frames
       perception(run, 600, follower.state_hash)
@@ -148,7 +148,7 @@ class FollowerTest < Minitest::Test
 
   def test_late_wrong_perception_at_the_current_frame_is_diverged
     with_recorded_run do |run|
-      follower = Koholint::Viewer::Follower.new(run.dir, from: :start)
+      follower = Koholint::Viewer::Follower.new(run.dir)
       drain(follower)
       perception(run, 600, 'wrong')
       follower.step_available
@@ -185,7 +185,7 @@ class FollowerTest < Minitest::Test
 
   def test_concurrent_readers_do_not_corrupt_the_follower
     with_recorded_run do |run|
-      follower = Koholint::Viewer::Follower.new(run.dir, from: :start)
+      follower = Koholint::Viewer::Follower.new(run.dir)
       drain(follower)
       errors = Queue.new
       readers = Array.new(3) do

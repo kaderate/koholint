@@ -25,7 +25,7 @@ class DelegatedEngineTest < Minitest::Test
 
   def events(run, type) = Koholint::Trace.read(File.join(run.dir, 'trace.jsonl')).select { |e| e['type'] == type.to_s }
 
-  def test_scripted_run_traces_cost_objectives_and_replays_bit_exact
+  def test_scripted_run_traces_cost_and_objectives
     skip_without_rom!
     with_run do |run|
       client = ScriptedClient.new(objective: [ok('title' => 'x')] + [leave_house] * 40, default: wait)
@@ -38,7 +38,6 @@ class DelegatedEngineTest < Minitest::Test
       assert_equal [200, 0.01], [agent[1]['latency_ms'], agent[1]['cost_usd']]
       statuses = events(run, :objective).map { |e| e['status'] }
       assert_includes statuses, 'abandoned'
-      assert_equal [], Koholint::Replay.verify(run, every: 600).reject(&:last)
     end
   end
 

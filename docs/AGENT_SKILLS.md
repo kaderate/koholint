@@ -7,7 +7,7 @@ The skills, protocols and harness behaviours the agent works with. Versioned wit
 - Between decisions the engine waits, with no input, until Link is ready (no screen scroll, door walk, jump or
   knockback, then 2 settled frames): the screen is never mapped and the model never called mid-scroll or mid-jump
   (`notable` `not_ready_wait` for waits over 5 frames; the run stops with `not_ready_stuck` after 600 frames).
-- `explore [direction]` (relaunched by the autopilot after benign stops, see Running) explores by itself: it walks to the nearest
+- `explore [direction]` (relaunched by the autopilot after benign stops, see Running in [OPERATING.md](OPERATING.md)) explores by itself: it walks to the nearest
   untried border exit (a side never left from this place) or untried door (walking up into it), else toward the nearest
   place it has taken an exit to that still has untried exits or doors (flow-67: the cells beside a learned hole, a look Link fell
   through more often than he walked onto it, are no frontier and are crossed by explore or goto only when no other route
@@ -101,7 +101,9 @@ The skills, protocols and harness behaviours the agent works with. Versioned wit
   uncatalogued screen gets `press` and `wait` and a `notable` `unknown_mode` in the trace; 600 frames on it stop the
   run as `unknown_mode_stuck`. Options that quit to the title are refused. The game-over screen is answered by the harness, free: it
   continues with the first option that does not quit (`notable` `death`); a health drop emits a `notable` `damage` and
-  the next prompt's health line shows the hearts lost since the last model call. There is no low-health rule (flow-37); six fruitless results in one
+  the next prompt's health line shows the hearts lost since the last model call. Low health has one rule (flow-68): at one heart or less (`health <= HP_PER_HEART`) the autopilot holds (`low health`), so the model
+  takes every decision, and walk, goto and explore grow every enemy contact zone by a cell, crossed only as a last resort (the contact zone
+  never); the disengage walk below steps away from a near enemy. Six fruitless results in one
   place without a new cell emit a `notable` `stuck` and a `STUCK` reset hint; a known place entered 4 times within 3600 frames
   with no new place emits a `notable` `stuck` (`loop: ...`) and a `LOOP` hint until a new place; the harness then explores toward
   the nearest place with untried work outside the loop (flow-66: the loop's places are not aimed at, only crossed) or, when none is left, toward the reachable place entered least outside the loop.
@@ -121,7 +123,9 @@ The skills, protocols and harness behaviours the agent works with. Versioned wit
   by that budget ends with `... (cut)`.
 - flow-78: explore treats a side known only as the assumed way back (never crossed) as an untried exit; it cuts a clearable object
   only on the way to an untried exit or door or an unknown cell that is not an object, and a cell Link stood in on an earlier visit is
-  never a frontier. A way explore could not reach from the side Link came in by, on two visits, is no longer routed through from that side, until a new item or milestone or 4 more visits of the place.
+  never a frontier. A way explore could not reach from the side Link came in by, on two visits, is no longer routed through from that side: the cut lasts until a new item or milestone, or until a crossing from that side takes the way (flow-84: a cut no
+  longer expires after a number of visits, and a place entered through a door or a walk-in exit is entered by that way, so a way unreachable from that landing
+  is cut too; flow-86 below adds landings reached without a crossing and the count of calls within one visit).
 - flow-82: a stone (object 167) slides one cell when Link holds a direction into it for 32 frames and the cell beyond is floor; walk, goto and explore
   keep pressing that long before they report `blocked`, wait for it to land and stop `pushed`; routes and explore frontiers cross a stone only in a
   direction it slides, and the things on screen list such stones. Object 166 is a stone that does not move, and the room puts stones back on re-entry.
@@ -182,4 +186,32 @@ The skills, protocols and harness behaviours the agent works with. Versioned wit
   a `notable` `revisit` event (`{npc|sign, round, outcome}`). Each new place also gets a `place_card` (people, enemies,
   creatures, signs, objects, exits) kept in `world.json` `places`. A conversation is identified by a signature of its pages' text pixels; a conversation
   already read is not sent to the model again (its stored text is reused, `dialogue` events with `cached: true`).
+- Answers and fallbacks: an invalid model answer falls back deterministically to a 30-frame wait, and 5 fallbacks in a row stop the run
+  (`agent_failures`); an engine exception before the model call is an `engine_error` fallback counted apart, 5 in a row stopping the run as
+  `engine_errors`. Autopilot decisions leave both counts untouched; loop and stall abandonment still apply to them.
+- Screens and locks: once the run has played, a menu, map, save or uncatalogued screen goes to the model with its own skills only, after a
+  deterministic wait while it is still opening. A `cutscene` (the dying animation included) waits like `locked`, in waits that end the frame
+  Link is free (flow-50). A hold that outlasts the 900-frame wait cap emits one `notable` `lock_cap`, and the model decides from then on.
+- Dialogue caps: a dialogue that reaches its page or frame cap is sent as sheets once and advanced on (the model's choice is replaced while the
+  box is open); only a second cap of the same dialogue hands the pages to the model. A dialogue that opens with no current objective is
+  advanced before a new objective is asked for.
+- Leads in the context: every `high` lead, the `normal` ones of the current place and the 4 newest tips, never `low` ones. A lead dropped
+  because its quote is not in the transcription is counted in a `notable` `lead_rejected`; duplicates are dropped by quote. A lead stops being
+  a `lead-N` candidate once refuted or once an achieved objective reached the place it points to. `new_text` compares the stitched text
+  whitespace-insensitively with the texts read before in the run.
+- flow-68 disengage: at one heart or less with an enemy within a cell of its touch, the harness walks one cell in the direction with no enemy
+  ahead that ends farthest from them, skipping directions a walk found blocked (or refused at once for danger) since the last model call and
+  cells on or beside a learned hole, up to 3 times per model call; the model decides after. There is no retreat and no shelter candidate.
+- Loop break (flow-44, flow-47): at the next skill or objective decision after a loop detection, once per detection, the harness abandons the
+  current objective (reason `loop`) and starts its own new-place objective; when no known place has untried work, it starts a `reach_place`
+  objective toward the reachable place entered least outside the loop, nearest first.
+- Zero cap (flow-45): after 3 identical results of at most one frame in one place (same skill and stop), the harness answers the next skill
+  decision itself with a `notable` `stuck`: it explores toward the nearest place with untried work, unless its own explore already came back
+  instantly in this streak, else it waits 120 frames; its own answers keep the count until a result takes more than a frame or the place changes.
+- Autopilot details beyond OPERATING's Running section: a `known_place` stop does not count in the 6-explore chain, but a third return to the
+  same place goes back to the model; an objective with a `target` is followed from the first skill decision after the model's call, and a new
+  goal from that call does not hold it.
+- A skill that ends its move with Link off the grid (a border crossing whose room id changes only after the scroll) waits up to 120 frames for
+  the room change. A capability that ran on an object without clearing it is recorded in the explore log (`failed_clears`), and that cell is no
+  longer a frontier there. Revisits of people wait while a surveyed place still has untried work.
 

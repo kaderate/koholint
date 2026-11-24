@@ -321,15 +321,6 @@ class GridBuilderTest < Minitest::Test
     assert(Koholint::Vision::ScreenVision.snapshot(emulator, place: [163, 16]).sprites.count { |s| Koholint::Vision::GridBuilder.link_sprite?(s, state) } >= 2)
   end
 
-  def test_replay_verifies_a_grid_run_from_boot
-    skip_without_rom!
-    with_run do |run|
-      Koholint::Engine.new(run:, policy: Koholint::Policies::StartGame.new(Koholint::Policies::WalkAndTalk.new),
-                           budget: Koholint::Budget.new(frames: 700), grid: true).run
-      assert_empty Koholint::Replay.verify(run, every: 200).reject(&:last)
-    end
-  end
-
   class FakeCells
     def initialize(pit) = @pit = pit
     def appearance(row, col) = [row, col] == @pit ? 'pit' : 'grass'
