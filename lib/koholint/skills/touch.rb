@@ -4,7 +4,7 @@ require 'koholint/skills/goto'
 module Koholint
   module Skills
     # Walks to a reachable cell next to a still thing and holds the direction into it, the way a push holds, one side after another,
-    # since the thing's own sprite covers its cell. A pickup is a change of the item bytes between arrival next to it and the game
+    # since the thing's own sprite covers its cell. A pickup is a change of the item bytes between arrival at a side and the game
     # settling, so nothing the walk met on the way counts. A scene or a text that opens first ends the touch unsettled: the harness reads it.
     class Touch
       SETTLE_STILL = 8
@@ -32,7 +32,7 @@ module Koholint
           return buttons unless buttons.nil? && @stopped_by == :done
 
           @stopped_by = nil
-          @arrival ||= { frame: state.frame, items: Touch.items(state) }
+          @arrival = { frame: state.frame, items: Touch.items(state) }
           @holding = { still: 0, last: nil, frames: 0 }
           hold(state)
         end
@@ -74,6 +74,7 @@ module Koholint
           @last = state
           return nil if @stopped_by
           return end_touch(:frame_cap) if @frames >= hard_cap
+          return end_touch(:room_change) if state.place != @start.place
           return end_touch(:scene) if state.scene?
           return end_touch(:dialogue) if state.dialog_open?
           return end_touch(:damage) if state.health < @start.health

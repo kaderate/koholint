@@ -648,7 +648,7 @@ class SkillsTest < Minitest::Test
   end
 
   def touch_state(x, y, frame, fields)
-    Koholint::GameState.new(frame:, room_id: 1, map_id: 0, x:, y:, hp: 24, dialog_state: 0, game_mode: 0x0B, game_submode: 7, milestone: :none, **fields)
+    Koholint::GameState.new(**{ frame:, room_id: 1, map_id: 0, x:, y:, hp: 24, dialog_state: 0, game_mode: 0x0B, game_submode: 7, milestone: :none }.merge(fields))
   end
 
   # Drives a touch of the thing at (4,8) from (4,5): the thing's cell is solid, so Link stops against it.
@@ -684,6 +684,25 @@ class SkillsTest < Minitest::Test
     assert_equal [:no_contact, false], result.values_at(:stopped_by, :settled)
     refute result.key?(:picked_up)
     assert_equal({ held: [1], rupees: 3 }, result[:items_before])
+  end
+
+  def test_a_byte_changed_on_the_walk_to_the_next_side_is_no_pickup
+    seen = []
+    walked = false
+    result = touch(lambda do |_, held|
+      seen << held
+      walked ||= held.positive? && seen.last(4).uniq.size == 1
+      walked ? { rupees: 7 } : {}
+    end)
+    assert_equal [:no_contact, { held: [], rupees: 7 }], result.values_at(:stopped_by, :items_before), 'the baseline is taken again on arrival at each side'
+    refute result.key?(:picked_up)
+  end
+
+  def test_a_room_change_during_a_hold_ends_the_touch
+    left = nil
+    result = touch(->(frame, held) { held > 3 ? (left ||= frame) && { room_id: 2 } : {} })
+    assert_equal [:room_change, %w[right]], result.values_at(:stopped_by, :sides)
+    assert_operator result[:frames], :<=, left, 'the hold stops on the frame the place changes'
   end
 
   def test_a_thing_that_answers_nothing_is_held_from_every_reachable_side_then_given_up
