@@ -7,6 +7,7 @@ require 'koholint/navigation/planner'
 module Koholint
   class ExploreLog
     TRIED_AT = 2
+    CUT_CALLS = 3
 
     def self.from_events(events)
       log = new
@@ -62,6 +63,7 @@ module Koholint
       @cut_off = Set.new
       @door_ways = Set.new
       @cut_seen = {}
+      @cut_calls = {}
       @unmet = {}
       @met = Set.new
       @spent_cuts = Set.new
@@ -82,7 +84,7 @@ module Koholint
     # The milestone and items held now (Exits.context): a puzzle objective is offered once per place and context in a run.
     # A new item or milestone may open what was cut off.
     def in_context(context)
-      [@cut_off, @cut_seen, @spent_cuts].each(&:clear) if @context && context != @context
+      [@cut_off, @cut_seen, @cut_calls, @spent_cuts].each(&:clear) if @context && context != @context
       @context = context
     end
 
@@ -157,9 +159,10 @@ module Koholint
       %i[from to].each { |end_| (place = Ledger.place_of(Ledger.pick(result, end_))) && know(place) }
       from = Ledger.place_of(Ledger.pick(result, :from))
       to = Ledger.place_of(Ledger.pick(result, :to))
-      @entered.delete(from) if from && @at && from != @at
+      @entered[from] = :landed if from && @at && from != @at
       @at = to || from
       @visits[to] += 1 if from && to && from != to
+      @entered[to] = :landed if from && to && from != to
       note_crossing(result)
       note_looks(from, result) if from
       note_stood(from, result) if from
@@ -472,12 +475,14 @@ module Koholint
       end
     end
 
-    # A way no path reaches from where Link entered, on two visits, is not routed through from that landing again in this context;
-    # found unreachable again while cut, after a route lifted it, the cut is spent and no route lifts it again in this episode.
+    # A way no path reaches from where Link entered, on two visits or on CUT_CALLS calls of one visit, is not routed through from that landing
+    # again in this context; a landing without a crossing (a continue after a game over) is a landing of its own.
+    # Found unreachable again while cut, after a route lifted it, the cut is spent and no route lifts it again in this episode.
     def cut_off(place, side, via)
       key = [place, side, via]
       return @spent_cuts << key if cut?(*key)
-      return unless again?(@cut_seen, key, place)
+      calls = (@cut_calls[key] = @cut_calls.fetch(key, 0) + 1)
+      return unless again?(@cut_seen, key, place) || calls >= CUT_CALLS
 
       @spent_cuts.delete(key)
       @cut_off << key
