@@ -1205,3 +1205,45 @@ class ExploreCutCallsTest < Minitest::Test
     refute log.cut?([171, 10], :right, :right)
   end
 end
+class ExploreStoneRoomTest < Minitest::Test
+  DOOR = [[80, 0], [2, 8]].freeze
+
+  def explore(frame, from, to, exit, unreachable = nil, pushed = nil)
+    map = ->(room) { room == 80 ? 0 : 10 }
+    { 'type' => 'action', 'frame' => frame, 'skill' => 'explore',
+      'result' => { 'from' => { 'room' => from[0], 'map' => map.(from[0]), 'row' => from[1], 'col' => from[2] },
+                    'to' => { 'room' => to[0], 'map' => map.(to[0]), 'row' => to[1], 'col' => to[2] },
+                    'exits' => exit ? [exit.merge('outcome' => 'left', 'to' => [to[0], map.(to[0])])] : [],
+                    'unreachable' => unreachable, 'pushed' => pushed }.compact }
+  end
+
+  def cut_then_leave(pushed)
+    [explore(1, [171, 2, 8], [172, 2, 0], { 'row' => 2, 'col' => 9, 'direction' => 'right' }),
+     explore(2, [172, 2, 0], [171, 2, 9], { 'row' => 2, 'col' => 0, 'direction' => 'left' }),
+     explore(3, [171, 5, 6], [80, 7, 5], { 'row' => 7, 'col' => 5, 'direction' => 'down', 'walk_in' => true }),
+     explore(4, [80, 2, 8], [171, 7, 5], { 'row' => 3, 'col' => 8, 'direction' => 'up', 'kind' => 'door' }),
+     explore(5, [171, 7, 5], [171, 5, 6], nil, nil, pushed)] +
+      Array.new(3) { |n| explore(6 + n, [171, 5, 6], [171, 5, 6], nil, ['right']) } +
+      [explore(9, [171, 7, 5], [80, 7, 5], { 'row' => 7, 'col' => 5, 'direction' => 'down', 'walk_in' => true })]
+  end
+
+  def test_a_cut_in_a_room_where_a_stone_was_pushed_expires_when_link_leaves_it
+    still = Koholint::ExploreLog.from_events(cut_then_leave(nil)[0..-2])
+    assert still.cut?([171, 10], DOOR, :right), 'three findings of one visit cut the way'
+    gone = Koholint::ExploreLog.from_events(cut_then_leave({ 'row' => 5, 'col' => 7, 'direction' => 'right' }))
+    refute gone.cut?([171, 10], DOOR, :right), 'the stones are back on re-entry'
+    kept = Koholint::ExploreLog.from_events(cut_then_leave(nil))
+    assert kept.cut?([171, 10], DOOR, :right), 'a room without a push keeps its cut'
+  end
+end
+class ExploreStoneRoomLoopTest < ExploreStoneRoomTest
+  def test_a_way_shut_for_another_reason_is_cut_again_at_once_and_a_visit_without_a_push_keeps_it
+    events = cut_then_leave({ 'row' => 5, 'col' => 7, 'direction' => 'right' })
+    refute Koholint::ExploreLog.from_events(events).cut?([171, 10], DOOR, :right), 'the visit pushed a stone'
+    events += [explore(10, [80, 2, 8], [171, 7, 5], { 'row' => 3, 'col' => 8, 'direction' => 'up', 'kind' => 'door' }),
+               explore(11, [171, 5, 6], [171, 5, 6], nil, ['right'])]
+    assert Koholint::ExploreLog.from_events(events).cut?([171, 10], DOOR, :right), 'found again on a later visit'
+    events << explore(12, [171, 7, 5], [80, 7, 5], { 'row' => 7, 'col' => 5, 'direction' => 'down', 'walk_in' => true })
+    assert Koholint::ExploreLog.from_events(events).cut?([171, 10], DOOR, :right), 'that visit pushed nothing'
+  end
+end

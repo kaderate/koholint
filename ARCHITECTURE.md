@@ -57,12 +57,12 @@ model. Unknown cells are unknown, not walls.
 **Navigation and skills** — `geometry.rb` holds the cell grid, pixel offsets and the one direction vocabulary
 (`DIRECTIONS`/`DELTAS`/`OPPOSITE`, `VERTICAL_FIRST` for the order some probes keep, `in_grid?`, `step`).
 `navigation/planner.rb` plans shortest paths over known cells around danger, holes and doubtful edges; `navigation/threat.rb`
-is the threat interface. `skills/` holds the deterministic skills behind `skills/registry.rb`: `walk`, `goto`, `step`,
+is the threat interface; `navigation/stones.rb` searches the pushes that open a cell in a room of sliding stones. `skills/` holds the deterministic skills behind `skills/registry.rb`: `walk`, `goto`, `step`,
 `talk_to`, `attack`, `explore`, `touch` (harness only), `press`, `advance_dialogue`, `wait`, the screen skills of `screens.rb`,
 `use_item` and `guard`, the `shielded` wrapper, `clearing` (operational capabilities used by the moving skills) and
 `composite` (learned capabilities). Every skill reports how it stopped (`done`, `blocked`, `no_path`, …).
 `explore_log.rb` keeps per place what explore walked, the exits and doors tried and their destinations, surveys and the exit
-graph, and cuts a way found unreachable from the landing Link entered by; `ledger.rb` counts blocked edges, `triggers.rb` forbids inputs that re-fire a scripted event, `talk_log.rb` remembers
+graph, and cuts a way found unreachable from the landing Link entered by (dropped when Link leaves a room where a stone was pushed); `ledger.rb` counts blocked edges, `triggers.rb` forbids inputs that re-fire a scripted event, `talk_log.rb` remembers
 what each person and sign said, `revisit.rb` drives the harness's own talks to people, signs and chests, and `dialogues.rb`
 stitches dialogue pages into texts. Their behaviour per flow is in `docs/AGENT_SKILLS.md`.
 

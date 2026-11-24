@@ -1,6 +1,6 @@
 # Agent skills
 
-The skills, protocols and harness behaviours the agent works with. Versioned with the play flow (currently `flow-88`): update this page, not the README, when a flow changes. Layers and data flow are in [ARCHITECTURE.md](../ARCHITECTURE.md).
+The skills, protocols and harness behaviours the agent works with. Versioned with the play flow (currently `flow-89`): update this page, not the README, when a flow changes. Layers and data flow are in [ARCHITECTURE.md](../ARCHITECTURE.md).
 
 
 - Learned capabilities (`data/capabilities.json`, `bin/koholint capability list`): an `operational` entry is a composite of the skills below, offered in the skill schema and listed under "Learned skills" only while its trigger item is held (flow-49) and its object is on screen (today `sword_on_object_92 row col direction`: stand next to object 92, face it, use the sword, step into its cell). `explore` and `goto` also run it themselves when blocked facing such a cell, and the planner routes through those cells as a last resort. `learn` and `capability publish|retire` are offline commands.
@@ -128,8 +128,18 @@ The skills, protocols and harness behaviours the agent works with. Versioned wit
   longer expires after a number of visits, and a place entered through a door or a walk-in exit is entered by that way, so a way unreachable from that landing
   is cut too; flow-86 below adds landings reached without a crossing and the count of calls within one visit).
 - flow-82: a stone (object 167) slides one cell when Link holds a direction into it for 32 frames and the cell beyond is floor; walk, goto and explore
-  keep pressing that long before they report `blocked`, wait for it to land and stop `pushed`; routes and explore frontiers cross a stone only in a
+  keep pressing that long before they report `blocked`, wait for it to land and stop `pushed`; goto routes and explore frontiers cross a stone only in a
   direction it slides, and the things on screen list such stones. Object 166 is a stone that does not move, and the room puts stones back on re-entry.
+- flow-89: explore no longer routes through stones on the way to an exit. When an untried exit or door, or the way its route takes, is reached only
+  by moving stones, it searches the pushes first (`Navigation::Stones`: breadth first over the stone positions of the live room objects, each stone
+  sliding one cell onto floor and landing fixed, from the cells Link walks to) and makes the first push of the fewest that open it, as a `push`
+  target, ranked by the exit or door it opens; it stops `pushed` and the next explore searches again on the fresh screen. The search stops at
+  1000 states (the result then says `stone_search: cut short`). A push target passes the same filters as any target (blocked and doubtful edges,
+  triggers). Before holding a push, Link steps to the stand's centre across the push, since a few pixels off the hold doubles or never ends; a
+  push that still leaves its stone in place (`failed_push`) is never planned again in that visit. A room whose exit still needs a
+  push keeps pending work. A stone ahead of an unknown cell is still a frontier. Leaving a visit that pushed a stone drops the room's cuts,
+  since its stones are back on re-entry; the second-visit and spent-cut memories stay, so a way shut by anything else is cut
+  again at its first finding, and a visit that pushed nothing lifts nothing. Cuts elsewhere are kept.
   Within a place, explore takes a side known only as the assumed way back (flow-78) after the place's other reachable untried exits, doors and frontiers;
   it is still a frontier, taken when nothing else here is reachable, before a route to another place. An explore that stops `no_frontier`
   in at most one frame is answered by the harness at the next decision, not after three, since from the same cell it would find none again.

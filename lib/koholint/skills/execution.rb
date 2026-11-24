@@ -88,10 +88,10 @@ module Koholint
 
       # Stationary enemies the raised shield pushes aside (sea urchins) sit on cells their sprites make look like objects; only with the shield held.
       # Cells of objects a published capability clears are passable at the same last-resort cost, and so is a stone entered in a direction it slides.
-      def pushable_of(context)
+      def pushable_of(context, stones: true)
         shield = Array(context[:held]).include?(Items::SHIELD)
         urchins = context[:entities] && shield ? -> { Array(context[:entities].call).select { |e| e[:kind].to_s == 'enemy' && e[:moves] == false && e[:cell] }.map { |e| e[:cell] } } : nil
-        stones = context[:room_objects] && context[:grid] ? -> { stone_pushes(context[:room_objects].call, context[:grid]) } : nil
+        stones = context[:room_objects] && context[:grid] && stones ? -> { stone_pushes(context[:room_objects].call, context[:grid]) } : nil
         clearing = Clearing.of(context)
         sources = [urchins, stones, (-> { clearing.cells.keys } if clearing)].compact
         -> { sources.flat_map(&:call).uniq } if sources.any?
@@ -104,11 +104,13 @@ module Koholint
           row.each_index.select { |c| catalogue.dig(row[c], :push) }.flat_map do |c|
             Geometry::DIRECTIONS.filter_map do |direction|
               far = ahead_of([r, c], direction)
-              [[r, c], direction] if far && !catalogue.key?(objects.dig(*far)) && !grid.static_sprite(*far) && grid.passable(*far, direction) == :yes
+              [[r, c], direction] if far && lands?(objects, grid, far, direction)
             end
           end
         end
       end
+
+      def lands?(objects, grid, cell, direction) = !Entities.object_catalogue.key?(objects.dig(*cell)) && !grid.static_sprite(*cell) && grid.passable(*cell, direction) == :yes
 
       def ahead_of(cell, direction) = cell && Geometry.step(cell, direction)
 

@@ -69,6 +69,8 @@ module Koholint
       @things = {}
       @met = Set.new
       @spent_cuts = Set.new
+      @pushed_rooms = Set.new
+      @failed_pushes = {}
     end
 
     # The exit bench's measured edges and benches for the current context (Exits.for_context); they fill ways this run never crossed.
@@ -161,8 +163,12 @@ module Koholint
       %i[from to].each { |end_| (place = Ledger.place_of(Ledger.pick(result, end_))) && know(place) }
       from = Ledger.place_of(Ledger.pick(result, :from))
       to = Ledger.place_of(Ledger.pick(result, :to))
+      @pushed_rooms << from if from && Ledger.pick(result, :pushed)
+      note_failed_push(from, result) if from
+      left = @at if @at && @at != (to || from)
       @entered[from] = :landed if from && @at && from != @at
       @at = to || from
+      uncut(left) if left && @pushed_rooms.delete?(left)
       @visits[to] += 1 if from && to && from != to
       @entered[to] = :landed if from && to && from != to
       note_crossing(result)
@@ -495,6 +501,21 @@ module Koholint
     end
 
     def cut?(place, side, via) = @cut_off.include?([place, side, via])
+
+    # A room where a stone was pushed puts its stones back on re-entry, so its cuts last only until Link leaves it.
+    # Only a visit that pushed a stone moved the room's stones, so only leaving such a visit lifts its cuts; the second-visit and spent-cut
+    # memories stay, so a way kept shut by anything else is cut again at once.
+    def uncut(place)
+      @cut_off.delete_if { |key| key[0] == place }
+    end
+
+    def note_failed_push(place, result)
+      push = Ledger.pick(result, :failed_push) or return
+      (@failed_pushes[place] ||= []) << [@visits[place], [Ledger.pick(push, :row), Ledger.pick(push, :col)], Ledger.pick(push, :direction).to_sym]
+    end
+
+    # The pushes of this visit that left their stone in place: [stone cell, direction].
+    def failed_pushes(place) = Array(@failed_pushes[place]).select { |visit, _, _| visit == @visits[place] }.map { |_, cell, direction| [cell, direction] }
 
     def again?(seen, key, place)
       return true if seen.key?(key) && seen[key] != @visits[place]
