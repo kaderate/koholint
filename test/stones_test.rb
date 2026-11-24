@@ -322,4 +322,23 @@ class StonesTest < Minitest::Test
     frontier = { kind: :frontier, cell: [2, 2], direction: :up, path: Array.new(2) }
     assert_equal [push, frontier], run.send(:order, [frontier, push]), 'the hint names the exit, not the push'
   end
+
+  # A held 167 slides only with Link centred across the push (measured in 171/10, data/entities.json); off by more it never slides here.
+  class OffCentreRoom < Room
+    private
+
+    def push(cell, direction)
+      cx, cy = Koholint::Geometry.center_of(*cell)
+      across = %i[left right].include?(direction) ? @y - cy : @x - cx
+      across.abs > 3 ? (@held = 0) : super
+    end
+  end
+
+  def test_explore_centres_link_across_a_push_before_holding_it
+    x, y = at([4, 5])
+    room = OffCentreRoom.new(JAM, start: [x + 4, y], exits: [[[3, 9], :right]])
+    result, = play('explore', {}, room, JAM, limit: 1500, grid: LiveGrid.new(room, JAM))
+    assert_equal :push, result.dig(:target, :kind)
+    assert_equal({ row: 3, col: 5, direction: :up }, result[:pushed], result.slice(:stopped_by, :target, :failed_push).inspect)
+  end
 end

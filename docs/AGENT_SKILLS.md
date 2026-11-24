@@ -135,9 +135,10 @@ The skills, protocols and harness behaviours the agent works with. Versioned wit
   sliding one cell onto floor and landing fixed, from the cells Link walks to) and makes the first push of the fewest that open it, as a `push`
   target, ranked by the exit or door it opens; it stops `pushed` and the next explore searches again on the fresh screen. The search stops at
   1000 states (the result then says `stone_search: cut short`). A push target passes the same filters as any target (blocked and doubtful edges,
-  triggers), and a push that leaves its stone in place (`failed_push`) is never planned again in that visit. A room whose exit still needs a
-  push keeps pending work. A stone ahead of an unknown cell is still a frontier. Leaving a visit that pushed a stone drops the room's cuts and
-  their call counts, since its stones are back on re-entry; the second-visit and spent-cut memories stay, so a way shut by anything else is cut
+  triggers). Before holding a push, Link steps to the stand's centre across the push, since a few pixels off the hold doubles or never ends; a
+  push that still leaves its stone in place (`failed_push`) is never planned again in that visit. A room whose exit still needs a
+  push keeps pending work. A stone ahead of an unknown cell is still a frontier. Leaving a visit that pushed a stone drops the room's cuts,
+  since its stones are back on re-entry; the second-visit and spent-cut memories stay, so a way shut by anything else is cut
   again at its first finding, and a visit that pushed nothing lifts nothing. Cuts elsewhere are kept.
   Within a place, explore takes a side known only as the assumed way back (flow-78) after the place's other reachable untried exits, doors and frontiers;
   it is still a frontier, taken when nothing else here is reachable, before a route to another place. An explore that stops `no_frontier`

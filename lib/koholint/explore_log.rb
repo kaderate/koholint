@@ -507,7 +507,6 @@ module Koholint
     # memories stay, so a way kept shut by anything else is cut again at once.
     def uncut(place)
       @cut_off.delete_if { |key| key[0] == place }
-      @cut_calls.delete_if { |key, _| key[0] == place }
     end
 
     def note_failed_push(place, result)

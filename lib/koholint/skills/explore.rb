@@ -295,6 +295,7 @@ module Koholint
             @outward = nil
             return attempt_over(state)
           end
+          across = across_push(state, cell, direction) and return across
           position = [state.x, state.y]
           @outward[:still] = @outward[:frames].positive? && position == @outward[:position] ? @outward[:still] + 1 : 0
           @outward[:position] = position
@@ -305,6 +306,18 @@ module Koholint
 
           @outward[:frames] += 1
           [direction]
+        end
+
+        # A stone slides after its measured hold only with Link centred across the push: 4 px low the hold doubles, 7 px low it never slides.
+        def across_push(state, cell, direction)
+          return unless @target[:kind] == :push && @outward[:frames].zero? && @outward[:centring].to_i < Geometry::CELL
+
+          dx, dy = Geometry.offset(state.x, state.y, cell)
+          off, toward = %i[left right].include?(direction) ? [dy, %i[up down]] : [dx, %i[left right]]
+          return if off.zero?
+
+          @outward[:centring] = @outward[:centring].to_i + 1
+          [off.positive? ? toward[0] : toward[1]]
         end
 
         def outward_blocked(state, cell, direction)
