@@ -248,7 +248,7 @@ catalogue options flagged `quits` (save and quit to the title), and the context 
 
 **Candidates** — `candidates.rb` builds the `choose_objective` menu: people here first (`npc`, status never/new/changed/repeat),
 unread signs here, unidentified things here (flow-40: `unknown` entities and sprites holding no entity never talked to, nearest 4,
-`examine-ROW-COL`, followed by one `talk_to`), untried exits by side and untried doors of the place (every candidate that leaves the place is labelled
+`examine-ROW-COL`, followed by one `talk_to`), untried exits by side and untried doors of the place (flow-84: a side known only as the assumed way back is labelled `the way back to <place> you came in by (assumed, never crossed)` and listed after the place's other exits and doors; order across places is unchanged) (every candidate that leaves the place is labelled
 `leaves unexhausted people here` while such a person is listed), known places with untried exits, people (never/new) and unread signs of
 other places from their last place card (`PlaceCard.latest`, kept current by the policy), and places a lead's `where` resolves to (a
 place id or a place name); remote ones are nearest first by `ExploreLog#hops`, 4 per kind. Each candidate carries an id, a label, a

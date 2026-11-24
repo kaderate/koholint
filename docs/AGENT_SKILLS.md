@@ -79,7 +79,7 @@ The skills, protocols and harness behaviours the agent works with. Versioned wit
   flow-59: a lead whose claim or `where` names a catalogued item (name or alias) that neither any text the run has read (earlier texts, the whole
   transcription, earlier lead quotes) nor any item Link has ever held (`Items.held_ids`, cumulative) names is dropped (`LeadCheck.named`, the rule `check-leads` applies to traces) and recorded as a `lead_leak` notable, so it never reaches a prompt.
 - At `choose_objective` the context lists candidate objectives with ids (`candidates.rb`): untried exits by side (`exit-up`) and doors
-  (`door-R-C`) of this place, people (`person-tT`, listed first) and unread signs (`sign-R-C`) here worth a visit, known places with untried exits
+  (`door-R-C`) of this place (flow-84: a side known only as the way back you came in by says so and comes after them), people (`person-tT`, listed first) and unread signs (`sign-R-C`) here worth a visit, known places with untried exits
   (`place-R-M`), people and unread signs of other known places (from their place cards; flow-62: a person exhausted
   under other held items or another milestone is offered again, once) and places tied to a lead by its `where`
   (`lead-N`), nearest first by moves over exits explore took (flow-69: never through a pocket, so a place routes cannot reach

@@ -98,6 +98,17 @@ class CandidatesTest < Minitest::Test
     assert_includes build(signs:, link: [5, 5]).map { |c| c[:id] }, 'door-3-5'
   end
 
+  def test_the_side_known_only_as_the_way_back_says_so_and_comes_after_the_place_s_other_exits_and_doors
+    found = Koholint::Candidates.build(place: [3, 0], grid: OpenGrid.new, explore_log: log, talk_log: Koholint::TalkLog.new, leads: Koholint::Leads.new,
+                                       signs: [{ kind: 'door', cell: [3, 5], object: 226 }])
+    leaving = found.map { |c| c[:id] }.grep(/\A(exit|door)-/)
+    assert_equal %w[exit-left exit-right door-3-5 exit-down], leaving, 'up was crossed; down is only the assumed way back to 1-0'
+    back = found.find { |c| c[:id] == 'exit-down' }
+    assert_match(/, the way back to place 1-0 you came in by \(assumed, never crossed\)\z/, back[:label])
+    refute_match(/way back/, found.find { |c| c[:id] == 'exit-left' }[:label])
+    assert_equal({ kind: 'exit', place: [3, 0], direction: 'down' }, back[:target])
+  end
+
   def test_the_offered_list_keeps_id_label_warning_and_pick_for_the_trace
     entities = [{ type: 62, kind: 'npc', cell: [2, 3] }]
     found = build(entities:)
