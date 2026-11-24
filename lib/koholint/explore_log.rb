@@ -7,7 +7,6 @@ require 'koholint/navigation/planner'
 module Koholint
   class ExploreLog
     TRIED_AT = 2
-    CUT_VISITS = 4
 
     def self.from_events(events)
       log = new
@@ -60,7 +59,8 @@ module Koholint
       @context = nil
       @puzzle_offers = Set.new
       @puzzle_entries = Set.new
-      @cut_off = {}
+      @cut_off = Set.new
+      @door_ways = Set.new
       @cut_seen = {}
       @unmet = {}
       @met = Set.new
@@ -384,7 +384,7 @@ module Koholint
         end
         return nil if goal
 
-        cut = live_cuts.find { |key| !lifted.include?(key) && !@spent_cuts.include?(key) } or return nil
+        cut = @cut_off.find { |key| !lifted.include?(key) && !@spent_cuts.include?(key) } or return nil
         lifted << cut
       end
     end
@@ -400,7 +400,7 @@ module Koholint
         return hops_to(seen, state) if place != from && (goal ? place == goal : work?(place) && !skip.include?(place))
 
         ways(place).each do |key, to|
-          ahead = [to, Geometry::OPPOSITE[key]]
+          ahead = [to, entry(place, key)]
           next if seen.key?(ahead) || pocket?(to, key) || (place == from && avoid.include?(key)) || beyond?(tier, place, key) ||
                   (cut?(place, came, key) && !lifted.include?([place, came, key]))
 
@@ -453,8 +453,12 @@ module Koholint
       @cut_off.delete([place, came, way])
       @spent_cuts.delete([place, came, way])
       @through << [place, came] if came && came != way && !@through.include?([place, came])
-      @entered[to] = (Geometry::OPPOSITE[way] unless door)
+      @door_ways << [place, way] if door
+      @entered[to] = entry(place, way)
     end
+
+    # A place entered through a door lands where that door leads, so the way through it stands for the landing.
+    def entry(place, way) = Geometry::OPPOSITE.key?(way) && !@door_ways.include?([place, way]) ? Geometry::OPPOSITE[way] : [place, way]
 
     def landing_side(place, cell) = @arrivals.find { |(where, _), arrival| where == place && arrival == cell }&.dig(0, 1)
 
@@ -468,7 +472,7 @@ module Koholint
       end
     end
 
-    # A way no path reaches from the side Link entered by, on two visits, is not routed through that side for CUT_VISITS more visits;
+    # A way no path reaches from where Link entered, on two visits, is not routed through from that landing again in this context;
     # found unreachable again while cut, after a route lifted it, the cut is spent and no route lifts it again in this episode.
     def cut_off(place, side, via)
       key = [place, side, via]
@@ -476,12 +480,10 @@ module Koholint
       return unless again?(@cut_seen, key, place)
 
       @spent_cuts.delete(key)
-      @cut_off[key] = @visits[place]
+      @cut_off << key
     end
 
-    def cut?(place, side, via) = (at = @cut_off[[place, side, via]]) && @visits[place] - at < CUT_VISITS
-
-    def live_cuts = @cut_off.keys.select { |key| cut?(*key) }
+    def cut?(place, side, via) = @cut_off.include?([place, side, via])
 
     def again?(seen, key, place)
       return true if seen.key?(key) && seen[key] != @visits[place]
