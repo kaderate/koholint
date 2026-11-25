@@ -112,6 +112,10 @@
   td { padding: 5px 0; border-bottom: 1px solid #22262e; }
   td:last-child { text-align: right; }
   #dialogues { max-height: 250px; }
+  #skills { max-height: 250px; }
+  #skills td { padding: 3px 6px 3px 0; text-align: left; white-space: nowrap; }
+  #skills td.args { color: var(--mut); white-space: normal; }
+  #skills-block h3 label { margin-left: auto; font-size: 11.5px; font-weight: 400; color: var(--mut); cursor: pointer; text-transform: none; letter-spacing: 0; }
   .who { margin: 10px 0 4px; font-weight: 600; font-size: 13px; }
   .who .lg { color: var(--mut); font-weight: 400; font-size: 12px; margin-left: 6px; }
   .bub { background: #171a20; border: 1px solid var(--line); border-radius: 10px 10px 10px 2px; padding: 7px 10px; margin: 4px 0; font-size: 13px; color: #d6d9e2; cursor: pointer; white-space: pre-wrap; }
@@ -200,6 +204,7 @@
       <div id="cands"></div>
     </section>
     <section class="card" id="dialogues-block"><h3>Dialogues <span>récents</span></h3><div id="dialogues" class="scroll"></div></section>
+    <section class="card" id="skills-block"><h3>Skills <span id="skills-count"></span><label><input type="checkbox" id="skills-objective"> objectif en cours seulement</label></h3><div id="skills" class="scroll"><table id="skills-table"></table></div></section>
   </div>
   <div>
     <section class="card" id="symptoms-block"><h3>Symptômes</h3><div class="sym" id="symptoms"></div></section>
@@ -995,6 +1000,42 @@
     document.getElementById('objective-predicate').textContent = objective ? objective.predicate : '';
     document.getElementById('objective-attempts').textContent = objective ? (objective.attempts === null ? '' : plural(objective.attempts, 'skill call') + ' so far') : '';
     document.getElementById('goal').textContent = memoryView(state.status).goal;
+    renderSkills(state.skills);
+  }
+
+  var SKILL_CHOOSERS = { model: 'modèle', stub: 'stub', autopilot: 'autopilote', harness: 'moteur' };
+  var lastSkills = null;
+
+  function screenLabel(place) {
+    if (!Array.isArray(place)) return '?';
+    if (place[1] !== 0) return place[0] + '/' + place[1];
+    return String.fromCharCode(65 + place[0] % 16) + (Math.floor(place[0] / 16) + 1);
+  }
+
+  function shortArgs(params) {
+    var text = Object.keys(params || {}).map(function (key) {
+      var value = params[key];
+      return key + ' ' + (typeof value === 'object' ? JSON.stringify(value) : value);
+    }).join(', ');
+    return text.length > 48 ? text.slice(0, 47) + '…' : text;
+  }
+
+  function renderSkills(skills) {
+    if (skills) lastSkills = skills;
+    if (!lastSkills) return;
+    var onlyObjective = document.getElementById('skills-objective').checked;
+    var rows = onlyObjective ? lastSkills.objective : lastSkills.recent;
+    document.getElementById('skills-count').textContent = rows.length + (onlyObjective ? ' de l\'objectif' : ' récents');
+    var table = document.getElementById('skills-table');
+    table.replaceChildren();
+    rows.forEach(function (row) {
+      var tr = document.createElement('tr');
+      var screen = el('td', '', screenLabel(row.place));
+      if (Array.isArray(row.place)) screen.title = row.place[0] + '/' + row.place[1];
+      [el('td', 'muted', String(row.frame)), screen, el('td', '', row.skill), el('td', 'args', shortArgs(row.params)),
+       el('td', row.by === 'model' || row.by === 'stub' ? 'warn' : 'muted', SKILL_CHOOSERS[row.by] || row.by)].forEach(function (td) { tr.appendChild(td); });
+      table.appendChild(tr);
+    });
   }
 
   function el(tag, cls, text) {
@@ -1197,6 +1238,7 @@
   }
 
   document.getElementById('filter').addEventListener('input', renderHistory);
+  document.getElementById('skills-objective').addEventListener('change', function () { renderSkills(); });
 
   function showTab(name) {
     tabName = name;

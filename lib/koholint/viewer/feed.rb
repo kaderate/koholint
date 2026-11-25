@@ -48,7 +48,8 @@ module Koholint
           server_now: Time.now.to_f,
           latency: latency(trace),
           budget: budget(manifest, trace, summary),
-          dialogues: dialogues(trace)
+          dialogues: dialogues(trace),
+          skills: skills(trace, summary[:objective])
         }
       end
 
@@ -140,17 +141,46 @@ module Koholint
       AUTOMATIC = ['automatic dialogue advance', 'deterministic hemmed-in', 'locked: waiting', 'autopilot:'].freeze
 
       def objective_view(trace, id)
-        return { objective_predicate: nil, objective_attempts: nil } unless id
-
-        index = trace.rindex { |e| e['type'] == 'objective' && e['id'] == id && e['status'] == 'started' }
+        index = objective_start(trace, id)
         return { objective_predicate: nil, objective_attempts: nil } unless index
 
+        { objective_predicate: trace[index]['predicate'], objective_attempts: counted_actions(trace, index).size }
+      end
+
+      def objective_start(trace, id) = id && trace.rindex { |e| e['type'] == 'objective' && e['id'] == id && e['status'] == 'started' }
+
+      # Trace indices of the actions the objective counter counts: from the objective's start, each one its decision did not answer automatically.
+      def counted_actions(trace, index)
         automatic = false
-        attempts = trace[index..].count do |e|
-          automatic = automatic_decision?(e) if e['type'] == 'decision'
-          e['type'] == 'action' && !automatic
+        (index...trace.size).select do |at|
+          automatic = automatic_decision?(trace[at]) if trace[at]['type'] == 'decision'
+          trace[at]['type'] == 'action' && !automatic
         end
-        { objective_predicate: trace[index]['predicate'], objective_attempts: attempts }
+      end
+
+      SKILLS_SHOWN = 50
+
+      def skills(trace, id)
+        index = objective_start(trace, id)
+        counted = index ? counted_actions(trace, index).to_set : Set.new
+        decision = nil
+        rows = trace.each_with_index.filter_map do |e, at|
+          decision = e if e['type'] == 'decision'
+          next unless e['type'] == 'action'
+
+          result = e['result'].is_a?(Hash) ? e['result'] : {}
+          from = result['from'].is_a?(Hash) ? [result['from']['room'], result['from']['map']] : nil
+          { frame: e['frame'].to_i - result['frames'].to_i, place: from, skill: e['skill'], params: e['params'] || {}, by: chooser(decision), counted: counted.include?(at) }
+        end
+        { recent: rows.last(SKILLS_SHOWN).reverse, objective: rows.select { |row| row[:counted] }.last(SKILLS_SHOWN).reverse }
+      end
+
+      def chooser(decision)
+        return 'harness' unless decision
+        return 'autopilot' if decision['autopilot']
+        return 'harness' unless Summary.model_call?(decision)
+
+        decision['justification'] == 'stub' ? 'stub' : 'model'
       end
 
       def automatic_decision?(event) = AUTOMATIC.any? { |text| event['justification'].to_s.start_with?(text) }

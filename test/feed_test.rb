@@ -28,7 +28,7 @@ class FeedTest < Minitest::Test
       decision(trace, 2)
       trace.emit(:action, frame: 3, skill: 'walk', params: { 'dir' => 'up' }, result: {})
       doc = Koholint::Viewer::Feed.for(dir, FOLLOWER)
-      assert_equal %i[status replay events grid activity server_now latency budget dialogues], doc.keys
+      assert_equal %i[status replay events grid activity server_now latency budget dialogues skills], doc.keys
       assert_equal File.basename(dir), doc[:status][:run_id]
       assert_equal({ flow_version: 'f', manifest_status: 'running', budget: { 'frames' => 9 }, health: 'unknown',
                      hearts: 2.0, max_hearts: 3.0, objective: nil, last_notable: nil, highest_milestone: 'none',
@@ -477,6 +477,32 @@ class FeedTest < Minitest::Test
         trace.emit(:action, frame: 3 + i * 2, skill: 'walk', params: {}, result: {})
       end
       assert_equal 1, Koholint::Viewer::Feed.for(dir, FOLLOWER)[:status][:objective_attempts]
+    end
+  end
+
+  def test_skills_list_the_latest_calls_newest_first_with_who_chose_them_and_the_objective_counter_s_rule
+    with_dir do |dir, trace|
+      call = lambda do |frame, why, skill, autopilot: false, agent: 'delegated', cost: 0.0|
+        trace.emit(:decision, frame:, decision_point: 'choose_skill', input: {}, options: [], choice: {}, justification: why, confidence: 1.0, agent:,
+                              latency_ms: 0, cost_usd: cost, **(autopilot ? { autopilot: true } : {}))
+        trace.emit(:action, frame: frame + 10, skill:, params: { 'direction' => 'up' }, result: { 'frames' => 10, 'from' => { 'room' => 228, 'map' => 0 } })
+      end
+      call.(1, 'before', 'walk', agent: 'claude', cost: 0.1)
+      trace.emit(:objective, frame: 20, id: 'o1', status: 'started', predicate: { kind: 'new_place' }, title: 'Explore')
+      call.(30, 'go north', 'explore', agent: 'claude', cost: 0.1)
+      call.(50, 'autopilot: explore again (1/6)', 'explore', autopilot: true)
+      call.(70, 'automatic dialogue advance', 'advance_dialogue')
+      call.(90, 'stub', 'explore', agent: 'claude')
+      60.times { |i| call.(200 + i * 20, 'automatic dialogue advance', 'advance_dialogue') }
+      doc = Koholint::Viewer::Feed.for(dir, Follower.new(5000, 5000, 0, :in_sync))
+      recent = doc[:skills][:recent]
+      assert_equal 50, recent.size
+      assert_equal [1380, 'advance_dialogue', 'harness', false], recent.first.values_at(:frame, :skill, :by, :counted)
+      shown = doc[:skills][:objective]
+      assert_equal [[90, 'stub'], [30, 'model']], shown.map { |row| row.values_at(:frame, :by) }
+      assert_equal doc[:status][:objective_attempts], shown.size
+      assert_equal({ frame: 30, place: [228, 0], skill: 'explore', params: { 'direction' => 'up' }, by: 'model', counted: true }, shown.last)
+      assert_equal 'autopilot', Koholint::Viewer::Feed.skills(Koholint::Trace.read(File.join(dir, 'trace.jsonl')).first(7), 'o1')[:recent].find { |row| row[:frame] == 50 }[:by]
     end
   end
 
