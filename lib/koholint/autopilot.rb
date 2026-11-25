@@ -42,7 +42,7 @@ module Koholint
       @returns = Hash.new(0)
       @fight = 0
       @struck = { place: nil, types: [] }
-      @missed = { place: nil, slots: [] }
+      @missed = { place: nil, slots: [], far: [] }
       @untried = []
       @trying = false
       @aimed = Set.new
@@ -209,10 +209,12 @@ module Koholint
       return if state.health <= Perception::HP_PER_HEART || @fight >= FIGHT_LIMIT || @fight_hurt
       return if Array(objects).any? { |object| object[:kind].to_s == 'crumbling' && Geometry.footprint_cells(state.x, state.y).include?(object[:cell]) }
 
-      missed = @missed[:place] == state.place ? @missed[:slots] : []
+      here = @missed[:place] == state.place
+      missed = here ? @missed[:slots] : []
       missed += [@struck[:slot]] if @struck[:place] == state.place
       distance = ->(entity) { [(entity[:x] - state.x).abs, (entity[:y] - state.y).abs].max }
-      Array(entities).select { |entity| entity[:kind].to_s == 'enemy' && entity[:sword_hits] == 1 && entity[:cell] && !missed.include?(entity[:slot]) }
+      far = ->(entity) { here && @missed[:far].include?(entity[:slot]) && distance.(entity) > Geometry::CELL }
+      Array(entities).select { |entity| entity[:kind].to_s == 'enemy' && entity[:sword_hits] == 1 && entity[:cell] && !missed.include?(entity[:slot]) && !far.(entity) }
                      .select { |entity| distance.(entity) <= FIGHT_SIGHT }
                      .min_by { |entity| [distance.(entity), entity[:slot]] }
     end
@@ -295,14 +297,15 @@ module Koholint
       nil
     end
 
-    # An enemy an attack could not reach or strike is not fought on sight again in that place.
+    # An enemy an attack could not reach or strike is not fought on sight again in that place; one that was only out of reach is, once
+    # it comes within a cell of Link.
     def note_missed(outcome)
       from = outcome[:from]
       return unless from.is_a?(Hash) && outcome[:target].is_a?(Hash) && MISSED.include?(outcome[:stopped_by].to_s)
 
       here = [from[:room], from[:map]]
-      @missed = { place: here, slots: [] } unless @missed[:place] == here
-      @missed[:slots] |= [outcome[:target][:slot]]
+      @missed = { place: here, slots: [], far: [] } unless @missed[:place] == here
+      @missed[outcome[:stopped_by].to_s == 'out_of_reach' ? :far : :slots] |= [outcome[:target][:slot]]
     end
 
     # The types struck count for the visit only: leaving the place forgets them, as a resume (which starts with none) would.
@@ -313,7 +316,7 @@ module Koholint
         here = [from[:room], from[:map]]
         @struck = { place: here, types: [] } unless @struck[:place] == here
         @struck[:types] |= [target[:type]]
-        @struck[:slot] = target[:slot]
+        @struck[:slot] = target[:slot] unless MISSED.include?(outcome[:stopped_by].to_s)
       end
       to = outcome[:to]
       @struck = { place: nil, types: [] } if to.is_a?(Hash) && @struck[:place] && [to[:room], to[:map]] != @struck[:place]

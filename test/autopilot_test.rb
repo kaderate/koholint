@@ -563,6 +563,14 @@ class AutopilotTest < Minitest::Test
     assert_nil pilot.fight_choice(state: state(frame: 200), entities: [sighted(0, 16, slot: 7)])
   end
 
+  # Run 5e81, 172/10: the attack on the second type 155 ended out_of_reach, and the explore after it walked into that 155 at 12 hp.
+  def test_an_enemy_an_attack_could_only_not_reach_is_fought_again_once_within_a_cell
+    pilot = primed
+    pilot.acted(skill: 'attack', outcome: { stopped_by: :out_of_reach, target: { slot: 4, type: 155, cell: [3, 6] }, from: { room: 163, map: 16 } })
+    assert_nil pilot.fight_choice(state: state(frame: 200), entities: [sighted(32, 0)]), 'still two cells away'
+    assert_equal({ row: 3, col: 5 }, pilot.fight_choice(state: state(frame: 210), entities: [sighted(16, 0)])[:choice][:params])
+  end
+
   def test_a_fight_on_sight_never_starts_the_chain_of_fights_after_a_kill
     pilot = primed
     refute_nil pilot.fight_choice(state: state(frame: 200), entities: [sighted(16, 0)])
@@ -585,10 +593,10 @@ class AutopilotTest < Minitest::Test
     refute_nil pilot.fight_choice(state: state(frame: 220), entities: [sighted(16, 0)])
   end
 
-  def test_an_enemy_an_attack_could_not_reach_is_not_fought_on_sight_again_there
+  def test_an_enemy_an_attack_could_not_reach_is_not_fought_on_sight_again_there_beyond_a_cell
     pilot = primed
     pilot.acted(skill: 'attack', outcome: { stopped_by: :out_of_reach, target: { slot: 4, type: 25, cell: [3, 5] }, from: { room: 163, map: 16 } })
     pilot.acted(skill: 'attack', outcome: { stopped_by: :no_target, target: { slot: 7, type: 25, cell: [1, 1] }, from: { room: 163, map: 16 } })
-    assert_nil pilot.fight_choice(state: state(frame: 200), entities: [sighted(16, 0)])
+    assert_nil pilot.fight_choice(state: state(frame: 200), entities: [sighted(32, 0)])
   end
 end
