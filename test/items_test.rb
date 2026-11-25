@@ -117,6 +117,46 @@ class ItemsTest < Minitest::Test
     assert_equal [1], watch.observe(state(item_a: 1, item_b: 4)).map { |g| g[:item] }
   end
 
+  def test_item_12_is_the_mushroom_until_the_powder_count_names_it_the_magic_powder
+    assert_equal 'mushroom', Items.name(12)
+    assert_equal 'mushroom', Items.name(12, state(item_b: 12, magic_powder: 0))
+    assert_equal 'magic powder', Items.name(12, state(item_b: 12, magic_powder: 20))
+    assert_equal 'magic powder', Items.name(12, { 'magic_powder' => 20 })
+    assert_equal 12, Items.find('magic powder')
+    assert_includes Items.names(Items.catalogue[12]), 'poudre magique'
+  end
+
+  def test_watch_emits_the_magic_powder_when_the_held_mushroom_becomes_it
+    watch = Koholint::ItemWatch.new
+    watch.observe(state(item_a: 1))
+    assert_equal [{ item: 12, name: 'mushroom', place: [163, 16], held: [1, 12] }], watch.observe(state(item_a: 1, item_b: 12))
+    assert_empty watch.observe(state(item_a: 1))
+    gained = watch.observe(state(item_a: 1, item_b: 12, magic_powder: 20))
+    assert_equal [{ item: 12, name: 'magic powder', form: 'magic powder', place: [163, 16], held: [1, 12] }], gained
+    assert_empty watch.observe(state(item_a: 1, item_b: 12, magic_powder: 19))
+  end
+
+  def test_watch_resumes_each_form_from_the_trace
+    watch = Koholint::ItemWatch.from_events([{ 'type' => 'item_gained', 'item' => 12, 'name' => 'magic powder?' }])
+    watch.observe(state)
+    assert_empty watch.observe(state(item_b: 12))
+    assert_equal ['magic powder'], watch.observe(state(item_b: 12, magic_powder: 20)).map { |gain| gain[:form] }
+    resumed = Koholint::ItemWatch.from_events([{ 'type' => 'item_gained', 'item' => 12, 'form' => 'magic powder' }])
+    resumed.observe(state)
+    assert_empty resumed.observe(state(item_b: 12, magic_powder: 20))
+  end
+
+  def test_a_form_needs_a_name_a_when_and_its_provenance
+    [['{"name": "magic powder", "source": "x", "confidence": "observed", "verified_count": 1}', /needs a name and a when/],
+     ['{"name": "magic powder", "when": "magic_powder", "confidence": "verified", "verified_count": 1, "source": "x"}', /verified needs verified_count >= 2/]].each do |form, message|
+      Tempfile.create(['items', '.json']) do |file|
+        file.write(%([{"id": 12, "name": "mushroom", "source": "x", "confidence": "observed", "verified_count": 1, "forms": [#{form}]}]))
+        file.flush
+        assert_match message, assert_raises(Items::Invalid) { Items.catalogue(file.path) }.message
+      end
+    end
+  end
+
   def test_watch_resumes_from_the_trace
     watch = Koholint::ItemWatch.from_events([{ 'type' => 'item_gained', 'item' => 4 }])
     watch.observe(state)
@@ -127,5 +167,7 @@ class ItemsTest < Minitest::Test
     text = Koholint::Agents::Context.send(:items_line, state(item_b: 4, inventory: [0, 0, 2, 0, 0, 0, 0, 0, 0, 0]))
     assert_equal 'Items (a ? marks a name not yet measured): A empty, B shield (id 4); inventory slots: 2 bombs? (id 2)', text
     assert_includes Koholint::Agents::Context.send(:items_line, state), 'inventory slots: all empty'
+    powder = Koholint::Agents::Context.send(:items_line, state(item_b: 12, magic_powder: 20))
+    assert_includes powder, 'B magic powder (id 12)'
   end
 end

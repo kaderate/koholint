@@ -35,7 +35,8 @@ observability.
 (position, place, hp and pending damage, rupees, phase, items, readiness signals). Every address carries provenance and a
 `verified_count`. `entities.rb` reads the 16 entity slots and the room object table and gives each a kind from
 `data/entities.json` (`npc`, `enemy`, `creature`, `object`, `unknown`; objects: `sign`, `door`, `chest`, `stone`, …).
-`items.rb` and `data/items.json` name item ids; the engine's `ItemWatch` emits `item_gained`. The engine also watches the room
+`items.rb` and `data/items.json` name item ids, and the forms an id takes by a RAM field (id 12 is the mushroom, then the magic
+powder once its count is positive); the engine's `ItemWatch` emits `item_gained` once per id and form. The engine also watches the room
 objects every frame and emits `floor_gave_way` when a crumbling floor object turns into a hole; the skills see that object as
 crumbling only in places where this was seen. `footing.rb` reads the game's crumble timer for the cell under Link's foot point,
 and `Skills::Execution` steps every skill off that cell before it gives way. The probes under `probes/`
