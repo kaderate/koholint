@@ -147,7 +147,7 @@ The skills, protocols and harness behaviours the agent works with. Versioned wit
 - flow-96: an examine- objective is achieved only once the thing at its place is tried: talk_to first, then touch when the talk drew
   no answer (an answered talk is a try). The walk probe records a way, like a wall, only from a start lined up with the row or column
   it crosses (Link sliding under a rock on a row edge read as a way into it), and a dialogue the game opens while explore pushes flush
-  against a cell (`pushed` in the result) records that cell's appearance as no way in that direction.
+  against a cell (`too_heavy` in the result) records that cell's appearance as no way in that direction.
 - flow-95: a still sprite stands only on the cells holding at least half of it each way (a person straddling a cell edge evenly still
   stands on both sides), and never on the cell Link stands on, so a speaker that stops a few pixels into his cell no longer walls him in.
 - flow-94: below full health (`health < max_hp`, one heart or less included) the harness walks to a heart on screen with no model call, right after

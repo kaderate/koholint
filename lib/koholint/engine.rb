@@ -140,7 +140,7 @@ module Koholint
         outcome = execute(choice, state, chosen.registry, context)
         @run.trace.emit(:action, frame: @emulator.frame, skill: choice[:skill], params: choice[:params], result: outcome)
         after = Perception.read(@emulator)
-        @builder&.note_push(after, outcome[:pushed]) if outcome.is_a?(Hash) && outcome[:pushed]
+        @builder&.note_push(after, outcome[:too_heavy]) if outcome.is_a?(Hash) && outcome[:too_heavy]
         @policy.after_action(choice:, outcome:, state: after, frame: @emulator.frame)
       elsif chosen.name != :choose_objective
         activity(:acting, 'acting: press', skill: 'press', params: choice)

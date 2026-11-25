@@ -798,7 +798,7 @@ class ExploreTest < Minitest::Test
     assert_equal :dialogue, result[:stopped_by]
     assert_equal({ kind: :exit, row: 7, col: 6, direction: :down }, result[:target])
     assert_includes result[:blocked_edges], { row: 3, col: 2, direction: :right }
-    assert_equal({ row: 3, col: 2, direction: :right }, result[:pushed])
+    assert_equal({ row: 3, col: 2, direction: :right }, result[:too_heavy])
     refute result.dig(:survey, :pending)
     log.absorb(result)
     refute log.untried?(PLACE)
@@ -812,7 +812,7 @@ class ExploreTest < Minitest::Test
     result, = explore(rows, callouts: [[3, 4]], start: Koholint::Geometry.center_of(3, 1), explore_log: log)
     assert_equal :dialogue, result[:stopped_by]
     assert_empty result[:blocked_edges]
-    assert_nil result[:pushed]
+    assert_nil result[:too_heavy]
     assert result.dig(:survey, :pending)
     log.absorb(result)
     assert log.untried?(PLACE)
