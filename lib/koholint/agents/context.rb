@@ -289,6 +289,8 @@ module Koholint
       def self.objective_block(objective, attempts, plan = nil, goal = nil, route = nil)
         lines = [goal ? "Goal (yours, long-term): #{goal}" : 'Goal: none set yet — set one in goal when you have a reason (a lead, an observation).']
         lines += objective ? ["Current objective: #{objective[:title]}#{" (candidate #{objective[:candidate]})" if objective[:candidate]}", "Predicate: #{objective[:predicate].to_json}"] : ['Current objective: none']
+        try = objective&.dig(:target, :try) && objective[:target]
+        lines << "To end it: at that place, talk to the thing of type #{try[:type]} (talk_to its cell), then touch it if the talk draws no answer; reaching the place alone does not end it." if try
         lines << route if objective && route
         lines << "Your plan from your last call (written by you; follow it unless the situation changed): #{plan}" if plan
         return lines.join("\n") unless objective

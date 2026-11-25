@@ -192,6 +192,14 @@ class AgentsContextTest < Minitest::Test
     refute_includes build, 'Refused objectives'
   end
 
+  def test_a_thing_to_try_says_how_its_objective_ends
+    thing = { id: 'obj-3', title: 'Go examine the unidentified thing (type 132)', predicate: { kind: 'reach_place', place: [83, 0] },
+              target: { kind: 'person', place: [83, 0], type: 132, cell: [3, 5], try: true } }
+    line = 'To end it: at that place, talk to the thing of type 132 (talk_to its cell), then touch it if the talk draws no answer; reaching the place alone does not end it.'
+    assert_includes build(objective: thing), "Predicate: {\"kind\":\"reach_place\",\"place\":[83,0]}\n#{line}"
+    refute_includes build(objective: thing.merge(target: thing[:target].except(:try))), 'To end it'
+  end
+
   def test_plan_is_shown_after_the_objective_and_before_the_attempts
     objective = { id: 'obj-2', title: 'Leave the room', predicate: { kind: 'new_place' } }
     text = build(objective:, attempts: ['walk -> blocked'], plan: 'talk to the NPC first')
