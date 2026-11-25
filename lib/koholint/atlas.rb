@@ -5,6 +5,7 @@ require 'koholint/archive'
 require 'koholint/capabilities'
 require 'koholint/dialogues'
 require 'koholint/exits'
+require 'koholint/geometry'
 require 'koholint/leads'
 require 'koholint/place_card'
 require 'koholint/place_kinds'
@@ -25,9 +26,8 @@ module Koholint
     DATA = File.expand_path('../../data', __dir__)
     FACTS = %w[addresses entities items modes place_kinds geometry exits capabilities checkpoints vocabulary].freeze
     VERIFIED_AT = 2
-    TILE = 16
-    HEAT_COLS = 10
-    HEAT_ROWS = 8
+    HEAT_COLS = Geometry::COLS
+    HEAT_ROWS = Geometry::ROWS
 
     module_function
 
@@ -140,7 +140,8 @@ module Koholint
                   heat: Array.new(HEAT_COLS * HEAT_ROWS, 0) }
 
     def heat_cell(state)
-      ((state['y'].to_i / TILE).clamp(0, HEAT_ROWS - 1) * HEAT_COLS) + (state['x'].to_i / TILE).clamp(0, HEAT_COLS - 1)
+      row, col = Geometry.cell_for(state['x'], state['y'])
+      row && ((row * HEAT_COLS) + col)
     end
 
     # Places count from `since` (the fork frame when the parent is read, else 0); cost, calls and frames always from the fork frame.
@@ -172,9 +173,10 @@ module Koholint
         case event['type']
         when 'perception'
           place = Summary.perceived_place(event)
-          if own && place && [place, heat_cell(event['state'])] != cell
-            cell = [place, heat_cell(event['state'])]
-            at.(place)[:heat][cell[1]] += 1
+          stood = place && heat_cell(event['state'])
+          if own && stood && [place, stood] != cell
+            cell = [place, stood]
+            at.(place)[:heat][stood] += 1
           end
           next if place.nil? || place == current
 

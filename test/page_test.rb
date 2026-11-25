@@ -27,13 +27,18 @@ class PageTest < Minitest::Test
     assert_equal ['23 nov.', '?', '91k', '1124·c3c7'], evaluate("[fd('2026-11-23'), fd(null), kf(91234), short('20261124-141419-c3c7')]", page: APP)
   end
 
+  def test_the_cockpit_names_an_interior_by_the_screen_it_opens_from
+    assert_equal ['F7', 'intérieur, porte en F7', 'intérieur 9/16'],
+                 evaluate("[placeName('F7', { grid: true }), placeName('172/10', { grid: false, opens_from: ['F7'] }), placeName('9/16', { grid: false, opens_from: [] })]", page: APP)
+  end
+
   def test_the_cockpit_reads_a_story_at_the_shown_frame
     assert_equal [5, 'C11'], evaluate("at([[1, 'C10'], [5, 'C11'], [9, 'C12']], 7)", page: APP)
     assert_nil evaluate('at([[3, 1]], 2)', page: APP)
     assert_equal [['walk', 2], ['talk_to', 1]], evaluate("tally([[1, 'walk'], [2, 'talk_to'], [3, 'walk'], [9, 'attack']], 5)", page: APP)
     assert_equal [1, 0.5, 0], evaluate('hearts(12, 24)', page: APP)
-    assert_equal [[4, 'achieved', 'Go', false], [6, 'started', 'Talk', false]],
-                 evaluate("latestObjectives([[2, 'started', 'Go', false], [4, 'achieved', 'Go', false], [6, 'started', 'Talk', false]])", page: APP)
+    assert_equal [[4, 'achieved', 'Go', false, 'a'], [5, 'started', 'Go', false, 'b'], [6, 'started', 'Talk', false, 'c']],
+                 evaluate("latestObjectives([[2, 'started', 'Go', false, 'a'], [4, 'achieved', 'Go', false, 'a'], [5, 'started', 'Go', false, 'b'], [6, 'started', 'Talk', false, 'c']])", page: APP)
   end
 
   def test_decisions_read_as_a_sentence

@@ -6,8 +6,6 @@ require 'koholint/trace'
 
 module Koholint
   module Viewer
-    # One run as the cockpit's Direct view reads it: what the agent thought and aimed at, what it read, which skills it called and
-    # where it went, each stamped with its frame so the page can show any frame of the run.
     module Story
       CACHE = {}
       CACHE_LOCK = Mutex.new
@@ -74,7 +72,7 @@ module Koholint
             story[:thoughts] << [frame, skill, text, current] if text.size >= MIN_THOUGHT && text != STUB
           when 'objective'
             titles[event['id']] ||= event['title'] || event.dig('predicate', 'kind')
-            story[:objectives] << [frame, event['status'], titles[event['id']], event['autopilot'] ? true : false]
+            story[:objectives] << [frame, event['status'], titles[event['id']], event['autopilot'] ? true : false, event['id']]
           when 'item_gained'
             story[:held] << [frame, Array(event['held'])]
             story[:marks] << [frame, 'item', event['item']] if frame >= fork
@@ -85,8 +83,7 @@ module Koholint
         story.merge(dialogues: merged(Dialogues.from_events(events)))
       end
 
-      # A text the game types out over several reads is traced as successive pieces; each piece that continues the one before
-      # in the same place is joined to it.
+      # The game types one text over several reads; a joined text takes its last piece's frame so no frame shows words read later.
       def merged(dialogues)
         dialogues.each_with_object([]) do |talk, out|
           text = talk[:text].to_s
@@ -99,7 +96,7 @@ module Koholint
                      elsif now.start_with?(before) then text
                      else Dialogues.join(last[:text], text)
                      end
-            next last[:text] = joined if joined
+            next last.merge!(text: joined, frame: talk[:frame]) if joined
           end
           out << { frame: talk[:frame], place:, text:, speaker: talk[:speaker] }.compact
         end

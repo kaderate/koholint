@@ -5,8 +5,6 @@ require 'koholint/place_kinds'
 
 module Koholint
   module Viewer
-    # The island of the cockpit: every run under the roots merged per screen, the first gain of each item, and the open leads of the
-    # lineage that holds the most items, read only from what the engine wrote.
     module Island
       ITEMS = File.join(Atlas::DATA, 'items.json')
       IMPORTANCE = %w[high normal low tip].freeze
@@ -15,6 +13,10 @@ module Koholint
 
       def build(roots, cache: {}, items: ITEMS)
         dirs, digests = Atlas.read(roots, cache:)
+        of(dirs, digests, roots:, items:)
+      end
+
+      def of(dirs, digests, roots:, items: ITEMS)
         digests = digests.compact
         atlas = Atlas.merge(digests, dirs:, roots:, unreadable: 0)
         places = atlas[:places]
@@ -55,7 +57,7 @@ module Koholint
         []
       end
 
-      # The lineage runs from the furthest run up through every parent that is read; its open leads, the latest reading first.
+      # The furthest run comes first, so a lead's newest verdict wins over an ancestor's.
       def next_leads(furthest, digests, screen_of)
         by_run = digests.to_h { |digest| [digest[:run], digest] }
         chain = []
@@ -64,8 +66,8 @@ module Koholint
           chain << digest
           digest = by_run[digest[:parent]]
         end
-        chain.flat_map { |member| member[:leads].select { |lead| lead[:status] == 'open' }.map { |lead| lead.merge(run: member[:run]) } }
-             .uniq { |lead| lead[:key] }
+        chain.flat_map { |member| member[:leads].map { |lead| lead.merge(run: member[:run]) } }
+             .uniq { |lead| lead[:key] }.select { |lead| lead[:status] == 'open' }
              .sort_by.with_index { |lead, index| [IMPORTANCE.index(lead[:importance].to_s) || IMPORTANCE.size, index] }
              .map { |lead| { quote: lead[:quote], claim: lead[:claim], importance: lead[:importance], place: lead[:place], screen: screen_of[lead[:place]] || lead[:place], run: lead[:run], date: date(lead[:run]) } }
       end

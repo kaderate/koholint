@@ -118,7 +118,9 @@ play button replays the discovery day by day. **Direct** (`#direct`, or `#direct
 the thought and objective at the shown frame, hearts, held items, the current place, the minimap with the trail, a
 scrubber with place, item and death marks (dragging it freezes the screen on that place's capture; a replay seeks), and
 the objectives, dialogues (pieces of one text merged) and skills up to that frame. Métro is a placeholder. `/island.json`
-and `/story.json[?run=<id>]` feed it, each cached by trace mtime and size.
+and `/story.json[?run=<id>]` feed it, each cached by trace mtime and size; the island is rebuilt at most every 30 s.
+The atlas digest of each run adds `parent` (the parent run's id), `held` (the items held at its last gain) and, per place,
+`heat`: 80 counts, one per playfield cell (10 columns by 8 rows), of the times Link entered that cell there in the run's own events.
 
 The run page moved to `/live`. Every older page has the same top bar (Cockpit, Live, Runs, Atlas, Compare once two runs are picked on `/runs`, the current run, a replay badge).
 The live page and a replay share one layout, in equal columns on a desktop and one column on a phone: the game screen

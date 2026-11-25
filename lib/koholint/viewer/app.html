@@ -199,7 +199,8 @@
   function upto(rows, frame) { return rows.filter(function (row) { return row[0] <= frame; }); }
   function tally(skills, frame) { const out = {}; upto(skills, frame).forEach(function (row) { out[row[1]] = (out[row[1]] || 0) + 1; }); return Object.entries(out).sort(function (a, b) { return b[1] - a[1]; }); }
   function hearts(hp, max) { const out = []; for (let k = 0; k < Math.ceil((max || 0) / 8); k++) out.push(Math.max(0, Math.min(1, (hp - k * 8) / 8))); return out; }
-  function latestObjectives(objectives) { const last = {}; objectives.forEach(function (o) { last[o[2]] = o; }); return Object.values(last).sort(function (a, b) { return a[0] - b[0]; }); }
+  function placeName(label, place) { return !place || place.grid ? label : place.opens_from[0] ? 'intérieur, porte en ' + place.opens_from[0] : 'intérieur ' + label; }
+  function latestObjectives(objectives) { const last = {}; objectives.forEach(function (o) { last[o[4]] = o; }); return Object.values(last).sort(function (a, b) { return a[0] - b[0]; }); }
   // pure:end
 
   const $ = function (id) { return document.getElementById(id); };
@@ -268,7 +269,7 @@
     }
     const c = function (l) { const p = P[l]; return [((p.room % 16) - c0) * W + W / 2, ((p.room >> 4) - r0) * H + H / 2]; };
     const trails = [], marks = [];
-    grid.filter(function (p) { return visible.has(p.label); }).forEach(function (p) { p.exits.forEach(function (e) { const q = P[e[0]]; if (!q || !q.grid || !visible.has(e[0]) || e[0] < p.label) return;
+    grid.filter(function (p) { return visible.has(p.label); }).forEach(function (p) { p.exits.forEach(function (e) { const q = P[e[0]]; if (!q || !q.grid || !visible.has(e[0]) || (e[0] < p.label && q.exits.some(function (x) { return x[0] === p.label; }))) return;
       const back = (q.exits.find(function (x) { return x[0] === p.label; }) || [0, 0])[1], n = e[1] + back; const a = c(p.label), b = c(e[0]);
       trails.push(s('line', { class: 'trail', x1: a[0], y1: a[1], x2: b[0], y2: b[1], 'stroke-width': (1 + Math.log2(1 + n) * 1.1).toFixed(1), opacity: Math.min(.6, .12 + Math.log10(1 + n) / 5).toFixed(2) })); }); });
     grid.filter(function (p) { return p.deaths && visible.has(p.label); }).forEach(function (p) { const xy = c(p.label); const z = p.deaths >= 6 ? 22 : p.deaths >= 3 ? 17 : 12; marks.push(use('skull', { x: xy[0] + W / 2 - z - 3, y: xy[1] - H / 2 + 3, width: z, height: z })); });
@@ -283,11 +284,11 @@
     let side;
     if (state.sel && P[state.sel]) {
       const p = P[state.sel]; const mx = Math.max.apply(null, [1].concat(p.heat));
-      const dots = p.heat.map(function (v, k) { const z = (8 + 22 * v / mx).toFixed(0); return v ? h('i', { style: 'left:' + ((k % 10) * 10 + 5) + '%;top:' + ((Math.floor(k / 10) * 16 + 24) / 144 * 100) + '%;width:' + z + 'px;height:' + z + 'px;opacity:' + (.2 + .65 * v / mx).toFixed(2) }) : null; });
+      const dots = p.heat.map(function (v, k) { const z = (8 + 22 * v / mx).toFixed(0); return v ? h('i', { style: 'left:' + ((k % 10) * 10 + 5) + '%;top:' + ((Math.floor(k / 10) * 16 + 8) / 144 * 100) + '%;width:' + z + 'px;height:' + z + 'px;opacity:' + (.2 + .65 * v / mx).toFixed(2) }) : null; });
       const seen = [['people', 'personnes'], ['enemies', 'ennemis'], ['creatures', 'créatures']].filter(function (k) { return p.seen[k[0]]; }).map(function (k) { return p.seen[k[0]] + ' ' + k[1]; }).join(' · ');
       side = h('div', { class: 'card' },
         h('div', { class: 'shot' }, p.screen && h('img', { class: 'px', alt: '', src: shotUrl(p.label) }), dots),
-        h('div', { class: 'facts' }, h('b', { text: p.label }), h('span', { class: 'mut', text: p.room + '/' + p.map }), h('span', { text: fd(p.first.date) }), h('span', { text: p.visits + '×' }), p.deaths && h('span', null, skull(14), ' ' + p.deaths)),
+        h('div', { class: 'facts' }, h('b', { text: p.label }), h('span', { class: 'mut', text: p.room + '/' + p.map }), h('span', { text: fd(p.first.date) }), h('span', { text: p.visits + '×' }), p.deaths ? h('span', null, skull(14), ' ' + p.deaths) : null),
         h('div', { class: 'cap', text: p.runs + ' runs' + (seen ? ' · ' + seen : '') }),
         h('div', { class: 'btns' }, h('button', { type: 'button', class: 'xbtn', id: 'unsel', text: '✕ fermer' })));
     } else {
@@ -298,7 +299,7 @@
             h('span', null, s('svg', { width: 14, height: 14 }, s('circle', { cx: 7, cy: 7, r: 5, fill: 'none', style: 'stroke:var(--warn)', 'stroke-width': 2 })), ' cap'))),
         s('svg', { class: 'spark', viewBox: '0 0 320 54', preserveAspectRatio: 'none' }, s('path', { class: 'area', d: line + 'L320,54L0,54Z' }), s('path', { d: line }), s('circle', { cx: sx(di), cy: sy(series[di]), r: 4, style: 'fill:var(--warn)' })),
         n && h('div', { class: 'card next' }, h('div', { class: 'lbl' }, h('span', { text: 'PROCHAIN' }), h('span', { class: 'mut', text: island.next.length + ' pistes' })), h('q', { text: n.quote }),
-          h('div', { class: 'where' }, P[n.screen] && P[n.screen].screen && h('img', { class: 'px', alt: '', src: shotUrl(n.screen) }), h('span', { class: 'linkish', 'data-sel': n.screen, text: n.place }), h('span', { text: 'lu le ' + fd(n.date) })))];
+          h('div', { class: 'where' }, P[n.screen] && P[n.screen].screen && h('img', { class: 'px', alt: '', src: shotUrl(n.screen) }), h('span', { class: 'linkish', 'data-sel': n.screen, text: placeName(n.place, P[n.place]) }), h('span', { text: 'lu le ' + fd(n.date) })))];
     }
     fill('ile', [h('div', { class: 'mapbox' },
       h('div', { class: 'island', style: 'grid-template-columns:repeat(' + nc + ',' + W + 'px);grid-auto-rows:' + H + 'px' }, cells,
@@ -344,7 +345,7 @@
     if (frozen) { const src = place && place.screen ? shotUrl(placeL) : ''; const el = $('screen'); if (el && el.getAttribute('src') !== src) { if (src) el.src = src; else el.removeAttribute('src'); } }
     const trail = new Set(upto(st.trail, f).map(function (r) { return scr(r[1]); }));
     const here = scr(placeL);
-    const own = upto(st.objectives, f); const obj = own.filter(function (o) { return o[1] === 'started' && !o[3]; }).pop() || own.filter(function (o) { return o[1] === 'started'; }).pop();
+    const latest = latestObjectives(upto(st.objectives, f)); const open = latest.filter(function (o) { return o[1] === 'started'; }); const obj = open.filter(function (o) { return !o[3]; }).pop() || open.pop();
     const pos = function (x) { return ((x - f0) / (f1 - f0) * 100).toFixed(2) + '%'; };
     const obIco = function (o) { return o === 'achieved' ? h('span', { style: 'color:var(--acc)', text: '✓' }) : o === 'failed' || o === 'abandoned' ? h('span', { style: 'color:var(--bad)', text: '✗' }) : h('span', { style: 'color:var(--warn)', text: '●' }); };
     const sk = tally(st.skills, f).slice(0, 7); const skMax = Math.max.apply(null, [1].concat(sk.map(function (e) { return e[1]; })));
@@ -361,22 +362,22 @@
     put('dbubble', t, function () { return [h('span', { class: 'sk', text: t ? t[1] || 'pense' : 'pense' }), h('p', { text: t ? t[2] : 'aucune pensée enregistrée' })]; });
     put('dgoal', obj && obj[2], function () { return obj && h('div', { class: 'goal' }, star(16), h('span', { text: obj[2] })); });
     put('dplace', [placeL, place && place.visits], function () {
-      return [h('span', { class: 'big', text: placeL || '?' }), h('span', { class: 'ents' }, place && [['people', 'personnes'], ['enemies', 'ennemis'], ['creatures', 'créatures']].map(function (k) { return place.seen[k[0]] && h('span', { text: place.seen[k[0]] + ' ' + k[1] }); }), place && h('span', { text: place.visits + '×' }))];
+      return [h('span', { class: 'big', text: placeName(placeL, place) || '?' }), h('span', { class: 'ents' }, place && [['people', 'personnes'], ['enemies', 'ennemis'], ['creatures', 'créatures']].map(function (k) { return place.seen[k[0]] ? h('span', { text: place.seen[k[0]] + ' ' + k[1] }) : null; }), place && h('span', { text: place.visits + '×' }))];
     });
     put('dmini', [here, trail.size, grid.length], function () { const mini = []; for (let room = 0; room < 256; room++) { const l = lbl(room); mini.push(h('i', { class: l === here ? 'here' : trail.has(l) ? 't' : P[l] ? 's' : '' })); } return mini; });
     put('playD', !!playing, function () { return playIco(playing); });
     put('dmarks', [st.run, f0, f1, st.marks.length, !!island], function () {
-      return st.marks.map(function (m) { return m[1] === 'death' ? h('span', { class: 'mk', style: 'left:' + pos(m[0]), title: 'mort à ' + m[2] }, skull(13)) : m[1] === 'item' ? h('span', { class: 'mk', style: 'left:' + pos(m[0]), title: itemName(m[2]) }, star(15)) : h('span', { class: 'mk p', style: 'left:' + pos(m[0]), title: m[2] }); });
+      return st.marks.map(function (m) { return m[1] === 'death' ? h('span', { class: 'mk', style: 'left:' + pos(m[0]), title: 'mort à ' + placeName(m[2], P[m[2]]) }, skull(13)) : m[1] === 'item' ? h('span', { class: 'mk', style: 'left:' + pos(m[0]), title: itemName(m[2]) }, star(15)) : h('span', { class: 'mk p', style: 'left:' + pos(m[0]), title: placeName(m[2], P[m[2]]) }); });
     });
     $('dfill').style.width = pos(f); $('dknob').style.left = pos(f);
     const range = $('frameD'); if (range && document.activeElement !== range) range.value = f;
-    put('dobj', [own.length, obj && obj[2]], function () { return latestObjectives(own).reverse().slice(0, 40).map(function (o) { return h('div', { class: 'ob' + (obj && o[2] === obj[2] ? ' now' : '') }, obIco(o[1]), h('span', { text: o[2] }), h('span', { class: 'mut num', text: kf(o[0]) })); }); });
-    put('ddl', [dl.length, dl.length && dl[0].frame, dl.length && dl[0].text], function () { return dl.length ? dl.map(function (d) { return h('div', { class: 'dl' }, h('small', { text: (d.speaker || d.place) + ' · ' + kf(d.frame) }), d.text); }) : h('span', { class: 'mut', text: 'aucun texte lu' }); });
+    put('dobj', [latest, obj && obj[4]], function () { return latest.slice().reverse().slice(0, 40).map(function (o) { return h('div', { class: 'ob' + (obj && o[4] === obj[4] ? ' now' : '') }, obIco(o[1]), h('span', { text: o[2] }), h('span', { class: 'mut num', text: kf(o[0]) })); }); });
+    put('ddl', [dl.length, dl.length && dl[0].frame, dl.length && dl[0].text], function () { return dl.length ? dl.map(function (d) { return h('div', { class: 'dl' }, h('small', { text: (d.speaker || placeName(d.place, P[d.place])) + ' · ' + kf(d.frame) }), d.text); }) : h('span', { class: 'mut', text: 'aucun texte lu' }); });
     put('dsk', sk, function () { return sk.map(function (e) { return h('div', { class: 'bar' }, h('span', { text: e[0] }), h('i', { style: 'width:' + (100 * e[1] / skMax) + '%' }), h('span', { class: 'mut num', text: e[1] })); }); });
   }
 
   function refreshScreen(force) {
-    const el = $('screen'); if (!el || state.scrub != null || state.view !== 'direct' || (state.run && (!controls || !story || controls.frame < story.fork))) return;
+    const el = $('screen'); if (!el || document.hidden || state.scrub != null || state.view !== 'direct' || (state.run && (!controls || !story || controls.frame < story.fork))) return;
     if (loadingFrame && !force) return;
     const url = state.run ? '/frame.png?run=' + encodeURIComponent(state.run) + '&t=' + Date.now() : '/frame.png?t=' + Date.now();
     const img = new Image(); loadingFrame = true;
@@ -397,13 +398,23 @@
     return json('/story.json' + (state.run ? '?run=' + encodeURIComponent(state.run) : '')).then(function (data) { story = data; if (state.view === 'direct') direct(); })
       .catch(function () { built = null; fill('direct', empty('Pas de run à suivre', 'Lancez watch sur une run, ou ouvrez-en une depuis l\'historique')); });
   }
+  let polling = false;
   function poll() {
-    if (state.view !== 'direct') return;
+    if (polling || document.hidden || state.view !== 'direct') return;
+    polling = true;
     const url = state.run ? '/state.json?run=' + encodeURIComponent(state.run) : '/state.json';
     json(url).then(function (st) {
       if (state.run) { controls = st.replay; if (story && controls.frame < story.fork && !seeking) { seeking = true; control('seek=' + story.fork); } } else liveFrame = st.replay.frame;
-      if (state.scrub == null && story && shownFrame() > story.end) loadStory(); else if (state.scrub == null) direct();
-    }).catch(function () { });
+      if (state.scrub == null) direct();
+    }).catch(function (e) { if (state.run && e.message === '410') reopen(); }).finally(function () { polling = false; });
+  }
+  let reopening = false;
+  function reopen() {
+    if (reopening || !state.run) return;
+    reopening = true;
+    fetch('/run/' + encodeURIComponent(state.run), { cache: 'no-store' }).then(function (r) { if (!r.ok) throw new Error(r.status); })
+      .catch(function (e) { built = null; fill('direct', empty('Replay impossible', 'Le serveur répond ' + e.message + ' pour cette run')); })
+      .finally(function () { reopening = false; });
   }
 
   function go(view) {
@@ -460,14 +471,14 @@
   addEventListener('hashchange', function () { route(); });
   function route() {
     const h = location.hash.slice(1).split('/');
-    if (h[0] === 'direct') { const run = h[1] ? decodeURIComponent(h[1]) : null; if (run !== state.run) { state.run = run; story = null; controls = null; state.scrub = null; seeking = false; } go('direct'); }
+    if (h[0] === 'direct') { const run = h[1] ? decodeURIComponent(h[1]) : null; if (run !== state.run) { state.run = run; story = null; controls = null; state.scrub = null; seeking = false; reopen(); } go('direct'); }
     else go(h[0] === 'ile' ? 'ile' : state.view === 'direct' && !location.hash ? 'direct' : 'ile');
   }
   route();
   loadIsland();
-  setInterval(loadIsland, 60000);
+  setInterval(function () { if (!document.hidden) loadIsland(); }, 60000);
   setInterval(poll, 1000);
-  setInterval(function () { if (state.view === 'direct' && story && !state.run && state.scrub == null) loadStory(); }, 5000);
+  setInterval(function () { if (!document.hidden && state.view === 'direct' && story && !state.run && state.scrub == null && liveFrame > story.end) loadStory(); }, 5000);
   setInterval(refreshScreen, 120);
 })();
 </script>
