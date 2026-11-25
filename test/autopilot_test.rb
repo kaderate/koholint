@@ -485,12 +485,15 @@ class AutopilotTest < Minitest::Test
     assert_equal 'left', pilot.disengage_choice(state: link, entities: [threat(70, 64)])[:choice][:params][:direction]
     pilot.model_called(state: link, objective: objective)
     assert_equal 'left', pilot.disengage_choice(state: link, entities: [threat(70, 64)])[:choice][:params][:direction]
+    pilot.acted(skill: 'walk', outcome: { stopped_by: :blocked, params: { direction: :right, cells: 3 }, from: { room: 163, map: 16, row: 3, col: 2 },
+                                          blocked_at: { row: 3, col: 4, direction: :right } })
+    assert_equal 'down', pilot.disengage_choice(state: link, entities: [threat(60, 64)])[:choice][:params][:direction], 'a longer walk is barred where it stopped'
     moved = state(frame: 300, hp: 8, x: 52, y: 60)
     assert_equal 'up', pilot.disengage_choice(state: moved, entities: [threat(54, 64)])[:choice][:params][:direction], 'from another cell up is tried'
   end
 
   def test_a_disengage_step_the_grid_shows_blocked_is_not_taken
-    grid = Struct.new(:none) { def passable(_row, _col, direction) = direction == :up ? :no : :yes }.new
+    grid = Struct.new(:none) { def passable(row, col, direction) = [row, col, direction] == [2, 4, :up] ? :no : :yes }.new
     assert_equal 'left', primed.disengage_choice(state: state(frame: 200, hp: 8, x: 68, y: 60), entities: [threat(70, 64)], grid:)[:choice][:params][:direction]
   end
 

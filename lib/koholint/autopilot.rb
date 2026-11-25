@@ -220,8 +220,7 @@ module Koholint
                      .min_by { |entity| [distance.(entity), entity[:slot]] }
     end
 
-    # At one heart or less with an enemy within a cell of its touch, step away from every such enemy before the model decides: each step
-    # takes Link farther from all of them and never into or beside another hostile's contact zone.
+    # At one heart or less with an enemy within a cell of its touch, step away from every such enemy before the model decides.
     def disengage_choice(state:, entities:, grid: nil)
       return unless @since && state.phase == :playing && state.x && state.cell && state.health <= Perception::HP_PER_HEART && @disengaged < DISENGAGE_LIMIT
 
@@ -233,7 +232,10 @@ module Koholint
       beside = zone.flat_map { |row, col| [[row, col], [row - 1, col], [row + 1, col], [row, col - 1], [row, col + 1]] }
       farther = ->(dx, dy) { near.all? { |threat| Navigation::Threat.distance(threat, state.x + (dx * Geometry::CELL), state.y + (dy * Geometry::CELL)) > Navigation::Threat.distance(threat, state.x, state.y) } }
       walled = @walled[:spot] == [*state.place, *state.cell] ? @walled[:directions] : []
-      wall = ->(name) { walled.include?(name.to_s) || (grid.respond_to?(:passable) && grid.passable(*state.cell, name) == :no) }
+      wall = lambda do |name|
+        ahead = Geometry.step(state.cell, name)
+        walled.include?(name.to_s) || (ahead && grid.respond_to?(:passable) && grid.passable(*ahead, name) == :no)
+      end
       direction = STEP.reject { |name, (dx, dy)| wall.(name) || (holes + beside).include?([state.cell[0] + dy, state.cell[1] + dx]) || !farther.(dx, dy) }
                       .max_by { |_, (dx, dy)| near.map { |threat| Navigation::Threat.distance(threat, state.x + (dx * Geometry::CELL), state.y + (dy * Geometry::CELL)) }.min }
                       &.first or return
@@ -300,8 +302,7 @@ module Koholint
       nil
     end
 
-    # An enemy an attack could not reach or strike is not fought on sight again in that place; one that was only out of reach is, once
-    # it comes within a cell of Link, REFIGHTS times a visit.
+    # An enemy an attack could not reach or strike is not fought on sight again in that place, save one only out of reach, once in touch.
     def note_missed(outcome)
       from = outcome[:from]
       return unless from.is_a?(Hash) && outcome[:target].is_a?(Hash) && MISSED.include?(outcome[:stopped_by].to_s)
@@ -338,10 +339,12 @@ module Koholint
 
     # A walk blocked from a cell stays blocked from it, across model calls, until Link stands somewhere else.
     def note_walled(outcome)
-      return unless outcome[:from].is_a?(Hash)
+      from = outcome[:from]
+      return unless from.is_a?(Hash)
 
-      from = outcome[:from].values_at(:room, :map, :row, :col)
-      @walled = { spot: from, directions: [] } unless @walled[:spot] == from
+      at = outcome[:blocked_at].is_a?(Hash) ? outcome[:blocked_at] : from
+      spot = [from[:room], from[:map], at[:row], at[:col]]
+      @walled = { spot:, directions: [] } unless @walled[:spot] == spot
       @walled[:directions] |= [outcome[:params][:direction].to_s]
     end
 
