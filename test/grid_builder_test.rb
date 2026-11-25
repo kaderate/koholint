@@ -324,12 +324,23 @@ class GridBuilderTest < Minitest::Test
   class FakeCells
     def initialize(pit) = @pit = pit
     def appearance(row, col) = [row, col] == @pit ? 'pit' : 'grass'
+    def static_sprite(*) = nil
   end
 
   def fall_at(pit, link)
     @builder.instance_variable_set(:@last, { place: [194, 0], cell: [3, 3], grid: FakeCells.new(pit) })
     @builder.note_fall(State.new(10, 194, 0, *link))
     @builder.instance_variable_get(:@beliefs)
+  end
+
+  def test_a_push_the_game_answers_with_a_dialogue_makes_the_cell_ahead_no_way_that_direction
+    @builder.instance_variable_set(:@last, { place: [194, 0], cell: [3, 3], grid: FakeCells.new([3, 4]) })
+    @builder.note_push(State.new(10, 194, 0, 56, 64), { row: 3, col: 3, direction: :right })
+    @builder.note_push(State.new(11, 195, 0, 56, 64), { row: 3, col: 3, direction: :left })
+    beliefs = @builder.instance_variable_get(:@beliefs)
+    capabilities = @builder.instance_variable_get(:@capabilities)
+    assert_equal :no, beliefs.query(appearance: 'pit', action: :walk, direction: :right, context: capabilities)
+    assert_equal [%w[right push]], beliefs.evidence_for('pit', :walk).map { |e| [e[:direction].to_s, e[:source]] }
   end
 
   def test_a_fall_makes_the_cell_appearance_impassable_in_every_direction

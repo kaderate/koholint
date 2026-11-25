@@ -154,12 +154,12 @@ class GridBuilderProbeTest < Minitest::Test
     builder = Builder.new(trace:, prober:)
     emulator = FakeEmulator.new
     3.times { fake_observe(builder, emulator, link: [78, 52]) }
-    assert_equal [%w[down yes], %w[left no], %w[right no]], trace.of(:affordance).map { |e| e.values_at(:direction, :result) }
+    assert_equal [%w[left no], %w[right no]], trace.of(:affordance).map { |e| e.values_at(:direction, :result) }
     assert_equal 4, prober.calls.size
     prober.at = { x: 73, y: 52 }
     fake_observe(builder, emulator, link: [73, 52])
     assert_equal %i[up down], prober.calls.drop(4).map { |c| c[:direction] }
-    assert_equal %w[up no], trace.of(:affordance).last.values_at(:direction, :result)
+    assert_equal [%w[up no], %w[down yes]], trace.of(:affordance).last(2).map { |e| e.values_at(:direction, :result) }
   end
 
   # Run 20261104-153743-acc2, room 165/16: the one-cell stairs at (4,3) stop Link at x 52 (offset -4) but admit him from x 53..60.
@@ -188,6 +188,18 @@ class GridBuilderProbeTest < Minitest::Test
     emulator.sprite(2, x: 150, y: 130)
     2.times { fake_observe(builder, emulator, link: [70, 52]) }
     assert_equal [%w[up yes], %w[down no], %w[left no]], trace.of(:affordance).map { |e| e.values_at(:direction, :result) }
+  end
+
+  # Run 20261125-070857-7734, room 66/0: Link 7 px below row 4 slid right under the heavy rock at (4,2), and the probe took that for a way into it.
+  def test_a_move_off_the_row_or_column_records_nothing
+    moves = { up: { to: { x: 70, y: 30 } }, right: { to: { x: 86, y: 59 } } }
+    prober = StubProber.new { |direction| moves.fetch(direction, {}) }
+    prober.at = { x: 70, y: 59 }
+    trace = FakeTrace.new
+    builder = Builder.new(trace:, prober:)
+    emulator = FakeEmulator.new
+    2.times { fake_observe(builder, emulator, link: [70, 59]) }
+    assert_equal [%w[up yes], %w[down no]], trace.of(:affordance).map { |e| e.values_at(:direction, :result) }
   end
 
   def test_a_left_or_right_stop_needs_vertical_alignment

@@ -193,7 +193,10 @@ module Koholint
             return ({ choice: EXPLORE, aim: { place: target[:place] } } if target[:remote] || @objectives.current.dig(:predicate, :kind).to_s == 'reach_place') unless here
 
             cell = target[:kind] == 'person' ? entities_now.find { |entity| entity[:type] == target[:type] && entity[:cell] }&.dig(:cell) : target[:cell]
-            { choice: { skill: 'talk_to', params: { row: cell[0], col: cell[1] } } } if cell
+            return unless cell
+            return { choice: { skill: 'touch', params: { row: cell[0], col: cell[1], type: target[:type] } } } if target[:try] && @objectives.talked_to?
+
+            { choice: { skill: 'talk_to', params: { row: cell[0], col: cell[1] } } }
           when 'place', 'lead' then { choice: EXPLORE, aim: { place: target[:place] } } unless here
           end
         end

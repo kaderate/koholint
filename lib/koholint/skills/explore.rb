@@ -116,6 +116,7 @@ module Koholint
           merged[:held] = held if held.any?
           merged[:dead_end] = true if @dead_end
           merged[:failed_push] = @failed_push if @failed_push
+          merged[:pushed] = @pushed if @pushed
           merged[:stone_search] = 'cut short' if @search_cut
           merged[:cause] = @fail_cause if @stopped_by == :blocked && @fail_cause
           merged[:untried_objects] = @untried.map { |row, col| { row:, col: } } if @stopped_by == :untried_object
@@ -176,7 +177,10 @@ module Koholint
         # A dialogue that opens as Link stops flush against his cell's edge (a rock too heavy to push) bars that edge, so the survey's pending
         # work leaves it out; one that opens anywhere else (a call-out, a scene, a talking door, a cell just crossed) bars nothing.
         def interrupted(state)
-          block({ row: @cell[0], col: @cell[1], direction: @heading }) if pushing?(state)
+          if pushing?(state)
+            @pushed = { row: @cell[0], col: @cell[1], direction: @heading }
+            block(@pushed)
+          end
           stop_now(:dialogue)
         end
 

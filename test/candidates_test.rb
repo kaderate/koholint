@@ -52,7 +52,7 @@ class CandidatesTest < Minitest::Test
     assert_equal %w[person-3-0-t70], away.([1, 4]).map { |c| c[:id] }, 'seen with the items held now, it is not offered'
     found = away.([1, 4, 12])
     assert_equal %w[person-3-0-t70 examine-4-0-t64], found.map { |c| c[:id] }, 'nearest first, never a thing seen in one cell once, nor a catalogued type'
-    assert_equal({ kind: 'person', place: [4, 0], type: 64, cell: [3, 4] }, found[1][:target])
+    assert_equal({ kind: 'person', place: [4, 0], type: 64, cell: [3, 4], try: true }, found[1][:target])
     assert_equal({ kind: 'reach_place', place: [4, 0] }, found[1][:predicate])
     assert_match(/2 moves away, never tried; Link holds other items than when it was seen/, found[1][:label])
     talk_log.record(place: [4, 0], row: 3, col: 4, talked: false, entity: 64)

@@ -638,6 +638,18 @@ class DelegatedAutopilotTest < Minitest::Test
     assert talk[:autopilot]
   end
 
+  def test_a_thing_to_try_is_walked_to_talked_to_then_touched
+    here = [state.room_id, state.map_id]
+    entities = [{ type: 132, kind: 'unknown', cell: [3, 4] }]
+    p = autopiloted(ScriptedClient.new(objective: []))
+    p.instance_variable_set(:@entities_reader, -> { entities })
+    @objectives.start(frame: 10, title: 'Go examine', predicate: { kind: 'reach_place', place: here }, target: { kind: 'person', place: here, type: 132, cell: [3, 4], try: true })
+    assert_equal({ choice: { skill: 'explore', params: {} }, aim: { place: here } }, p.send(:follow_choice, state(room_id: 9)))
+    assert_equal({ choice: { skill: 'talk_to', params: { row: 3, col: 4 } } }, p.send(:follow_choice, state))
+    @objectives.note_try(place: here, type: 132, skill: 'talk_to', answered: false)
+    assert_equal({ choice: { skill: 'touch', params: { row: 3, col: 4, type: 132 } } }, p.send(:follow_choice, state))
+  end
+
   def test_a_sign_of_another_place_is_walked_to_and_read_before_its_objective_ends
     p = autopiloted(ScriptedClient.new(objective: []))
     here = [state.room_id, state.map_id]
