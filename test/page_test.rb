@@ -27,6 +27,11 @@ class PageTest < Minitest::Test
     assert_equal ['23 nov.', '?', '91k', '1124·c3c7'], evaluate("[fd('2026-11-23'), fd(null), kf(91234), short('20261124-141419-c3c7')]", page: APP)
   end
 
+  def test_the_cockpit_groups_consecutive_attempts_with_the_same_title
+    rows = "[[1, 'achieved', 'Go', false, 'a'], [2, 'failed', 'Go', false, 'b'], [3, 'started', 'Talk', false, 'c'], [4, 'achieved', 'Go', false, 'd']]"
+    assert_equal [%w[a b], %w[c], %w[d]], evaluate("groupAttempts(#{rows}).map(function (g) { return g.map(function (o) { return o[4]; }); })", page: APP)
+  end
+
   def test_the_cockpit_names_an_interior_by_the_screen_it_opens_from
     assert_equal ['F7', 'intérieur, porte en F7', 'intérieur 9/16'],
                  evaluate("[placeName('F7', { grid: true }), placeName('172/10', { grid: false, opens_from: ['F7'] }), placeName('9/16', { grid: false, opens_from: [] })]", page: APP)
