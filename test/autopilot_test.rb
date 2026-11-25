@@ -487,4 +487,20 @@ class AutopilotTest < Minitest::Test
     pilot.acted(skill: 'attack', outcome: { stopped_by: :done, target: { slot: 4, type: 25, cell: [3, 5] }, from: { room: 163, map: 16 } })
     assert_nil pilot.fight_choice(state: state(frame: 200), entities: [sighted(16, 0)])
   end
+
+  def test_a_place_where_a_fight_cost_health_stays_without_fights_for_the_visit_across_model_calls
+    pilot = primed
+    pilot.acted(skill: 'attack', outcome: { stopped_by: :damage, target: { slot: 6, type: 25, cell: [4, 4] }, from: { room: 163, map: 16 } })
+    pilot.model_called(state: state(frame: 150), objective: objective)
+    assert_nil pilot.fight_choice(state: state(frame: 200), entities: [sighted(16, 0)])
+    assert_nil pilot.fight_choice(state: state(frame: 210, room_id: 164), entities: [])
+    refute_nil pilot.fight_choice(state: state(frame: 220), entities: [sighted(16, 0)])
+  end
+
+  def test_an_enemy_an_attack_could_not_reach_is_not_fought_on_sight_again_there
+    pilot = primed
+    pilot.acted(skill: 'attack', outcome: { stopped_by: :out_of_reach, target: { slot: 4, type: 25, cell: [3, 5] }, from: { room: 163, map: 16 } })
+    pilot.acted(skill: 'attack', outcome: { stopped_by: :no_target, target: { slot: 7, type: 25, cell: [1, 1] }, from: { room: 163, map: 16 } })
+    assert_nil pilot.fight_choice(state: state(frame: 200), entities: [sighted(16, 0)])
+  end
 end

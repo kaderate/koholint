@@ -61,7 +61,6 @@ module Koholint
       @fight = 0
       @attack_stop = nil
       @disengaged = 0
-      @fight_hurt = nil
       @walled = []
       @untried = []
       @tries = 0
@@ -197,7 +196,9 @@ module Koholint
     # Crumbling floor gives way under a Link who stands to strike, so no fight starts with his footprint on it.
     def fight_target(state:, entities:, objects: [])
       return unless @since && state.phase == :playing && state.cell && state.x
-      return if state.health <= Perception::HP_PER_HEART || @fight >= FIGHT_LIMIT || @fight_hurt == state.place
+
+      @fight_hurt = nil if @fight_hurt != state.place
+      return if state.health <= Perception::HP_PER_HEART || @fight >= FIGHT_LIMIT || @fight_hurt
       return if Array(objects).any? { |object| object[:kind].to_s == 'crumbling' && Geometry.footprint_cells(state.x, state.y).include?(object[:cell]) }
 
       missed = @missed[:place] == state.place ? @missed[:slots] : []
