@@ -117,10 +117,10 @@ module Koholint
     # A thing an objective came to try is tried once a talk draws an answer, or once Link walks onto it after a talk that drew none.
     def note_try(place:, type:, skill:, answered:)
       target = @current&.dig(:target) or return
-      return unless target[:try] && target[:place] == place && target[:type] == type
+      return unless target[:try] && target[:place] == place && (skill == 'use_item' || target[:type] == type)
 
       @talked_to = true if skill == 'talk_to'
-      @tried = true if skill == 'touch' || answered
+      @tried = true if (target[:item] ? skill == 'use_item' : skill == 'touch' || answered)
     end
 
     def talked_to? = @talked_to

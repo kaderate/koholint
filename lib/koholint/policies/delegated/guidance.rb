@@ -194,7 +194,11 @@ module Koholint
 
             cell = target[:kind] == 'person' ? entities_now.find { |entity| entity[:type] == target[:type] && entity[:cell] }&.dig(:cell) : target[:cell]
             return unless cell
-            return { choice: { skill: 'touch', params: { row: cell[0], col: cell[1], type: target[:type] } } } if target[:try] && @objectives.talked_to?
+            if target[:try] && @objectives.talked_to?
+              return { choice: { skill: 'use_item', params: { item: Items.name(target[:item]) } } } if target[:item]
+
+              return { choice: { skill: 'touch', params: { row: cell[0], col: cell[1], type: target[:type] } } }
+            end
 
             { choice: { skill: 'talk_to', params: { row: cell[0], col: cell[1] } } }
           when 'place', 'lead' then { choice: EXPLORE, aim: { place: target[:place] } } unless here
@@ -246,6 +250,30 @@ module Koholint
                  else "wait #{ZERO_WAIT[:params][:frames]} frames before asking again"
                  end
           DecisionPoint.harness_choice(choice, "#{skill} ended #{stop} #{mark} #{count} times here: #{what}", autopilot: true)
+        end
+
+        # A person whose recorded text names an item Link holds, by the words of its pickup text, is tried with it once: talk while holding it, then use it.
+        def item_objective(decision_point, state)
+          return unless decision_point.name == :choose_objective && !@puzzle_ask
+
+          hops = @explore_log.hops(state.place)
+          held = Items.held_ids(state)
+          @item_names.each do |item, words|
+            next unless held.include?(item)
+
+            place, type, cell = @talk_log.mentioning(words).find do |where, who, _|
+              (where == state.place || hops[where]) && !@talk_log.talked_holding?(where, who, item)
+            end
+            next unless place
+
+            who = @talk_log.name_of(place, type) || "person (type #{type})"
+            objective = { title: "Bring the #{words.join(' ')} to #{who}"[0, 80], predicate: { kind: 'reach_place', place: },
+                          target: { kind: 'person', place:, type:, cell:, try: true, item:, name: words.join(' ') } }
+            @objectives.start(frame: state.frame, **objective, autopilot: true)
+            @autopilot&.adopt(@objectives.current)
+            return DecisionPoint.harness_choice(objective.slice(:title, :predicate), "autopilot: #{who} in #{place.join('-')} named the #{words.join(' ')} Link holds; talk with it held, then use it", autopilot: true)
+          end
+          nil
         end
 
         def auto_objective(decision_point, state)

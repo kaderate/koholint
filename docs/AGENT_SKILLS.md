@@ -1,6 +1,6 @@
 # Agent skills
 
-The skills, protocols and harness behaviours the agent works with. Versioned with the play flow (currently `flow-96`): update this page, not the README, when a flow changes. Layers and data flow are in [ARCHITECTURE.md](../ARCHITECTURE.md).
+The skills, protocols and harness behaviours the agent works with. Versioned with the play flow (currently `flow-97`): update this page, not the README, when a flow changes. Layers and data flow are in [ARCHITECTURE.md](../ARCHITECTURE.md).
 
 
 - Learned capabilities (`data/capabilities.json`, `bin/koholint capability list`): an `operational` entry is a composite of the skills below, offered in the skill schema and listed under "Learned skills" only while its trigger item is held (flow-49) and its object is on screen (today `sword_on_object_92 row col direction`: stand next to object 92, face it, use the sword, step into its cell). `explore` and `goto` also run it themselves when blocked facing such a cell, and the planner routes through those cells as a last resort. `learn` and `capability publish|retire` are offline commands.
@@ -144,6 +144,11 @@ The skills, protocols and harness behaviours the agent works with. Versioned wit
   Within a place, explore takes a side known only as the assumed way back (flow-78) after the place's other reachable untried exits, doors and frontiers;
   it is still a frontier, taken when nothing else here is reachable, before a route to another place. An explore that stops `no_frontier`
   in at most one frame is answered by the harness at the next decision, not after three, since from the same cell it would find none again.
+- flow-97: an item gained takes its name from its pickup text, the capitalised words of the first sentence of the text read at that
+  place just before the gain (`Items.name_words`; from the trace on resume). After a gain, the people and unidentified things of other
+  places this lineage never read are all candidates, nearest first, past the cap of four. At an objective choice, a person whose recorded
+  text holds every word of the name of an item Link holds, and who never talked with Link holding it, becomes the objective (picked by
+  the harness): Link talks to them holding it, then the harness uses it facing them; the use ends the objective.
 - flow-96: an examine- objective is achieved only once the thing at its place is tried: talk_to first, then touch when the talk drew
   no answer (an answered talk, or a dialogue that opens as Link walks up to it, is a try); the agent is told so; the autopilot follows each of those steps once, even when the model's own explore brought Link
   there. The walk probe records a way, like a wall, only from a start lined up with the row or column

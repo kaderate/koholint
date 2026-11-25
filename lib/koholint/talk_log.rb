@@ -164,6 +164,17 @@ module Koholint
 
     def talks_with(place, type) = @texts.select { |talk| talk[:place] == place && talk[:entity] == type }
 
+    # The people whose recorded texts hold every one of these words: [place, type, cell], once each.
+    def mentioning(words)
+      keys = words.map { |word| Dialogues.key(word) }.reject(&:empty?)
+      return [] if keys.empty?
+
+      @texts.select { |talk| talk[:entity] && keys.all? { |key| talk[:key].include?(key) } }.map { |talk| [talk[:place], talk[:entity], talk[:cell]] }.uniq { |place, type, _| [place, type] }
+    end
+
+    # Whether Link talked to that person while holding the item.
+    def talked_holding?(place, type, item) = talks_with(place, type).any? { |talk| Array(Array(talk[:stamp])[1]).include?(item) }
+
     def name_of(place, type) = talks_with(place, type).reverse.find { |talk| talk[:speaker] }&.dig(:speaker)
 
     def people(place, entities)

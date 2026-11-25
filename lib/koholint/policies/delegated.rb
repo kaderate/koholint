@@ -86,6 +86,7 @@ module Koholint
         @ledger = memory.ledger
         @triggers = memory.triggers
         @talk_log = memory.talk_log
+        @item_names = memory.item_names.dup
         @revisit = revisit || Revisit.new(talk_log: @talk_log)
         @entities = []
         @refusals = []
@@ -142,6 +143,7 @@ module Koholint
           @triggers.reset_unless(state.place)
         end
         @screen_since = nil unless screen(state)
+        note_gains(state)
         @held = Dialogues.items(state.inventory, state.item_a, state.item_b)
         release_hemmed(state)
         track_locked(state)
@@ -222,6 +224,9 @@ module Koholint
 
           autopilot = autopilot_choice(decision_point, state, context)
           return autopilot if autopilot
+
+          wanted = item_objective(decision_point, state)
+          return wanted if wanted
 
           auto = auto_objective(decision_point, state)
           return auto if auto
@@ -498,13 +503,28 @@ module Koholint
       end
 
       # Any talk_to aimed at a chest takes it off the away list; one that drew no response leaves it closed for this visit.
+      # An item newly held takes its name from the text read just before at the same place, its pickup text.
+      def note_gains(state)
+        held = Dialogues.items(state.inventory, state.item_a, state.item_b)
+        return unless @held && @last_read && state.place == @last_read[:place] && state.frame - @last_read[:frame] <= Items::PICKUP_FRAMES
+
+        (held - @held).each do |item|
+          words = Items.name_words(@last_read[:text])
+          @item_names[item] ||= words if words.any?
+        end
+      end
+
       # Only a talk that reached the thing, or a touch that held against it, tries it.
       def note_try(choice, outcome, state)
         skill = choice[:skill].to_s
-        return unless %w[talk_to touch].include?(skill)
+        return unless %w[talk_to touch use_item].include?(skill)
 
         answered = outcome[:talked] == true || outcome[:dialog_after] == true
-        reached = skill == 'touch' ? outcome.key?(:arrival_frame) : answered || TalkLog.attempt?(outcome)
+        reached = case skill
+                  when 'touch' then outcome.key?(:arrival_frame)
+                  when 'use_item' then outcome[:item] && !%w[refused wrong_mode].include?(outcome[:stopped_by].to_s)
+                  else answered || TalkLog.attempt?(outcome)
+                  end
         @objectives.note_try(place: state.place, type: outcome[:target_type], skill:, answered:) if reached
       end
 

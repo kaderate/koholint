@@ -1,6 +1,7 @@
 require 'json'
 require 'set'
 require 'koholint'
+require 'koholint/dialogues'
 
 module Koholint
   module Items
@@ -12,6 +13,7 @@ module Koholint
     SLOTS = 10
     SHIELD = 4
     SWORD = 1
+    PICKUP_FRAMES = 600
 
     module_function
 
@@ -73,6 +75,22 @@ module Koholint
     end
 
     def slot_of(state, id) = slots(state).index { |item| item.to_i == id }
+
+    # The words naming an item in its pickup text: the capitalised words of the text's first sentence, past its first word.
+    def name_words(text)
+      sentence = text.to_s.split(/(?<=[.!?])\s/).first.to_s
+      sentence.scan(/[\p{L}\p{N}'-]+/).drop(1).select { |word| word.match?(/\A\p{Lu}/) }
+    end
+
+    # Each gained item's name words, read from the last text at the place of its gain at most PICKUP_FRAMES before it.
+    def pickup_names(events)
+      dialogues = Dialogues.from_events(events)
+      events.select { |event| event['type'] == 'item_gained' }.to_h do |gain|
+        frame = gain['frame'].to_i
+        read = dialogues.select { |dialogue| dialogue[:place] == gain['place'] && dialogue[:frame].to_i.between?(frame - PICKUP_FRAMES, frame) }.last
+        [gain['item'].to_i, name_words(read&.dig(:text))]
+      end.reject { |_, words| words.empty? }
+    end
 
     def find(query)
       return Integer(query) if query.is_a?(Integer) || query.to_s.match?(/\A\d+\z/)

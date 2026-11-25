@@ -116,19 +116,24 @@ module Koholint
       end
     end
 
+    # After a gain, people and things this lineage never read pass the cap, nearest first like the rest.
     def people_away(place, hops, cards, talk_log, named, stamp = nil)
-      away(place, hops).flat_map do |where|
+      kept = 0
+      found = away(place, hops).flat_map do |where|
+        gained = stamp && cards.dig(where, :held) && cards.dig(where, :held) != Array(stamp)[1]
         Array(cards.dig(where, :people)).uniq { |person| person[:type] }.filter_map do |person|
           stale = talk_log.stale?(place: where, entity: person[:type], stamp:)
           next unless stale || AWAY_WORTH.include?(talk_log.last_status(place: where, entity: person[:type]))
 
           who = talk_log.name_of(where, person[:type]) || "person (type #{person[:type]})"
           why = stale ? 'Link holds other items than at the last talk' : 'not exhausted'
+          unread = gained && talk_log.talks_with(where, person[:type]).empty?
           { id: "person-#{where.join('-')}-t#{person[:type]}", label: "talk to #{who} in #{describe(where, named)}, #{moves(hops[where])}, #{why}",
             title: "Go talk to #{who}"[0, 80], predicate: { kind: 'reach_place', place: where },
-            target: { kind: 'person', place: where, type: person[:type], cell: person[:cell] } }
-        end + things_away(where, hops, cards, talk_log, named, stamp)
-      end.first(PER_KIND)
+            target: { kind: 'person', place: where, type: person[:type], cell: person[:cell] }, unread: }
+        end + things_away(where, hops, cards, talk_log, named, stamp).map { |thing| thing.merge(unread: true) }
+      end
+      found.select { |candidate| candidate.delete(:unread) || (kept += 1) <= PER_KIND }
     end
 
     # An uncatalogued thing never tried, seen still in its cell while Link held other items than now, may answer what he holds now: offered like a stale person.
