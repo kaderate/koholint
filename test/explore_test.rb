@@ -946,6 +946,19 @@ class ExploreTest < Minitest::Test
     refute log.surveyed_untried?(PLACE)
   end
 
+  # 64/0 (run 20261125-035532-e8c3, from frame 97527): its never crossed way back down was out of reach from the right landing too,
+  # yet only the side up was reported while the route went right, so 64/0 kept work for a route that landed there from the right.
+  def test_an_assumed_way_back_no_path_reaches_is_unreachable_while_a_route_leads_elsewhere
+    log = Koholint::ExploreLog.new
+    log.absorb({ from: { room: 17, map: 0 }, exits: [{ row: 0, col: 5, direction: :up, outcome: :left, to: [1, 0] }] })
+    log.absorb({ from: { room: 1, map: 0 }, exits: [{ row: 3, col: 9, direction: :right, outcome: :left, to: [2, 0] }] })
+    log.absorb({ from: { room: 17, map: 0 }, survey: { sides: {}, doors: [], pending: false } })
+    rows = with(CLOSED, [7, 5], '.', [6, 5], '#', [3, 9], '.', [3, 6], '.', [3, 7], '.', [3, 8], '.')
+    result, = explore(rows, exits: [[[7, 5], :down], [[3, 9], :right]], explore_log: log, limit: 1)
+    assert_equal [2, 0], result.dig(:route, :goal), result.inspect
+    assert_equal [:down], result[:unreachable]
+  end
+
   def test_an_assumed_way_back_ranks_after_the_other_reachable_work_of_the_place
     log = Koholint::ExploreLog.new
     log.absorb({ from: { room: 17, map: 0 }, exits: [{ row: 0, col: 5, direction: :up, outcome: :left, to: [1, 0] }] })

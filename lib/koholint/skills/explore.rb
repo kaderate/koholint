@@ -382,7 +382,7 @@ module Koholint
           return order(frontier) if frontier.any? && (@fresh || untried(from, nil).any? || @log&.untried?(@place))
           return order(back) if back.any?
 
-          stranded = @crumbling.any? ? [] : untried(from, nil).reject { |candidate| way_back?(candidate) || path_to.(candidate[:cell]) }
+          stranded = @crumbling.any? ? [] : untried(from, nil).reject { |candidate| path_to.(candidate[:cell]) }
           @unreachable = (@unreachable || []) | stranded.map { |candidate| candidate[:kind] == :door ? [candidate[:cell][0] - 1, candidate[:cell][1]] : candidate[:direction] }.uniq if stranded.any?
           routed = routed(from, path_to)
           return order(routed) if routed.any?
