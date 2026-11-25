@@ -242,7 +242,7 @@ module Koholint
       fields[:reason] = reason if reason
       @trace.emit(:objective, frame:, **fields)
       @history << { id: done[:id], title: done[:title], predicate: done[:predicate], outcome:, reason:,
-                    started_frame: done[:started_frame], ended_frame: frame, **done.slice(:target, :autopilot, :because) }
+                    started_frame: done[:started_frame], ended_frame: frame, **done.slice(:target, :autopilot, :because, :candidate) }
       outcome
     end
   end

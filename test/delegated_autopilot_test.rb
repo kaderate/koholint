@@ -719,6 +719,24 @@ class DelegatedAutopilotTest < Minitest::Test
     assert_equal({ [12, here, 64] => [2, true] }, Koholint::Policies::Memory.item_tries(started), 'a resumed run keeps the tries')
   end
 
+  # Run f089, 172/10: examine-68-0-t53, with no known route, was picked five times and stalled each time.
+  def test_a_candidate_no_known_route_reaches_is_not_offered_again_after_it_stalled_until_a_route_appears
+    p = autopiloted(ScriptedClient.new(objective: []))
+    p.instance_variable_get(:@cards)[[9, 0]] = { people: [{ type: 70, cell: [1, 1] }], held: [] }
+    holding = state(inventory: [12] + Array.new(9, 0))
+    offered = -> { p.send(:build_candidates, holding, { grid: }).map { |c| c[:id] } }
+    assert_includes offered.(), 'person-9-0-t70'
+    @objectives.start(frame: 100, title: 'Go talk', predicate: { kind: 'reach_place', place: [9, 0] }, candidate: 'person-9-0-t70',
+                      target: { kind: 'person', place: [9, 0], type: 70, cell: [1, 1] })
+    @objectives.update(holding, frame: 101)
+    assert_equal :abandoned, @objectives.update(holding, frame: 2000)
+    refute_includes offered.(), 'person-9-0-t70'
+    p.instance_variable_get(:@explore_log).absorb({ from: { room: 163, map: 16 }, exits: [{ row: 0, col: 5, direction: :up, outcome: :left, to: [9, 0] }] })
+    assert_includes offered.(), 'person-9-0-t70', 'a route to it reopens it'
+    events = Koholint::Trace.read(File.join(@dir, 'trace.jsonl'))
+    assert_equal ['person-9-0-t70'], Koholint::Policies::Memory.stalled(events), 'a resumed run keeps it'
+  end
+
   # Run 626d, 80/0: item 12 is held at 91617 but its pickup sheet is transcribed only at 91633, once it closed.
   def test_a_gained_item_is_named_by_the_pickup_text_transcribed_after_it_is_held
     here = [state.room_id, state.map_id]

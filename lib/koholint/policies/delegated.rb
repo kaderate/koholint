@@ -89,6 +89,7 @@ module Koholint
         @item_names = memory.item_names.dup
         @pending_gains = []
         @item_tries = memory.item_tries.dup
+        @stalled = memory.stalled.dup
         @revisit = revisit || Revisit.new(talk_log: @talk_log)
         @entities = []
         @refusals = []
@@ -384,6 +385,10 @@ module Koholint
         end
         @candidates = Candidates.build(place:, grid: context[:grid], explore_log: @explore_log, talk_log: @talk_log, leads: @leads, cards: @cards,
                                        entities: @entities, signs:, stamp: stamp(state), link: state.cell)
+        # A candidate no known route reaches is not offered again after its objective stalled, until a route to it appears.
+        stalled = @stalled | @objectives.history.filter_map { |done| done[:candidate] if done[:reason] == 'stall' }
+        hops = @explore_log.hops(place)
+        @candidates.reject! { |candidate| stalled.include?(candidate[:id]) && (where = candidate.dig(:target, :place)) && where != place && !hops.key?(where) }
         @candidates.each { |candidate| offer_puzzle(candidate[:target][:place]) if candidate[:id].start_with?('puzzle-') }
         @candidates
       end

@@ -148,7 +148,8 @@ The skills, protocols and harness behaviours the agent works with. Versioned wit
   600 frames, never an earlier text): the first run of capitalised words of its first sentence, past the first word (`Items.name_words`;
   the same rule rebuilds it from the trace on resume). After a gain, the people and unidentified things of other places this lineage
   never read are all candidates past the cap of four, nearest first, then those of places no known route reaches yet, nearest on the
-  map; without a gain the cap holds. At an objective choice, a person whose recorded text holds that name as whole words in a row, and
+  map; without a gain the cap holds. A candidate no known route reaches whose objective stalled is not offered again until a route to
+  it appears. At an objective choice, a person whose recorded text holds that name as whole words in a row, and
   who never talked with Link holding the item, becomes the objective (picked by the harness): Link talks to them holding it, then the
   harness uses it facing them; only that item used after the talk ends the objective. It is picked again for that person only once
   Link read a new text from them or a route to them appeared. A step of explore a hostile knocked Link back from just before it failed

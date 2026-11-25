@@ -92,7 +92,7 @@ Every policy inherits the no-op hooks of `policies/base.rb` (`observe`, `prepare
 `note_card`, `offered_candidates`, `cancel`), so the engine calls them without probing.
 - `policies/delegated.rb` is the agent policy. Its memory is rebuilt from the trace in one object,
   `Policies::Memory.from_events` (ledger, triggers, talk log, explore log, leads, place cards, loop and zero watches, and each gained item's name words
-  read from its pickup text, `Items.pickup_names`). Its
+  read from its pickup text, `Items.pickup_names`, the item objectives started and the candidates whose objective stalled). Its
   concerns are mixed in from `policies/delegated/`: `dialogue.rb` (pages, sheets, cached readings), `waits.rb` (screens,
   locks, hemmed), `outcomes.rb` (what each result teaches the memory) and `guidance.rb` (loop breaks, zero caps, objective
   follow-up, alerts). Before asking the model it lets the harness answer: screen waits, game over, dialogue advance, lock and
