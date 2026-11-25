@@ -699,6 +699,19 @@ class DelegatedAutopilotTest < Minitest::Test
     assert_equal({ choice: { skill: 'use_item', params: { item: Koholint::Items.name(12) } } }, p.send(:follow_choice, holding))
   end
 
+  # Run 626d, 80/0: item 12 is held at 91617 but its pickup sheet is transcribed only at 91633, once it closed.
+  def test_a_gained_item_is_named_by_the_pickup_text_transcribed_after_it_is_held
+    here = [state.room_id, state.map_id]
+    p = autopiloted(ScriptedClient.new(objective: []))
+    p.instance_variable_set(:@last_read, { text: 'Bonjour, petit!', place: here, frame: 80 })
+    p.observe(state(frame: 90), frame: 90)
+    p.observe(state(frame: 100, inventory: [12] + Array.new(9, 0)), frame: 100)
+    assert_nil p.instance_variable_get(:@item_names)[12]
+    p.instance_variable_set(:@last_read, { text: 'Tu as trouvé le Champignon! Un arôme subtil.', place: here, frame: 116 })
+    p.observe(state(frame: 120, inventory: [12] + Array.new(9, 0)), frame: 120)
+    assert_equal %w[Champignon], p.instance_variable_get(:@item_names)[12]
+  end
+
   # Run 20261125-175039-96c6, 83/0: the thing spoke as Link walked up to it, so talk_to stopped on that dialogue without a talk of its own.
   def test_a_dialogue_that_stops_the_talk_to_a_thing_to_try_is_its_answer
     here = [state.room_id, state.map_id]

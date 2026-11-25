@@ -266,10 +266,14 @@ class ObjectivesTest < Minitest::Test
   def test_a_person_brought_an_item_is_reached_only_once_the_item_is_used_after_the_talk
     @objectives.start(frame: 1, title: 'Bring the Champignon', predicate: { kind: 'reach_place', place: [7, 8] },
                       target: { kind: 'person', place: [7, 8], type: 64, cell: [3, 4], try: true, item: 12, name: 'Champignon' })
+    @objectives.note_try(place: [7, 8], type: nil, skill: 'use_item', answered: false, item: 12)
+    assert_nil @objectives.update(state(frame: 2, room: 7, map: 8), frame: 2), 'a use before the talk'
     @objectives.note_try(place: [7, 8], type: 64, skill: 'talk_to', answered: true)
     assert @objectives.talked_to?
     assert_nil @objectives.update(state(frame: 2, room: 7, map: 8), frame: 2), 'an answer alone does not bring the item'
-    @objectives.note_try(place: [7, 8], type: nil, skill: 'use_item', answered: false)
+    @objectives.note_try(place: [7, 8], type: nil, skill: 'use_item', answered: false, item: 1)
+    assert_nil @objectives.update(state(frame: 3, room: 7, map: 8), frame: 3), 'another item'
+    @objectives.note_try(place: [7, 8], type: nil, skill: 'use_item', answered: false, item: 12)
     assert_equal :achieved, @objectives.update(state(frame: 3, room: 7, map: 8), frame: 3)
   end
 

@@ -91,11 +91,13 @@ their output schema and validation; `DecisionPoint.harness_choice` builds every 
 Every policy inherits the no-op hooks of `policies/base.rb` (`observe`, `prepare`, `decision_point_for`, `after_action`,
 `note_card`, `offered_candidates`, `cancel`), so the engine calls them without probing.
 - `policies/delegated.rb` is the agent policy. Its memory is rebuilt from the trace in one object,
-  `Policies::Memory.from_events` (ledger, triggers, talk log, explore log, leads, place cards, loop and zero watches). Its
+  `Policies::Memory.from_events` (ledger, triggers, talk log, explore log, leads, place cards, loop and zero watches, and each gained item's name words
+  read from its pickup text, `Items.pickup_names`). Its
   concerns are mixed in from `policies/delegated/`: `dialogue.rb` (pages, sheets, cached readings), `waits.rb` (screens,
   locks, hemmed), `outcomes.rb` (what each result teaches the memory) and `guidance.rb` (loop breaks, zero caps, objective
   follow-up, alerts). Before asking the model it lets the harness answer: screen waits, game over, dialogue advance, lock and
-  settle waits, revisits, hemmed probes, loop breaks, zero caps, the explore autopilot (`autopilot.rb`, which also takes a
+  settle waits, revisits, hemmed probes, loop breaks, zero caps, item objectives (a person whose recorded text names a held item, by
+  those name words, is talked to with it held, then given it with `use_item`), the explore autopilot (`autopilot.rb`, which also takes a
   visible heart below full health and fights one-strike enemies on sight through a `fight` hook in the skill context that explore checks every frame) and automatic
   objectives. An invalid answer falls back to a wait; 5 fallbacks in a row stop the run.
 - `policies/start_game.rb` runs the intro and wraps the policy of every CLI run, forwarding the hooks to it.

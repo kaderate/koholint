@@ -87,6 +87,7 @@ module Koholint
         @triggers = memory.triggers
         @talk_log = memory.talk_log
         @item_names = memory.item_names.dup
+        @pending_gains = []
         @revisit = revisit || Revisit.new(talk_log: @talk_log)
         @entities = []
         @refusals = []
@@ -503,14 +504,21 @@ module Koholint
       end
 
       # Any talk_to aimed at a chest takes it off the away list; one that drew no response leaves it closed for this visit.
-      # An item newly held takes its name from the text read just before at the same place, its pickup text.
+      # An item newly held takes its name from its pickup text: the text read at its place right after the gain, as the sheet is
+      # transcribed only once it closes, else the one read there just before.
       def note_gains(state)
         held = Dialogues.items(state.inventory, state.item_a, state.item_b)
-        return unless @held && @last_read && state.place == @last_read[:place] && state.frame - @last_read[:frame] <= Items::PICKUP_FRAMES
-
-        (held - @held).each do |item|
-          words = Items.name_words(@last_read[:text])
-          @item_names[item] ||= words if words.any?
+        if @held
+          before = @last_read if @last_read && @last_read[:place] == state.place && state.frame - @last_read[:frame] <= Items::PICKUP_FRAMES
+          @pending_gains += (held - @held).map { |item| { item:, place: state.place, frame: state.frame, before: } }
+        end
+        @pending_gains.reject! do |gain|
+          after = @last_read if @last_read && @last_read[:place] == gain[:place] && @last_read[:frame] > gain[:frame]
+          expired = state.frame - gain[:frame] > Items::PICKUP_FRAMES
+          read = after || (gain[:before] if expired)
+          words = Items.name_words(read&.dig(:text))
+          @item_names[gain[:item]] ||= words if words.any?
+          read || expired
         end
       end
 
@@ -525,7 +533,7 @@ module Koholint
                   when 'use_item' then outcome[:item] && !%w[refused wrong_mode].include?(outcome[:stopped_by].to_s)
                   else answered || TalkLog.attempt?(outcome)
                   end
-        @objectives.note_try(place: state.place, type: outcome[:target_type], skill:, answered:) if reached
+        @objectives.note_try(place: state.place, type: outcome[:target_type], skill:, answered:, item: outcome[:item]) if reached
       end
 
       def note_chest_attempt(choice, outcome, state)

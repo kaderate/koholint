@@ -1,4 +1,5 @@
 require 'koholint/entities'
+require 'koholint/geometry'
 require 'koholint/leads'
 require 'koholint/place_card'
 require 'koholint/place_kinds'
@@ -237,13 +238,15 @@ module Koholint
       b = overworld(to, explore_log)
       return unless a && b
 
-      ((a[0] / 16) - (b[0] / 16)).abs + ((a[0] % 16) - (b[0] % 16)).abs
+      width = Geometry.fact(:overworld_neighbour)['width']
+      ((a[0] / width) - (b[0] / width)).abs + ((a[0] % width) - (b[0] % width)).abs
     end
 
     def overworld(place, explore_log)
-      return place if place[1].zero?
+      maps = Geometry.fact(:overworld_neighbour)['maps']
+      return place if maps.include?(place[1])
 
-      explore_log&.ways(place)&.values&.find { |to| to[1].zero? }
+      explore_log&.ways(place)&.values&.find { |to| maps.include?(to[1]) }
     end
 
     def status_text(status)
