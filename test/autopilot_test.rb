@@ -624,6 +624,18 @@ class AutopilotTest < Minitest::Test
     refute_nil pilot.fight_choice(state: state(frame: 220), entities: [sighted(16, 0)])
   end
 
+  # Gate run 38bd, 66/0: a struck type 27 charged into Link during the swing (24 to 20 hp) and no fight started there again, so the way to the right exit stayed closed.
+  def test_above_half_health_one_damage_stop_keeps_fights_with_verified_enemies_until_a_second_or_half_health
+    pilot = primed
+    hurt = { stopped_by: :damage, target: { slot: 4, type: 27, cell: [3, 5] }, from: { room: 163, map: 16 } }
+    pilot.acted(skill: 'attack', outcome: hurt)
+    assert_equal({ row: 3, col: 5 }, pilot.fight_choice(state: state(frame: 200, hp: 20), entities: [sighted(16, 0, hits: 2, verified: true)])[:choice][:params])
+    assert_nil pilot.fight_choice(state: state(frame: 200, hp: 20), entities: [sighted(16, 0, slot: 6)]), 'unverified'
+    assert_nil pilot.fight_choice(state: state(frame: 200, hp: 12), entities: [sighted(16, 0, hits: 2, verified: true)]), 'half health'
+    pilot.acted(skill: 'attack', outcome: hurt)
+    assert_nil pilot.fight_choice(state: state(frame: 200, hp: 16), entities: [sighted(16, 0, hits: 2, verified: true)]), 'second damage'
+  end
+
   def test_an_enemy_an_attack_could_not_reach_is_not_fought_on_sight_again_there_beyond_a_cell
     pilot = primed
     pilot.acted(skill: 'attack', outcome: { stopped_by: :out_of_reach, target: { slot: 4, type: 25, cell: [3, 5] }, from: { room: 163, map: 16 } })

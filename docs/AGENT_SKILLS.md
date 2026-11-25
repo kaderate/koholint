@@ -148,6 +148,7 @@ The skills, protocols and harness behaviours the agent works with. Versioned wit
   reaches Link's cell or a neighbour, it sends explore back by the side Link came in at once (once per cell, until Link changes
   place or heals). Fight on sight also takes an enemy whose two sword hits are verified (types 27 and 11 today), not only one-strike ones. A cell
   doubted on every side (two blocked attempts per side) forgets those doubts: Link stands on it, so it was a hold such as a healing scene, not four walls.
+  Above half health one `damage` stop in a place no longer ends fights there: verified enemies are still fought until a second one or half health.
 - flow-99: souvenirs. A text a person said in another branch (`data/souvenirs.json`, the run's `souvenirs` cutoff) whose words hold the
   name of an item Link holds, by flow-97's rule or a name of `data/items.json` that the item's observed pickup text quotes, read by
   someone who did not hold it, from a person this lineage never heard say it nor talked to holding the item, at a place this lineage's
@@ -215,7 +216,7 @@ The skills, protocols and harness behaviours the agent works with. Versioned wit
   outside the walls of rooms where it never gives way. Above one heart the harness fights on sight with no model call:
   the nearest `enemy` within 32 px whose `sword_hits` is 1, or 2 when verified (flow-100; explore stops `enemy`, a stop the autopilot treats as benign), up to
   8 attacks per call, never while Link's footprint (his measured row band) covers a crumbling cell, never again in the visit of a place where an
-  attack stopped `damage` (model calls in between included), and never again a slot an attack missed there (`blocked`, `no_path`, `out_of_reach`, `no_kill`, `hole`)
+  attack stopped `damage` twice, or once at half health or below (above it only enemies with verified sword hits; flow-100; model calls in between included), and never again a slot an attack missed there (`blocked`, `no_path`, `out_of_reach`, `no_kill`, `hole`)
   or the slot just struck; a fight on sight never starts the flow-65 chain of fights after a kill.
   The attack strikes from where Link stands when its target is within 2 cells of him, turns to any enemy that comes nearer than its
   target within 2 cells, and stops `hole` before a lineup step enters a hole. Explore stops `fell` as soon as Link starts to fall.
