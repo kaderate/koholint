@@ -3,6 +3,7 @@ require 'json'
 require 'koholint/trace'
 require 'koholint/game_state'
 require 'koholint/perception'
+require 'koholint/items'
 
 module Koholint
   module Summary
@@ -12,7 +13,7 @@ module Koholint
     TERMINAL = %w[achieved abandoned failed].freeze
     DETERMINISTIC_AGENTS = %w[start_game walk_and_talk engine learner].freeze
     FILE = 'summary.json'.freeze
-    VERSION = 10
+    VERSION = 11
     LEAD_TIERS = %w[high normal low tip].freeze
     MANIFEST_KEYS = %w[flow_version tag harness_sha prompts_sha model autopilot capabilities].freeze
 
@@ -56,7 +57,7 @@ module Koholint
         frames:, dollars: base[:cost_usd].round(6), calls: calls.size,
         calls_per_1000f: per_1000(calls.size, frames), usd_per_1000f: per_1000(base[:cost_usd], frames),
         latency_ms: { median: percentile(latencies, 0.5), p90: percentile(latencies, 0.9) },
-        highest_milestone: base[:highest_milestone], places_seen: visited_places(events).size,
+        highest_milestone: base[:highest_milestone], milestones: milestones(events), held: held(events), places_seen: visited_places(events).size,
         objectives: { count: objectives.map { |e| e['id'] }.uniq.size, achieved: objectives.select { |e| e['status'] == 'achieved' }.map { |e| e['id'] }.uniq.size },
         stop_reason: events.reverse_each.find { |e| e['type'] == 'stop' }&.fetch('reason'),
         symptoms: symptoms(unexhausted), starred: File.exist?(File.join(dir, 'star.json')),
@@ -65,6 +66,24 @@ module Koholint
         capability_uses: capability_uses(events, since: manifest.dig('parent', 'frame').to_i),
         puzzles: puzzles(events)
       }
+    end
+
+    # One milestone per first gain of an item or of one of its forms, named from the current catalogue; a milestone item (shield,
+    # sword) first perceived without its item_gained (older traces, a fork at the gain frame) counts from that perception.
+    def milestones(events)
+      gains = events.select { |event| event['type'] == 'item_gained' }.uniq { |event| [event['item'].to_i, event['form']] }
+      perceived = events.filter_map { |event| [event.dig('state', 'milestone').to_s, event['frame']] if event['type'] == 'perception' && event['state'].is_a?(Hash) }
+                        .uniq(&:first).filter_map do |milestone, frame|
+        id = Items.catalogue.find { |_, item| item['milestone'] == milestone }&.first
+        { 'item' => id, 'frame' => frame } if id && gains.none? { |gain| gain['item'].to_i == id && !gain['form'] }
+      end
+      (gains + perceived).sort_by { |gain| gain['frame'].to_i }.map { |gain| { name: Items.gain_name(gain), frame: gain['frame'] } }
+    end
+
+    # The items held at the last perceived state, by id, each named by its form in that state.
+    def held(events)
+      state = events.reverse_each.find { |event| event['type'] == 'perception' && event['state'].is_a?(Hash) }&.fetch('state') or return []
+      Items.held_ids(state).sort.map { |id| Items.name(id, state) }
     end
 
     # World-model breaks the exit graph raised (one per id), per place and kind; all stay open until a bench resolves them.

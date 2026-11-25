@@ -1,5 +1,5 @@
 {
-  "v": 4,
+  "v": 11,
   "run_id": "20261101-140253-3cc4",
   "flow_version": "flow-15",
   "tag": "fixes-2",
@@ -7,6 +7,7 @@
   "prompts_sha": "2193c9d6bc04429f16638be23dd499eeffa4d860d84448b38b04ada91aa51de6",
   "model": "sonnet",
   "autopilot": true,
+  "capabilities": null,
   "frames": 20772,
   "dollars": 1.514397,
   "calls": 95,
@@ -17,13 +18,113 @@
     "p90": 4827
   },
   "highest_milestone": "shield",
+  "milestones": [
+    {
+      "name": "shield",
+      "frame": 4252
+    }
+  ],
+  "held": [
+    "shield"
+  ],
   "places_seen": 28,
   "objectives": {
     "count": 31,
     "achieved": 30
   },
   "stop_reason": "dollars",
-  "symptoms": [],
+  "symptoms": [
+    {
+      "kind": "left_with_unexhausted_people",
+      "count": 8,
+      "evidence": [
+        {
+          "frame": 4625,
+          "place": [
+            163,
+            16
+          ],
+          "people": [
+            62,
+            63
+          ]
+        },
+        {
+          "frame": 5984,
+          "place": [
+            163,
+            16
+          ],
+          "people": [
+            63
+          ]
+        },
+        {
+          "frame": 7002,
+          "place": [
+            179,
+            0
+          ],
+          "people": [
+            111,
+            115
+          ]
+        },
+        {
+          "frame": 7194,
+          "place": [
+            179,
+            0
+          ],
+          "people": [
+            111,
+            115
+          ]
+        },
+        {
+          "frame": 8227,
+          "place": [
+            161,
+            0
+          ],
+          "people": [
+            111
+          ]
+        },
+        {
+          "frame": 8326,
+          "place": [
+            161,
+            0
+          ],
+          "people": [
+            111
+          ]
+        },
+        {
+          "frame": 11002,
+          "place": [
+            179,
+            0
+          ],
+          "people": [
+            111,
+            115
+          ]
+        },
+        {
+          "frame": 16831,
+          "place": [
+            161,
+            0
+          ],
+          "people": [
+            111
+          ]
+        }
+      ]
+    }
+  ],
   "starred": false,
   "cost_by_skill": {
     "advance_dialogue": {
@@ -76,7 +177,18 @@
     "dialogues": 19,
     "not_ready_frames": 4531,
     "not_ready_waits": 109,
+    "deaths": 0,
+    "damage_events": 0,
+    "stuck_events": 0,
+    "chests_opened": 0,
+    "rupees": null,
     "autopilot_decisions": 71,
-    "chain_max": 31
+    "chain_max": 31,
+    "left_with_unexhausted_people": 8
+  },
+  "capability_uses": {},
+  "puzzles": {
+    "open": 0,
+    "by_place": {}
   }
 }

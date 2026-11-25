@@ -1,5 +1,5 @@
 {
-  "v": 4,
+  "v": 11,
   "run_id": "20261101-122743-1fec",
   "flow_version": "flow-14",
   "tag": "arrival-a",
@@ -7,6 +7,7 @@
   "prompts_sha": "0a7f5abbbc742ae2776590032fb234ba0040da4e7f3f8553aa9af226103c0980",
   "model": "sonnet",
   "autopilot": true,
+  "capabilities": null,
   "frames": 27563,
   "dollars": 3.015832,
   "calls": 168,
@@ -17,13 +18,506 @@
     "p90": 5108
   },
   "highest_milestone": "shield",
+  "milestones": [
+    {
+      "name": "shield",
+      "frame": 7328
+    }
+  ],
+  "held": [
+    "shield"
+  ],
   "places_seen": 11,
   "objectives": {
     "count": 15,
     "achieved": 14
   },
   "stop_reason": "dollars",
-  "symptoms": [],
+  "symptoms": [
+    {
+      "kind": "left_with_unexhausted_people",
+      "count": 46,
+      "evidence": [
+        {
+          "frame": 7944,
+          "place": [
+            163,
+            16
+          ],
+          "people": [
+            62,
+            63
+          ]
+        },
+        {
+          "frame": 9623,
+          "place": [
+            161,
+            0
+          ],
+          "people": [
+            111
+          ]
+        },
+        {
+          "frame": 9715,
+          "place": [
+            161,
+            0
+          ],
+          "people": [
+            111
+          ]
+        },
+        {
+          "frame": 9815,
+          "place": [
+            161,
+            0
+          ],
+          "people": [
+            111
+          ]
+        },
+        {
+          "frame": 9915,
+          "place": [
+            161,
+            0
+          ],
+          "people": [
+            111
+          ]
+        },
+        {
+          "frame": 10614,
+          "place": [
+            161,
+            0
+          ],
+          "people": [
+            111
+          ]
+        },
+        {
+          "frame": 10755,
+          "place": [
+            161,
+            0
+          ],
+          "people": [
+            111
+          ]
+        },
+        {
+          "frame": 10861,
+          "place": [
+            161,
+            0
+          ],
+          "people": [
+            111
+          ]
+        },
+        {
+          "frame": 11241,
+          "place": [
+            161,
+            0
+          ],
+          "people": [
+            111
+          ]
+        },
+        {
+          "frame": 11340,
+          "place": [
+            161,
+            0
+          ],
+          "people": [
+            111
+          ]
+        },
+        {
+          "frame": 11440,
+          "place": [
+            161,
+            0
+          ],
+          "people": [
+            111
+          ]
+        },
+        {
+          "frame": 11540,
+          "place": [
+            161,
+            0
+          ],
+          "people": [
+            111
+          ]
+        },
+        {
+          "frame": 11640,
+          "place": [
+            161,
+            0
+          ],
+          "people": [
+            111
+          ]
+        },
+        {
+          "frame": 14530,
+          "place": [
+            179,
+            0
+          ],
+          "people": [
+            111,
+            115
+          ]
+        },
+        {
+          "frame": 14628,
+          "place": [
+            179,
+            0
+          ],
+          "people": [
+            111,
+            115
+          ]
+        },
+        {
+          "frame": 14737,
+          "place": [
+            179,
+            0
+          ],
+          "people": [
+            111,
+            115
+          ]
+        },
+        {
+          "frame": 14881,
+          "place": [
+            179,
+            0
+          ],
+          "people": [
+            111,
+            115
+          ]
+        },
+        {
+          "frame": 15229,
+          "place": [
+            179,
+            0
+          ],
+          "people": [
+            111,
+            115
+          ]
+        },
+        {
+          "frame": 15336,
+          "place": [
+            179,
+            0
+          ],
+          "people": [
+            111,
+            115
+          ]
+        },
+        {
+          "frame": 15445,
+          "place": [
+            179,
+            0
+          ],
+          "people": [
+            111,
+            115
+          ]
+        },
+        {
+          "frame": 15552,
+          "place": [
+            179,
+            0
+          ],
+          "people": [
+            111,
+            115
+          ]
+        },
+        {
+          "frame": 15724,
+          "place": [
+            179,
+            0
+          ],
+          "people": [
+            111,
+            115
+          ]
+        },
+        {
+          "frame": 16774,
+          "place": [
+            161,
+            0
+          ],
+          "people": [
+            111
+          ]
+        },
+        {
+          "frame": 16894,
+          "place": [
+            161,
+            0
+          ],
+          "people": [
+            111
+          ]
+        },
+        {
+          "frame": 17038,
+          "place": [
+            161,
+            0
+          ],
+          "people": [
+            111
+          ]
+        },
+        {
+          "frame": 17516,
+          "place": [
+            146,
+            0
+          ],
+          "people": [
+            111
+          ]
+        },
+        {
+          "frame": 17616,
+          "place": [
+            146,
+            0
+          ],
+          "people": [
+            111
+          ]
+        },
+        {
+          "frame": 17716,
+          "place": [
+            146,
+            0
+          ],
+          "people": [
+            111
+          ]
+        },
+        {
+          "frame": 17817,
+          "place": [
+            146,
+            0
+          ],
+          "people": [
+            111
+          ]
+        },
+        {
+          "frame": 17916,
+          "place": [
+            146,
+            0
+          ],
+          "people": [
+            111
+          ]
+        },
+        {
+          "frame": 18016,
+          "place": [
+            146,
+            0
+          ],
+          "people": [
+            111
+          ]
+        },
+        {
+          "frame": 18116,
+          "place": [
+            146,
+            0
+          ],
+          "people": [
+            111
+          ]
+        },
+        {
+          "frame": 18216,
+          "place": [
+            146,
+            0
+          ],
+          "people": [
+            111
+          ]
+        },
+        {
+          "frame": 18687,
+          "place": [
+            146,
+            0
+          ],
+          "people": [
+            111
+          ]
+        },
+        {
+          "frame": 18913,
+          "place": [
+            146,
+            0
+          ],
+          "people": [
+            111
+          ]
+        },
+        {
+          "frame": 19178,
+          "place": [
+            161,
+            0
+          ],
+          "people": [
+            111
+          ]
+        },
+        {
+          "frame": 19306,
+          "place": [
+            161,
+            0
+          ],
+          "people": [
+            111
+          ]
+        },
+        {
+          "frame": 19434,
+          "place": [
+            161,
+            0
+          ],
+          "people": [
+            111
+          ]
+        },
+        {
+          "frame": 19562,
+          "place": [
+            161,
+            0
+          ],
+          "people": [
+            111
+          ]
+        },
+        {
+          "frame": 21152,
+          "place": [
+            179,
+            0
+          ],
+          "people": [
+            111,
+            115
+          ]
+        },
+        {
+          "frame": 23990,
+          "place": [
+            179,
+            0
+          ],
+          "people": [
+            111,
+            115
+          ]
+        },
+        {
+          "frame": 24112,
+          "place": [
+            179,
+            0
+          ],
+          "people": [
+            111,
+            115
+          ]
+        },
+        {
+          "frame": 24306,
+          "place": [
+            179,
+            0
+          ],
+          "people": [
+            111,
+            115
+          ]
+        },
+        {
+          "frame": 24428,
+          "place": [
+            179,
+            0
+          ],
+          "people": [
+            111,
+            115
+          ]
+        },
+        {
+          "frame": 24550,
+          "place": [
+            179,
+            0
+          ],
+          "people": [
+            111,
+            115
+          ]
+        },
+        {
+          "frame": 24671,
+          "place": [
+            179,
+            0
+          ],
+          "people": [
+            111,
+            115
+          ]
+        }
+      ]
+    }
+  ],
   "starred": false,
   "cost_by_skill": {
     "advance_dialogue": {
@@ -77,7 +571,8 @@
     "leads": {
       "high": 1,
       "normal": 5,
-      "low": 2
+      "low": 2,
+      "tip": 0
     },
     "lead_rejected": 1,
     "objectives_by_kind": {
@@ -91,7 +586,18 @@
     "dialogues": 17,
     "not_ready_frames": 6500,
     "not_ready_waits": 164,
+    "deaths": 0,
+    "damage_events": 0,
+    "stuck_events": 0,
+    "chests_opened": 0,
+    "rupees": null,
     "autopilot_decisions": 133,
-    "chain_max": 6
+    "chain_max": 6,
+    "left_with_unexhausted_people": 46
+  },
+  "capability_uses": {},
+  "puzzles": {
+    "open": 0,
+    "by_place": {}
   }
 }

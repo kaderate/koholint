@@ -1,5 +1,5 @@
 {
-  "v": 4,
+  "v": 11,
   "run_id": "20261020-152208-109e",
   "flow_version": "flow-5",
   "tag": "npc-dialogues",
@@ -7,6 +7,7 @@
   "prompts_sha": "25729ddc41b19a4033783db4c40557982640b345c1f916f72f7a355cd4082c23",
   "model": "sonnet",
   "autopilot": null,
+  "capabilities": null,
   "frames": 5462,
   "dollars": 0.750266,
   "calls": 48,
@@ -17,6 +18,15 @@
     "p90": 8194
   },
   "highest_milestone": "shield",
+  "milestones": [
+    {
+      "name": "shield",
+      "frame": 3533
+    }
+  ],
+  "held": [
+    "shield"
+  ],
   "places_seen": 1,
   "objectives": {
     "count": 2,
@@ -79,7 +89,18 @@
     "dialogues": 4,
     "not_ready_frames": 0,
     "not_ready_waits": 0,
+    "deaths": 0,
+    "damage_events": 0,
+    "stuck_events": 0,
+    "chests_opened": 0,
+    "rupees": null,
     "autopilot_decisions": 0,
-    "chain_max": 0
+    "chain_max": 0,
+    "left_with_unexhausted_people": 0
+  },
+  "capability_uses": {},
+  "puzzles": {
+    "open": 0,
+    "by_place": {}
   }
 }

@@ -150,7 +150,7 @@ class SummaryTest < Minitest::Test
       t.emit(:stop, frame: 2000, reason: 'dollars')
       assert_equal({ v: Koholint::Summary::VERSION, run_id: run.id, flow_version: 'f', tag: 'exp', harness_sha: 'abc', prompts_sha: run.manifest['prompts_sha'], model: 'sonnet',
                      autopilot: nil, capabilities: run.manifest['capabilities'], frames: 2000, dollars: 1.0, calls: 4, calls_per_1000f: 2.0, usd_per_1000f: 0.5,
-                     latency_ms: { median: 3000, p90: 5000 }, highest_milestone: 'shield', places_seen: 2,
+                     latency_ms: { median: 3000, p90: 5000 }, highest_milestone: 'shield', milestones: [{ name: 'shield', frame: 1000 }], held: ['shield'], places_seen: 2,
                      objectives: { count: 2, achieved: 1 }, stop_reason: 'dollars', symptoms: [], starred: false,
                      cost_by_skill: { 'choose_skill' => { calls: 4, usd: 1.0 } }, decisions_by_agent: { 'claude' => 4, 'start_game' => 1 },
                      usage: { goal_changes: 0, leads: { high: 0, normal: 0, low: 0, tip: 0 }, lead_rejected: 0, objectives_by_kind: { 'unknown' => 2 },
@@ -159,6 +159,20 @@ class SummaryTest < Minitest::Test
                      puzzles: { open: 0, by_place: {} } },
                    Koholint::Summary.record(run.dir))
     end
+  end
+
+  def test_milestones_are_the_first_gains_named_by_the_catalogue_and_held_names_each_form
+    events = [{ 'type' => 'item_gained', 'frame' => 3906, 'item' => 4, 'name' => 'shield' },
+              { 'type' => 'item_gained', 'frame' => 91_615, 'item' => 12, 'name' => 'magic powder?' },
+              { 'type' => 'item_gained', 'frame' => 100_134, 'item' => 12, 'name' => 'magic powder', 'form' => 'magic powder' },
+              { 'type' => 'item_gained', 'frame' => 100_200, 'item' => 4, 'name' => 'shield' },
+              { 'type' => 'perception', 'frame' => 100_300, 'state' => PLAYING.merge('item_a' => 1, 'item_b' => 12, 'inventory' => [4] + Array.new(9, 0), 'magic_powder' => 20) }]
+    assert_equal [{ name: 'shield', frame: 3906 }, { name: 'mushroom', frame: 91_615 }, { name: 'magic powder', frame: 100_134 }], Koholint::Summary.milestones(events)
+    assert_equal ['sword', 'shield', 'magic powder'], Koholint::Summary.held(events)
+    assert_empty Koholint::Summary.held([])
+    sword = { 'type' => 'perception', 'frame' => 60_404, 'state' => PLAYING.merge('milestone' => 'sword') }
+    assert_equal %w[shield sword mushroom magic\ powder], Koholint::Summary.milestones(events.insert(1, sword)).map { |milestone| milestone[:name] }
+    assert_equal [{ name: 'shield', frame: 10 }], Koholint::Summary.milestones([{ 'type' => 'perception', 'frame' => 10, 'state' => PLAYING.merge('milestone' => 'shield') }])
   end
 
   def test_puzzles_are_counted_once_per_id_by_place_and_kind

@@ -65,8 +65,13 @@ module Koholint
       ids | catalogue.values.select { |item| item['milestone'] && item['milestone'] == state['milestone'].to_s }.map { |item| item['id'] }
     end
 
-    def name(id, state = nil)
-      entry = form(id, state) || catalogue[id.to_i]
+    def name(id, state = nil) = named(id, form(id, state))
+
+    # The name an item_gained event stands for in the current catalogue: its form's, else its id's (event names may predate a measure).
+    def gain_name(event) = named(event['item'], Array(catalogue.dig(event['item'].to_i, 'forms')).find { |form| form['name'] == event['form'] })
+
+    def named(id, form)
+      entry = form || catalogue[id.to_i]
       return "unknown item #{id}" unless entry
 
       entry['confidence'] == 'verified' ? entry['name'] : "#{entry['name']}?"
