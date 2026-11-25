@@ -74,6 +74,8 @@ module Koholint
       DROPPED = %w[need- souvenir-].freeze
       REOFFERS = 2
       HEAL_DETOURS = 2
+      RETREAT_CAP = 2
+      RETREAT_WINDOW = 3000
       EXPLORE = { skill: 'explore', params: {} }.freeze
       AUTO_OBJECTIVE = { title: 'Explore the nearest untried exits (picked by the harness)', predicate: { kind: 'new_place' } }.freeze
 
@@ -83,6 +85,7 @@ module Koholint
         @cards = memory.cards.dup
         @healers = memory.healers
         @heal_detours = 0
+        @retreats = []
         @loop_watch = memory.loop_watch
         @zero_watch = memory.zero_watch
         @candidates = []

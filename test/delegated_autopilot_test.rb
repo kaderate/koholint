@@ -514,6 +514,26 @@ class DelegatedAutopilotTest < Minitest::Test
     refute_nil p.instance_variable_get(:@retreated), 'full health is no heal: the way back is not sent again from that cell'
   end
 
+  # Gate run 15df: sent back from 66/0 to 65/0 about every 440 frames, Link came back each time and was sent back again.
+  def test_a_third_retreat_by_the_same_side_within_the_window_marks_the_place_guarded_and_sets_the_objective_aside
+    client = ScriptedClient.new(objective: new_place, default: explore)
+    p = autopiloted(client, autopilot: nil)
+    p.instance_variable_set(:@entities_reader, -> { [{ slot: 2, type: 27, kind: 'enemy', x: 84, y: 60, contact: 11, cell: [3, 5] }] })
+    decide(p)
+    answers = [300, 800, 1300].map do |frame|
+      here = state(frame:, hp: 24)
+      p.instance_variable_set(:@retreated, nil)
+      result = p.decide(p.decision_point_for(here), here, { grid: })
+      p.after_action(choice: result[:choice], outcome: outcome(:no_frontier, 0).merge(frames: 1, moved_cells: 0, cells_walked: 0), state: here, frame:)
+      context = { grid: }
+      result = p.decide(p.decision_point_for(here), here, context)
+      p.after_action(choice: result[:choice], outcome: outcome(:known_place, 0).merge(frames: 40, moved_cells: 2, cells_walked: 2), state: here, frame: frame + 1)
+      [context[:retreat], result[:justification].to_s[/guarded/]]
+    end
+    assert_equal [[true, nil], [true, nil], [nil, 'guarded']], answers
+    assert_equal 'guarded', @objectives.history.last[:reason]
+  end
+
   # Run 5e81, 172/10 at 4 hp: the type 155 walked up to Link during the first 120-frame wait and killed him.
   def test_at_one_heart_with_a_hostile_in_touch_explore_leaves_by_the_side_link_came_in_without_waiting
     client = ScriptedClient.new(objective: new_place, default: explore)

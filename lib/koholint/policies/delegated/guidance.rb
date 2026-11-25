@@ -237,7 +237,8 @@ module Koholint
         def note_dropped(objective, any: false)
           return unless objective && (any || DROPPED.any? { |prefix| objective[:candidate].to_s.start_with?(prefix) })
 
-          offers = @dropped&.dig(:objective, :candidate) == objective[:candidate] ? @dropped[:offers] : 0
+          same = @dropped && @dropped[:objective].values_at(:candidate, :title) == objective.values_at(:candidate, :title)
+          offers = same ? @dropped[:offers] : 0
           @dropped = { objective: objective.slice(:title, :predicate, :candidate, :target), offers: }
         end
 
@@ -295,7 +296,9 @@ module Koholint
           zone = !goal && state.cell ? Entities.danger_cells(entities_now) : []
           pressed = ([state.cell] + Geometry::DELTAS.values.map { |dr, dc| [state.cell[0] + dr, state.cell[1] + dc] }).intersect?(zone) if zone.any?
           retreat = @retreated&.dig(:spot) != spot && (pressed || (low && @deadlock && @deadlock[:waits] >= DEADLOCK_WAITS))
+          return guarded(state, context) if retreat && retreats(state) >= RETREAT_CAP
           @retreated = { spot:, hp: state.health } if retreat
+          @retreats << [place, @explore_log.entered(place), state.frame] if retreat
           context[:retreat] = true if retreat
           @deadlock = { spot:, waits: (@deadlock&.dig(:waits) || 0) + 1 } if low && !retreat
           choice = goal || retreat ? EXPLORE : ZERO_WAIT
@@ -307,6 +310,22 @@ module Koholint
                  else "wait #{ZERO_WAIT[:params][:frames]} frames before asking again"
                  end
           DecisionPoint.harness_choice(choice, "#{skill} ended #{stop} #{mark} #{count} times here: #{what}", autopilot: true)
+        end
+
+        def retreats(state) = @retreats.count { |place, side, frame| place == state.place && side == @explore_log.entered(state.place) && state.frame - frame < RETREAT_WINDOW }
+
+        # Sent back by the same side of the same place RETREAT_CAP times within RETREAT_WINDOW frames, the way is guarded: the objective is set
+        # aside (taken up again later) and explore heads for work elsewhere instead of coming back to retreat again.
+        def guarded(state, context)
+          place = state.place
+          @notes << { kind: 'stuck', detail: "guarded: sent back by the #{@explore_log.entered(place)} side of #{place.join('-')} #{RETREAT_CAP} times in #{RETREAT_WINDOW} frames" }
+          note_dropped(@objectives.current, any: true)
+          @objectives.abandon(frame: state.frame, reason: 'guarded')
+          @objectives.start(frame: state.frame, **AUTO_OBJECTIVE, autopilot: true)
+          @autopilot&.adopt(@objectives.current)
+          route = @explore_log.route(place, skip: [place])
+          context[:aim] = { place: route[:goal] } if route && !route[:lifted]
+          DecisionPoint.harness_choice(EXPLORE, "#{place.join('-')} is guarded (#{RETREAT_CAP} retreats in #{RETREAT_WINDOW} frames): explore #{route ? "toward #{route[:goal].join('-')}" : 'elsewhere'}", autopilot: true)
         end
 
         # A person whose recorded text names an item Link holds, by the words of its pickup text, is tried with it: talk while holding it,
