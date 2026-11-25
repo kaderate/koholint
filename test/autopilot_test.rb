@@ -476,14 +476,22 @@ class AutopilotTest < Minitest::Test
     assert_includes %w[left right], step
   end
 
-  def test_a_disengage_step_into_a_wall_is_not_tried_again_before_the_next_model_call
+  # Run 5e81, 172/10: up was walled at (2,4), a model call in between forgot it, and the second walk up took a hit (8 -> 4 hp).
+  def test_a_disengage_step_into_a_wall_is_not_tried_again_from_that_cell_even_after_a_model_call
     pilot = primed
     link = state(frame: 200, hp: 8, x: 68, y: 60)
     assert_equal 'up', pilot.disengage_choice(state: link, entities: [threat(70, 64)])[:choice][:params][:direction]
-    pilot.acted(skill: 'walk', outcome: { stopped_by: :blocked, params: { direction: :up, cells: 1 } })
+    pilot.acted(skill: 'walk', outcome: { stopped_by: :blocked, params: { direction: :up, cells: 1 }, from: { room: 163, map: 16, row: 3, col: 4 } })
     assert_equal 'left', pilot.disengage_choice(state: link, entities: [threat(70, 64)])[:choice][:params][:direction]
     pilot.model_called(state: link, objective: objective)
-    assert_equal 'up', pilot.disengage_choice(state: link, entities: [threat(70, 64)])[:choice][:params][:direction]
+    assert_equal 'left', pilot.disengage_choice(state: link, entities: [threat(70, 64)])[:choice][:params][:direction]
+    moved = state(frame: 300, hp: 8, x: 52, y: 60)
+    assert_equal 'up', pilot.disengage_choice(state: moved, entities: [threat(54, 64)])[:choice][:params][:direction], 'from another cell up is tried'
+  end
+
+  def test_a_disengage_step_the_grid_shows_blocked_is_not_taken
+    grid = Struct.new(:none) { def passable(_row, _col, direction) = direction == :up ? :no : :yes }.new
+    assert_equal 'left', primed.disengage_choice(state: state(frame: 200, hp: 8, x: 68, y: 60), entities: [threat(70, 64)], grid:)[:choice][:params][:direction]
   end
 
   class HoledGrid

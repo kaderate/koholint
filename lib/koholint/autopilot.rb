@@ -43,6 +43,7 @@ module Koholint
       @fight = 0
       @struck = { place: nil, types: [] }
       @missed = { place: nil, slots: [], far: [] }
+      @walled = { spot: nil, directions: [] }
       @untried = []
       @trying = false
       @aimed = Set.new
@@ -65,7 +66,6 @@ module Koholint
       @fight = 0
       @attack_stop = nil
       @disengaged = 0
-      @walled = []
       @untried = []
       @tries = 0
       @goto_done = false
@@ -81,7 +81,7 @@ module Koholint
       @fight_hurt = [outcome[:from][:room], outcome[:from][:map]] if skill.to_s == 'attack' && outcome.is_a?(Hash) && outcome[:stopped_by].to_s == 'damage' && outcome[:from].is_a?(Hash)
       note_missed(outcome) if skill.to_s == 'attack' && outcome.is_a?(Hash)
       note_struck(skill, outcome) if outcome.is_a?(Hash)
-      @walled |= [outcome[:params][:direction].to_s] if skill.to_s == 'walk' && outcome.is_a?(Hash) && outcome[:params].is_a?(Hash) && walled?(outcome)
+      note_walled(outcome) if skill.to_s == 'walk' && outcome.is_a?(Hash) && outcome[:params].is_a?(Hash) && walled?(outcome)
       explored = skill.to_s == 'explore' && outcome.is_a?(Hash)
       @stop = stop_after(skill.to_s, outcome.is_a?(Hash) ? outcome[:stopped_by].to_s : nil) unless @heart_touch && skill.to_s == 'touch' && outcome.is_a?(Hash) && HEART_ENDS.include?(outcome[:stopped_by].to_s)
       @heart_touch = false
@@ -231,7 +231,9 @@ module Koholint
       zone = Navigation::Threat.zone(Navigation::Threat.of(Array(entities)) - near, margin: Entities::DANGER_MARGIN)
       beside = zone.flat_map { |row, col| [[row, col], [row - 1, col], [row + 1, col], [row, col - 1], [row, col + 1]] }
       farther = ->(dx, dy) { near.all? { |threat| Navigation::Threat.distance(threat, state.x + (dx * Geometry::CELL), state.y + (dy * Geometry::CELL)) > Navigation::Threat.distance(threat, state.x, state.y) } }
-      direction = STEP.reject { |name, (dx, dy)| Array(@walled).include?(name.to_s) || (holes + beside).include?([state.cell[0] + dy, state.cell[1] + dx]) || !farther.(dx, dy) }
+      walled = @walled[:spot].nil? || @walled[:spot] == [*state.place, *state.cell] ? @walled[:directions] : []
+      wall = ->(name) { walled.include?(name.to_s) || (grid.respond_to?(:passable) && grid.passable(*state.cell, name) == :no) }
+      direction = STEP.reject { |name, (dx, dy)| wall.(name) || (holes + beside).include?([state.cell[0] + dy, state.cell[1] + dx]) || !farther.(dx, dy) }
                       .max_by { |_, (dx, dy)| near.map { |threat| Navigation::Threat.distance(threat, state.x + (dx * Geometry::CELL), state.y + (dy * Geometry::CELL)) }.min }
                       &.first or return
       @disengaged += 1
@@ -329,6 +331,13 @@ module Koholint
       return TALKED if (skill == 'talk_to' && TALK_ENDS.include?(stop)) || (%w[advance_dialogue wait].include?(skill) && @stop == TALKED)
 
       nil
+    end
+
+    # A walk blocked from a cell stays blocked from it, across model calls, until Link stands somewhere else.
+    def note_walled(outcome)
+      from = outcome[:from].is_a?(Hash) ? outcome[:from].values_at(:room, :map, :row, :col) : nil
+      @walled = { spot: from, directions: [] } unless @walled[:spot] == from
+      @walled[:directions] |= [outcome[:params][:direction].to_s]
     end
 
     def walled?(outcome) = outcome[:stopped_by].to_s == 'blocked' || (outcome[:stopped_by].to_s == 'danger' && outcome[:frames].to_i.zero?)
