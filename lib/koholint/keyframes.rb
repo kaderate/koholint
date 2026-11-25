@@ -4,6 +4,8 @@ require 'koholint/emulator'
 
 module Koholint
   class Keyframes
+    EVERY = 1800
+
     def initialize(dir)
       @dir = dir
       FileUtils.mkdir_p(dir)

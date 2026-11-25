@@ -159,6 +159,24 @@ class ResilienceTest < Minitest::Test
     end
   end
 
+  def test_a_fork_rebuilds_missing_saves_in_one_pass_and_its_child_resumes_from_a_keyframe
+    skip_without_rom!
+    with_run do |_dir, run|
+      new_engine(run, budget: Koholint::Budget.new(frames: 300), keyframe_every: 120).run
+      %w[save keyframes].each { |name| FileUtils.rm_rf(File.join(run.dir, name)) }
+      child = run.fork(at_frame: 250, flow_version: FLOW)
+      saves = Koholint::Trace.read(File.join(child.dir, 'trace.jsonl')).select { |e| e['type'] == 'save' }
+      refute_empty saves
+      saves.each { |save| assert_equal save['sav_sha256'], Digest::SHA256.file(File.join(child.dir, 'save', save['path'])).hexdigest }
+      assert_equal 249, Koholint::Keyframes.new(File.join(child.dir, 'keyframes')).nearest_at_or_before(249)&.first
+      booted = Koholint::Emulator.boot
+      run.inputs.each_frame.first(249).each { |buttons| booted.step(buttons) }
+      assert_equal booted.state_hash, Koholint::Replay.to(child, 249).state_hash
+      Koholint::Engine.resume(child.dir, policy: Koholint::Policies::WalkAndTalk.new, budget: Koholint::Budget.new(frames: 30)).run
+      assert_equal [], Koholint::Replay.verify(Koholint::Run.open(child.dir, flow_version: FLOW), every: 60).reject(&:last)
+    end
+  end
+
   def test_fork_fails_clearly_when_a_missing_save_does_not_replay
     skip_without_rom!
     with_run do |_dir, run|

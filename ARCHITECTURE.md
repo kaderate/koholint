@@ -25,7 +25,8 @@ The engine owns the loop, the budgets, the files of a run and the trace; agents 
 
 **Emulator and replay** — `emulator.rb` wraps emu-gb, headless and paused between engine steps. `input_log.rb` is the
 append-only input journal; `replay.rb` rebuilds any state from boot; `keyframes.rb` and `canonical_save.rb` checkpoint it
-(every 1800 frames, at the stop, on each `item_gained` and on each first ready frame in a new place). Keyframes never feed
+(every 1800 frames, at the stop, on each `item_gained` and on each first ready frame in a new place; a fork that has to replay
+keyframes the parent locally on the way and the frame before the fork, where the child resumes). Keyframes never feed
 perception or decisions. `checkpoints.rb` and `data/checkpoints.json` name points of runs to branch from. The game is
 deterministic, so *ROM + journal* is the whole run; time is the frame, and wall clock appears only in budgets, `pacer.rb` and
 observability.
