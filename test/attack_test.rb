@@ -32,7 +32,7 @@ class AttackTest < Minitest::Test
     inputs = []
     limit.times do
       hp = 20 if hurt_at && inputs.size >= hurt_at
-      moves&.call(enemies, inputs.size)
+      moves&.call(enemies, inputs.size, [x, y])
       buttons = execution.next_input(state(x:, y:, sword:, hp:)) or break
       inputs << buttons
       direction = (buttons & VECTORS.keys).first
@@ -209,17 +209,23 @@ class AttackTest < Minitest::Test
     assert_equal [true, 3], [result[:killed], result[:target][:slot]]
   end
 
-  # 172/10 (run 20261125-051543-0c86, frame 94976): a wall left of Link and the enemy 11 px right of him, walking at him.
+  # 172/10 (run 20261125-051543-0c86, frames 94976-94984): a wall left of Link and a type 155 walking at him from the right, which hit him
+  # at 6 px.
   def test_an_enemy_walking_at_link_against_a_wall_is_struck_before_it_touches_him
-    foe = enemy(4, 4).except(:contact).merge(x: 64, y: 80)
-    walk = ->(enemies, _) { enemies[0][:x] -= 1 if enemies[0][:status] == 5 }
+    foe = enemy(4, 4).except(:contact).merge(x: 65, y: 80)
+    touched = nil
+    walk = lambda do |enemies, frame, link|
+      enemies[0][:x] -= 1 if enemies[0][:status] == 5
+      touched ||= frame if enemies[0][:status] == 5 && (enemies[0][:x] - link[0]).abs <= 6
+    end
     result, inputs = fight([4, 4], [foe], at: [53, 80], left_wall: 52, moves: walk)
     assert result[:killed]
-    assert_equal [[], [:right, :b], [:a]], inputs.first(3)
+    assert_nil touched, 'killed before it came within the 6 px where it hit him'
+    refute(inputs.take_while { |buttons| !buttons.include?(:a) }.any? { |buttons| buttons.include?(:left) }, 'no back-off into the wall')
   end
 
   def test_while_striking_an_enemy_nearer_than_the_target_is_struck_instead
-    approach = ->(enemies, frame) { enemies[1][:y] = 80 - 24 if frame == 3 }
+    approach = ->(enemies, frame, _link) { enemies[1][:y] = 80 - 24 if frame == 3 }
     result, = fight([4, 4], [enemy(4, 4), enemy(0, 2, slot: 4)], moves: approach)
     assert_equal [true, 4, { row: 4, col: 2 }], [result[:killed], result[:target][:slot], result[:standing_cell]]
   end
