@@ -553,7 +553,7 @@ class AutopilotTest < Minitest::Test
     assert_nil pilot.fight_choice(state: state(frame: 300), entities: near)
   end
 
-  def sighted(dx, dy, slot: 4, hits: 1) = { slot:, type: 25, kind: 'enemy', sword_hits: hits, cell: [3 + (dy / 16), 4 + (dx / 16)], x: 68 + dx, y: 60 + dy }
+  def sighted(dx, dy, slot: 4, hits: 1, verified: false) = { slot:, type: 25, kind: 'enemy', sword_hits: hits, sword_verified: verified, cell: [3 + (dy / 16), 4 + (dx / 16)], x: 68 + dx, y: 60 + dy }
 
   def test_above_one_heart_a_one_strike_enemy_within_two_cells_is_fought_on_sight
     result = primed.fight_choice(state: state(frame: 200), entities: [sighted(32, 0, slot: 5), sighted(16, 0)])
@@ -564,6 +564,14 @@ class AutopilotTest < Minitest::Test
     assert_nil primed.fight_choice(state: state(frame: 200, hp: 4), entities: [sighted(16, 0)])
     assert_nil primed.fight_choice(state: state(frame: 200), entities: [sighted(16, 0)], objects: [{ kind: 'crumbling', cell: [3, 4] }])
     refute_nil primed.fight_choice(state: state(frame: 200), entities: [sighted(16, 0)], objects: [{ kind: 'crumbling', cell: [3, 5] }])
+  end
+
+  # Run 5442, 66/0: two type 27s (two hits, verified) cost Link 16 hp beside him while the fight hook only took one-strike enemies.
+  def test_an_enemy_two_verified_strikes_kill_is_fought_on_sight
+    result = primed.fight_choice(state: state(frame: 200), entities: [sighted(16, 0, hits: 2, verified: true)])
+    assert_equal({ skill: 'attack', params: { row: 3, col: 5 } }, result[:choice])
+    assert_match(/a 2-strike kill/, result[:justification])
+    assert_nil primed.fight_choice(state: state(frame: 200), entities: [sighted(16, 0, hits: 3, verified: true)])
   end
 
   def test_an_enemy_an_attack_missed_and_a_place_where_one_cost_health_are_not_fought_on_sight_again
@@ -614,6 +622,18 @@ class AutopilotTest < Minitest::Test
     assert_nil pilot.fight_choice(state: state(frame: 200), entities: [sighted(16, 0)])
     assert_nil pilot.fight_choice(state: state(frame: 210, room_id: 164), entities: [])
     refute_nil pilot.fight_choice(state: state(frame: 220), entities: [sighted(16, 0)])
+  end
+
+  # Gate run 38bd, 66/0: a struck type 27 charged into Link during the swing (24 to 20 hp) and no fight started there again, so the way to the right exit stayed closed.
+  def test_above_half_health_one_damage_stop_keeps_fights_with_verified_enemies_until_a_second_or_half_health
+    pilot = primed
+    hurt = { stopped_by: :damage, target: { slot: 4, type: 27, cell: [3, 5] }, from: { room: 163, map: 16 } }
+    pilot.acted(skill: 'attack', outcome: hurt)
+    assert_equal({ row: 3, col: 5 }, pilot.fight_choice(state: state(frame: 200, hp: 20), entities: [sighted(16, 0, hits: 2, verified: true)])[:choice][:params])
+    assert_nil pilot.fight_choice(state: state(frame: 200, hp: 20), entities: [sighted(16, 0, slot: 6)]), 'unverified'
+    assert_nil pilot.fight_choice(state: state(frame: 200, hp: 12), entities: [sighted(16, 0, hits: 2, verified: true)]), 'half health'
+    pilot.acted(skill: 'attack', outcome: hurt)
+    assert_nil pilot.fight_choice(state: state(frame: 200, hp: 16), entities: [sighted(16, 0, hits: 2, verified: true)]), 'second damage'
   end
 
   def test_an_enemy_an_attack_could_not_reach_is_not_fought_on_sight_again_there_beyond_a_cell

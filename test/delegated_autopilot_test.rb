@@ -443,6 +443,22 @@ class DelegatedAutopilotTest < Minitest::Test
     assert_equal [['wait', nil]] * 4, answers.(24), 'above one heart the waits go on'
   end
 
+  # Run 5442, 66/0 at 24 hp: two 120-frame waits beside the type 27s took Link from 24 to 8 hp.
+  def test_at_full_health_with_a_hostile_in_touch_explore_leaves_by_the_side_link_came_in_without_waiting
+    client = ScriptedClient.new(objective: new_place, default: explore)
+    p = autopiloted(client, autopilot: nil)
+    p.instance_variable_set(:@entities_reader, -> { [{ slot: 2, type: 27, kind: 'enemy', x: 84, y: 60, contact: 11, cell: [3, 5] }] })
+    full = state(hp: 24)
+    decide(p)
+    result = p.decide(p.decision_point_for(full), full, { grid: })
+    p.after_action(choice: result[:choice], outcome: outcome(:no_frontier, 0).merge(frames: 1, moved_cells: 0, cells_walked: 0), state: full, frame: 300)
+    context = { grid: }
+    result = p.decide(p.decision_point_for(full), full, context)
+    assert_equal ['explore', true], [result[:choice][:skill], context[:retreat]]
+    p.observe(full, frame: 301)
+    refute_nil p.instance_variable_get(:@retreated), 'full health is no heal: the way back is not sent again from that cell'
+  end
+
   # Run 5e81, 172/10 at 4 hp: the type 155 walked up to Link during the first 120-frame wait and killed him.
   def test_at_one_heart_with_a_hostile_in_touch_explore_leaves_by_the_side_link_came_in_without_waiting
     client = ScriptedClient.new(objective: new_place, default: explore)
@@ -464,10 +480,15 @@ class DelegatedAutopilotTest < Minitest::Test
     result = p.decide(p.decision_point_for(low), low, context)
     assert_equal ['wait', nil], [result[:choice][:skill], context[:retreat]], 'a way back that is out of reach too is not sent again from that cell'
     p.observe(state(hp: 24), frame: 400)
-    assert_nil p.instance_variable_get(:@retreated), 'health back above one heart lifts it'
-    p.instance_variable_set(:@retreated, [low.place, low.cell])
+    assert_nil p.instance_variable_get(:@retreated), 'a heal lifts it'
+    p.instance_variable_set(:@retreated, { spot: [low.place, low.cell], hp: 8 })
     p.observe(state(hp: 8, room_id: 9), frame: 410)
     assert_nil p.instance_variable_get(:@retreated), 'another place lifts it'
+    p.instance_variable_set(:@retreated, { spot: [low.place, low.cell], hp: 24 })
+    p.observe(state(hp: 20), frame: 420)
+    refute_nil p.instance_variable_get(:@retreated), 'damage does not lift it'
+    p.observe(state(hp: 24), frame: 430)
+    assert_nil p.instance_variable_get(:@retreated), 'a heal back to the health it was sent at lifts it'
   end
 
   def test_repeated_zero_frame_results_in_one_place_are_answered_by_the_harness

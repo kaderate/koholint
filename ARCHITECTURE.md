@@ -104,7 +104,7 @@ Every policy inherits the no-op hooks of `policies/base.rb` (`observe`, `prepare
   follow-up, alerts). Before asking the model it lets the harness answer: screen waits, game over, dialogue advance, lock and
   settle waits, revisits, hemmed probes, loop breaks, zero caps, item objectives (a person whose recorded text names a held item, by
   those name words, is talked to with it held, then given it with `use_item`), the explore autopilot (`autopilot.rb`, which also takes a
-  visible heart below full health and fights one-strike enemies on sight through a `fight` hook in the skill context that explore checks every frame) and automatic
+  visible heart below full health and fights enemies one strike or two verified strikes kill on sight through a `fight` hook in the skill context that explore checks every frame) and automatic
   objectives. An invalid answer falls back to a wait; 5 fallbacks in a row stop the run.
 - `policies/start_game.rb` runs the intro and wraps the policy of every CLI run, forwarding the hooks to it.
 - `policies/walk_and_talk.rb` is the deterministic baseline.

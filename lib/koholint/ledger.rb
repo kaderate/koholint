@@ -1,4 +1,7 @@
+require 'koholint/geometry'
+
 module Koholint
+  # Link stands on the cell he is in, so a cell doubted on every side was a hold (a scene, a heal), not four walls.
   class Ledger
     DOUBT_AT = 2
 
@@ -46,8 +49,9 @@ module Koholint
       direction = Ledger.pick(blocked_at, :direction)
       return unless row && col && direction.respond_to?(:to_sym)
 
-      key = edge(place, [row, col], direction)
-      @counts[key] += 1
+      @counts[edge(place, [row, col], direction)] += 1
+      sides = Geometry::DIRECTIONS.map { |side| edge(place, [row, col], side) }
+      sides.each { |side| @counts.delete(side) } if sides.all? { |side| @counts[side] >= DOUBT_AT }
     end
 
     def entered(place:, cell:, direction:) = @counts.delete(edge(place, cell, direction))

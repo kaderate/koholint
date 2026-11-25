@@ -85,4 +85,14 @@ class LedgerTest < Minitest::Test
     ledger.entered(place: PLACE, cell: [3, 4], direction: :up)
     assert_equal 1, ledger.count(PLACE, [3, 4], :left)
   end
+
+  # Gate run 099b, 83/0: explores during the healing scene doubted down, right, up and then left of the cell Link stood on, and he never moved again.
+  def test_a_cell_doubted_on_every_side_is_a_hold_and_forgets_its_edges
+    ledger = Koholint::Ledger.new
+    2.times { %i[down right up].each { |direction| ledger.record(place: PLACE, blocked_at: blocked(direction:)) } }
+    ledger.record(place: PLACE, blocked_at: blocked(direction: :left))
+    assert ledger.doubtful?(PLACE, [3, 4], :up)
+    ledger.record(place: PLACE, blocked_at: blocked(direction: :left))
+    %i[up down left right].each { |direction| refute ledger.doubtful?(PLACE, [3, 4], direction), direction }
+  end
 end

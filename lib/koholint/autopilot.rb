@@ -79,7 +79,7 @@ module Koholint
       @last_skill = skill.to_s unless %w[wait advance_dialogue].include?(skill.to_s)
       @attack_stop = skill.to_s == 'attack' && outcome.is_a?(Hash) && !@sighted ? outcome[:stopped_by].to_s : nil unless skill.to_s == 'wait'
       @sighted = false unless skill.to_s == 'wait'
-      @fight_hurt = [outcome[:from][:room], outcome[:from][:map]] if skill.to_s == 'attack' && outcome.is_a?(Hash) && outcome[:stopped_by].to_s == 'damage' && outcome[:from].is_a?(Hash)
+      note_hurt(outcome) if skill.to_s == 'attack' && outcome.is_a?(Hash) && outcome[:stopped_by].to_s == 'damage' && outcome[:from].is_a?(Hash)
       note_missed(outcome) if skill.to_s == 'attack' && outcome.is_a?(Hash)
       note_struck(skill, outcome) if outcome.is_a?(Hash)
       note_walled(outcome) if skill.to_s == 'walk' && outcome.is_a?(Hash) && outcome[:params].is_a?(Hash) && walled?(outcome)
@@ -184,7 +184,7 @@ module Koholint
         @attack_stop = nil
         @sighted = true
         return DecisionPoint.harness_choice({ skill: 'attack', params: { row: sighted[:cell][0], col: sighted[:cell][1] } },
-                                            "autopilot: fight type #{sighted[:type]} at (#{sighted[:cell].join(',')}), a one-strike kill (#{@fight}/#{FIGHT_LIMIT})", autopilot: true)
+                                            "autopilot: fight type #{sighted[:type]} at (#{sighted[:cell].join(',')}), a #{sighted[:sword_hits]}-strike kill (#{@fight}/#{FIGHT_LIMIT})", autopilot: true)
       end
       return unless @since && FIGHT_ON.include?(@attack_stop) && state.phase == :playing && state.cell
       return if state.health < FIGHT_FLOOR || state.health < @hp - FIGHT_DROP
@@ -206,8 +206,9 @@ module Koholint
     def fight_target(state:, entities:, objects: [])
       return unless @since && state.phase == :playing && state.cell && state.x
 
-      @fight_hurt = nil if @fight_hurt != state.place
-      return if state.health <= Perception::HP_PER_HEART || @fight >= FIGHT_LIMIT || @fight_hurt
+      @fight_hurt = nil if @fight_hurt && @fight_hurt[:place] != state.place
+      return if state.health <= Perception::HP_PER_HEART || @fight >= FIGHT_LIMIT
+      return if @fight_hurt && (@fight_hurt[:count] > 1 || !state.max_hp || state.health * 2 <= state.max_hp)
       return if Array(objects).any? { |object| object[:kind].to_s == 'crumbling' && Geometry.footprint_cells(state.x, state.y).include?(object[:cell]) }
 
       here = @missed[:place] == state.place
@@ -215,7 +216,7 @@ module Koholint
       missed += [@struck[:slot]] if @struck[:place] == state.place
       distance = ->(entity) { [(entity[:x] - state.x).abs, (entity[:y] - state.y).abs].max }
       far = ->(entity) { here && @missed[:far].key?(entity[:slot]) && distance.(entity) > Geometry::CELL }
-      Array(entities).select { |entity| entity[:kind].to_s == 'enemy' && entity[:sword_hits] == 1 && entity[:cell] && !missed.include?(entity[:slot]) && !far.(entity) }
+      Array(entities).select { |entity| entity[:kind].to_s == 'enemy' && (entity[:sword_hits] == 1 || (entity[:sword_hits] == 2 && entity[:sword_verified])) && (!@fight_hurt || entity[:sword_verified]) && entity[:cell] && !missed.include?(entity[:slot]) && !far.(entity) }
                      .select { |entity| distance.(entity) <= FIGHT_SIGHT }
                      .min_by { |entity| [distance.(entity), entity[:slot]] }
     end
@@ -314,6 +315,12 @@ module Koholint
       @missed[:slots] |= [slot] if outcome[:stopped_by].to_s != 'out_of_reach' || @missed[:far][slot] > REFIGHTS
     end
 
+    # Above half health a first damage in a place leaves fights with verified enemies on; a second one, or half health, ends them for the visit.
+    def note_hurt(outcome)
+      here = [outcome[:from][:room], outcome[:from][:map]]
+      @fight_hurt = { place: here, count: @fight_hurt&.dig(:place) == here ? @fight_hurt[:count] + 1 : 1 }
+    end
+
     # The types struck count for the visit only: leaving the place forgets them, as a resume (which starts with none) would.
     def note_struck(skill, outcome)
       from = outcome[:from]
@@ -322,7 +329,7 @@ module Koholint
         here = [from[:room], from[:map]]
         @struck = { place: here, types: [] } unless @struck[:place] == here
         @struck[:types] |= [target[:type]]
-        @struck[:slot] = target[:slot] unless MISSED.include?(outcome[:stopped_by].to_s)
+        @struck[:slot] = target[:slot] unless MISSED.include?(outcome[:stopped_by].to_s) || outcome[:stopped_by].to_s == 'damage'
       end
       to = outcome[:to]
       @struck = { place: nil, types: [] } if to.is_a?(Hash) && @struck[:place] && [to[:room], to[:map]] != @struck[:place]
