@@ -1,6 +1,6 @@
 # Agent skills
 
-The skills, protocols and harness behaviours the agent works with. Versioned with the play flow (currently `flow-92`): update this page, not the README, when a flow changes. Layers and data flow are in [ARCHITECTURE.md](../ARCHITECTURE.md).
+The skills, protocols and harness behaviours the agent works with. Versioned with the play flow (currently `flow-94`): update this page, not the README, when a flow changes. Layers and data flow are in [ARCHITECTURE.md](../ARCHITECTURE.md).
 
 
 - Learned capabilities (`data/capabilities.json`, `bin/koholint capability list`): an `operational` entry is a composite of the skills below, offered in the skill schema and listed under "Learned skills" only while its trigger item is held (flow-49) and its object is on screen (today `sword_on_object_92 row col direction`: stand next to object 92, face it, use the sword, step into its cell). `explore` and `goto` also run it themselves when blocked facing such a cell, and the planner routes through those cells as a last resort. `learn` and `capability publish|retire` are offline commands.
@@ -144,13 +144,20 @@ The skills, protocols and harness behaviours the agent works with. Versioned wit
   Within a place, explore takes a side known only as the assumed way back (flow-78) after the place's other reachable untried exits, doors and frontiers;
   it is still a frontier, taken when nothing else here is reachable, before a route to another place. An explore that stops `no_frontier`
   in at most one frame is answered by the harness at the next decision, not after three, since from the same cell it would find none again.
-- flow-92: below full health (`health < max_hp`, one heart or less included) the harness walks to a heart on screen with no model call, right after
+- flow-94: below full health (`health < max_hp`, one heart or less included) the harness walks to a heart on screen with no model call, right after
   the disengage step and before any fight: the nearest entity whose catalogued `heals` is verified (type 45), visible (a still sprite on its cell,
   whose background tile was walked before; a heart hidden under a pot or a bush has no sprite) and outside every enemy contact zone (a cell wider at
   one heart or less, as the planner draws them then), by a safe touch of its slot, which walks to a cell beside it on a route that never
   crosses a contact zone (or gives up) and holds into it; any heal settles a touch at once, so no other side is tried, and the touch ends
   `target_gone` when the slot stops holding the heart with no heal counted. A pickup that ends `done` or `target_gone` keeps the
   autopilot chain going, as if the touch had not happened. Each slot is aimed at once per visit of a place, 2 at most per visit.
+- flow-93: an attack strikes from reach: its walk ends as soon as the target is inside the sword's measured reach, and once the target has
+  come closer between two frames the lineup no longer backs off, since backing off from an enemy that walks at Link never opens the gap;
+  it turns to face it and strikes. A route never aims at a place whose untried ways are all cut off from the side the route lands by,
+  whatever that place's survey left pending (a lifted cut counts as open); an assumed way back no path reaches is reported unreachable
+  like any other untried exit, so it is cut from that landing too; the result lists it as `held` as well, and a held way back is never
+  dropped from the graph, since health returning or an enemy leaving can open it again (one a route found out of reach on two dead-end
+  visits is still dropped, as before). The lineup forgets an approaching enemy when it turns to another target. Object 176 is a hole like 174 and 175.
 - flow-91: no skill stands on floor that gives way past its time. The game counts the frames the cell under Link's foot point
   (`link_foot`, 4 px below him) has been crumbling floor (`crumble_timer`), starts over when that cell changes and drops the cell
   into a hole at its `give_way` value (40 for object 223). While the game is in play, every skill's step (goto, explore, touch with

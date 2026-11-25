@@ -115,6 +115,6 @@ class GridTest < Minitest::Test
 
   def test_the_catalogue_lists_the_hole_objects
     holes = Koholint::Entities.object_catalogue.select { |_, entry| entry[:kind] == :hole }.keys
-    assert_equal [174, 175], holes.sort
+    assert_equal [174, 175, 176], holes.sort
   end
 end
