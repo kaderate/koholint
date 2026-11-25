@@ -46,6 +46,14 @@ class EntitiesTest < Minitest::Test
     end
   end
 
+  def test_a_heals_fact_needs_its_provenance
+    assert_equal 8, JSON.parse(File.read(Koholint::Entities::DEFAULT_PATH)).find { |entry| entry['type'] == 45 }.dig('heals', 'value')
+    entry = { 'type' => 45, 'kind' => 'creature', 'source' => 's', 'confidence' => 'hypothesis', 'verified_count' => 1 }
+    Koholint::Entities.validate!(entry.merge('heals' => { 'value' => 8, 'confidence' => 'hypothesis', 'verified_count' => 1, 'source' => 's' }))
+    assert_raises(Koholint::Entities::Invalid) { Koholint::Entities.validate!(entry.merge('heals' => { 'value' => 8, 'confidence' => 'verified', 'verified_count' => 1, 'source' => 's' })) }
+    assert_raises(Koholint::Entities::Invalid) { Koholint::Entities.validate!(entry.merge('heals' => { 'value' => 8, 'confidence' => 'hypothesis', 'verified_count' => 1 })) }
+  end
+
   def test_room_objects_of_a_catalogued_id_are_read_by_cell
     reader = FakeReader.new
     reader.write(0xD711 + (2 * 16) + 3, 99)
