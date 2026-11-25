@@ -182,4 +182,13 @@ class SouvenirsTest < Minitest::Test
     plural = remembered.map { |entry| entry.merge('text' => 'Tarkin est parti à la champignonnière.') }
     assert_empty ids.(souvenirs: plural), 'whole words only'
   end
+
+  def test_a_souvenir_is_retired_once_the_held_item_used_there_opened_a_dialogue_and_left_the_buttons_even_when_its_id_comes_back
+    used = ->(item_b) { { 'type' => 'action', 'frame' => 100_696, 'skill' => 'use_item', 'params' => { 'item' => 'mushroom?' },
+                          'result' => { 'stopped_by' => 'dialogue', 'dialog_after' => true, 'item' => 12, 'button' => 'b', 'item_a' => 1, 'item_b' => item_b,
+                                        'from' => { 'room' => HUT[0], 'map' => HUT[1], 'row' => 3, 'col' => 5 } } } }
+    ids = ->(events) { menu(souvenirs: remembered, talk_log: Koholint::TalkLog.from_events(events)).map { |candidate| candidate[:id] }.grep(/souvenir/) }
+    assert_equal %w[souvenir-3-0-t64], ids.([used.(12)]), 'the item stayed on its button: nothing was handed over'
+    assert_empty ids.([used.(0)]), 'handed over at the hut, then held again under the same id'
+  end
 end

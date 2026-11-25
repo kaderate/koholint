@@ -116,6 +116,8 @@ module Koholint
         end
 
         def feed_talk_log(choice, outcome, state)
+          item = choice[:skill] == 'use_item' && TalkLog.given(outcome)
+          @talk_log.give(place: place_of(outcome, :from, state), item:) if item
           return unless choice[:skill] == 'talk_to' && TalkLog.attempt?(outcome)
 
           params = choice[:params]
