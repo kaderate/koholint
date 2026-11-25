@@ -457,6 +457,12 @@ class DelegatedAutopilotTest < Minitest::Test
     result = p.decide(p.decision_point_for(low), low, context)
     assert_equal ['explore', true], [result[:choice][:skill], context[:retreat]]
     assert_match(/hostile in touch/, result[:justification])
+    p.after_action(choice: result[:choice], outcome: outcome(:no_frontier, 0).merge(frames: 1, moved_cells: 0, cells_walked: 0), state: low, frame: 301)
+    result = p.decide(p.decision_point_for(low), low, { grid: })
+    p.after_action(choice: result[:choice], outcome: outcome(:no_frontier, 0).merge(frames: 1, moved_cells: 0, cells_walked: 0), state: low, frame: 302)
+    context = { grid: }
+    result = p.decide(p.decision_point_for(low), low, context)
+    assert_equal ['wait', nil], [result[:choice][:skill], context[:retreat]], 'a way back that is out of reach too is not sent again from that cell'
   end
 
   def test_repeated_zero_frame_results_in_one_place_are_answered_by_the_harness

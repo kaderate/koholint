@@ -248,7 +248,8 @@ module Koholint
           @deadlock = nil unless low && @deadlock&.dig(:spot) == spot
           zone = low && state.cell ? Entities.danger_cells(entities_now) : []
           pressed = ([state.cell] + Geometry::DELTAS.values.map { |dr, dc| [state.cell[0] + dr, state.cell[1] + dc] }).intersect?(zone) if zone.any?
-          retreat = low && (pressed || (@deadlock && @deadlock[:waits] >= DEADLOCK_WAITS))
+          retreat = low && @retreated != spot && (pressed || (@deadlock && @deadlock[:waits] >= DEADLOCK_WAITS))
+          @retreated = spot if retreat
           context[:retreat] = true if retreat
           @deadlock = { spot:, waits: (@deadlock&.dig(:waits) || 0) + 1 } if low && !retreat
           choice = goal || retreat ? EXPLORE : ZERO_WAIT
