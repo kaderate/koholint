@@ -22,7 +22,7 @@ class AttackTest < Minitest::Test
   end
 
   # Link moves 1 px per direction frame; an A press lands a hit when he faces the enemy within 24 px along and 8 px across.
-  def fight(target, enemies, from: [4, 2], sword: 1, immune: false, knockback: 0, hurt_at: nil, cap: nil, limit: 1000, ceiling: nil, at: nil, grid: FakeGrid.new, moves: nil)
+  def fight(target, enemies, from: [4, 2], sword: 1, immune: false, knockback: 0, hurt_at: nil, cap: nil, limit: 1000, ceiling: nil, left_wall: nil, at: nil, grid: FakeGrid.new, moves: nil)
     x, y = at || Koholint::Geometry.center_of(*from)
     hp = 24
     reader = -> { enemies.map { |e| e.merge(cell: Koholint::Geometry.cell_for(e[:x], e[:y])) } }
@@ -36,7 +36,7 @@ class AttackTest < Minitest::Test
       buttons = execution.next_input(state(x:, y:, sword:, hp:)) or break
       inputs << buttons
       direction = (buttons & VECTORS.keys).first
-      if direction && !(ceiling && direction == :up && y <= ceiling)
+      if direction && !(ceiling && direction == :up && y <= ceiling) && !(left_wall && direction == :left && x <= left_wall)
         facing = direction
         x += VECTORS[direction][0]
         y += VECTORS[direction][1]
@@ -207,6 +207,15 @@ class AttackTest < Minitest::Test
   def test_a_dying_enemy_nearer_than_the_target_is_not_struck_instead
     result, = fight([4, 6], [enemy(4, 6), enemy(2, 2, slot: 4).merge(status: 1)])
     assert_equal [true, 3], [result[:killed], result[:target][:slot]]
+  end
+
+  # 172/10 (run 20261125-051543-0c86, frame 94976): a wall left of Link and the enemy 11 px right of him, walking at him.
+  def test_an_enemy_walking_at_link_against_a_wall_is_struck_before_it_touches_him
+    foe = enemy(4, 4).except(:contact).merge(x: 64, y: 80)
+    walk = ->(enemies, _) { enemies[0][:x] -= 1 if enemies[0][:status] == 5 }
+    result, inputs = fight([4, 4], [foe], at: [53, 80], left_wall: 52, moves: walk)
+    assert result[:killed]
+    assert_equal [[], [:right, :b], [:a]], inputs.first(3)
   end
 
   def test_while_striking_an_enemy_nearer_than_the_target_is_struck_instead
