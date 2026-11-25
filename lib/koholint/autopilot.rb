@@ -7,7 +7,7 @@ module Koholint
   class Autopilot
     CHAIN_LIMIT = 6
     CHAIN_FRAMES = 2400
-    BENIGN = %w[new_place known_place budget untried_object tried pushed].freeze
+    BENIGN = %w[new_place known_place budget untried_object tried pushed enemy].freeze
     ARRIVED = %w[new_place known_place].freeze
     TALKED = 'talked'.freeze
     TALK_ENDS = %w[done no_response].freeze
@@ -23,6 +23,8 @@ module Koholint
     FIGHT_FLOOR = 16
     FIGHT_DROP = 8
     FIGHT_ON = %w[done target_gone].freeze
+    FIGHT_SIGHT = 2 * Geometry::CELL
+    MISSED = %w[blocked no_path out_of_reach no_kill hole].freeze
     DISENGAGE_LIMIT = 3
     STEP = { up: [0, -1], down: [0, 1], left: [-1, 0], right: [1, 0] }.freeze
 
@@ -37,6 +39,7 @@ module Koholint
       @returns = Hash.new(0)
       @fight = 0
       @struck = { place: nil, types: [] }
+      @missed = { place: nil, slots: [] }
       @untried = []
       @trying = false
       @aimed = Set.new
@@ -58,6 +61,7 @@ module Koholint
       @fight = 0
       @attack_stop = nil
       @disengaged = 0
+      @fight_hurt = nil
       @walled = []
       @untried = []
       @tries = 0
@@ -69,6 +73,8 @@ module Koholint
     def acted(skill:, outcome:)
       @acted = true
       @attack_stop = skill.to_s == 'attack' && outcome.is_a?(Hash) ? outcome[:stopped_by].to_s : nil unless skill.to_s == 'wait'
+      @fight_hurt = [outcome[:from][:room], outcome[:from][:map]] if @attack_stop == 'damage' && outcome[:from].is_a?(Hash)
+      note_missed(outcome) if skill.to_s == 'attack' && outcome.is_a?(Hash)
       note_struck(skill, outcome) if outcome.is_a?(Hash)
       @walled |= [outcome[:params][:direction].to_s] if skill.to_s == 'walk' && outcome.is_a?(Hash) && outcome[:params].is_a?(Hash) && walled?(outcome)
       explored = skill.to_s == 'explore' && outcome.is_a?(Hash)
@@ -162,7 +168,14 @@ module Koholint
     end
 
     # After an attack that killed or lost its target, strike the nearest other enemy (or a type struck here before) without a call.
-    def fight_choice(state:, entities:)
+    def fight_choice(state:, entities:, objects: [])
+      sighted = fight_target(state:, entities:, objects:)
+      if sighted
+        @fight += 1
+        @attack_stop = nil
+        return DecisionPoint.harness_choice({ skill: 'attack', params: { row: sighted[:cell][0], col: sighted[:cell][1] } },
+                                            "autopilot: fight type #{sighted[:type]} at (#{sighted[:cell].join(',')}), a one-strike kill (#{@fight}/#{FIGHT_LIMIT})", autopilot: true)
+      end
       return unless @since && FIGHT_ON.include?(@attack_stop) && state.phase == :playing && state.cell
       return if state.health < FIGHT_FLOOR || state.health < @hp - FIGHT_DROP
       return if @fight >= FIGHT_LIMIT || state.frame - @since >= FIGHT_FRAMES
@@ -177,6 +190,19 @@ module Koholint
       @fight += 1
       @attack_stop = nil
       DecisionPoint.harness_choice({ skill: 'attack', params: { row: target[:cell][0], col: target[:cell][1] } }, "autopilot: keep fighting, type #{target[:type]} at (#{target[:cell].join(',')}) (#{@fight}/#{FIGHT_LIMIT})", autopilot: true)
+    end
+
+    # Crumbling floor gives way under a Link who stands to strike, so no fight starts with his footprint on it.
+    def fight_target(state:, entities:, objects: [])
+      return unless @since && state.phase == :playing && state.cell && state.x
+      return if state.health <= Perception::HP_PER_HEART || @fight >= FIGHT_LIMIT || @fight_hurt == state.place
+      return if Array(objects).any? { |object| object[:kind].to_s == 'crumbling' && Geometry.footprint_cells(state.x, state.y).include?(object[:cell]) }
+
+      missed = @missed[:place] == state.place ? @missed[:slots] : []
+      distance = ->(entity) { [(entity[:x] - state.x).abs, (entity[:y] - state.y).abs].max }
+      Array(entities).select { |entity| entity[:kind].to_s == 'enemy' && entity[:sword_hits] == 1 && entity[:cell] && !missed.include?(entity[:slot]) }
+                     .select { |entity| distance.(entity) <= FIGHT_SIGHT }
+                     .min_by { |entity| [distance.(entity), entity[:slot]] }
     end
 
     # At one heart or less with an enemy within a cell of its touch, step away from every such enemy before the model decides.
@@ -231,6 +257,16 @@ module Koholint
       return 'low health' if state.health <= Perception::HP_PER_HEART
 
       nil
+    end
+
+    # An enemy an attack could not reach or strike is not fought on sight again in that place.
+    def note_missed(outcome)
+      from = outcome[:from]
+      return unless from.is_a?(Hash) && outcome[:target].is_a?(Hash) && MISSED.include?(outcome[:stopped_by].to_s)
+
+      here = [from[:room], from[:map]]
+      @missed = { place: here, slots: [] } unless @missed[:place] == here
+      @missed[:slots] |= [outcome[:target][:slot]]
     end
 
     # The types struck count for the visit only: leaving the place forgets them, as a resume (which starts with none) would.

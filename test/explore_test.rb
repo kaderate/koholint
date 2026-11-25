@@ -1155,6 +1155,16 @@ class ExploreTest < Minitest::Test
     log = Koholint::ExploreLog.from_events(stalled.(3))
     assert_equal [[80, 0], [171, 10], [172, 10]], log.path([171, 10], goal: [172, 10]).map { |hop| hop[:to] }, 'round through the door, whose landing reaches it'
   end
+
+  def test_a_fall_and_an_enemy_to_fight_stop_explore
+    falling = Koholint::GameState.new(**state.to_h, link_motion_state: Koholint::FALL_MOTION)
+    execution = registry.start('explore', state, {}, { grid: MapGrid.new(with(CLOSED, [2, 5], '?')) })
+    execution.next_input(state)
+    execution.next_input(falling)
+    assert_equal [:fell, []], execution.result(state).values_at(:stopped_by, :blocked_edges)
+    result, = explore(with(CLOSED, [2, 5], '?'), fight: ->(_now) { true })
+    assert_equal [:enemy, 0], result.values_at(:stopped_by, :cells_walked)
+  end
 end
 class ExploreCutCallsTest < Minitest::Test
   DOOR = [[80, 0], [2, 8]].freeze

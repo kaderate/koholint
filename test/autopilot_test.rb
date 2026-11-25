@@ -452,4 +452,27 @@ class AutopilotTest < Minitest::Test
     end
     assert_nil pilot.fight_choice(state: state(frame: 300), entities: near)
   end
+
+  def sighted(dx, dy, slot: 4, hits: 1) = { slot:, type: 25, kind: 'enemy', sword_hits: hits, cell: [3 + (dy / 16), 4 + (dx / 16)], x: 68 + dx, y: 60 + dy }
+
+  def test_above_one_heart_a_one_strike_enemy_within_two_cells_is_fought_on_sight
+    result = primed.fight_choice(state: state(frame: 200), entities: [sighted(32, 0, slot: 5), sighted(16, 0)])
+    assert_equal({ skill: 'attack', params: { row: 3, col: 5 } }, result[:choice])
+    assert_match(/fight type 25 at \(3,5\)/, result[:justification])
+    assert_nil primed.fight_choice(state: state(frame: 200), entities: [sighted(33, 0)])
+    assert_nil primed.fight_choice(state: state(frame: 200), entities: [sighted(16, 0, hits: 2), sighted(0, 16, hits: nil)])
+    assert_nil primed.fight_choice(state: state(frame: 200, hp: 4), entities: [sighted(16, 0)])
+    assert_nil primed.fight_choice(state: state(frame: 200), entities: [sighted(16, 0)], objects: [{ kind: 'crumbling', cell: [3, 4] }])
+    refute_nil primed.fight_choice(state: state(frame: 200), entities: [sighted(16, 0)], objects: [{ kind: 'crumbling', cell: [3, 5] }])
+  end
+
+  def test_an_enemy_an_attack_missed_and_a_place_where_one_cost_health_are_not_fought_on_sight_again
+    pilot = primed
+    pilot.acted(skill: 'attack', outcome: { stopped_by: :hole, target: { slot: 4, type: 25, cell: [3, 5] }, from: { room: 163, map: 16 } })
+    assert_nil pilot.fight_choice(state: state(frame: 200), entities: [sighted(16, 0)])
+    assert_equal({ row: 4, col: 4 }, pilot.fight_choice(state: state(frame: 200), entities: [sighted(16, 0), sighted(0, 16, slot: 6)])[:choice][:params])
+    pilot.acted(skill: 'attack', outcome: { stopped_by: :damage, target: { slot: 6, type: 25, cell: [4, 4] }, from: { room: 163, map: 16 } })
+    assert_nil pilot.fight_choice(state: state(frame: 200), entities: [sighted(0, 16, slot: 7)])
+  end
 end
+

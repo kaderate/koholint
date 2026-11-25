@@ -188,6 +188,7 @@ module Koholint
         context[:triggers] = @triggers
         context[:talk_log] = @talk_log
         context[:explore_log] = @explore_log
+        context[:fight] = ->(now) { @autopilot.fight_target(state: now, entities: entities_now, objects: objects_now) } if @autopilot
         remember_grid(state, context)
         drop_stale_sequence(state)
         if screen(state)

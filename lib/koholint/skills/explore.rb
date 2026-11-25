@@ -74,8 +74,10 @@ module Koholint
           @grid = grid
           @clearing = Clearing.of(context)
           @room_objects = context[:room_objects]
+          @fight = context[:fight]
           @objects = grid ? TalkLog.objects(grid) : []
-          @doors = Array(context[:objects]&.call).select { |object| object[:kind].to_s == 'door' && object[:cell][0] < Geometry::ROWS - 1 }.map { |object| object[:cell] }
+          objects = Array(context[:objects]&.call)
+          @doors = objects.select { |object| object[:kind].to_s == 'door' && object[:cell][0] < Geometry::ROWS - 1 }.map { |object| object[:cell] }
           @survey = @known && survey
           @route = @unreachable = @dead_end = nil
           @entering = 0
@@ -132,7 +134,9 @@ module Koholint
           @position = [state.x, state.y]
           return @clearing.step(state) if @clearing&.active? && !@leg
           return depart(state) if state.place != @place
+          return stop_now(:fell) if state.falling?
           return harmed if state.health < @start.health
+          return stop_now(:enemy) if @fight&.call(state)
           return interrupted(state) if state.dialog_open?
           return entering if walking_in?(state)
 
