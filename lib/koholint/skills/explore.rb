@@ -101,7 +101,7 @@ module Koholint
           @knocked_edges = []
           @since_knock = KNOCK_FRAMES + 1
           @crossed = []
-          @excluded = []
+          @excluded = @log ? @log.dialogue_frontiers(@place) : []
           # Runs without the capability logged clearable objects as walls.
           @failed = @log ? @log.failed_clears(@place) : []
           @walls = (@log ? @log.walls(@place) : []) - (Array(@clearing&.cells&.keys) - @failed)
@@ -114,7 +114,7 @@ module Koholint
           @found = false
           @legs = 0
           @locked = 0
-          @leg = @outward = @target = @stop = @heading = @idle = @fail_cause = nil
+          @leg = @outward = @target = @stop = @heading = @idle = @fail_cause = @dialogue_frontier = nil
         end
 
         def result(state = @last)
@@ -131,6 +131,7 @@ module Koholint
           merged[:dead_end] = true if @dead_end
           merged[:failed_push] = @failed_push if @failed_push
           merged[:too_heavy] = @too_heavy if @too_heavy
+          merged[:dialogue_frontier] = @dialogue_frontier if @dialogue_frontier
           merged[:stone_search] = 'cut short' if @search_cut
           merged[:cause] = @fail_cause if @stopped_by == :blocked && @fail_cause
           merged[:untried_objects] = @untried.map { |row, col| { row:, col: } } if @stopped_by == :untried_object
@@ -197,6 +198,7 @@ module Koholint
             block(edge)
             @too_heavy = edge if unprompted?(Geometry.step(@cell, @heading))
           end
+          @dialogue_frontier = target_summary if @target&.dig(:kind) == :frontier
           stop_now(:dialogue)
         end
 

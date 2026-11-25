@@ -37,6 +37,7 @@ module Koholint
       @walked = Hash.new { |hash, key| hash[key] = [] }
       @walls = Hash.new { |hash, key| hash[key] = [] }
       @edges = Hash.new { |hash, key| hash[key] = {} }
+      @dialogue_hits = Hash.new(0)
       @surveys = {}
       @known = []
       @arrivals = {}
@@ -122,6 +123,8 @@ module Koholint
       drop_unreachable(place, result) if Ledger.pick(result, :dead_end)
       Array(Ledger.pick(result, :offered)).each { |object| offer(place, cell_of(object)) }
       Array(Ledger.pick(result, :walls)).each { |wall| (@walls[place] << cell_of(wall)).uniq! }
+      hit = Ledger.pick(result, :dialogue_frontier)
+      @dialogue_hits[[place, cell_of(hit), Ledger.pick(hit, :direction).to_s.to_sym]] += 1 if hit.is_a?(Hash)
       Array(Ledger.pick(result, :clears)).each do |use|
         cell = cell_of(Ledger.pick(use, :target) || {})
         Ledger.pick(use, :effect) ? @failed[place].delete(cell) : (@failed[place] << cell).uniq!
@@ -568,6 +571,9 @@ module Koholint
     end
 
     def walls(place) = @walls.fetch(place, []).dup
+
+    # A frontier whose walk opened a dialogue TRIED_AT times, on any visits, only opens it again: it is no work here.
+    def dialogue_frontiers(place) = @dialogue_hits.filter_map { |(where, cell, direction), count| [cell, direction] if where == place && count >= TRIED_AT }
 
     # Object cells a capability ran on without clearing them: no longer frontiers there.
     def failed_clears(place) = @failed.fetch(place, []).dup
