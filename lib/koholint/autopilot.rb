@@ -184,7 +184,7 @@ module Koholint
         @attack_stop = nil
         @sighted = true
         return DecisionPoint.harness_choice({ skill: 'attack', params: { row: sighted[:cell][0], col: sighted[:cell][1] } },
-                                            "autopilot: fight type #{sighted[:type]} at (#{sighted[:cell].join(',')}), a one-strike kill (#{@fight}/#{FIGHT_LIMIT})", autopilot: true)
+                                            "autopilot: fight type #{sighted[:type]} at (#{sighted[:cell].join(',')}), a #{sighted[:sword_hits]}-strike kill (#{@fight}/#{FIGHT_LIMIT})", autopilot: true)
       end
       return unless @since && FIGHT_ON.include?(@attack_stop) && state.phase == :playing && state.cell
       return if state.health < FIGHT_FLOOR || state.health < @hp - FIGHT_DROP
@@ -215,7 +215,7 @@ module Koholint
       missed += [@struck[:slot]] if @struck[:place] == state.place
       distance = ->(entity) { [(entity[:x] - state.x).abs, (entity[:y] - state.y).abs].max }
       far = ->(entity) { here && @missed[:far].key?(entity[:slot]) && distance.(entity) > Geometry::CELL }
-      Array(entities).select { |entity| entity[:kind].to_s == 'enemy' && entity[:sword_hits] == 1 && entity[:cell] && !missed.include?(entity[:slot]) && !far.(entity) }
+      Array(entities).select { |entity| entity[:kind].to_s == 'enemy' && (entity[:sword_hits] == 1 || (entity[:sword_hits] == 2 && entity[:sword_verified])) && entity[:cell] && !missed.include?(entity[:slot]) && !far.(entity) }
                      .select { |entity| distance.(entity) <= FIGHT_SIGHT }
                      .min_by { |entity| [distance.(entity), entity[:slot]] }
     end

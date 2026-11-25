@@ -1,6 +1,6 @@
 # Agent skills
 
-The skills, protocols and harness behaviours the agent works with. Versioned with the play flow (currently `flow-99`): update this page, not the README, when a flow changes. Layers and data flow are in [ARCHITECTURE.md](../ARCHITECTURE.md).
+The skills, protocols and harness behaviours the agent works with. Versioned with the play flow (currently `flow-100`): update this page, not the README, when a flow changes. Layers and data flow are in [ARCHITECTURE.md](../ARCHITECTURE.md).
 
 
 - Learned capabilities (`data/capabilities.json`, `bin/koholint capability list`): an `operational` entry is a composite of the skills below, offered in the skill schema and listed under "Learned skills" only while its trigger item is held (flow-49) and its object is on screen (today `sword_on_object_92 row col direction`: stand next to object 92, face it, use the sword, step into its cell). `explore` and `goto` also run it themselves when blocked facing such a cell, and the planner routes through those cells as a last resort. `learn` and `capability publish|retire` are offline commands.
@@ -144,9 +144,9 @@ The skills, protocols and harness behaviours the agent works with. Versioned wit
   Within a place, explore takes a side known only as the assumed way back (flow-78) after the place's other reachable untried exits, doors and frontiers;
   it is still a frontier, taken when nothing else here is reachable, before a route to another place. An explore that stops `no_frontier`
   in at most one frame is answered by the harness at the next decision, not after three, since from the same cell it would find none again.
-- flow-99: the harness never waits beside a hostile at any health: when explore finds no way out while a hostile's contact zone
+- flow-100: the harness never waits beside a hostile at any health: when explore finds no way out while a hostile's contact zone
   reaches Link's cell or a neighbour, it sends explore back by the side Link came in at once (once per cell, until Link changes
-  place or heals).
+  place or heals). Fight on sight also takes an enemy whose two sword hits are verified (types 27 and 11 today), not only one-strike ones.
 - flow-99: souvenirs. A text a person said in another branch (`data/souvenirs.json`, the run's `souvenirs` cutoff) whose words hold the
   name of an item Link holds, by flow-97's rule or a name of `data/items.json` that the item's observed pickup text quotes, read by
   someone who did not hold it, from a person this lineage never heard say it nor talked to holding the item, at a place this lineage's
@@ -212,7 +212,7 @@ The skills, protocols and harness behaviours the agent works with. Versioned wit
   about half a second, and the room restores it on re-entry; it counts as crumbling in a place only once one of its cells there was
   seen turning into a hole (the engine traces `floor_gave_way` once per place and object), since the same object also fills cells
   outside the walls of rooms where it never gives way. Above one heart the harness fights on sight with no model call:
-  the nearest `enemy` within 32 px whose `sword_hits` is 1 (explore stops `enemy`, a stop the autopilot treats as benign), up to
+  the nearest `enemy` within 32 px whose `sword_hits` is 1, or 2 when verified (flow-100; explore stops `enemy`, a stop the autopilot treats as benign), up to
   8 attacks per call, never while Link's footprint (his measured row band) covers a crumbling cell, never again in the visit of a place where an
   attack stopped `damage` (model calls in between included), and never again a slot an attack missed there (`blocked`, `no_path`, `out_of_reach`, `no_kill`, `hole`)
   or the slot just struck; a fight on sight never starts the flow-65 chain of fights after a kill.
