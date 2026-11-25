@@ -176,7 +176,7 @@
   @media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; } }
   .empty { margin: auto; display: flex; flex-direction: column; align-items: center; gap: 10px; color: var(--ink); font-size: 15px; }
   .sprite-big { width: 48px; height: 48px; animation: bob .5s steps(2) infinite; }
-  a.tool { text-decoration: none; }
+  a.tool, a.xbtn { text-decoration: none; color: inherit; }
   button.tag.live { border: 0; cursor: pointer; }
 </style>
 </head>
@@ -215,6 +215,7 @@
   <button type="button" class="tool" data-drawer="runs" title="Runs" aria-pressed="false"><svg class="ico" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M3 4h10M3 8h10M3 12h6"></path></svg></button>
   <button type="button" class="tool" data-drawer="leads" title="Pistes" aria-pressed="false"><svg class="ico" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M4 2h8v12l-4-3-4 3z"></path></svg></button>
   <button type="button" class="tool" data-drawer="people" title="Personnes" aria-pressed="false"><svg class="ico" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="8" cy="5.5" r="2.5"></circle><path d="M3 14c.5-3 2.5-4.5 5-4.5s4.5 1.5 5 4.5"></path></svg></button>
+  <a class="tool" href="/live" title="Debug"><svg class="ico" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M5 5l-3 3 3 3M11 5l3 3-3 3M9 3l-2 10"></path></svg></a>
   <a class="tool" href="/atlas" title="Atlas"><svg class="ico" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="2" y="2" width="12" height="12" rx="1"></rect><path d="M2 6h12M2 10h12M6 2v12M10 2v12"></path></svg></a>
   <button type="button" class="tool" id="sound" title="Son"></button>
 </header>
@@ -405,6 +406,7 @@
       return [h('h2', { text: short(st.run) }), isLive && !frozen ? h('span', { class: 'tag live', text: '● direct' }) : frozen && isLive ? h('button', { type: 'button', class: 'tag live', id: 'backLive', text: '● revenir au direct' }) : h('span', { class: 'tag', text: 'replay' }),
         h('span', { class: 'tag', text: st.flow }), h('span', { class: 'mut', text: fd(st.run.slice(0, 4) + '-' + st.run.slice(4, 6) + '-' + st.run.slice(6, 8)) }), h('span', { style: 'flex:1' }),
         h('button', { type: 'button', class: 'xbtn', 'data-trail': st.run, text: 'sa trace sur l\'île' }), inMetro(st.run) && h('button', { type: 'button', class: 'xbtn', 'data-lineage': st.run, text: 'sa lignée' }),
+        h('a', { class: 'xbtn', href: state.run ? '/run/' + encodeURIComponent(st.run) : '/live', text: 'Debug' }),
         h('button', { type: 'button', class: 'xbtn', 'data-drawer': 'runs', text: 'runs' })];
     });
     put('dhud', [body, held, kf(f), !!island], function () {

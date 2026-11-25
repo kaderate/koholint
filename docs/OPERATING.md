@@ -120,7 +120,7 @@ the thought and objective at the shown frame, hearts, held items, the current pl
 scrubber with place, item and death marks (dragging it freezes the screen on that place's capture; a replay seeks), and
 the objectives (consecutive attempts with one title folded into one line with ×N and the last outcome, a click unfolds
 them), dialogues (pieces of one text merged) and skills up to that frame; its header links to the run's trace on the
-island and its lineage on the metro. **Métro** draws the lineages that reached a checkpoint of `data/checkpoints.json`, a
+island, its lineage on the metro and its debug page (`/live` or `/run/<id>`, also linked from the top bar as Debug). **Métro** draws the lineages that reached a checkpoint of `data/checkpoints.json`, a
 first item gain or a new screen, against minutes of play: the furthest lineage as the main line, each fork leaving its
 parent at its fork frame, checkpoints and first gains as stations, deaths at line ends and +N for the forks that reached
 nothing new; a click on a line dims everything but its lineage and shows its card (minutes, new screens, cumulated cost,
