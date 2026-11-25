@@ -46,6 +46,14 @@ class EntitiesTest < Minitest::Test
     end
   end
 
+  def test_only_a_verified_heal_reaches_the_catalogue
+    assert_equal 8, Koholint::Entities.catalogue[45][:heals]
+    path = File.join(Dir.mktmpdir, 'entities.json')
+    heals = { 'value' => 8, 'confidence' => 'hypothesis', 'verified_count' => 1, 'source' => 's' }
+    File.write(path, JSON.generate([{ 'type' => 7, 'kind' => 'creature', 'source' => 's', 'confidence' => 'hypothesis', 'verified_count' => 1, 'heals' => heals }]))
+    assert_nil Koholint::Entities.load(path)[7][:heals]
+  end
+
   def test_a_heals_fact_needs_its_provenance
     assert_equal 8, JSON.parse(File.read(Koholint::Entities::DEFAULT_PATH)).find { |entry| entry['type'] == 45 }.dig('heals', 'value')
     entry = { 'type' => 45, 'kind' => 'creature', 'source' => 's', 'confidence' => 'hypothesis', 'verified_count' => 1 }

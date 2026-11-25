@@ -1,5 +1,6 @@
 require 'set'
 require 'koholint/decision'
+require 'koholint/entities'
 require 'koholint/navigation/threat'
 require 'koholint/perception'
 
@@ -26,6 +27,7 @@ module Koholint
     FIGHT_SIGHT = 2 * Geometry::CELL
     MISSED = %w[blocked no_path out_of_reach no_kill hole].freeze
     DISENGAGE_LIMIT = 3
+    HEART_LIMIT = 2
     STEP = { up: [0, -1], down: [0, 1], left: [-1, 0], right: [1, 0] }.freeze
 
     attr_reader :chain, :chain_limit, :chain_frames
@@ -223,6 +225,23 @@ module Koholint
                       &.first or return
       @disengaged += 1
       DecisionPoint.harness_choice({ skill: 'walk', params: { direction: direction.to_s, cells: 1 } }, "autopilot: disengage at #{state.health} hp, step #{direction} away from #{near.map { |threat| threat[:type] }.join(', ')} (#{@disengaged}/#{DISENGAGE_LIMIT})", autopilot: true)
+    end
+
+    # Below full health, the nearest heart on screen outside every contact zone is walked to before any fight; goto routes around the zones.
+    # Each slot is aimed at once per visit and HEART_LIMIT bounds a visit, so a heart goto cannot reach is not chased.
+    def heart_choice(state:, entities:)
+      return unless @since && state.phase == :playing && state.cell && state.max_hp && state.health < state.max_hp
+
+      @hearts = { place: state.place, slots: [] } unless @hearts&.dig(:place) == state.place
+      return if @hearts[:slots].size >= HEART_LIMIT
+
+      danger = Entities.danger_cells(Array(entities))
+      row, col = state.cell
+      heart = Array(entities).select { |entity| entity[:heals] && entity[:cell] && !danger.include?(entity[:cell]) && !@hearts[:slots].include?(entity[:slot]) }
+                             .min_by { |entity| [(entity[:cell][0] - row).abs + (entity[:cell][1] - col).abs, entity[:slot]] } or return
+      @hearts[:slots] << heart[:slot]
+      DecisionPoint.harness_choice({ skill: 'goto', params: { row: heart[:cell][0], col: heart[:cell][1] } },
+                                   "autopilot: pick up the heart at (#{heart[:cell].join(',')}) at #{state.health}/#{state.max_hp} hp (#{@hearts[:slots].size}/#{HEART_LIMIT})", autopilot: true)
     end
 
     # After a goto that ended on the cell right below a door, step through the door without a call.
