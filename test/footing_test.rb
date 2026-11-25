@@ -7,8 +7,8 @@ class FootingTest < Minitest::Test
   CRUMBLING = 223
   HOLE = 174
 
-  def state(x:, y:, timer: 0, frame: 0)
-    Koholint::GameState.new(frame:, room_id: 189, map_id: 10, x:, y:, hp: 12, max_hp: 24, dialog_state: 0, game_mode: 0x0B, game_submode: 7,
+  def state(x:, y:, timer: 0, frame: 0, game_mode: 0x0B)
+    Koholint::GameState.new(frame:, room_id: 189, map_id: 10, x:, y:, hp: 12, max_hp: 24, dialog_state: 0, game_mode:, game_submode: 7,
                             milestone: :none, crumble_timer: timer)
   end
 
@@ -25,7 +25,7 @@ class FootingTest < Minitest::Test
   end
 
   def wait_with(footing, grid, at)
-    Koholint::Skills::Registry.default.start('wait', at, { frames: 60 }, { footing:, grid: })
+    Koholint::Skills::Registry.default.start('wait', at, { frames: 60 }, { footing:, grid: }).tap { |wait| wait.next_input(at) }
   end
 
   def test_the_foot_point_is_four_pixels_below_link
@@ -68,6 +68,17 @@ class FootingTest < Minitest::Test
     assert_equal [:left], wait.next_input(state(x: 68, y: 26, timer: 27))
     assert_equal [:left], wait.next_input(state(x: 68, y: 26, timer: 28))
     assert_equal [:up], wait.next_input(state(x: 68, y: 26, timer: 29))
+  end
+
+  def test_a_skill_keeps_its_first_frame_and_menus_keep_their_directions
+    urgent = state(x: 68, y: 26, timer: 27)
+    walk = Koholint::Skills::Registry.default.start('walk', urgent, { direction: 'right', cells: 1 }, { footing:, grid: Grid.new })
+    assert_equal [:right], walk.next_input(urgent), 'the first frame is the skill own'
+    assert_equal [:left], walk.next_input(urgent)
+    live = footing(objects.tap { |rows| rows[1][5] = HOLE })
+    menu = state(x: 78, y: 26, timer: 39, game_mode: 12)
+    cursor = Koholint::Skills::Registry.default.start('walk', menu, { direction: 'right', cells: 1 }, { footing: live, grid: Grid.new })
+    2.times { assert_equal [:right], cursor.next_input(menu), 'a direction in a menu moves no Link' }
   end
 
   def test_a_step_into_a_hole_that_opened_after_the_skill_planned_ends_the_skill

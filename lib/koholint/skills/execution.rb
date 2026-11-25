@@ -54,11 +54,11 @@ module Koholint
                   elsif state.scene? && !@start.scene? then finish(:scene)
                   elsif @pushed then settle_push
                   elsif waits_through_doors? && door_walk?(state) then []
-                  elsif (off = step_off(state)) then off
+                  elsif @frames.positive? && walking?(state) && (off = step_off(state)) then off
                   elsif @centring then centre(state)
                   else input_for(state)
                   end
-        buttons = finish(:hole) if buttons && !off && into_hole?(state, buttons)
+        buttons = finish(:hole) if buttons && !off && walking?(state) && into_hole?(state, buttons)
         watch_push(state, buttons)
         note_exit(state, buttons)
         @frames += 1 if buttons
@@ -159,11 +159,14 @@ module Koholint
         nil
       end
 
+      # Floor reflexes act only while directions walk Link, and never on a skill's first frame, which some skills set themselves up on.
+      def walking?(state) = state.phase(booted: true) == :playing
+
       # No skill keeps Link on floor that gives way: when the shortest step that takes his foot point onto another floor cell, where the game's
       # count starts over, would just fit in the frames left, he takes it to the end.
       def step_off(state)
         under = @footing&.under(state) or return
-        if under.empty? || state.dialog_open? || state.locked?
+        if under.empty?
           @stepping = nil
           @walled_off = []
           return

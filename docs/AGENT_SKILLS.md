@@ -146,11 +146,11 @@ The skills, protocols and harness behaviours the agent works with. Versioned wit
   in at most one frame is answered by the harness at the next decision, not after three, since from the same cell it would find none again.
 - flow-91: no skill stands on floor that gives way past its time. The game counts the frames the cell under Link's foot point
   (`link_foot`, 4 px below him) has been crumbling floor (`crumble_timer`), starts over when that cell changes and drops the cell
-  into a hole at its `give_way` value (40 for object 223). Every skill's step (goto, explore, touch, talk_to, wait, walk and the attack
-  lineup) checks it first: when the shortest step that takes the foot point onto another floor cell (crumbling floor included, since the
+  into a hole at its `give_way` value (40 for object 223). While the game is in play, every skill's step (goto, explore, touch, talk_to,
+  wait, walk and the attack lineup) checks it first from the skill's second frame on: when the shortest step that takes the foot point onto another floor cell (crumbling floor included, since the
   count starts over there; never a hole, live ones included) would just fit in the frames left, Link takes that step to the end, and a
   step that leaves him in place for 2 frames is retried another way. A step that would put the foot point into a hole that opened after
-  the skill planned ends the skill (`hole`). The autopilot never tries an untried object cell a catalogued enemy stands on. An explore
+  the skill planned ends the skill (`hole`). The autopilot never tries an untried object cell a catalogued enemy stands on. An unaimed explore
   whose only reachable way on is the side Link came in by, after the routes it preferred proved unreachable, reports `dead_end`, so
   that landing becomes a pocket.
 - flow-90: holes and crumbling floor are read from the live room objects. Objects 174 and 175 are holes wherever they appear

@@ -490,6 +490,10 @@ class ExploreTest < Minitest::Test
     assert_equal [:exit, 3, 0, :left, true], result[:target].values_at(:kind, :row, :col, :direction) + [result[:dead_end]]
     2.times { log.absorb(result.merge(skill: 'explore', from: { room: 1, map: 0, row: 3, col: 0 })) }
     assert_equal :left, log.pocket_side([1, 0], [3, 0])
+    log.absorb({ from: { room: 16, map: 0 }, exits: [{ row: 3, col: 9, direction: :right, outcome: :left, to: [2, 0] }] })
+    open = with(pocket, [7, 1], '.')
+    aimed, = explore(open, start: Koholint::Geometry.center_of(3, 0), exits: [[[3, 0], :left]], explore_log: log, aim: { place: [2, 0] })
+    assert_nil aimed[:dead_end], 'an aimed route is taken before the work here is weighed, so it proves no dead end'
   end
 
   def test_least_visited_skips_a_place_whose_landing_from_here_is_a_pocket

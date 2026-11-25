@@ -457,7 +457,7 @@ module Koholint
               @route = { goal: hop[:goal], next: hop[:next] }
               inferred = @log.surveyed_untried?(hop[:goal]) ? [] : @log.inferred_clearable(hop[:goal])
               @route[:clearable] = inferred if inferred.any?
-              @dead_end = true if avoid.any? && via == @log.landing_side(@place, from)
+              @dead_end = true if avoid.any? && via == @log.landing_side(@place, from) && [nil, @place].include?(@aim[:place])
               return found
             end
             avoid << via
