@@ -4,7 +4,9 @@ require 'socket'
 require 'uri'
 require 'koholint'
 require 'koholint/viewer/explorer'
+require 'koholint/archive'
 require 'koholint/viewer/feed'
+require 'koholint/viewer/machines'
 require 'koholint/viewer/registry'
 require 'koholint/viewer/story'
 
@@ -22,10 +24,11 @@ module Koholint
       attr_reader :listener
       attr_writer :follower, :feed, :explorer, :run_dir
 
-      def initialize(follower: nil, feed: nil, explorer: nil, port: 0, host: '127.0.0.1', read_timeout: READ_TIMEOUT)
+      def initialize(follower: nil, feed: nil, explorer: nil, machines: Machines.new, port: 0, host: '127.0.0.1', read_timeout: READ_TIMEOUT)
         @follower = follower
         @feed = feed
         @explorer = explorer
+        @machines = machines
         @port = port
         @read_timeout = read_timeout
         @host = host
@@ -48,6 +51,8 @@ module Koholint
         @acceptor = Thread.new { accept_loop }
         port
       end
+
+      def viewed_within?(seconds) = !@viewed_at.nil? && Process.clock_gettime(Process::CLOCK_MONOTONIC) - @viewed_at < seconds
 
       def stop
         @listener&.close
@@ -142,10 +147,13 @@ module Koholint
       end
 
       def get(path, params)
+        @viewed_at = Process.clock_gettime(Process::CLOCK_MONOTONIC) if %w[/frame.png /state.json].include?(path) && !params['run']
         case path
         when '/' then html(@pages[:app])
         when '/live' then html(@page)
-        when '/island.json' then json(explorer.island)
+        when '/island.json' then island
+        when '/direct.json' then json(live: !@run_dir.nil? && Archive.locked?(@run_dir), run: @run_dir && File.basename(@run_dir), latest: @explorer&.latest)
+        when '/machines.json' then json(machines)
         when '/story.json' then json(Story.for(dir_of(only(params, %w[run])['run'])))
         when '/frame.png' then ['200 OK', 'image/png', params['run'] ? explorer.frame_png(params['run']) : @follower.frame_png, NO_STORE]
         when '/state.json' then json(params['run'] ? explorer.state(params['run']) : @feed.call)
@@ -189,6 +197,15 @@ module Koholint
         raise Explorer::BadRequest, 'seek must be a frame number' unless seek.nil? || seek.match?(/\A\d{1,9}\z/)
 
         explorer.control(params['run'], speed: speed&.to_i, paused: pause && pause == '1', seek: seek&.to_i)
+      end
+
+      def island
+        value = explorer.island
+        value.key?(:building) ? ['202 Accepted', 'application/json', JSON.generate(value), NO_STORE] : json(value)
+      end
+
+      def machines
+        @machines.list.map { |row| row.except(:dir).merge(open: row[:dir] && @explorer&.notes_run(row[:dir])) }
       end
 
       def insight(kind, run)

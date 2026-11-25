@@ -8,6 +8,7 @@ require 'koholint/perception'
 require 'koholint/run_compare'
 require 'koholint/summary'
 require 'koholint/trace'
+require 'koholint/viewer/digest_cache'
 require 'koholint/viewer/insights'
 require 'koholint/viewer/island'
 require 'koholint/viewer/registry'
@@ -25,17 +26,21 @@ module Koholint
       MAX_NOTES = 8192
       NOTES = 'notes.md'.freeze
       ISLAND_REFRESH = 30
+      ISLAND_WAIT = 2
+      CACHE = '.cache'.freeze
       HEADER = %w[run_id tag flow_version model harness_sha highest_milestone places_seen frames dollars stop_reason].freeze
       FIELDS = %w[run_id tag flow_version frames dollars calls usd_per_1000f highest_milestone places_seen stop_reason].freeze
 
       attr_reader :root, :registry
 
-      def initialize(root:, registry:)
+      def initialize(root:, registry:, cache: File.join(root, CACHE))
         @root = root
         @registry = registry
-        @atlas = {}
+        @cache = cache
+        @atlas = DigestCache.new(File.join(cache, 'digests'))
         @atlas_lock = Mutex.new
         @island_lock = Mutex.new
+        @progress = [0, 0]
       end
 
       def self.default_root(run_dir)
@@ -117,17 +122,33 @@ module Koholint
 
       def atlas = @atlas_lock.synchronize { Atlas.build([@root], cache: @atlas) }
 
-      def island
-        @island_lock.synchronize do
-          now = Process.clock_gettime(Process::CLOCK_MONOTONIC)
-          return @island[:value] if @island && now - @island[:at] < ISLAND_REFRESH
+      def latest
+        dir = Archive.runs(@root).reverse.find { |run| File.basename(run).match?(RUN_ID) && File.file?(File.join(run, 'inputs.log')) }
+        dir && File.basename(dir)
+      end
 
-          dirs, digests = @atlas_lock.synchronize { Atlas.read([@root], cache: @atlas) }
-          generation = digests.map(&:object_id)
-          value = @island&.dig(:generation) == generation ? @island[:value] : Island.of(dirs, digests, roots: [@root])
-          @island = { at: now, generation:, value: }
-          value
+      # The last island known, at once; a stale one is rebuilt in the background. With none yet, the build's progress.
+      def island
+        refresh = @island_lock.synchronize do
+          @island ||= stored_island
+          started = refresh_island
+          started if @island.nil?
         end
+        refresh&.join(ISLAND_WAIT)
+        @island_lock.synchronize do
+          next @island[:value] if @island
+          raise Unreadable, @island_failure if @island_failure && !@refresh&.alive?
+
+          { building: true, done: @progress[0], total: @progress[1] }
+        end
+      end
+
+      def warm
+        @island_lock.synchronize do
+          @island ||= stored_island
+          refresh_island
+        end
+        nil
       end
 
       def compare(a, b) = readable("#{a} or #{b}") { RunCompare.compare(resolve(a), resolve(b)) }
@@ -143,6 +164,45 @@ module Koholint
       end
 
       private
+
+      def now = Process.clock_gettime(Process::CLOCK_MONOTONIC)
+
+      def island_path = File.join(@cache, 'island.json')
+
+      def refresh_island
+        return @refresh if @refresh&.alive?
+        return nil if @island&.dig(:at) && now - @island[:at] < ISLAND_REFRESH
+
+        @refresh = Thread.new { build_island }
+      end
+
+      def build_island
+        dirs, digests = @atlas_lock.synchronize { Atlas.read([@root], cache: @atlas, progress: ->(done, total) { @progress = [done, total] }) }
+        generation = digests.map(&:object_id)
+        known = @island_lock.synchronize { @island }
+        value = known&.dig(:generation) == generation ? known[:value] : Island.of(dirs, digests, roots: [@root])
+        @island_lock.synchronize do
+          @island = { at: now, generation:, value: }
+          @island_failure = nil
+        end
+        store_island(value) unless known&.dig(:value).equal?(value)
+      rescue StandardError => e
+        @island_lock.synchronize { @island_failure = "the runs cannot be read: #{e.message}" }
+      end
+
+      def stored_island
+        { at: nil, generation: nil, value: JSON.parse(File.read(island_path), symbolize_names: true) }
+      rescue SystemCallError, JSON::ParserError
+        nil
+      end
+
+      def store_island(value)
+        FileUtils.mkdir_p(@cache)
+        File.write("#{island_path}.#{Process.pid}.tmp", JSON.generate(value))
+        File.rename("#{island_path}.#{Process.pid}.tmp", island_path)
+      rescue SystemCallError
+        nil
+      end
 
       def readable(id)
         yield

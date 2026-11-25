@@ -107,6 +107,18 @@ class RegistryTest < Minitest::Test
     assert_equal 960, follower.frame
   end
 
+  def test_a_replay_no_page_asks_for_waits_until_it_is_asked_again
+    reg = registry
+    follower = reg.fetch('a').follower
+    @now = 20.0
+    reg.tick
+    assert_equal 0, follower.frame
+    reg.fetch('a')
+    @now = 20.5
+    reg.tick
+    assert_equal 30, follower.frame
+  end
+
   def test_a_paused_replay_does_not_advance_and_resumes_from_now
     reg = registry
     follower = reg.fetch('a').follower
