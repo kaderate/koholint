@@ -54,7 +54,7 @@ module Koholint
                   elsif state.scene? && !@start.scene? then finish(:scene)
                   elsif @pushed then settle_push
                   elsif waits_through_doors? && door_walk?(state) then []
-                  elsif @frames.positive? && walking?(state) && (off = step_off(state)) then off
+                  elsif (off = floor_step(state)) then off
                   elsif @centring then centre(state)
                   else input_for(state)
                   end
@@ -162,6 +162,8 @@ module Koholint
       # Floor reflexes act only while directions walk Link, and never on a skill's first frame, which some skills set themselves up on.
       def walking?(state) = state.phase(booted: true) == :playing
 
+      def floor_step(state) = @frames.positive? && walking?(state) && step_off(state)
+
       # No skill keeps Link on floor that gives way: when the shortest step that takes his foot point onto another floor cell, where the game's
       # count starts over, would just fit in the frames left, he takes it to the end.
       def step_off(state)
@@ -183,7 +185,7 @@ module Koholint
 
       # A step off that leaves Link where he was for STILL_STEPS frames runs into something the grid did not show; another way is tried.
       def stepping_on?(state)
-        return false unless @stepping && Footing.feet(state.x, state.y).intersect?(@stepping[:cells]) && (@stepping[:frames] += 1) <= STEP_OFF_PIXELS
+        return @stepping = false unless @stepping && Footing.feet(state.x, state.y).intersect?(@stepping[:cells]) && (@stepping[:frames] += 1) <= STEP_OFF_PIXELS
 
         @stepping[:still] = [state.x, state.y] == @stepping[:at] ? @stepping[:still] + 1 : 0
         @stepping[:at] = [state.x, state.y]

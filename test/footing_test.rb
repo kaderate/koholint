@@ -18,6 +18,7 @@ class FootingTest < Minitest::Test
     def initialize(holes = [], dead_ends = []) = (@holes = holes; @dead_ends = dead_ends)
     def passable(row, col, direction) = @dead_ends.include?([row, col, direction]) ? :no : :yes
     def hole?(row, col) = @holes.include?([row, col])
+    def static_sprite(*) = nil
   end
 
   def footing(rows = objects)
@@ -79,6 +80,21 @@ class FootingTest < Minitest::Test
     menu = state(x: 78, y: 26, timer: 39, game_mode: 12)
     cursor = Koholint::Skills::Registry.default.start('walk', menu, { direction: 'right', cells: 1 }, { footing: live, grid: Grid.new })
     2.times { assert_equal [:right], cursor.next_input(menu), 'a direction in a menu moves no Link' }
+  end
+
+  def test_menu_screens_keep_their_directions_on_floor_that_gives_way
+    menu = Koholint::GameState.new(**state(x: 68, y: 26, timer: 35, game_mode: 12).to_h, game_submode: 8, inventory_cursor: 0, item_a: 0, item_b: 4)
+    inputs = ->(context) { move = Koholint::Skills::Registry.default.start('menu_move', menu, { slot: 1 }, context); Array.new(4) { move.next_input(menu) } }
+    assert_equal inputs.({}), inputs.({ footing:, grid: Grid.new })
+  end
+
+  def test_a_touch_holding_into_a_thing_steps_off_floor_about_to_give_way
+    start = state(x: 68, y: 26, timer: 10)
+    touch = Koholint::Skills::Registry.default.start('touch', start, { row: 1, col: 5, type: 58 }, { footing:, grid: Grid.new })
+    held = Array.new(6) { touch.next_input(start) }
+    assert_equal [:right], held.last, 'it holds into the thing from the cell next to it'
+    assert touch.instance_variable_get(:@holding)
+    assert_equal [:left], touch.next_input(state(x: 68, y: 26, timer: 39))
   end
 
   def test_a_step_into_a_hole_that_opened_after_the_skill_planned_ends_the_skill
