@@ -247,6 +247,22 @@ class ObjectivesTest < Minitest::Test
     assert_equal :achieved, @objectives.update(state(frame: 4), frame: 4)
   end
 
+  def test_a_thing_to_try_is_reached_only_once_tried_with_an_answer_or_a_touch_after_a_silent_talk
+    @objectives.start(frame: 1, title: 'Go examine', predicate: { kind: 'reach_place', place: [7, 8] }, target: { kind: 'person', place: [7, 8], type: 132, cell: [3, 4], try: true })
+    assert_nil @objectives.update(state(frame: 2, room: 7, map: 8), frame: 2), 'reaching the place is not enough'
+    @objectives.note_try(place: [7, 8], type: 64, skill: 'touch', answered: false)
+    assert_nil @objectives.update(state(frame: 3, room: 7, map: 8), frame: 3), 'another thing'
+    @objectives.note_try(place: [7, 8], type: 132, skill: 'talk_to', answered: false)
+    assert @objectives.talked_to?
+    assert_nil @objectives.update(state(frame: 4, room: 7, map: 8), frame: 4), 'a talk that drew nothing'
+    @objectives.note_try(place: [7, 8], type: 132, skill: 'touch', answered: false)
+    assert_equal :achieved, @objectives.update(state(frame: 5, room: 7, map: 8), frame: 5)
+    @objectives.start(frame: 6, title: 'Go examine', predicate: { kind: 'reach_place', place: [7, 8] }, target: { kind: 'person', place: [7, 8], type: 132, cell: [3, 4], try: true })
+    refute @objectives.talked_to?
+    @objectives.note_try(place: [7, 8], type: 132, skill: 'talk_to', answered: true)
+    assert_equal :achieved, @objectives.update(state(frame: 7, room: 7, map: 8), frame: 7), 'an answer is a try'
+  end
+
   def test_a_sign_objective_ends_on_that_signs_text_only_even_when_the_text_is_known
     @objectives.note_text('Attention au plancher')
     @objectives.start(frame: 1, title: 'Go read the sign', predicate: { kind: 'new_text' }, target: { kind: 'sign', place: [101, 0], cell: [4, 8], remote: true })

@@ -798,10 +798,20 @@ class ExploreTest < Minitest::Test
     assert_equal :dialogue, result[:stopped_by]
     assert_equal({ kind: :exit, row: 7, col: 6, direction: :down }, result[:target])
     assert_includes result[:blocked_edges], { row: 3, col: 2, direction: :right }
+    assert_equal({ row: 3, col: 2, direction: :right }, result[:too_heavy])
     refute result.dig(:survey, :pending)
     log.absorb(result)
     refute log.untried?(PLACE)
     assert_nil log.route([0, 0])
+  end
+
+  def test_a_push_with_someone_on_screen_who_could_have_spoken_bars_the_edge_but_is_no_evidence
+    rows = with(CLOSED, *(1..6).flat_map { |row| [[row, 3], '#'] }, [3, 3], '.', [3, 0], '.', [7, 6], '.')
+    person = [{ kind: :npc, type: 5, cell: [6, 8], slot: 1 }]
+    result, = explore(rows, rocks: [[3, 3]], start: Koholint::Geometry.center_of(3, 1), entities: -> { person })
+    assert_equal :dialogue, result[:stopped_by]
+    assert_includes result[:blocked_edges], { row: 3, col: 2, direction: :right }
+    assert_nil result[:too_heavy]
   end
 
   def test_a_dialogue_that_opens_while_link_walks_bars_nothing
@@ -811,6 +821,7 @@ class ExploreTest < Minitest::Test
     result, = explore(rows, callouts: [[3, 4]], start: Koholint::Geometry.center_of(3, 1), explore_log: log)
     assert_equal :dialogue, result[:stopped_by]
     assert_empty result[:blocked_edges]
+    assert_nil result[:too_heavy]
     assert result.dig(:survey, :pending)
     log.absorb(result)
     assert log.untried?(PLACE)

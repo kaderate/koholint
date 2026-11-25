@@ -14,6 +14,7 @@ module Koholint
       FRUITLESS_ATTEMPTS = 3
       OBJECT_RANGE = 3
       ENTER_FRAMES = 120
+      SPEAKERS = %w[npc unknown].freeze
       UNKNOWN = %i[unknown stale].freeze
       SIDES = { up: ->(row, _col) { row.zero? }, down: ->(row, _col) { row == Geometry::ROWS - 1 },
                 left: ->(_row, col) { col.zero? }, right: ->(_row, col) { col == Geometry::COLS - 1 } }.freeze
@@ -76,7 +77,9 @@ module Koholint
           @room_objects = context[:room_objects]
           @fight = context[:fight]
           @objects = grid ? TalkLog.objects(grid) : []
+          @entities = context[:entities]
           objects = Array(context[:objects]&.call)
+          @object_cells = objects.map { |object| object[:cell] }
           @doors = objects.select { |object| object[:kind].to_s == 'door' && object[:cell][0] < Geometry::ROWS - 1 }.map { |object| object[:cell] }
           @crumbling = objects.select { |object| object[:kind].to_s == 'crumbling' }.map { |object| object[:cell] }
           @survey = @known && survey
@@ -116,6 +119,7 @@ module Koholint
           merged[:held] = held if held.any?
           merged[:dead_end] = true if @dead_end
           merged[:failed_push] = @failed_push if @failed_push
+          merged[:too_heavy] = @too_heavy if @too_heavy
           merged[:stone_search] = 'cut short' if @search_cut
           merged[:cause] = @fail_cause if @stopped_by == :blocked && @fail_cause
           merged[:untried_objects] = @untried.map { |row, col| { row:, col: } } if @stopped_by == :untried_object
@@ -176,8 +180,17 @@ module Koholint
         # A dialogue that opens as Link stops flush against his cell's edge (a rock too heavy to push) bars that edge, so the survey's pending
         # work leaves it out; one that opens anywhere else (a call-out, a scene, a talking door, a cell just crossed) bars nothing.
         def interrupted(state)
-          block({ row: @cell[0], col: @cell[1], direction: @heading }) if pushing?(state)
+          if pushing?(state)
+            edge = { row: @cell[0], col: @cell[1], direction: @heading }
+            block(edge)
+            @too_heavy = edge if unprompted?(Geometry.step(@cell, @heading))
+          end
           stop_now(:dialogue)
+        end
+
+        # Only a push with nothing else that could have opened the text (a person or unidentified thing on screen, an object ahead) says the cell ahead pushed back.
+        def unprompted?(ahead)
+          Array(@entities&.call).none? { |entity| SPEAKERS.include?(entity[:kind].to_s) } && !@object_cells.include?(ahead)
         end
 
         def pushing?(state)

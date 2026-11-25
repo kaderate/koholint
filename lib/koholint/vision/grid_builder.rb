@@ -85,6 +85,15 @@ module Koholint
         Geometry::VERTICAL_FIRST.each { |direction| record(appearance, direction, :no, state.frame, method: 'fall', source: 'fall') }
       end
 
+      # A dialogue the game opened while Link pushed flush against the cell ahead (a rock too heavy to push): that appearance is no way in that direction.
+      def note_push(state, pushed)
+        direction = pushed[:direction].to_sym
+        ahead = Geometry.step(pushed.values_at(:row, :col), direction)
+        return unless @last && ahead && @last[:place] == state.place
+
+        record(@last[:grid].static_sprite(*ahead) || @last[:grid].appearance(*ahead), direction, :no, state.frame, method: 'push', source: 'push')
+      end
+
       private
 
       def note_overlay(frame, place)
@@ -162,7 +171,8 @@ module Koholint
         start = probe.fetch(:from)
         cell = self.class.link_cell(start[:x], start[:y]) or return
         after = self.class.link_cell(probe[:to][:x], probe[:to][:y]) or return
-        return aligned?(start, cell, direction) && !sprite_ahead?(start, direction) ? :no : :misaligned if after == cell
+        return :misaligned unless aligned?(start, cell, direction)
+        return sprite_ahead?(start, direction) ? :misaligned : :no if after == cell
 
         drow, dcol = Geometry::DELTAS.fetch(direction)
         delta = [after[0] - cell[0], after[1] - cell[1]]

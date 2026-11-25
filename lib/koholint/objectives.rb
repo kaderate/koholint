@@ -81,6 +81,7 @@ module Koholint
       @dialogue_seen = false
       @new_text = false
       @sign_read = false
+      @talked_to = @tried = false
       @repeat = 0
       @last_key = nil
       @last_state_part = nil
@@ -112,6 +113,17 @@ module Koholint
       target = @current&.dig(:target) or return
       @sign_read = true if target[:kind].to_s == 'chest' && target[:place] == place && target[:cell] == cell
     end
+
+    # A thing an objective came to try is tried once a talk draws an answer, or once Link walks onto it after a talk that drew none.
+    def note_try(place:, type:, skill:, answered:)
+      target = @current&.dig(:target) or return
+      return unless target[:try] && target[:place] == place && target[:type] == type
+
+      @talked_to = true if skill == 'talk_to'
+      @tried = true if skill == 'touch' || answered
+    end
+
+    def talked_to? = @talked_to
 
     def finished = @counter - (@current ? 1 : 0)
 
@@ -212,7 +224,7 @@ module Koholint
       target = predicate[:place]
       case predicate[:kind].to_s
       when 'leave_place' then place != target
-      when 'reach_place' then place == target
+      when 'reach_place' then place == target && (!@current.dig(:target, :try) || @tried)
       when 'reach_cell' then place == target && cell == [predicate[:row], predicate[:col]]
       when 'dialogue_closed' then @dialogue_seen && !state.dialog_open?
       when 'new_place' then first_visit

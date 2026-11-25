@@ -142,7 +142,7 @@ module Koholint
         what = "the unidentified thing (type #{thing[:type]})"
         { id: "examine-#{where.join('-')}-t#{thing[:type]}", label: "examine #{what} in #{describe(where, named)}, #{moves(hops[where])}, never tried; Link holds other items than when it was seen",
           title: "Go examine #{what}"[0, 80], predicate: { kind: 'reach_place', place: where },
-          target: { kind: 'person', place: where, type: thing[:type], cell: thing[:cell] } }
+          target: { kind: 'person', place: where, type: thing[:type], cell: thing[:cell], try: true } }
       end
     end
 
