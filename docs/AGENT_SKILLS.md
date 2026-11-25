@@ -148,7 +148,9 @@ The skills, protocols and harness behaviours the agent works with. Versioned wit
   come closer between two frames the lineup no longer backs off, since backing off from an enemy that walks at Link never opens the gap;
   it turns to face it and strikes. A route never aims at a place whose untried ways are all cut off from the side the route lands by,
   whatever that place's survey left pending (a lifted cut counts as open); an assumed way back no path reaches is reported unreachable
-  like any other untried exit, so it is cut from that landing too. Object 176 is a hole like 174 and 175.
+  like any other untried exit, so it is cut from that landing too; the result lists it as `held` as well, and a held way back is never
+  dropped from the graph, since health returning or an enemy leaving can open it again (one a route found out of reach on two dead-end
+  visits is still dropped, as before). The lineup forgets an approaching enemy when it turns to another target. Object 176 is a hole like 174 and 175.
 - flow-91: no skill stands on floor that gives way past its time. The game counts the frames the cell under Link's foot point
   (`link_foot`, 4 px below him) has been crumbling floor (`crumble_timer`), starts over when that cell changes and drops the cell
   into a hole at its `give_way` value (40 for object 223). While the game is in play, every skill's step (goto, explore, touch with

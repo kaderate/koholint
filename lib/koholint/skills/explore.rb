@@ -80,7 +80,7 @@ module Koholint
           @doors = objects.select { |object| object[:kind].to_s == 'door' && object[:cell][0] < Geometry::ROWS - 1 }.map { |object| object[:cell] }
           @crumbling = objects.select { |object| object[:kind].to_s == 'crumbling' }.map { |object| object[:cell] }
           @survey = @known && survey
-          @route = @unreachable = @dead_end = nil
+          @route = @unreachable = @dead_end = @backs = @routed_off = nil
           @entering = 0
           @cell = @start.cell
           @offered = near_objects(@cell)
@@ -112,6 +112,8 @@ module Koholint
           merged[:survey] = @survey.merge(pending: pending?) if @survey
           merged[:route] = @route if @route
           merged[:unreachable] = @unreachable if @unreachable
+          held = Array(@backs) - Array(@routed_off)
+          merged[:held] = held if held.any?
           merged[:dead_end] = true if @dead_end
           merged[:failed_push] = @failed_push if @failed_push
           merged[:stone_search] = 'cut short' if @search_cut
@@ -384,6 +386,7 @@ module Koholint
 
           stranded = @crumbling.any? ? [] : untried(from, nil).reject { |candidate| path_to.(candidate[:cell]) }
           @unreachable = (@unreachable || []) | stranded.map { |candidate| candidate[:kind] == :door ? [candidate[:cell][0] - 1, candidate[:cell][1]] : candidate[:direction] }.uniq if stranded.any?
+          @backs = (@backs || []) | stranded.select { |candidate| way_back?(candidate) }.map { |candidate| candidate[:direction] } if stranded.any?
           routed = routed(from, path_to)
           return order(routed) if routed.any?
 
@@ -462,6 +465,7 @@ module Koholint
             end
             avoid << via
             @unreachable = (@unreachable || []) | [via]
+            @routed_off = (@routed_off || []) | [via]
           end
           @route = { goal: first[:goal], next: first[:next] } if first
           @dead_end = true if first

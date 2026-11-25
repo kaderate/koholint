@@ -485,9 +485,13 @@ module Koholint
 
     def landing_side(place, cell) = @arrivals.find { |(where, _), arrival| where == place && arrival == cell }&.dig(0, 1)
 
+    # held: an assumed way back only the survey found out of reach (low-health contact zones can cause that), so it is cut, never dropped;
+    # one a route found out of reach is dropped, since a ledge only leads down.
     def drop_unreachable(place, result)
+      held = Array(Ledger.pick(result, :held)).map(&:to_s)
       Array(Ledger.pick(result, :unreachable)).each do |via|
         key = via.is_a?(Array) ? via : via.to_s.to_sym
+        next if held.include?(via.to_s)
         next unless @assumed.include?([place, key]) && again?(@doubted, [place, key], place)
 
         @assumed.delete([place, key])

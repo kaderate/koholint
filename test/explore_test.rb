@@ -956,7 +956,22 @@ class ExploreTest < Minitest::Test
     rows = with(CLOSED, [7, 5], '.', [6, 5], '#', [3, 9], '.', [3, 6], '.', [3, 7], '.', [3, 8], '.')
     result, = explore(rows, exits: [[[7, 5], :down], [[3, 9], :right]], explore_log: log, limit: 1)
     assert_equal [2, 0], result.dig(:route, :goal), result.inspect
-    assert_equal [:down], result[:unreachable]
+    assert_equal [[:down], [:down]], result.values_at(:unreachable, :held)
+  end
+
+  def test_an_assumed_way_back_held_out_of_reach_on_two_dead_end_visits_is_cut_never_dropped
+    log = Koholint::ExploreLog.new
+    walk = ->(from, to, direction) { log.note({ skill: 'walk', params: { direction: }, from: { room: from, map: 0, row: 3, col: 5 }, to: { room: to, map: 0, row: 3, col: 5 } }) }
+    walk.(17, 18, 'right')
+    visit = lambda do |result|
+      walk.(18, 19, 'right')
+      walk.(19, 18, 'left')
+      log.absorb({ from: { room: 18, map: 0, row: 3, col: 5 }, unreachable: ['left'], dead_end: true }.merge(result))
+    end
+    2.times { visit.({ held: ['left'] }) }
+    assert log.side_left?([18, 0], :left), 'health returning or the enemy leaving can bring it back'
+    2.times { visit.({}) }
+    refute log.side_left?([18, 0], :left), 'a way back a route found out of reach on two visits is still dropped'
   end
 
   def test_an_assumed_way_back_ranks_after_the_other_reachable_work_of_the_place
