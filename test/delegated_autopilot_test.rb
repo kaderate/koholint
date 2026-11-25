@@ -650,6 +650,17 @@ class DelegatedAutopilotTest < Minitest::Test
     assert_equal({ choice: { skill: 'touch', params: { row: 3, col: 4, type: 132 } } }, p.send(:follow_choice, state))
   end
 
+  # Run 20261125-175039-96c6, 83/0: the thing spoke as Link walked up to it, so talk_to stopped on that dialogue without a talk of its own.
+  def test_a_dialogue_that_stops_the_talk_to_a_thing_to_try_is_its_answer
+    here = [state.room_id, state.map_id]
+    p = autopiloted(ScriptedClient.new(objective: []))
+    @objectives.start(frame: 10, title: 'Go examine', predicate: { kind: 'reach_place', place: here }, target: { kind: 'person', place: here, type: 132, cell: [3, 4], try: true })
+    outcome = { skill: 'talk_to', params: { row: 3, col: 4 }, stopped_by: :dialogue, dialog_after: true, talked: false, target_type: 132, moved_cells: 2,
+                from: { room: here[0], map: here[1], row: 5, col: 4 }, to: { room: here[0], map: here[1], row: 4, col: 4 } }
+    p.after_action(choice: { skill: 'talk_to', params: { row: 3, col: 4 } }, outcome:, state:, frame: 20)
+    assert_equal :achieved, @objectives.update(state, frame: 21)
+  end
+
   def test_a_sign_of_another_place_is_walked_to_and_read_before_its_objective_ends
     p = autopiloted(ScriptedClient.new(objective: []))
     here = [state.room_id, state.map_id]

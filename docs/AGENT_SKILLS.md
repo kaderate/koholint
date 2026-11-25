@@ -145,7 +145,7 @@ The skills, protocols and harness behaviours the agent works with. Versioned wit
   it is still a frontier, taken when nothing else here is reachable, before a route to another place. An explore that stops `no_frontier`
   in at most one frame is answered by the harness at the next decision, not after three, since from the same cell it would find none again.
 - flow-96: an examine- objective is achieved only once the thing at its place is tried: talk_to first, then touch when the talk drew
-  no answer (an answered talk is a try); the autopilot follows each of those steps once, even when the model's own explore brought Link
+  no answer (an answered talk, or a dialogue that opens as Link walks up to it, is a try); the agent is told so; the autopilot follows each of those steps once, even when the model's own explore brought Link
   there. The walk probe records a way, like a wall, only from a start lined up with the row or column
   it crosses (Link sliding under a rock on a row edge read as a way into it), and a dialogue the game opens while explore pushes flush
   against a cell (`too_heavy` in the result) records that cell's appearance as no way in that direction.

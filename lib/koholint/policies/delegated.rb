@@ -284,7 +284,7 @@ module Koholint
         note_lock(choice, outcome, state)
         note_talk_source(choice, outcome)
         note_chest_attempt(choice, outcome, state)
-        @objectives.note_try(place: state.place, type: outcome[:target_type], skill: choice[:skill].to_s, answered: outcome[:talked] == true) if %w[talk_to touch].include?(choice[:skill].to_s)
+        @objectives.note_try(place: state.place, type: outcome[:target_type], skill: choice[:skill].to_s, answered: outcome[:talked] == true || outcome[:dialog_after] == true) if %w[talk_to touch].include?(choice[:skill].to_s)
         feed_ledger(choice, outcome, state, frame, objective: !revisiting)
         opened = feed_triggers(choice, outcome, state)
         feed_talk_log(choice, outcome, state)
