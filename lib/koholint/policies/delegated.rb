@@ -284,7 +284,7 @@ module Koholint
         note_lock(choice, outcome, state)
         note_talk_source(choice, outcome)
         note_chest_attempt(choice, outcome, state)
-        @objectives.note_try(place: state.place, type: outcome[:target_type], skill: choice[:skill].to_s, answered: outcome[:talked] == true || outcome[:dialog_after] == true) if %w[talk_to touch].include?(choice[:skill].to_s)
+        note_try(choice, outcome, state)
         feed_ledger(choice, outcome, state, frame, objective: !revisiting)
         opened = feed_triggers(choice, outcome, state)
         feed_talk_log(choice, outcome, state)
@@ -498,6 +498,16 @@ module Koholint
       end
 
       # Any talk_to aimed at a chest takes it off the away list; one that drew no response leaves it closed for this visit.
+      # Only a talk that reached the thing, or a touch that held against it, tries it.
+      def note_try(choice, outcome, state)
+        skill = choice[:skill].to_s
+        return unless %w[talk_to touch].include?(skill)
+
+        answered = outcome[:talked] == true || outcome[:dialog_after] == true
+        reached = skill == 'touch' ? outcome.key?(:arrival_frame) : answered || TalkLog.attempt?(outcome)
+        @objectives.note_try(place: state.place, type: outcome[:target_type], skill:, answered:) if reached
+      end
+
       def note_chest_attempt(choice, outcome, state)
         return unless choice[:skill] == 'talk_to'
 

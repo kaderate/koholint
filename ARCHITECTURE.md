@@ -145,7 +145,9 @@ up to the shown frame; `page.html` draws them. It never writes game state; it wr
    renders the context, calls the model and validates the answer, falling back deterministically when it is invalid.
 3. The engine emits a `decision` event and runs the chosen skill frame by frame, appending every input to the journal.
 4. The skill result becomes an `action` event, feeds the policy's memory (`after_action`) and the next context; objectives are
-   re-evaluated.
+   re-evaluated. An explore result carrying `too_heavy` (a push the game answered with a dialogue, nothing else on screen able to
+   speak) also goes to `grid_builder`, which records that cell's appearance as no way in that direction (an `affordance` of source
+   `push`).
 5. The budget is checked after every frame; at stop the engine saves, checkpoints, emits `stop` and writes `summary.json` and
    `world.json`.
 

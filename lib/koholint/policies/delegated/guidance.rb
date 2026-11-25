@@ -180,7 +180,7 @@ module Koholint
           result = @autopilot.next_choice(state:, objective: @objectives.current, follow: follow&.dig(:choice)) or return
           context[:aim] = follow[:aim] if follow&.dig(:aim)
           @autopilot_acting = true
-          result
+          result[:choice][:skill] == 'touch' ? result.merge(decision_point: @touch_point) : result
         end
 
         def follow_choice(state)

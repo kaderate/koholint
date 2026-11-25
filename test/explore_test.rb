@@ -805,6 +805,15 @@ class ExploreTest < Minitest::Test
     assert_nil log.route([0, 0])
   end
 
+  def test_a_push_with_someone_on_screen_who_could_have_spoken_bars_the_edge_but_is_no_evidence
+    rows = with(CLOSED, *(1..6).flat_map { |row| [[row, 3], '#'] }, [3, 3], '.', [3, 0], '.', [7, 6], '.')
+    person = [{ kind: :npc, type: 5, cell: [6, 8], slot: 1 }]
+    result, = explore(rows, rocks: [[3, 3]], start: Koholint::Geometry.center_of(3, 1), entities: -> { person })
+    assert_equal :dialogue, result[:stopped_by]
+    assert_includes result[:blocked_edges], { row: 3, col: 2, direction: :right }
+    assert_nil result[:too_heavy]
+  end
+
   def test_a_dialogue_that_opens_while_link_walks_bars_nothing
     rows = with(CLOSED, *(1..6).flat_map { |row| [[row, 3], '#'] }, [3, 3], '.', [3, 0], '.', [7, 6], '.')
     log = Koholint::ExploreLog.new

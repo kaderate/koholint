@@ -106,7 +106,7 @@ module Koholint
       return "last stop #{@stop || 'not an explore'}" unless first || BENIGN.include?(@stop) || @stop == TALKED
       return 'target followed' if target && @acted && follow && follow[:skill] != 'explore' && !fresh
 
-      common = common_hold(state, news: !target || @stop == TALKED)
+      common = common_hold(state, news: !target || @stop == TALKED, health: !fresh)
       return common if common
       return 'objective changed' unless objective && objective[:id] == @objective
 
@@ -280,12 +280,13 @@ module Koholint
       @try_place = here
     end
 
-    def common_hold(state, news: true)
+    # health: false for a step at the target itself (its talk or touch), which only the harness can make once the model handed it the target.
+    def common_hold(state, news: true, health: true)
       return 'new lead or goal' if news && @news
       return 'explore loop' if @returns.values.max.to_i >= RETURNS
       return "phase #{state.phase}" unless state.phase == :playing
-      return 'hp dropped' if state.health < @hp
-      return 'low health' if state.health <= Perception::HP_PER_HEART
+      return 'hp dropped' if health && state.health < @hp
+      return 'low health' if health && state.health <= Perception::HP_PER_HEART
 
       nil
     end

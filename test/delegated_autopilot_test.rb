@@ -509,6 +509,37 @@ class DelegatedAutopilotTest < Minitest::Test
     assert_equal 2, client.calls.size
   end
 
+  def test_a_thing_to_try_is_talked_to_then_touched_through_the_touch_decision_point_even_at_low_health
+    client = ScriptedClient.new(objective: new_place, default: explore)
+    pilot = Koholint::Autopilot.new
+    p = autopiloted(client, autopilot: pilot)
+    here = [state.room_id, state.map_id]
+    ctx = { grid:, entities: -> { [{ kind: :unknown, type: 132, cell: [2, 2], slot: 3, x: 40, y: 48 }] } }
+    p.prepare(ctx)
+    tours(p, 2)
+    @objectives.start(frame: 700, title: 'Go examine', predicate: { kind: 'reach_place', place: here }, target: { kind: 'person', place: here, type: 132, cell: [2, 2], try: true })
+    pilot.adopt(@objectives.current)
+    low = state(frame: 800, hp: 8)
+    result = p.decide(p.decision_point_for(low), low, ctx)
+    assert_equal [true, { skill: 'talk_to', params: { row: 2, col: 2 } }], result.values_at(:autopilot, :choice)
+    p.after_action(choice: result[:choice], outcome: { skill: 'talk_to', params: { row: 2, col: 2 }, stopped_by: 'no_path', talked: false, target_type: 132,
+                                                       from: { room: here[0], map: here[1], row: 3, col: 4 }, to: { room: here[0], map: here[1], row: 3, col: 4 } },
+                   state: state(frame: 900, hp: 8), frame: 900)
+    refute @objectives.talked_to?, 'a talk that never reached the thing'
+    p.after_action(choice: result[:choice], outcome: { skill: 'talk_to', params: { row: 2, col: 2 }, stopped_by: 'no_response', talked: false, target_type: 132,
+                                                       from: { room: here[0], map: here[1], row: 3, col: 4 }, to: { room: here[0], map: here[1], row: 2, col: 3 } },
+                   state: state(frame: 950, hp: 8), frame: 950)
+    low = state(frame: 1000, hp: 8)
+    result = p.decide(p.decision_point_for(low), low, ctx)
+    touch = { skill: 'touch', params: { row: 2, col: 2, type: 132 } }
+    assert_equal [true, touch], result.values_at(:autopilot, :choice)
+    assert_equal touch, result[:decision_point].validate(result[:choice])
+    p.after_action(choice: touch, outcome: { skill: 'touch', params: touch[:params], stopped_by: 'no_contact', target_type: 132,
+                                             from: { room: here[0], map: here[1], row: 2, col: 3 }, to: { room: here[0], map: here[1], row: 2, col: 3 } },
+                   state: state(frame: 1100, hp: 8), frame: 1100)
+    assert @objectives.current, 'a touch that never reached the thing'
+  end
+
   def test_below_full_health_a_visible_heart_is_taken_with_a_safe_touch_and_the_chain_goes_on
     client = ScriptedClient.new(objective: new_place, default: explore)
     p = autopiloted(client)
