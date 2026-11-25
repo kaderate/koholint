@@ -110,7 +110,7 @@ module Koholint
       cap_hold(state) if caps
     end
 
-    # A thing on screen never tried is tried once with talk_to before exploring on, nearest first: the sprites the last explore offered,
+    # A thing on screen never tried is tried once with talk_to before exploring on, nearest first: the sprites the last explore offered where no catalogued enemy stands,
     # and uncatalogued entities of a type never aimed at here. Tries cost no call, so TRY_LIMIT per visit bounds them, not the chain caps.
     def try_choice(state:, objective:, entities:, tried:)
       return unless state.cell && !objective&.dig(:target) && !hold_reason(state:, objective:, caps: false)
@@ -120,7 +120,8 @@ module Koholint
       return if @tries >= TRY_LIMIT
 
       struck = @struck[:place] == here ? @struck[:types] : []
-      things = @untried.map { |cell| [cell, nil] } +
+      enemies = Array(entities).select { |entity| entity[:kind].to_s == 'enemy' }.map { |entity| entity[:cell] }
+      things = (@untried - enemies).map { |cell| [cell, nil] } +
                Array(entities).select { |entity| entity[:kind].to_s == 'unknown' && entity[:cell] && !struck.include?(entity[:type]) && !tried.(entity[:type]) && !@aimed.include?([here, entity[:type]]) }
                               .map { |entity| [entity[:cell], entity[:type]] }
       row, col = state.cell

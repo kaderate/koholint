@@ -37,7 +37,8 @@ observability.
 `data/entities.json` (`npc`, `enemy`, `creature`, `object`, `unknown`; objects: `sign`, `door`, `chest`, `stone`, …).
 `items.rb` and `data/items.json` name item ids; the engine's `ItemWatch` emits `item_gained`. The engine also watches the room
 objects every frame and emits `floor_gave_way` when a crumbling floor object turns into a hole; the skills see that object as
-crumbling only in places where this was seen. The probes under `probes/`
+crumbling only in places where this was seen. `footing.rb` reads the game's crumble timer for the cell under Link's foot point,
+and `Skills::Execution` steps every skill off that cell before it gives way. The probes under `probes/`
 (`bin/koholint census …`) measure these files on throwaway copies; they are the only code that writes RAM.
 
 **Game modes** — `modes.rb` and `data/modes.json` catalogue the game's screens by their mode tuple, each with the engine

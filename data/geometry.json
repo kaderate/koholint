@@ -1,4 +1,9 @@
 {
+  "link_foot": {
+    "value": { "dx": 0, "dy": 4 },
+    "verified_count": 1,
+    "provenance": "foot probes 2026-11-25 on crumbling floor (object 223) in room 189/10, run 20261124-223713-6d60 frame 94716: standing at x 68 the floor of row 1 gave way from y 21 (y 20 never), walking right x 76 gave way under col 4 and x 77 under col 5, walking left x 63 under col 3 and x 66 under col 4; and crumble_timer replays of runs 20261125-033455-6141 (frames 95190-95280: the timer restarted between x 47 and x 49, walking right and left, at y 28) and 20261125-040711-101c; and a crumble_timer probe on a copy of 6d60 at 94716 (standing at x 68 the timer counted at y 20 and went back to 0 at y 19; walking right at y 27 it went back to 0 at x 80 and x 96); so the floor under Link is the cell of the point (x, y + 4)"
+  },
   "link_footprint": {
     "value": {
       "width": 8,

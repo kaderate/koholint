@@ -116,6 +116,16 @@ class AutopilotTest < Minitest::Test
     assert_equal({ skill: 'touch', params: { row: 3, col: 2, type: 58 } }, pilot.touch_choice(state: state(frame: 500), objective:, entities: [at])[:choice])
   end
 
+  def test_no_try_aims_at_an_object_cell_a_catalogued_enemy_stands_on
+    pilot = primed
+    never = ->(_) { false }
+    pilot.acted(skill: 'explore', outcome: { stopped_by: :untried_object, untried_objects: [{ row: 5, col: 2 }] })
+    enemy = [{ kind: :enemy, type: 25, cell: [5, 2] }]
+    assert_nil pilot.try_choice(state: state(frame: 400), objective:, entities: enemy, tried: never)
+    assert_equal({ skill: 'talk_to', params: { row: 5, col: 2 } }, pilot.try_choice(state: state(frame: 500), objective:, entities: [], tried: never)[:choice],
+                 'the object is tried once the enemy is gone')
+  end
+
   def test_tries_are_bounded_per_visit_by_the_autopilot_itself_and_leave_the_chain_alone
     pilot = primed
     never = ->(_) { false }

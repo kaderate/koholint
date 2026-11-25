@@ -52,7 +52,7 @@ module Koholint
       @object_catalogue[path] ||= JSON.parse(File.read(path)).select { |entry| entry.key?('object') }.to_h do |entry|
         validate!(entry)
         [Integer(entry.fetch('object')), { kind: entry.fetch('kind').to_sym, verified: entry['confidence'] == 'verified', faces: entry['faces']&.map(&:to_sym), open: (true if entry['open']),
-                                             push: entry.dig('push', 'value') }.compact]
+                                             push: entry.dig('push', 'value'), give_way: entry.dig('give_way', 'value') }.compact]
       end.freeze
     end
 
@@ -81,6 +81,7 @@ module Koholint
 
       validate_fact!(entry['sword_hits'], "entity #{entry['type']} sword_hits") if entry.key?('sword_hits')
       validate_fact!(entry['push'], "object #{entry['object']} push") if entry.key?('push')
+      validate_fact!(entry['give_way'], "object #{entry['object']} give_way") if entry.key?('give_way')
       validate_fact!(entry['heals'], "entity #{entry['type']} heals") if entry.key?('heals')
     end
 

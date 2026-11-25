@@ -25,6 +25,10 @@ module Koholint
         end
 
         def next_input(state)
+          if (@landing || @holding) && !@stopped_by && (off = floor_step(state))
+            @frames += 1
+            return off
+          end
           return land(state) if @landing
           return hold(state) if @holding
 

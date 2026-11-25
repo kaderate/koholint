@@ -50,6 +50,10 @@ module Koholint
       def start(name, state, params, context = {})
         execution = fetch(name).start(state, params, context.merge(registry: self))
         execution.triggers = context[:triggers] if execution.respond_to?(:triggers=)
+        if execution.respond_to?(:footing=)
+          execution.footing = context[:footing]
+          execution.footing_grid = context[:grid]
+        end
         execution = Shielded.new(execution, entities: context[:entities]) if Shielded::MOVING.include?(name.to_s) && context[:entities]
         execution
       end

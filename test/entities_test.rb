@@ -69,6 +69,16 @@ class EntitiesTest < Minitest::Test
     assert_equal({ kind: :chest, verified: true, faces: [:up], open: true }, catalogue[161])
   end
 
+  def test_floor_that_gives_way_carries_its_timer_value_as_a_fact
+    assert_equal({ kind: :crumbling, verified: false, give_way: 40 }, Koholint::Entities.object_catalogue[223])
+    Dir.mktmpdir do |dir|
+      bad = File.join(dir, 'bad.json')
+      File.write(bad, JSON.generate([{ 'object' => 99, 'kind' => 'crumbling', 'source' => 's', 'confidence' => 'hypothesis', 'verified_count' => 1,
+                                       'give_way' => { 'value' => 40, 'confidence' => 'verified', 'verified_count' => 1, 'source' => 's' } }]))
+      assert_raises(Koholint::Entities::Invalid) { Koholint::Entities.object_catalogue(bad) }
+    end
+  end
+
   def test_object_entries_are_validated_apart_from_entity_types
     Dir.mktmpdir do |dir|
       path = File.join(dir, 'entities.json')

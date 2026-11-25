@@ -4,6 +4,7 @@ require 'fileutils'
 require 'koholint/budget'
 require 'koholint/canonical_save'
 require 'koholint/entities'
+require 'koholint/footing'
 require 'koholint/items'
 require 'koholint/decision'
 require 'koholint/emulator'
@@ -60,6 +61,7 @@ module Koholint
       @engine_errors = 0
       @emulator = emulator || Emulator.boot
       @readiness = Readiness.new
+      @footing = Footing.new
       @readiness.observe(previous) if previous
       @keyframes = Keyframes.new(File.join(run.dir, 'keyframes'))
       events = Trace.read(File.join(run.dir, 'trace.jsonl'))
@@ -214,7 +216,7 @@ module Koholint
       context[:held] = Items.held(state)
       context.merge(dialogue_shot: -> { Vision::DialogueShot.crop(@emulator) }, dialogue_rgb: -> { Vision::DialogueShot.rgb(@emulator) },
                     entities: -> { Entities.read(@emulator) }, objects: -> { observed_floors(Entities.objects(@emulator)) },
-                    room_objects: -> { Entities.room_objects(@emulator) })
+                    room_objects: -> { Entities.room_objects(@emulator) }, footing: @footing)
     end
 
     def record_prompt(result, frame, name)
@@ -320,6 +322,7 @@ module Koholint
       @budget.tick(frames: 1)
       state = Perception.read(@emulator)
       note_floor(state)
+      @footing.observe(state, @floor.last)
       @readiness.observe(state)
       gains = @items.observe(state)
       gains.each { |gain| @run.trace.emit(:item_gained, frame: state.frame, **gain) }
