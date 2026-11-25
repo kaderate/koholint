@@ -1,6 +1,6 @@
 # Agent skills
 
-The skills, protocols and harness behaviours the agent works with. Versioned with the play flow (currently `flow-90`): update this page, not the README, when a flow changes. Layers and data flow are in [ARCHITECTURE.md](../ARCHITECTURE.md).
+The skills, protocols and harness behaviours the agent works with. Versioned with the play flow (currently `flow-91`): update this page, not the README, when a flow changes. Layers and data flow are in [ARCHITECTURE.md](../ARCHITECTURE.md).
 
 
 - Learned capabilities (`data/capabilities.json`, `bin/koholint capability list`): an `operational` entry is a composite of the skills below, offered in the skill schema and listed under "Learned skills" only while its trigger item is held (flow-49) and its object is on screen (today `sword_on_object_92 row col direction`: stand next to object 92, face it, use the sword, step into its cell). `explore` and `goto` also run it themselves when blocked facing such a cell, and the planner routes through those cells as a last resort. `learn` and `capability publish|retire` are offline commands.
@@ -144,6 +144,15 @@ The skills, protocols and harness behaviours the agent works with. Versioned wit
   Within a place, explore takes a side known only as the assumed way back (flow-78) after the place's other reachable untried exits, doors and frontiers;
   it is still a frontier, taken when nothing else here is reachable, before a route to another place. An explore that stops `no_frontier`
   in at most one frame is answered by the harness at the next decision, not after three, since from the same cell it would find none again.
+- flow-91: no skill stands on floor that gives way past its time. The game counts the frames the cell under Link's foot point
+  (`link_foot`, 4 px below him) has been crumbling floor (`crumble_timer`), starts over when that cell changes and drops the cell
+  into a hole at its `give_way` value (40 for object 223). Every skill's step (goto, explore, touch, talk_to, wait, walk and the attack
+  lineup) checks it first: when the shortest step that takes the foot point onto another floor cell (crumbling floor included, since the
+  count starts over there; never a hole, live ones included) would just fit in the frames left, Link takes that step to the end, and a
+  step that leaves him in place for 2 frames is retried another way. A step that would put the foot point into a hole that opened after
+  the skill planned ends the skill (`hole`). The autopilot never tries an untried object cell a catalogued enemy stands on. An explore
+  whose only reachable way on is the side Link came in by, after the routes it preferred proved unreachable, reports `dead_end`, so
+  that landing becomes a pocket.
 - flow-90: holes and crumbling floor are read from the live room objects. Objects 174 and 175 are holes wherever they appear
   (the grid's `hole_objects`, never walked, with their margin); object 223 is a floor that becomes a hole when Link stands on it
   about half a second, and the room restores it on re-entry; it counts as crumbling in a place only once one of its cells there was
