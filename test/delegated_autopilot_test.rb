@@ -833,18 +833,20 @@ class DelegatedAutopilotTest < Minitest::Test
     assert_nil p.send(:follow_choice, state(room_id: 9))
   end
 
-  def test_a_souvenir_candidate_here_starts_its_delivery_and_is_followed_with_a_talk
+  def test_a_souvenir_candidate_here_is_taken_by_the_harness_and_followed_with_a_talk
     entities = -> { [{ type: 64, kind: 'npc', cell: [2, 3] }] }
     souvenirs = [{ 'place' => [163, 16], 'entity' => 64, 'cell' => [2, 3], 'text' => 'Pour ma poudre, il me faut le Champignon de la forêt.',
                    'seen' => [{ 'run' => '20261101-000000-aaaa', 'frame' => 1, 'held' => [1, 4] }] }]
-    client = ScriptedClient.new(objective: ok('candidate' => 'souvenir-163-16-t64', 'plan' => 'x', 'goal' => 'g'))
+    client = ScriptedClient.new(objective: objective)
     @objectives = Koholint::Objectives.new(trace:)
     p = Koholint::Policies::Delegated.new(client:, registry: Koholint::Skills::Registry.default, objectives: @objectives, manual: '', autopilot: Koholint::Autopilot.new,
                                           revisit: QuietRevisit.new(talk_log: Koholint::TalkLog.new), souvenirs:)
+    p.decide(p.decision_point_for(state), state, { grid:, entities: })
+    @objectives.abandon(frame: 100, reason: 'test')
     holding = state(item_a: 1, item_b: 4, inventory: [12, 0, 0, 0, 0, 0, 0, 0, 0, 0])
     picked = p.decide(p.decision_point_for(holding), holding, { grid:, entities: })
-    refute picked[:refused], picked[:justification]
-    refute_includes client.calls.first[:prompt], '- person-t64:'
+    assert picked[:autopilot], picked[:justification]
+    assert_equal 1, client.calls.size, 'the harness takes it before asking the model'
     assert_equal({ kind: 'person', place: [163, 16], type: 64, cell: [2, 3], try: true, item: 12, name: 'champignon' }, @objectives.current[:target])
     talk = p.decide(p.decision_point_for(holding), holding, { grid:, entities: })
     assert_equal({ skill: 'talk_to', params: { row: 2, col: 3 } }, talk[:choice])
@@ -894,6 +896,30 @@ class DelegatedAutopilotTest < Minitest::Test
     assert_equal({ choice: { skill: 'talk_to', params: { row: 3, col: 4 } } }, p.send(:follow_choice, holding))
     @objectives.note_try(place: here, type: 64, skill: 'talk_to', answered: true)
     assert_equal({ choice: { skill: 'use_item', params: { item: Koholint::Items.name(12) } } }, p.send(:follow_choice, holding))
+  end
+
+  # Paid forks 5a6d, c187 and f760: the model left by the nearest side every time the hut's souvenir was offered.
+  def test_a_reachable_souvenir_naming_a_held_item_by_its_pickup_text_becomes_the_objective_once
+    here = [state.room_id, state.map_id]
+    souvenir = ->(text) { { 'place' => here, 'entity' => 64, 'cell' => [3, 4], 'text' => text, 'seen' => [{ 'run' => '20261101-000000-aaaa', 'frame' => 1, 'held' => [1, 4] }] } }
+    build = lambda do |souvenirs, item_names: {}|
+      @objectives = Koholint::Objectives.new(trace: trace)
+      Koholint::Policies::Delegated.new(client: ScriptedClient.new(objective: []), registry: Koholint::Skills::Registry.default, objectives: @objectives, manual: '',
+                                        autopilot: Koholint::Autopilot.new, souvenirs:, memory: Koholint::Policies::Memory.new(item_names:))
+    end
+    take = ->(p, now) { p.send(:souvenir_objective, p.decision_point_for(now), now, { grid: }) }
+    p = build.([souvenir.('Pour ma poudre, il me faut le Champignon de la forêt.')])
+    holding = state(inventory: [12] + Array.new(9, 0))
+    assert_nil take.(p, state), 'not while Link does not hold it'
+    picked = take.(p, holding)
+    assert picked[:autopilot]
+    assert_equal ['souvenir-163-16-t64', { kind: 'person', place: here, type: 64, cell: [3, 4], try: true, item: 12, name: 'champignon' }], @objectives.current.values_at(:candidate, :target)
+    @objectives.abandon(frame: 200, reason: 'stall')
+    assert_nil take.(p, holding), 'taken once; a drop is the re-offer rules\' to take up'
+    started = Koholint::Trace.read(File.join(@dir, 'trace.jsonl')).select { |e| e['type'] == 'objective' }
+    assert_equal ['souvenir-163-16-t64'], Koholint::Policies::Memory.souvenirs_taken(started), 'a resumed run keeps it taken'
+    named = build.([souvenir.('Rapporte-moi le boomerang, petit.')], item_names: { 13 => %w[boomerang] })
+    assert_nil take.(named, state(inventory: [13] + Array.new(9, 0))), 'a name not read from a pickup text stays a model choice'
   end
 
   def test_an_item_objective_whose_try_drew_no_text_is_not_picked_again_until_a_new_text_from_that_person
