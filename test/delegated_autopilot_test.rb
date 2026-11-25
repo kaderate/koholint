@@ -443,6 +443,22 @@ class DelegatedAutopilotTest < Minitest::Test
     assert_equal [['wait', nil]] * 4, answers.(24), 'above one heart the waits go on'
   end
 
+  # Run 5e81, 172/10 at 4 hp: the type 155 walked up to Link during the first 120-frame wait and killed him.
+  def test_at_one_heart_with_a_hostile_in_touch_explore_leaves_by_the_side_link_came_in_without_waiting
+    client = ScriptedClient.new(objective: new_place, default: explore)
+    p = autopiloted(client, autopilot: nil)
+    hostile = { slot: 3, type: 155, kind: 'enemy', x: 68, y: 84, contact: 11, cell: [4, 4] }
+    p.instance_variable_set(:@entities_reader, -> { [hostile] })
+    low = state(hp: 8)
+    decide(p)
+    result = p.decide(p.decision_point_for(low), low, { grid: })
+    p.after_action(choice: result[:choice], outcome: outcome(:no_frontier, 0).merge(frames: 1, moved_cells: 0, cells_walked: 0), state: low, frame: 300)
+    context = { grid: }
+    result = p.decide(p.decision_point_for(low), low, context)
+    assert_equal ['explore', true], [result[:choice][:skill], context[:retreat]]
+    assert_match(/hostile in touch/, result[:justification])
+  end
+
   def test_repeated_zero_frame_results_in_one_place_are_answered_by_the_harness
     client = ScriptedClient.new(objective: new_place, default: explore)
     p = autopiloted(client, autopilot: nil)

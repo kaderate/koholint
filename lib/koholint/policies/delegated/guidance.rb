@@ -244,14 +244,18 @@ module Koholint
           goal = (route || away)&.dig(:goal)
           context[:aim] = { place: goal } if goal && !route&.dig(:lifted)
           spot = [place, state.cell]
-          @deadlock = nil unless !goal && state.health <= Perception::HP_PER_HEART && @deadlock&.dig(:spot) == spot
-          retreat = @deadlock && @deadlock[:waits] >= DEADLOCK_WAITS
+          low = !goal && state.health <= Perception::HP_PER_HEART
+          @deadlock = nil unless low && @deadlock&.dig(:spot) == spot
+          zone = low && state.cell ? Entities.danger_cells(entities_now) : []
+          pressed = ([state.cell] + Geometry::DELTAS.values.map { |dr, dc| [state.cell[0] + dr, state.cell[1] + dc] }).intersect?(zone) if zone.any?
+          retreat = low && (pressed || (@deadlock && @deadlock[:waits] >= DEADLOCK_WAITS))
           context[:retreat] = true if retreat
-          @deadlock = { spot:, waits: (@deadlock&.dig(:waits) || 0) + 1 } if !goal && !retreat && state.health <= Perception::HP_PER_HEART
+          @deadlock = { spot:, waits: (@deadlock&.dig(:waits) || 0) + 1 } if low && !retreat
           choice = goal || retreat ? EXPLORE : ZERO_WAIT
           @zero_watch.capping(choice[:skill])
           what = if route then "explore toward #{goal.join('-')}, the nearest place with untried work"
                  elsif away then "no place has untried work: explore toward #{goal.join('-')}, the reachable place entered least"
+                 elsif pressed then 'no way out at one heart with a hostile in touch: leave by the side Link came in'
                  elsif retreat then "no way out at one heart after #{DEADLOCK_WAITS} waits: leave by the side Link came in"
                  else "wait #{ZERO_WAIT[:params][:frames]} frames before asking again"
                  end
