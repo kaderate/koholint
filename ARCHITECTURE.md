@@ -131,7 +131,7 @@ the engine wrote; each fork counts from its fork frame. `Atlas.facts` lists ever
 and provenance. `koholint atlas` writes `tmp/atlas.json`; the viewer serves `/atlas`.
 
 **Viewer** (`viewer.rb`, `viewer/`) — a small HTTP server. A `Follower` replays the watched run's journal and seeks by keyframe;
-`Feed` and `Insights` derive status, feed, reasoning, objectives, leads, dialogues, the world map and the cockpit from the trace
+`Feed` and `Insights` derive status, feed, reasoning, objectives, leads, dialogues, recent skill calls, the world map and the cockpit from the trace
 up to the shown frame; `page.html` draws them. It never writes game state; it writes only `star.json`, `summary.json`'s
 `starred` and `notes.md`.
 
