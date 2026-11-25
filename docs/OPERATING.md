@@ -111,16 +111,27 @@ feeds `data/addresses.json` and the `ready` of the `play` mode in `data/modes.js
 finished run or one being written; Ctrl-C stops it. It listens on 127.0.0.1 only; `--host 0.0.0.0` opens it to other
 devices on the same network (no authentication: use it on a network you trust).
 
-`/` is the cockpit (French UI, keys 1 and 2 switch views, state kept in the browser). **Île** draws the overworld screens
+`/` is the cockpit (French UI, keys 1 to 3 switch views, Escape closes a drawer, state kept in the browser). **Île** draws the overworld screens
 seen by every run under the runs root with their captures, the ways taken (thicker when crossed more), deaths summed on the
 screen an interior opens from, a star where each item was first gained and rings on the next leads; the side shows the
 screens discovered, the 16x16 locator, discoveries over time and the Prochain card (the top open lead of the lineage that
-holds the most items); a click on a screen shows its capture with where Link stood (heat), visits, runs and entities; the
-play button replays the discovery day by day. **Direct** (`#direct`, or `#direct/<id>` for a replay) shows the live frame,
+holds the most items); a click on a screen shows its capture with where Link stood (heat), visits, runs and entities, and
+opens the runs that last passed there; the play button replays the discovery day by day; a run's trace draws its path over
+the screens. **Direct** (`#direct`, or `#direct/<id>` for a replay) shows the live frame,
 the thought and objective at the shown frame, hearts, held items, the current place, the minimap with the trail, a
 scrubber with place, item and death marks (dragging it freezes the screen on that place's capture; a replay seeks), and
-the objectives, dialogues (pieces of one text merged) and skills up to that frame. Métro is a placeholder. `/island.json`
-and `/story.json[?run=<id>]` feed it, each cached by trace mtime and size; the island is rebuilt at most every 30 s.
+the objectives (consecutive attempts with one title folded into one line with ×N and the last outcome, a click unfolds
+them), dialogues (pieces of one text merged) and skills up to that frame; its header links to the run's trace on the
+island, its lineage on the metro and its debug page (`/live` or `/run/<id>`, also linked from the top bar as Debug). **Métro** draws the lineages that reached a checkpoint of `data/checkpoints.json`, a
+first item gain or a new screen, against minutes of play: the furthest lineage as the main line, each fork leaving its
+parent at its fork frame, checkpoints and first gains as stations, deaths at line ends and +N for the forks that reached
+nothing new; a click on a line dims everything but its lineage and shows its card (minutes, new screens, cumulated cost,
+items, Direct, trace on the island); the play button rolls Link along the main line. Three drawers open from the top bar:
+**Runs** (the runs with a `summary.json`, searched by id, flow, tag, stop or star reason, starred only; a row opens Direct,
+✎ stars it with a reason through `POST /star` and edits its notes through `POST /notes`), **Pistes** (every lead, open
+first then by importance, with its reading and where it was read) and **Personnes** (the texts read, by speaker or, without
+a name, by the screen they were heard on; one text read in several runs counts once). `/island.json`
+(which also carries the metro lines, leads and people) and `/story.json[?run=<id>]` feed it, each cached by trace mtime and size; the island is rebuilt at most every 30 s.
 The atlas digest of each run adds `parent` (the parent run's id), `held` (the items held at its last gain) and, per place,
 `heat`: 80 counts, one per playfield cell (10 columns by 8 rows), of the times Link entered that cell there in the run's own events.
 

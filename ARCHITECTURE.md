@@ -140,7 +140,8 @@ and provenance. `koholint atlas` writes `tmp/atlas.json`; the viewer serves `/at
 **Viewer** (`viewer.rb`, `viewer/`) — a small HTTP server. A `Follower` replays the watched run's journal and seeks by keyframe;
 `Feed` and `Insights` derive status, feed, reasoning, objectives, leads, dialogues, recent skill calls, the world map and the cockpit from the trace
 up to the shown frame; `page.html` draws them. `app.html` is the cockpit at `/`: `Island` merges the atlas of the runs root per screen
-(captures, ways, deaths, heat, first gains, the open leads of the lineage holding the most items) and `Story` reads one run as
+(captures, ways, deaths, heat, first gains, the open leads of the lineage holding the most items, the metro lines of the
+lineages that reached something, every lead, the texts by voice) and `Story` reads one run as
 frame-stamped thoughts, objectives, places, body, items, skills and merged dialogues; both are cached by trace mtime and size. It never writes game state; it writes only `star.json`, `summary.json`'s
 `starred` and `notes.md`.
 

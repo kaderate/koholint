@@ -131,6 +131,42 @@
   .list { display: flex; flex-direction: column; gap: 6px; max-height: 210px; overflow: auto; font-size: 13px; }
   .ob { display: grid; grid-template-columns: 18px 1fr auto; gap: 6px; align-items: start; }
   .ob.fut { opacity: .3; } .ob.now { font-weight: 700; }
+  .ob.grp { cursor: pointer; } .ob .n { color: var(--mut); font-weight: 600; margin-left: 6px; } .ob.sub { padding-left: 18px; font-size: 12.5px; color: var(--mut); }
+  #metro { flex-direction: column; padding: 16px 24px; }
+  #metro .mhead { display: flex; align-items: flex-end; gap: 28px; }
+  #msvg { flex: 1; width: 100%; min-height: 0; }
+  .ln { fill: none; stroke-width: 6; stroke-linecap: round; stroke-linejoin: round; cursor: pointer; transition: opacity .3s; }
+  .ln.main { stroke-width: 11; }
+  .ln:hover { stroke-width: 9; }
+  .st { fill: var(--bg); stroke: var(--ink); stroke-width: 3; cursor: pointer; }
+  .xch { fill: var(--panel); stroke: var(--ink); stroke-width: 3; cursor: pointer; }
+  .term { fill: var(--ink); }
+  .dim { opacity: .12; }
+  .ckname { font-size: 12.5px; fill: var(--ink); font-weight: 700; }
+  .hid { font-size: 11px; fill: var(--mut); font-weight: 700; }
+  .axis text { font-size: 11px; fill: var(--mut); } .axis line { stroke: var(--soft); }
+  .msel { position: absolute; right: 24px; bottom: 22px; width: 330px; animation: drop2 .35s var(--ease); }
+  @keyframes drop2 { from { transform: translateY(14px); opacity: 0; } }
+  .scrim { position: fixed; inset: 52px 0 0 0; background: rgba(0,0,0,.25); opacity: 0; pointer-events: none; transition: opacity .3s; z-index: 39; }
+  .scrim.on { opacity: 1; pointer-events: auto; }
+  aside { position: fixed; top: 52px; right: 0; bottom: 0; width: 420px; background: var(--panel); border-left: 1px solid var(--line); z-index: 40; transform: translateX(100%); transition: transform .45s var(--ease); display: flex; flex-direction: column; }
+  aside.on { transform: none; }
+  aside .h { padding: 14px 16px 10px; display: flex; align-items: center; gap: 10px; }
+  aside .h b { font-size: 15px; }
+  aside .body { flex: 1; overflow: auto; padding: 0 10px 16px; }
+  .search { flex: 1; padding: 7px 12px; border-radius: 10px; border: 1px solid var(--line); background: var(--bg); color: var(--ink); }
+  .runitem { width: 100%; display: grid; grid-template-columns: 18px 72px 1fr 56px 22px; gap: 8px; align-items: center; padding: 8px; border-radius: 10px; text-align: left; font-size: 13px; font-variant-numeric: tabular-nums; cursor: pointer; }
+  .runitem:hover { background: var(--soft); }
+  .runitem .stb { color: var(--line); } .runitem .stb.on { color: var(--warn); }
+  .runmore { margin: 0 8px 10px 34px; display: flex; flex-direction: column; gap: 6px; font-size: 12.5px; }
+  .runmore textarea, .runmore input { width: 100%; padding: 6px 8px; border-radius: 8px; border: 1px solid var(--line); background: var(--bg); color: var(--ink); font: inherit; }
+  .runmore textarea { min-height: 70px; resize: vertical; }
+  .lead { display: grid; grid-template-columns: 10px 1fr auto; gap: 10px; align-items: start; padding: 8px; border-radius: 10px; font-size: 13px; }
+  .lead q { font-style: italic; }
+  .lead .dot { width: 9px; height: 9px; border-radius: 50%; margin-top: 5px; }
+  .person { margin: 8px 6px 14px; }
+  .person b { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
+  .person .dl { margin: 0 0 5px; font-size: 13px; }
   .dl { padding: 6px 10px; border-radius: 10px 10px 10px 2px; background: var(--soft); white-space: pre-line; }
   .dl.fut { display: none; }
   .dl small { display: block; color: var(--mut); font-size: 11px; }
@@ -140,7 +176,7 @@
   @media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; } }
   .empty { margin: auto; display: flex; flex-direction: column; align-items: center; gap: 10px; color: var(--ink); font-size: 15px; }
   .sprite-big { width: 48px; height: 48px; animation: bob .5s steps(2) infinite; }
-  a.tool { text-decoration: none; }
+  a.tool, a.xbtn { text-decoration: none; color: inherit; }
   button.tag.live { border: 0; cursor: pointer; }
 </style>
 </head>
@@ -173,17 +209,23 @@
   <nav id="nav"><span class="pill"></span>
     <button type="button" data-go="ile"><svg class="ico" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M2 11c2-1 3-4 6-4s4 3 6 4M3 13h10"></path><circle cx="11" cy="4" r="1.5"></circle></svg>Île</button>
     <button type="button" data-go="direct"><svg class="ico" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="2" y="3" width="12" height="10" rx="2"></rect><path d="M7 6l3 2-3 2z" fill="currentColor"></path></svg>Direct</button>
-    <button type="button" disabled title="bientôt" style="opacity:.4;cursor:default"><svg class="ico" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M2 8h12M6 8l3-4h5"></path><circle cx="6" cy="8" r="1.6" fill="currentColor"></circle><circle cx="11" cy="8" r="1.6" fill="currentColor"></circle></svg>Métro</button>
+    <button type="button" data-go="metro"><svg class="ico" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M2 8h12M6 8l3-4h5"></path><circle cx="6" cy="8" r="1.6" fill="currentColor"></circle><circle cx="11" cy="8" r="1.6" fill="currentColor"></circle></svg>Métro</button>
   </nav>
   <div class="chips" id="chips"></div>
-  <a class="tool" href="/runs" title="Historique"><svg class="ico" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M3 4h10M3 8h10M3 12h6"></path></svg></a>
+  <button type="button" class="tool" data-drawer="runs" title="Runs" aria-pressed="false"><svg class="ico" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M3 4h10M3 8h10M3 12h6"></path></svg></button>
+  <button type="button" class="tool" data-drawer="leads" title="Pistes" aria-pressed="false"><svg class="ico" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M4 2h8v12l-4-3-4 3z"></path></svg></button>
+  <button type="button" class="tool" data-drawer="people" title="Personnes" aria-pressed="false"><svg class="ico" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="8" cy="5.5" r="2.5"></circle><path d="M3 14c.5-3 2.5-4.5 5-4.5s4.5 1.5 5 4.5"></path></svg></button>
+  <a class="tool" href="/live" title="Debug"><svg class="ico" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M5 5l-3 3 3 3M11 5l3 3-3 3M9 3l-2 10"></path></svg></a>
   <a class="tool" href="/atlas" title="Atlas"><svg class="ico" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="2" y="2" width="12" height="12" rx="1"></rect><path d="M2 6h12M2 10h12M6 2v12M10 2v12"></path></svg></a>
   <button type="button" class="tool" id="sound" title="Son"></button>
 </header>
 <main>
   <section class="place" id="ile"></section>
   <section class="place" id="direct"></section>
+  <section class="place" id="metro"></section>
 </main>
+<div class="scrim" id="scrim"></div>
+<aside id="drawer" aria-label="tiroir"></aside>
 <script>
 (function () {
   // pure:begin
@@ -200,17 +242,19 @@
   function tally(skills, frame) { const out = {}; upto(skills, frame).forEach(function (row) { out[row[1]] = (out[row[1]] || 0) + 1; }); return Object.entries(out).sort(function (a, b) { return b[1] - a[1]; }); }
   function hearts(hp, max) { const out = []; for (let k = 0; k < Math.ceil((max || 0) / 8); k++) out.push(Math.max(0, Math.min(1, (hp - k * 8) / 8))); return out; }
   function placeName(label, place) { return !place || place.grid ? label : place.opens_from[0] ? 'intérieur, porte en ' + place.opens_from[0] : 'intérieur ' + label; }
+  function groupAttempts(rows) { const out = []; rows.forEach(function (o) { const g = out[out.length - 1]; if (g && g[0][2] === o[2]) g.push(o); else out.push([o]); }); return out; }
   function latestObjectives(objectives) { const last = {}; objectives.forEach(function (o) { last[o[4]] = o; }); return Object.values(last).sort(function (a, b) { return a[0] - b[0]; }); }
   // pure:end
 
   const $ = function (id) { return document.getElementById(id); };
   const SVGNS = $('sprites').namespaceURI;
-  const ORDER = ['ile', 'direct'];
+  const ORDER = ['ile', 'direct', 'metro'];
   const KEY = 'koholint-app';
-  const state = { view: 'ile', sel: null, day: null, sound: false, run: null, frame: null, scrub: null };
+  const state = { view: 'ile', sel: null, day: null, sound: false, run: null, frame: null, scrub: null, drawer: null, q: '', starOnly: false, runsAt: null, more: null, msel: null, trail: null };
   try { Object.assign(state, JSON.parse(localStorage.getItem(KEY) || '{}')); } catch (e) { }
-  const save = function () { try { localStorage.setItem(KEY, JSON.stringify({ view: state.view, sound: state.sound })); } catch (e) { } };
-  let island = null, P = {}, grid = [], days = [], story = null, replay = null, spritePos = null;
+  const save = function () { try { localStorage.setItem(KEY, JSON.stringify({ view: state.view, sound: state.sound, q: state.q, starOnly: state.starOnly })); } catch (e) { } };
+  let island = null, P = {}, grid = [], days = [], story = null, replay = null, spritePos = null, runs = null, trailStory = null, train = null, trainTimer = null;
+  const expanded = new Set();
 
   function nodes(kids) { return [].concat(kids).flat(Infinity).filter(function (k) { return k != null && k !== false && k !== ''; }).map(function (k) { return k.nodeType ? k : document.createTextNode(String(k)); }); }
   function make(node, attrs, kids) {
@@ -290,7 +334,7 @@
         h('div', { class: 'shot' }, p.screen && h('img', { class: 'px', alt: '', src: shotUrl(p.label) }), dots),
         h('div', { class: 'facts' }, h('b', { text: p.label }), h('span', { class: 'mut', text: p.room + '/' + p.map }), h('span', { text: fd(p.first.date) }), h('span', { text: p.visits + '×' }), p.deaths ? h('span', null, skull(14), ' ' + p.deaths) : null),
         h('div', { class: 'cap', text: p.runs + ' runs' + (seen ? ' · ' + seen : '') }),
-        h('div', { class: 'btns' }, h('button', { type: 'button', class: 'xbtn', id: 'unsel', text: '✕ fermer' })));
+        h('div', { class: 'btns' }, p.recent.length ? h('button', { type: 'button', class: 'xbtn', 'data-runs-at': p.label, text: p.recent.length + ' runs récentes ici' }) : null, h('button', { type: 'button', class: 'xbtn', id: 'unsel', text: '✕ fermer' })));
     } else {
       const n = island.next[0];
       side = [h('div', null, h('div', { class: 'hero' }, count, h('small', { text: ' / 256' })), h('div', { class: 'cap', text: 'écrans découverts' })),
@@ -303,12 +347,19 @@
     }
     fill('ile', [h('div', { class: 'mapbox' },
       h('div', { class: 'island', style: 'grid-template-columns:repeat(' + nc + ',' + W + 'px);grid-auto-rows:' + H + 'px' }, cells,
-        s('svg', { viewBox: '0 0 ' + nc * W + ' ' + nr * H }, trails, marks),
+        s('svg', { viewBox: '0 0 ' + nc * W + ' ' + nr * H }, trails, marks, runTrail(c)),
+        state.trail && h('div', { class: 'banner' }, 'trace de ' + short(state.trail), h('button', { type: 'button', id: 'untrail', 'aria-label': 'retirer la trace', text: '✕' })),
         h('div', { class: 'sprite', id: 'sprite', style: 'display:' + (replay && spritePos ? 'block' : 'none') + ';transform:translate(' + (spritePos ? spritePos[0] - 13 : 0) + 'px,' + (spritePos ? spritePos[1] - 13 : 0) + 'px)' }, sprite())),
       h('div', { class: 'scrub' }, h('button', { type: 'button', class: 'round', id: 'playA', 'aria-label': 'rejouer la découverte' }, playIco(!!replay)),
         h('input', { type: 'range', id: 'dayA', min: 0, max: days.length - 1, value: di, 'aria-label': 'jour' }), h('b', { style: 'width:70px;text-align:right', text: fd(day) }))),
       h('div', { class: 'side' }, side)]);
     ile.center = c;
+  }
+  function runTrail(c) {
+    if (!state.trail || !trailStory || trailStory.run !== state.trail) return null;
+    const pts = []; trailStory.trail.forEach(function (row) { const l = scr(row[1]); if (l && P[l] && P[l].grid && pts[pts.length - 1] !== l) pts.push(l); });
+    if (!pts.length) return null;
+    return s('path', { class: 'mytrail', d: pts.map(function (l, k) { const xy = c(l); return (k ? 'L' : 'M') + xy[0] + ',' + xy[1]; }).join('') });
   }
   function walk(points, dt) {
     points.forEach(function (pt, k) { setTimeout(function () { if (!replay) return; spritePos = pt; const el = $('sprite'); if (el) { el.style.display = 'block'; el.style.transform = 'translate(' + (pt[0] - 13) + 'px,' + (pt[1] - 13) + 'px)'; } }, k * dt); });
@@ -351,9 +402,12 @@
     const sk = tally(st.skills, f).slice(0, 7); const skMax = Math.max.apply(null, [1].concat(sk.map(function (e) { return e[1]; })));
     const dl = st.dialogues.filter(function (d) { return d.frame <= f; }).slice(-30).reverse();
     const playing = !isLive && controls && !controls.paused && !frozen;
-    put('dhead', [st.run, st.flow, isLive, frozen], function () {
+    put('dhead', [st.run, st.flow, isLive, frozen, inMetro(st.run)], function () {
       return [h('h2', { text: short(st.run) }), isLive && !frozen ? h('span', { class: 'tag live', text: '● direct' }) : frozen && isLive ? h('button', { type: 'button', class: 'tag live', id: 'backLive', text: '● revenir au direct' }) : h('span', { class: 'tag', text: 'replay' }),
-        h('span', { class: 'tag', text: st.flow }), h('span', { class: 'mut', text: fd(st.run.slice(0, 4) + '-' + st.run.slice(4, 6) + '-' + st.run.slice(6, 8)) })];
+        h('span', { class: 'tag', text: st.flow }), h('span', { class: 'mut', text: fd(st.run.slice(0, 4) + '-' + st.run.slice(4, 6) + '-' + st.run.slice(6, 8)) }), h('span', { style: 'flex:1' }),
+        h('button', { type: 'button', class: 'xbtn', 'data-trail': st.run, text: 'sa trace sur l\'île' }), inMetro(st.run) && h('button', { type: 'button', class: 'xbtn', 'data-lineage': st.run, text: 'sa lignée' }),
+        h('a', { class: 'xbtn', href: state.run ? '/run/' + encodeURIComponent(st.run) : '/live', text: 'Debug' }),
+        h('button', { type: 'button', class: 'xbtn', 'data-drawer': 'runs', text: 'runs' })];
     });
     put('dhud', [body, held, kf(f), !!island], function () {
       return [h('span', { class: 'hearts' }, body && hearts(body[1], body[2]).map(function (fr) { return s('svg', { viewBox: '0 0 16 16' }, s('path', { d: HEART, fill: fr >= 1 ? '#ef6f6f' : fr > 0 ? '#f0b54a' : 'none', stroke: '#ef6f6f', 'stroke-width': 1.2 })); })),
@@ -371,7 +425,13 @@
     });
     $('dfill').style.width = pos(f); $('dknob').style.left = pos(f);
     const range = $('frameD'); if (range && document.activeElement !== range) range.value = f;
-    put('dobj', [latest, obj && obj[4]], function () { return latest.slice().reverse().slice(0, 40).map(function (o) { return h('div', { class: 'ob' + (obj && o[4] === obj[4] ? ' now' : '') }, obIco(o[1]), h('span', { text: o[2] }), h('span', { class: 'mut num', text: kf(o[0]) })); }); });
+    put('dobj', [latest, obj && obj[4], Array.from(expanded)], function () {
+      return groupAttempts(latest).reverse().slice(0, 40).map(function (g) {
+        const last = g[g.length - 1], key = String(g[0][4]), now = obj && g.some(function (o) { return o[4] === obj[4]; });
+        const line = h('div', { class: 'ob' + (g.length > 1 ? ' grp' : '') + (now ? ' now' : ''), 'data-group': g.length > 1 ? key : null }, obIco(last[1]), h('span', null, last[2], g.length > 1 && h('span', { class: 'n', text: '×' + g.length })), h('span', { class: 'mut num', text: kf(last[0]) }));
+        return [line, expanded.has(key) && g.slice().reverse().map(function (o) { return h('div', { class: 'ob sub' }, obIco(o[1]), h('span', { text: ({ started: 'en cours', achieved: 'atteint', failed: 'échoué', abandoned: 'abandonné' })[o[1]] || o[1] }), h('span', { class: 'mut num', text: kf(o[0]) })); })];
+      });
+    });
     put('ddl', [dl.length, dl.length && dl[0].frame, dl.length && dl[0].text], function () { return dl.length ? dl.map(function (d) { return h('div', { class: 'dl' }, h('small', { text: (d.speaker || placeName(d.place, P[d.place])) + ' · ' + kf(d.frame) }), d.text); }) : h('span', { class: 'mut', text: 'aucun texte lu' }); });
     put('dsk', sk, function () { return sk.map(function (e) { return h('div', { class: 'bar' }, h('span', { text: e[0] }), h('i', { style: 'width:' + (100 * e[1] / skMax) + '%' }), h('span', { class: 'mut num', text: e[1] })); }); });
   }
@@ -385,9 +445,12 @@
   }
 
   function json(url) { return fetch(url, { cache: 'no-store' }).then(function (r) { if (!r.ok) throw new Error(r.status); return r.json(); }); }
+  let islandText = null;
   function loadIsland() {
-    return json('/island.json').then(function (data) {
-      island = data; P = {}; data.places.forEach(function (p) { P[p.label] = p; });
+    return fetch('/island.json', { cache: 'no-store' }).then(function (r) { if (!r.ok) throw new Error(r.status); return r.text(); }).then(function (text) {
+      if (text === islandText) return;
+      islandText = text; const data = JSON.parse(text);
+      island = data; islandGen++; P = {}; data.places.forEach(function (p) { P[p.label] = p; });
       grid = data.places.filter(function (p) { return p.grid; });
       days = Array.from(new Set(data.places.map(function (p) { return p.first.date; }))).sort();
       if (!replay) state.day = null;
@@ -417,8 +480,139 @@
       .finally(function () { reopening = false; });
   }
 
+  const FPM = 3584;
+  const mins = function (f) { return Math.round(f / FPM); };
+  const day = function (id) { return id.slice(0, 4) + '-' + id.slice(4, 6) + '-' + id.slice(6, 8); };
+  function inMetro(run) { return !!(island && island.metro.some(function (l) { return l.run === run; })); }
+  function stopTrain() { clearInterval(trainTimer); trainTimer = null; train = null; }
+
+  /* ---------- Métro ---------- */
+  function metro() {
+    if (!island) return loading('metro');
+    const list = island.metro.map(function (l) { return Object.assign({}, l); });
+    if (!list.length) return fill('metro', empty('Aucune lignée', 'Aucune run du dossier n\'a encore rien atteint'));
+    const nodes = {}; list.forEach(function (n) { nodes[n.run] = n; });
+    const maxF = Math.max.apply(null, list.map(function (n) { return n.end; }).concat([1]));
+    const W = 1400, X0 = 70, LANE = 38, X = function (f) { return X0 + (W - X0 - 60) * f / maxF; };
+    list.forEach(function (n) { if (n.main) n.lane = 0; });
+    const used = {};
+    const free = function (lane, a, b) { return !(used[lane] || []).some(function (r) { return a < r[1] + 4000 && b > r[0] - 4000; }); };
+    list.slice().sort(function (a, b) { return a.fork - b.fork || (a.run < b.run ? -1 : 1); }).forEach(function (n, i) {
+      if (n.lane !== undefined) return;
+      const pl = n.parent && nodes[n.parent] && nodes[n.parent].lane !== undefined ? nodes[n.parent].lane : 0, dir = pl > 0 ? 1 : pl < 0 ? -1 : (i % 2 ? 1 : -1);
+      for (let k = 1; k < 40 && n.lane === undefined; k++) [pl + dir * k, pl - dir * k].forEach(function (cand) { if (cand !== 0 && n.lane === undefined && free(cand, n.fork, n.end)) { n.lane = cand; (used[cand] = used[cand] || []).push([n.fork, n.end]); } });
+      if (n.lane === undefined) n.lane = 40;
+    });
+    const lanes = list.map(function (n) { return n.lane; }), lo = Math.min.apply(null, lanes.concat([0])), hi = Math.max.apply(null, lanes.concat([0]));
+    const Y0 = 260 + (-lo) * LANE, Y = function (l) { return Y0 + l * LANE; }, HH = Y(hi) + 120;
+    const pal = ['#7ab0ec', '#8bac0f', '#b98bd8', '#f0b54a', '#5fc4cf', '#d8849b', '#9bbc0f'];
+    const path = new Set(); for (let n = nodes[state.msel]; n && !path.has(n.run); n = n.parent ? nodes[n.parent] : null) path.add(n.run);
+    const mains = list.filter(function (n) { return n.main; }), end = mains.reduce(function (a, n) { return !a || n.end > a.end ? n : a; }, null) || list[0];
+    const lines = [], st = [], labels = [], cks = [];
+    list.forEach(function (n) {
+      const p = n.parent ? nodes[n.parent] : null, y = Y(n.lane), x1 = X(n.fork), x2 = X(Math.max(n.end, n.fork + 800));
+      const py = p ? Y(p.lane) : y, dy = Math.abs(y - py), bend = p && dy ? Math.min(dy, Math.max(4, (x2 - x1) / 2)) : 0, on = function (f) { return Math.max(X(f), x1 + bend); };
+      const d = bend ? 'M' + x1 + ',' + py + 'L' + (x1 + bend) + ',' + y + 'L' + x2 + ',' + y : 'M' + x1 + ',' + y + 'L' + x2 + ',' + y;
+      const dim = state.msel && nodes[state.msel] && !path.has(n.run) ? 'dim' : null;
+      lines.push(s('path', { class: 'ln' + (n.main ? ' main' : '') + (dim ? ' dim' : ''), d: d, stroke: n.main ? '#b83a3a' : pal[(n.lane + 40) % pal.length], 'data-m': n.run }, s('title', { text: short(n.run) + ' · ' + n.flow })));
+      if (!n.main || n === end) st.push(s('circle', { class: 'term' + (dim ? ' dim' : ''), cx: x2, cy: y, r: 4.5 }));
+      if (n.deaths && !n.main) st.push(use('skull', { class: dim, x: x2 + 5, y: y - 7, width: 13, height: 13 }));
+      if (n.main) st.push(s('circle', { class: 'st' + (dim ? ' dim' : ''), cx: x1 + bend, cy: y, r: 7, 'data-m': n.run }));
+      n.gains.forEach(function (g) { const gx = on(g[1]); st.push(s('g', { class: dim, 'data-m': n.run }, s('title', { text: itemName(g[0]) }), s('circle', { class: 'xch', cx: gx, cy: y, r: 17 }), use($('s-item-' + g[0]) ? 'item-' + g[0] : 'item-0', { x: gx - 12, y: y - 12, width: 24, height: 24 }))); });
+      n.checkpoints.forEach(function (c) { const cx = on(c.frame); st.push(s('circle', { class: 'st' + (dim ? ' dim' : ''), cx: cx, cy: y, r: 10, 'stroke-width': 4, 'data-m': n.run })); cks.push({ x: cx, y: y, name: c.name.replace(/-/g, ' '), dim: dim }); });
+      if (n.hidden) labels.push(s('text', { class: 'hid' + (dim ? ' dim' : ''), x: n.main ? X(n.end) - 4 : x2 + (n.deaths ? 22 : 9), y: n.main ? y - 12 : y + 4, 'text-anchor': n.main ? 'end' : null, text: '+' + n.hidden }));
+    });
+    const band = Y(lo) - 70; let lastX = -1e9;
+    cks.sort(function (a, b) { return a.x - b.x; }).forEach(function (k) { const lx = Math.max(k.x, lastX + 26); lastX = lx;
+      labels.push(s('path', { class: k.dim, d: 'M' + k.x + ',' + (k.y - 12) + 'L' + k.x + ',' + (band + 18) + 'L' + lx + ',' + (band + 6), style: 'stroke:var(--mut)', 'stroke-width': 1, fill: 'none', 'stroke-dasharray': '2 3' }),
+        s('text', { class: 'ckname' + (k.dim ? ' dim' : ''), transform: 'translate(' + (lx + 3) + ',' + band + ') rotate(-40)', text: k.name })); });
+    const axis = []; for (let m = 0; m * FPM <= maxF; m += 5) axis.push(s('line', { x1: X(m * FPM), x2: X(m * FPM), y1: 20, y2: HH - 30 }), s('text', { x: X(m * FPM), y: HH - 14, 'text-anchor': 'middle', text: m + ' min' }));
+    const trainNodes = train != null && [use('link', { x: X(train) - 13, y: Y0 - 32, width: 26, height: 26 }), s('circle', { cx: X(train), cy: Y0, r: 8, fill: '#9bbc0f', stroke: '#0f380f', 'stroke-width': 3 })];
+    const r = nodes[state.msel];
+    const sel = r && h('div', { class: 'card msel' },
+      h('div', { style: 'display:flex;gap:10px;align-items:baseline' }, h('b', { style: 'font-size:18px', text: short(r.run) }), h('span', { class: 'tag', text: r.flow }), h('span', { class: 'mut', text: fd(r.date) })),
+      h('div', { class: 'facts' }, h('span', null, h('b', { text: mins(r.fork) + '→' + mins(r.end) }), ' min'), h('span', null, h('b', { text: '+' + r.screens }), ' écrans'), h('span', null, h('b', { text: '$' + Math.round(r.cum) }), ' cumulés')),
+      h('div', { class: 'held' }, r.held.map(function (id) { return itemIco(id, 22); })),
+      h('div', { class: 'btns' }, h('button', { type: 'button', class: 'xbtn', 'data-direct': r.run }, playIco(false), ' Direct'), h('button', { type: 'button', class: 'xbtn', 'data-trail': r.run, text: 'sa trace sur l\'île' }), h('button', { type: 'button', class: 'xbtn', id: 'unmsel', 'aria-label': 'fermer', text: '✕' })));
+    fill('metro', [h('div', { class: 'mhead' },
+      h('div', null, h('div', { class: 'hero' }, mins(end.end), h('small', { text: ' min de jeu' })), h('div', { class: 'cap', text: 'de l\'allumage à la run la plus avancée · ' + mains.length + ' runs bout à bout' })),
+      h('div', { class: 'legend', style: 'margin-bottom:8px' }, h('span', null, s('svg', { width: 20, height: 20 }, s('circle', { cx: 10, cy: 10, r: 7, fill: 'none', stroke: 'currentColor', 'stroke-width': 3 })), 'checkpoint'),
+        h('span', null, s('svg', { width: 24, height: 24 }, s('circle', { cx: 12, cy: 12, r: 10, fill: 'none', stroke: 'currentColor', 'stroke-width': 3 })), 'premier objet'), h('span', null, skull(13), ' mort'), h('span', null, h('b', { text: '+N' }), ' forks repliés')),
+      h('span', { style: 'flex:1' }), h('button', { type: 'button', class: 'round', id: 'playM', 'aria-label': 'faire rouler' }, playIco(!!trainTimer))),
+      s('svg', { id: 'msvg', viewBox: '0 0 ' + W + ' ' + HH, preserveAspectRatio: 'xMidYMid meet' }, s('g', { class: 'axis' }, axis), lines, st, labels, trainNodes), sel]);
+  }
+
+  /* ---------- Tiroirs ---------- */
+  let islandGen = 0, runsGen = 0, drawn = null, drawnKind = null;
+  const notesOf = {}, drafts = {};
+  const RANK = { high: 0, normal: 1, low: 2, tip: 3 }, LEADCOL = { open: 'var(--warn)', tested: 'var(--acc)', refuted: 'var(--bad)' }, LEADWORD = { open: 'ouverte', tested: 'vérifiée', refuted: 'réfutée' };
+  function loadRuns() { return json('/runs.json').then(function (rows) { runs = rows; runsGen++; drawer(); }).catch(function () { runs = []; runsGen++; drawer(); }); }
+  function post(path, id, fields) {
+    return fetch(path + '?run=' + encodeURIComponent(id), { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body: new URLSearchParams(fields).toString() })
+      .then(function (r) { return r.json().then(function (b) { if (!r.ok) throw new Error(b.error || r.status); return b; }); });
+  }
+  function drawer() {
+    const d = state.drawer;
+    $('scrim').classList.toggle('on', !!d); $('drawer').classList.toggle('on', !!d);
+    document.querySelectorAll('header .tool[data-drawer]').forEach(function (b) { b.setAttribute('aria-pressed', String(b.dataset.drawer === d)); });
+    if (!d) { drawn = null; drawnKind = null; return; }
+    const key = d === 'runs' ? JSON.stringify([d, state.q, state.starOnly, state.runsAt, state.more, runsGen, islandGen]) : d + '|' + islandGen;
+    if (drawn === key) return;
+    const focus = document.activeElement, body = document.querySelector('#drawer .body');
+    if (body && focus && body.contains(focus) && /^(INPUT|TEXTAREA)$/.test(focus.tagName)) return;
+    const scroll = body && drawnKind === d ? body.scrollTop : 0;
+    if (d === 'runs') runsDrawer(drawn && drawn.indexOf('["runs"') === 0); else if (d === 'leads') leadsDrawer(); else peopleDrawer();
+    const after = document.querySelector('#drawer .body'); if (after) after.scrollTop = scroll;
+    drawn = key; drawnKind = d;
+  }
+  function runsDrawer(kept) {
+    if (!kept) fill('drawer', [h('div', { class: 'h' }, h('input', { class: 'search', id: 'q', placeholder: 'run, flow, tag, arrêt, étoile…', value: state.q, 'aria-label': 'chercher une run' }), h('button', { type: 'button', class: 'tool', id: 'starOnly', title: 'étoilées seulement', text: '★' })), h('div', { class: 'body', id: 'dbody' })]);
+    $('starOnly').setAttribute('aria-pressed', String(state.starOnly)); $('starOnly').style.color = state.starOnly ? 'var(--warn)' : '';
+    if (!runs) return fill('dbody', h('p', { class: 'mut', style: 'padding:12px', text: 'Lecture des runs…' }));
+    const q = state.q.toLowerCase(), at = state.runsAt && P[state.runsAt] ? new Set(P[state.runsAt].recent) : null;
+    const rows = runs.filter(function (r) { return (!state.starOnly || r.starred) && (!at || at.has(r.run_id)) && (!q || [r.run_id, r.flow_version, r.tag, r.stop_reason, r.why].join(' ').toLowerCase().indexOf(q) >= 0); });
+    fill('dbody', [at && h('div', { class: 'banner', style: 'position:static;transform:none;margin:4px 6px 8px;width:max-content' }, 'récentes à ' + placeName(state.runsAt, P[state.runsAt]), h('button', { type: 'button', id: 'unat', 'aria-label': 'toutes les runs', text: '✕' })),
+      rows.length ? rows.slice(0, 200).map(runRow) : h('p', { class: 'mut', style: 'padding:12px', text: 'Aucune run ne correspond' }),
+      rows.length > 200 && h('p', { class: 'mut', style: 'padding:8px', text: '+' + (rows.length - 200) + ' de plus' })]);
+  }
+  function runRow(r) {
+    const id = r.run_id;
+    return [h('div', { class: 'runitem', 'data-direct': id, role: 'button', tabindex: 0 },
+      h('span', { class: 'stb' + (r.starred ? ' on' : ''), title: r.why || '', text: '★' }), h('span', { text: short(id) }),
+      h('span', { class: 'mut', text: [r.flow_version, fd(day(id)), r.stop_reason && 'arrêt ' + r.stop_reason].filter(Boolean).join(' · ') }),
+      h('span', { text: typeof r.dollars === 'number' ? '$' + r.dollars.toFixed(2) : '' }),
+      h('button', { type: 'button', class: 'tool', 'data-more': id, title: 'étoile et notes', text: '✎' })),
+      state.more === id && moreBox(r)];
+  }
+  function moreBox(r) {
+    const id = r.run_id, draft = drafts[id] || {};
+    if (notesOf[id] == null) { notesOf[id] = ''; json('/header.json?run=' + encodeURIComponent(id)).then(function (hd) { notesOf[id] = hd.notes || ''; const ta = $('notesT'); if (ta && state.more === id && draft.notes == null && !ta.value) ta.value = notesOf[id]; }).catch(function () { }); }
+    return h('div', { class: 'runmore' },
+      h('label', null, 'étoile : pourquoi', h('input', { id: 'whyI', maxlength: 500, value: draft.why != null ? draft.why : r.why || '', placeholder: 'ce que cette run montre' })),
+      h('div', { class: 'btns' }, h('button', { type: 'button', class: 'xbtn', id: 'starGo', 'data-run': id, text: r.starred ? '★ mettre à jour' : '★ étoiler' })),
+      h('label', null, 'notes', h('textarea', { id: 'notesT', maxlength: 8192 }, draft.notes != null ? draft.notes : notesOf[id])),
+      h('div', { class: 'btns' }, h('button', { type: 'button', class: 'xbtn', id: 'notesGo', 'data-run': id, text: 'enregistrer les notes' }), h('span', { class: 'mut', id: 'moreMsg' })));
+  }
+  function leadsDrawer() {
+    const ls = island ? island.leads.slice().sort(function (a, b) { return (a.status === 'open' ? 0 : 1) - (b.status === 'open' ? 0 : 1) || (RANK[a.importance] == null ? 4 : RANK[a.importance]) - (RANK[b.importance] == null ? 4 : RANK[b.importance]); }) : [];
+    fill('drawer', [h('div', { class: 'h' }, h('b', { text: 'Pistes' }), h('span', { class: 'mut', text: ls.filter(function (l) { return l.status === 'open'; }).length + ' ouvertes / ' + ls.length })),
+      h('div', { class: 'body' }, ls.length ? ls.map(function (l) { const go = P[l.screen] && P[l.screen].grid;
+        return h('div', { class: 'lead' }, h('span', { class: 'dot', style: 'background:' + (LEADCOL[l.status] || 'var(--mut)'), title: LEADWORD[l.status] || l.status }),
+          h('span', null, h('q', { text: l.quote }), l.importance === 'high' && h('b', { style: 'color:var(--warn)', text: ' !' }), l.claim && h('div', { class: 'mut', style: 'font-size:12px', text: l.claim })),
+          l.place ? h('span', { class: go ? 'linkish' : 'mut', 'data-sel': go ? l.screen : null, text: placeName(l.place, P[l.place]) }) : h('span')); }) : h('p', { class: 'mut', style: 'padding:12px', text: 'Aucune piste lue' }))]);
+  }
+  function peopleDrawer() {
+    const ps = island ? island.people : [];
+    fill('drawer', [h('div', { class: 'h' }, h('b', { text: 'Personnes' }), h('span', { class: 'mut', text: ps.length + ' voix' })),
+      h('div', { class: 'body' }, ps.length ? ps.map(function (p) { const sc = P[p.screen], go = sc && sc.grid;
+        return h('div', { class: 'person' }, h('b', null, sc && sc.screen && h('img', { class: 'px', alt: '', style: 'width:36px;border-radius:4px', src: shotUrl(p.screen) }),
+          p.name || [h('span', { class: 'mut', text: 'sans nom, à' }), ' ', h('span', { class: go ? 'linkish' : null, 'data-sel': go ? p.screen : null, text: placeName(p.screen, sc) })], h('span', { class: 'mut', text: String(p.count) })),
+          p.texts.map(function (t) { return h('div', { class: 'dl', text: t.text }); }), p.count > p.texts.length && h('span', { class: 'mut', style: 'font-size:12px', text: '+' + (p.count - p.texts.length) })); }) : h('p', { class: 'mut', style: 'padding:12px', text: 'Aucun texte lu' }))]);
+  }
+
   function go(view) {
-    if (view !== state.view) beep(view === 'ile' ? 523 : 659, .09);
+    if (view !== state.view) beep(view === 'ile' ? 523 : view === 'direct' ? 659 : 784, .09);
+    if (view !== 'metro') stopTrain();
     const to = ORDER.indexOf(view);
     ORDER.forEach(function (v, k) { const el = $(v); el.classList.toggle('on', v === view); el.classList.toggle('left', k < to); });
     state.view = view; save();
@@ -430,15 +624,35 @@
     render();
     if (view === 'direct') { if (!story || (story.run !== state.run && state.run)) loadStory(); poll(); }
   }
-  function render() { chips(); if (state.view === 'ile') ile(); else direct(); }
+  function render() { chips(); ({ ile: ile, direct: direct, metro: metro })[state.view](); drawer(); }
   function stopReplay() { clearInterval(replay); replay = null; spritePos = null; }
   function control(query) { return json('/control?run=' + encodeURIComponent(state.run) + '&' + query).then(function (c) { controls = c; direct(); }); }
+  function openDrawer(d) { state.drawer = d; if (d === 'runs') loadRuns(); drawer(); }
+  function showTrail(run) {
+    state.trail = run; state.sel = null; state.drawer = null; trailStory = null; stopReplay();
+    json('/story.json?run=' + encodeURIComponent(run)).then(function (data) { trailStory = data; if (state.view === 'ile') ile(); }).catch(function () { });
+    location.hash = '#ile';
+  }
 
   document.addEventListener('click', function (e) {
     const t = e.target;
     const g = t.closest('[data-go]'); if (g) { stopReplay(); return go(g.dataset.go); }
     if (t.closest('#sound')) { state.sound = !state.sound; save(); beep(880, .1); return chips(); }
-    const sl = t.closest('[data-sel]'); if (sl && P[sl.dataset.sel]) { stopReplay(); state.sel = sl.dataset.sel; state.day = null; return go('ile'); }
+    const dr = t.closest('[data-drawer]'); if (dr) { return state.drawer === dr.dataset.drawer ? (state.drawer = null, drawer()) : openDrawer(dr.dataset.drawer); }
+    if (t.closest('#scrim')) { state.drawer = null; return drawer(); }
+    if (t.closest('#starOnly')) { state.starOnly = !state.starOnly; save(); return drawer(); }
+    if (t.closest('#unat')) { state.runsAt = null; return drawer(); }
+    const mo = t.closest('[data-more]'); if (mo) { state.more = state.more === mo.dataset.more ? null : mo.dataset.more; return drawer(); }
+    const sg = t.closest('#starGo'); if (sg) { const id = sg.dataset.run, why = $('whyI').value;
+      return post('/star', id, { why: why }).then(function (b) { const r = runs.find(function (x) { return x.run_id === id; }); if (r) { r.starred = true; r.why = b.why; } if (drafts[id]) delete drafts[id].why; runsGen++; drawer(); }).catch(function (err) { const m = $('moreMsg'); if (m) m.textContent = err.message; }); }
+    const ng = t.closest('#notesGo'); if (ng) { const id = ng.dataset.run, text = $('notesT').value;
+      return post('/notes', id, { text: text }).then(function () { notesOf[id] = text; if (drafts[id]) delete drafts[id].notes; const m = $('moreMsg'); if (m) m.textContent = 'enregistré'; }).catch(function (err) { const m = $('moreMsg'); if (m) m.textContent = err.message; }); }
+    const ra = t.closest('[data-runs-at]'); if (ra) { state.runsAt = ra.dataset.runsAt; state.q = ''; return openDrawer('runs'); }
+    const dg = t.closest('[data-direct]'); if (dg && !t.closest('input, textarea')) { stopReplay(); state.drawer = null; drawer(); location.hash = '#direct/' + encodeURIComponent(dg.dataset.direct); return; }
+    const tg = t.closest('[data-trail]'); if (tg) return showTrail(tg.dataset.trail);
+    if (t.closest('#untrail')) { state.trail = null; trailStory = null; return render(); }
+    const lg = t.closest('[data-lineage]'); if (lg) { state.msel = lg.dataset.lineage; return go('metro'); }
+    const sl = t.closest('[data-sel]'); if (sl && P[sl.dataset.sel]) { stopReplay(); state.sel = sl.dataset.sel; state.day = null; state.drawer = null; return go('ile'); }
     if (state.view === 'ile') {
       if (t.closest('#unsel')) { state.sel = null; return render(); }
       const pc = t.closest('[data-p]'); if (pc) { beep(440, .05); state.sel = state.sel === pc.dataset.p ? null : pc.dataset.p; return render(); }
@@ -451,7 +665,17 @@
         replay = setInterval(tick, 1200); tick(); return;
       }
     }
+    if (state.view === 'metro') {
+      if (t.closest('#unmsel')) { state.msel = null; return metro(); }
+      if (t.closest('#playM')) {
+        if (trainTimer) { stopTrain(); return metro(); }
+        const end = Math.max.apply(null, island.metro.filter(function (l) { return l.main; }).map(function (l) { return l.end; }).concat([1]));
+        train = 0; trainTimer = setInterval(function () { train += end / 180; if (train >= end) stopTrain(); metro(); }, 50); return metro();
+      }
+      const m = t.closest('[data-m]'); if (m) { beep(440, .05); state.msel = state.msel === m.dataset.m ? null : m.dataset.m; return metro(); }
+    }
     if (state.view === 'direct') {
+      const gr = t.closest('[data-group]'); if (gr) { const k = gr.dataset.group; if (expanded.has(k)) expanded.delete(k); else expanded.add(k); return direct(); }
       if (t.closest('#backLive')) { state.scrub = null; return direct(); }
       if (t.closest('#playD')) {
         if (!state.run) { state.scrub = null; return direct(); }
@@ -462,17 +686,24 @@
     }
   });
   document.addEventListener('input', function (e) {
+    if (e.target.id === 'q') { state.q = e.target.value; save(); return drawer(); }
+    if ((e.target.id === 'whyI' || e.target.id === 'notesT') && state.more) { const draft = drafts[state.more] = drafts[state.more] || {}; draft[e.target.id === 'whyI' ? 'why' : 'notes'] = e.target.value; return; }
     if (e.target.id === 'dayA') { stopReplay(); state.day = days[+e.target.value]; render(); }
     if (e.target.id === 'frameD') { state.scrub = +e.target.value; direct(); const el = $('frameD'); if (el) el.focus(); }
   });
   document.addEventListener('change', function (e) { if (e.target.id === 'frameD' && state.run) control('seek=' + state.scrub + '&pause=1').then(function () { state.scrub = null; direct(); }); });
-  document.addEventListener('keydown', function (e) { if (e.target.tagName === 'INPUT') return; if (e.key === 'Escape') { state.sel = null; render(); } const k = { '1': 'ile', '2': 'direct' }[e.key]; if (k) { stopReplay(); go(k); } });
+  document.addEventListener('keydown', function (e) {
+    if (e.key === 'Escape') { if (state.drawer) { state.drawer = null; return drawer(); } state.sel = null; state.msel = null; return render(); }
+    if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+    if (e.key === 'Enter' && e.target.dataset && e.target.dataset.direct) return e.target.click();
+    const k = { '1': 'ile', '2': 'direct', '3': 'metro' }[e.key]; if (k) { stopReplay(); go(k); }
+  });
   addEventListener('resize', render);
   addEventListener('hashchange', function () { route(); });
   function route() {
-    const h = location.hash.slice(1).split('/');
-    if (h[0] === 'direct') { const run = h[1] ? decodeURIComponent(h[1]) : null; if (run !== state.run) { state.run = run; story = null; controls = null; state.scrub = null; seeking = false; reopen(); } go('direct'); }
-    else go(h[0] === 'ile' ? 'ile' : state.view === 'direct' && !location.hash ? 'direct' : 'ile');
+    const parts = location.hash.slice(1).split('/');
+    if (parts[0] === 'direct') { const run = parts[1] ? decodeURIComponent(parts[1]) : null; if (run !== state.run) { state.run = run; story = null; controls = null; state.scrub = null; seeking = false; expanded.clear(); reopen(); } go('direct'); }
+    else go(ORDER.indexOf(parts[0]) >= 0 ? parts[0] : state.view === 'direct' && !location.hash ? 'direct' : 'ile');
   }
   route();
   loadIsland();
