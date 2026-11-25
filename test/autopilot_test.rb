@@ -3,7 +3,10 @@ require 'koholint/autopilot'
 require 'koholint/game_state'
 
 class AutopilotTest < Minitest::Test
-  FLOOR = Struct.new(:none) { def floor?(*) = true }.new.freeze
+  FLOOR = Struct.new(:none) do
+    def floor?(*) = true
+    def static_sprite(*) = 'heart'
+  end.new.freeze
 
   def state(**over)
     Koholint::GameState.new(frame: 100, room_id: 163, map_id: 16, x: 68, y: 60, direction: :up, hp: 24, max_hp: 24,
@@ -398,11 +401,11 @@ class AutopilotTest < Minitest::Test
     far = { slot: 6, kind: :creature, type: 45, x: 136, y: 120, cell: [7, 8], heals: 8 }
     assert_nil pilot.heart_choice(state: state(frame: 400), entities: [near, far], grid: FLOOR), 'full health'
     result = pilot.heart_choice(state: state(frame: 400, hp: 16), entities: [near, far], grid: FLOOR)
-    assert_equal({ skill: 'goto', params: { row: 3, col: 2 } }, result[:choice])
+    assert_equal({ skill: 'touch', params: { row: 3, col: 2, type: 45 } }, result[:choice])
     assert_equal [0.0, true], result.values_at(:cost_usd, :autopilot)
-    assert_equal({ row: 7, col: 8 }, pilot.heart_choice(state: state(frame: 500, hp: 16), entities: [near, far], grid: FLOOR)[:choice][:params])
+    assert_equal({ row: 7, col: 8, type: 45 }, pilot.heart_choice(state: state(frame: 500, hp: 16), entities: [near, far], grid: FLOOR)[:choice][:params])
     assert_nil pilot.heart_choice(state: state(frame: 600, hp: 16), entities: [near, far], grid: FLOOR), 'each slot once'
-    assert_equal({ row: 3, col: 2 }, pilot.heart_choice(state: state(frame: 700, hp: 16, room_id: 164), entities: [near], grid: FLOOR)[:choice][:params], 'a new visit')
+    assert_equal({ row: 3, col: 2, type: 45 }, pilot.heart_choice(state: state(frame: 700, hp: 16, room_id: 164), entities: [near], grid: FLOOR)[:choice][:params], 'a new visit')
   end
 
   def test_no_heart_is_aimed_at_inside_a_contact_zone_past_the_limit_or_without_a_verified_heal
@@ -410,7 +413,9 @@ class AutopilotTest < Minitest::Test
     heart = { slot: 5, kind: :creature, type: 45, x: 40, y: 56, cell: [3, 2], heals: 8 }
     assert_nil primed.heart_choice(state: state(frame: 400, hp: 16), entities: [enemy, heart], grid: FLOOR), 'in reach of an enemy'
     assert_nil primed.heart_choice(state: state(frame: 400, hp: 16), entities: [heart.except(:heals)], grid: FLOOR), 'no heal'
-    assert_nil primed.heart_choice(state: state(frame: 400, hp: 16), entities: [heart], grid: Struct.new(:none) { def floor?(*) = false }.new), 'hidden under a pot or a bush'
+    assert_nil primed.heart_choice(state: state(frame: 400, hp: 16), entities: [heart], grid: Struct.new(:none) { def static_sprite(*) = nil }.new), 'hidden under a pot or a bush, with no sprite'
+    assert_nil primed.heart_choice(state: state(frame: 400, hp: 16), entities: [heart], grid: Struct.new(:none) { def static_sprite(*) = 'pot'
+                                                                                                                 def floor?(*) = false }.new), 'a sprite on a tile never walked'
     assert_nil Koholint::Autopilot.new.heart_choice(state: state(frame: 400, hp: 16), entities: [heart], grid: FLOOR), 'no model call yet'
     pilot = primed
     hearts = (5..7).map { |slot| heart.merge(slot:) }

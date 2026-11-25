@@ -227,8 +227,8 @@ module Koholint
       DecisionPoint.harness_choice({ skill: 'walk', params: { direction: direction.to_s, cells: 1 } }, "autopilot: disengage at #{state.health} hp, step #{direction} away from #{near.map { |threat| threat[:type] }.join(', ')} (#{@disengaged}/#{DISENGAGE_LIMIT})", autopilot: true)
     end
 
-    # Below full health, the nearest heart on screen outside every contact zone is walked to before any fight; goto routes around the zones.
-    # A heart counts only on known floor, since one hidden under a pot or a bush sits there with no sprite.
+    # Below full health, the nearest heart on screen outside every contact zone is walked to before any fight; the walk routes around the zones.
+    # A heart counts only when visible, a still sprite on known floor, since one hidden under a pot or a bush has no sprite; touch walks beside it and holds into it.
     # Each slot is aimed at once per visit and HEART_LIMIT bounds a visit, so a heart goto cannot reach is not chased.
     def heart_choice(state:, entities:, grid: nil)
       return unless @since && state.phase == :playing && state.cell && state.max_hp && state.health < state.max_hp
@@ -238,10 +238,10 @@ module Koholint
 
       danger = Entities.danger_cells(Array(entities))
       row, col = state.cell
-      heart = Array(entities).select { |entity| entity[:heals] && entity[:cell] && grid&.floor?(*entity[:cell]) && !danger.include?(entity[:cell]) && !@hearts[:slots].include?(entity[:slot]) }
+      heart = Array(entities).select { |entity| entity[:heals] && entity[:cell] && grid&.static_sprite(*entity[:cell]) && grid.floor?(*entity[:cell]) && !danger.include?(entity[:cell]) && !@hearts[:slots].include?(entity[:slot]) }
                              .min_by { |entity| [(entity[:cell][0] - row).abs + (entity[:cell][1] - col).abs, entity[:slot]] } or return
       @hearts[:slots] << heart[:slot]
-      DecisionPoint.harness_choice({ skill: 'goto', params: { row: heart[:cell][0], col: heart[:cell][1] } },
+      DecisionPoint.harness_choice({ skill: 'touch', params: { row: heart[:cell][0], col: heart[:cell][1], type: heart[:type] } },
                                    "autopilot: pick up the heart at (#{heart[:cell].join(',')}) at #{state.health}/#{state.max_hp} hp (#{@hearts[:slots].size}/#{HEART_LIMIT})", autopilot: true)
     end
 
