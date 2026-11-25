@@ -22,16 +22,17 @@ class AttackTest < Minitest::Test
   end
 
   # Link moves 1 px per direction frame; an A press lands a hit when he faces the enemy within 24 px along and 8 px across.
-  def fight(target, enemies, from: [4, 2], sword: 1, immune: false, knockback: 0, hurt_at: nil, cap: nil, limit: 1000, ceiling: nil, at: nil)
+  def fight(target, enemies, from: [4, 2], sword: 1, immune: false, knockback: 0, hurt_at: nil, cap: nil, limit: 1000, ceiling: nil, at: nil, grid: FakeGrid.new, moves: nil)
     x, y = at || Koholint::Geometry.center_of(*from)
     hp = 24
     reader = -> { enemies.map { |e| e.merge(cell: Koholint::Geometry.cell_for(e[:x], e[:y])) } }
-    execution = registry.start('attack', state(x:, y:, sword:), { row: target[0], col: target[1] }, { grid: FakeGrid.new, entities: reader })
+    execution = registry.start('attack', state(x:, y:, sword:), { row: target[0], col: target[1] }, { grid:, entities: reader })
     execution.__getobj__.define_singleton_method(:hard_cap) { cap } if cap
     facing = nil
     inputs = []
     limit.times do
       hp = 20 if hurt_at && inputs.size >= hurt_at
+      moves&.call(enemies, inputs.size)
       buttons = execution.next_input(state(x:, y:, sword:, hp:)) or break
       inputs << buttons
       direction = (buttons & VECTORS.keys).first
@@ -181,5 +182,36 @@ class AttackTest < Minitest::Test
     other = enemy(2, 6, slot: 4)
     result, = fight([4, 6], [enemy(4, 6), other], from: [3, 2])
     refute_equal({ row: 3, col: 6 }, result[:standing_cell])
+  end
+
+  class HoleGrid < FakeGrid
+    def initialize(holes) = @holes = holes
+    def hole?(row, col) = @holes.include?([row, col])
+  end
+
+  def test_strikes_from_where_link_stands_when_the_enemy_is_within_two_cells
+    result, = fight([4, 4], [enemy(4, 4)])
+    assert_equal [true, { row: 4, col: 2 }], result.values_at(:killed, :standing_cell)
+  end
+
+  def test_the_lineup_stops_before_its_next_pixels_enter_a_hole
+    result, = fight([4, 4], [enemy(4, 4)], grid: HoleGrid.new([[4, 3]]))
+    assert_equal [:hole, 0], result.values_at(:stopped_by, :strikes)
+  end
+
+  def test_an_enemy_that_comes_nearer_than_the_target_is_struck_instead
+    result, = fight([4, 6], [enemy(4, 6), enemy(2, 2, slot: 4)])
+    assert_equal [true, 4], [result[:killed], result[:target][:slot]]
+  end
+
+  def test_a_dying_enemy_nearer_than_the_target_is_not_struck_instead
+    result, = fight([4, 6], [enemy(4, 6), enemy(2, 2, slot: 4).merge(status: 1)])
+    assert_equal [true, 3], [result[:killed], result[:target][:slot]]
+  end
+
+  def test_while_striking_an_enemy_nearer_than_the_target_is_struck_instead
+    approach = ->(enemies, frame) { enemies[1][:y] = 80 - 24 if frame == 3 }
+    result, = fight([4, 4], [enemy(4, 4), enemy(0, 2, slot: 4)], moves: approach)
+    assert_equal [true, 4, { row: 4, col: 2 }], [result[:killed], result[:target][:slot], result[:standing_cell]]
   end
 end

@@ -24,6 +24,11 @@ module Koholint
       [row, col] if in_grid?([row, col])
     end
 
+    def footprint_cells(x, y)
+      band = fact(:link_footprint)['row_band']
+      [cell_for(x, y + band['min_offset']), cell_for(x, y + band['max_offset'])].compact.uniq
+    end
+
     def in_grid?(cell) = cell[0].between?(0, ROWS - 1) && cell[1].between?(0, COLS - 1)
 
     def step(cell, direction)

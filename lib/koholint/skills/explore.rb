@@ -74,8 +74,11 @@ module Koholint
           @grid = grid
           @clearing = Clearing.of(context)
           @room_objects = context[:room_objects]
+          @fight = context[:fight]
           @objects = grid ? TalkLog.objects(grid) : []
-          @doors = Array(context[:objects]&.call).select { |object| object[:kind].to_s == 'door' && object[:cell][0] < Geometry::ROWS - 1 }.map { |object| object[:cell] }
+          objects = Array(context[:objects]&.call)
+          @doors = objects.select { |object| object[:kind].to_s == 'door' && object[:cell][0] < Geometry::ROWS - 1 }.map { |object| object[:cell] }
+          @crumbling = objects.select { |object| object[:kind].to_s == 'crumbling' }.map { |object| object[:cell] }
           @survey = @known && survey
           @route = @unreachable = @dead_end = nil
           @entering = 0
@@ -132,7 +135,9 @@ module Koholint
           @position = [state.x, state.y]
           return @clearing.step(state) if @clearing&.active? && !@leg
           return depart(state) if state.place != @place
+          return stop_now(:fell) if state.falling?
           return harmed if state.health < @start.health
+          return stop_now(:enemy) if @fight&.call(state)
           return interrupted(state) if state.dialog_open?
           return entering if walking_in?(state)
 
@@ -377,6 +382,8 @@ module Koholint
           return order(frontier) if frontier.any? && (@fresh || untried(from, nil).any? || @log&.untried?(@place))
           return order(back) if back.any?
 
+          stranded = @crumbling.any? ? [] : untried(from, nil).reject { |candidate| way_back?(candidate) || path_to.(candidate[:cell]) }
+          @unreachable = (@unreachable || []) | stranded.map { |candidate| candidate[:kind] == :door ? [candidate[:cell][0] - 1, candidate[:cell][1]] : candidate[:direction] }.uniq if stranded.any?
           routed = routed(from, path_to)
           return order(routed) if routed.any?
 

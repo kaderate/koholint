@@ -69,6 +69,7 @@ module Koholint
       @played = GameState.played?(events)
       @card_place = carded_place(events)
       @items = ItemWatch.from_events(events)
+      @gave_way = events.filter_map { |event| [event['place'], event['object']] if event['type'] == 'floor_gave_way' }.to_set
       @places = (Summary.visited_places(events) + events.filter_map { |event| event['place'] if event['type'] == 'keyframe' }).to_set
       @unknown_modes = events.filter_map { |event| event['detail'] if event['type'] == 'notable' && event['kind'] == 'unknown_mode' }.to_set
     end
@@ -176,6 +177,24 @@ module Koholint
       @closed_chests = [place, chests.reject { |chest| chest[:open] }.map { |chest| chest[:cell] }]
     end
 
+    # A floor object counts as crumbling in a place only once one of its cells there was seen turning into a hole.
+    def note_floor(state)
+      objects = Entities.room_objects(@emulator)
+      catalogue = Entities.object_catalogue
+      if @floor&.first == state.place
+        @floor.last.each_with_index do |row, r|
+          row.each_with_index do |before, c|
+            next unless catalogue.dig(before, :kind) == :crumbling && catalogue.dig(objects[r][c], :kind) == :hole && @gave_way.add?([state.place, before])
+
+            @run.trace.emit(:floor_gave_way, frame: state.frame, place: state.place, cell: [r, c], object: before)
+          end
+        end
+      end
+      @floor = [state.place, objects]
+    end
+
+    def observed_floors(objects) = objects.reject { |object| object[:kind] == :crumbling && !@gave_way.include?([@floor&.first, object[:object]]) }
+
     def carded_place(events)
       events.reduce(nil) do |carded, event|
         next event['place'] if event['type'] == 'place_card'
@@ -194,7 +213,7 @@ module Koholint
       context = @builder ? { grid: } : {}
       context[:held] = Items.held(state)
       context.merge(dialogue_shot: -> { Vision::DialogueShot.crop(@emulator) }, dialogue_rgb: -> { Vision::DialogueShot.rgb(@emulator) },
-                    entities: -> { Entities.read(@emulator) }, objects: -> { Entities.objects(@emulator) },
+                    entities: -> { Entities.read(@emulator) }, objects: -> { observed_floors(Entities.objects(@emulator)) },
                     room_objects: -> { Entities.room_objects(@emulator) })
     end
 
@@ -300,6 +319,7 @@ module Koholint
       @run.inputs.append(buttons)
       @budget.tick(frames: 1)
       state = Perception.read(@emulator)
+      note_floor(state)
       @readiness.observe(state)
       gains = @items.observe(state)
       gains.each { |gain| @run.trace.emit(:item_gained, frame: state.frame, **gain) }

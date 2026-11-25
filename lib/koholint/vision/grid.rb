@@ -8,8 +8,9 @@ module Koholint
       SPRITE_WIDTH = 8
       SPRITE_HEIGHT = 16
 
-      def initialize(cells:, static_sprites:, beliefs:, capabilities:)
+      def initialize(cells:, static_sprites:, beliefs:, capabilities:, hole_objects: [])
         @cells = cells
+        @hole_objects = hole_objects
         @beliefs = beliefs
         @capabilities = capabilities
         @sprites = {}
@@ -34,6 +35,8 @@ module Koholint
 
       def passable(row, col, direction)
         check(row, col)
+        return :no if @hole_objects.include?([row, col])
+
         @beliefs.query(appearance: static_sprite(row, col) || appearance(row, col), action: :walk, direction:, context: @capabilities)
       end
 
@@ -50,7 +53,7 @@ module Koholint
       def holes
         @holes ||= begin
           looks = @cells.flatten.uniq.select { |look| @beliefs.hole?(look) }
-          ROWS.times.to_a.product(COLS.times.to_a).select { |row, col| looks.include?(@cells[row][col]) }
+          ROWS.times.to_a.product(COLS.times.to_a).select { |row, col| looks.include?(@cells[row][col]) } | @hole_objects
         end
       end
 

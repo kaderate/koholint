@@ -375,9 +375,16 @@ module Koholint
     end
 
     # Where a loop goes when no place has untried work: the reachable place entered least, nearest first, outside the loop.
+    # A place whose landing from here was left by the side Link came in, with nothing reached from it, is no destination: Link would only come back.
     def least_visited(from, avoid: [])
       far = hops(from).reject { |place, _| place == from || avoid.include?(place) }
-      far.sort_by { |place, count| [@visits[place], count, place] }.each { |place, _| (found = route(from, goal: place)) and return found }
+      far.sort_by { |place, count| [@visits[place], count, place] }.each do |place, _|
+        hops = path(from, goal: place) or next
+        way = hops.last[:via]
+        next if way.is_a?(Symbol) && Geometry::OPPOSITE.key?(way) && pocket_side(place, @arrivals[[place, Geometry::OPPOSITE.fetch(way)]])
+
+        return route(from, goal: place)
+      end
       nil
     end
 

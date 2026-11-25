@@ -478,6 +478,18 @@ class ExploreTest < Minitest::Test
     assert_equal [:exit, 7, 9], result[:target].values_at(:kind, :row, :col)
   end
 
+  def test_least_visited_skips_a_place_whose_landing_from_here_is_a_pocket
+    log = Koholint::ExploreLog.new
+    log.absorb({ from: { room: 2, map: 1 }, exits: [{ row: 0, col: 9, direction: :up, outcome: :left, to: [1, 0] }, { row: 3, col: 9, direction: :right, outcome: :left, to: [3, 1] }], survey: { sides: {}, doors: [] } })
+    others = [[3, 1]]
+    assert_equal [1, 0], log.least_visited([2, 1], avoid: others)[:goal]
+    stuck = { skill: 'explore', from: { room: 1, map: 0, row: 7, col: 9 }, stopped_by: 'no_frontier', cells_walked: 0, route: { goal: [3, 1], next: [2, 1] }, dead_end: true }
+    2.times { log.absorb(stuck) }
+    assert log.pocket_side([1, 0], [7, 9])
+    log.note({ skill: 'walk', params: { direction: :up }, from: { room: 2, map: 1, row: 0, col: 9 }, to: { room: 1, map: 0, row: 7, col: 9 } })
+    assert_nil log.least_visited([2, 1], avoid: others)
+  end
+
   def test_a_way_back_never_crossed_is_dropped_when_an_explore_finds_no_exit_for_it
     log = Koholint::ExploreLog.new
     log.absorb({ from: { room: 5, map: 1 }, exits: [{ row: 7, col: 5, direction: :down, outcome: :left, to: [1, 0] }] })
@@ -1154,6 +1166,31 @@ class ExploreTest < Minitest::Test
     assert_equal [172, 10], Koholint::ExploreLog.from_events(stalled.(2)).route([171, 10], goal: [172, 10])[:next], 'two calls of one visit may meet a passing block'
     log = Koholint::ExploreLog.from_events(stalled.(3))
     assert_equal [[80, 0], [171, 10], [172, 10]], log.path([171, 10], goal: [172, 10]).map { |hop| hop[:to] }, 'round through the door, whose landing reaches it'
+  end
+
+  def test_an_untried_exit_no_path_reaches_is_unreachable_unless_the_room_has_crumbling_floor
+    rows = with(CLOSED, [7, 5], '.', [6, 5], '#')
+    result, = explore(rows, explore_log: Koholint::ExploreLog.new, limit: 200)
+    assert_equal [:down], result[:unreachable], result.inspect
+    result, = explore(rows, explore_log: Koholint::ExploreLog.new, objects: -> { [{ kind: :crumbling, cell: [2, 2] }] }, limit: 200)
+    assert_nil result[:unreachable]
+  end
+
+  def test_an_unreachable_door_is_reported_by_its_own_cell
+    rows = with(CLOSED, [2, 5], '#', [3, 4], '#', [3, 6], '#', [4, 5], '#')
+    door = -> { [{ kind: :door, cell: [2, 5] }] }
+    result, = explore(rows, explore_log: Koholint::ExploreLog.new, objects: door, start: [40, 96], limit: 200)
+    assert_equal [[2, 5]], result[:unreachable], result.inspect
+  end
+
+  def test_a_fall_and_an_enemy_to_fight_stop_explore
+    falling = Koholint::GameState.new(**state.to_h, link_motion_state: Koholint::FALL_MOTION)
+    execution = registry.start('explore', state, {}, { grid: MapGrid.new(with(CLOSED, [2, 5], '?')) })
+    execution.next_input(state)
+    execution.next_input(falling)
+    assert_equal [:fell, []], execution.result(state).values_at(:stopped_by, :blocked_edges)
+    result, = explore(with(CLOSED, [2, 5], '?'), fight: ->(_now) { true })
+    assert_equal [:enemy, 0], result.values_at(:stopped_by, :cells_walked)
   end
 end
 class ExploreCutCallsTest < Minitest::Test

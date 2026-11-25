@@ -35,7 +35,9 @@ observability.
 (position, place, hp and pending damage, rupees, phase, items, readiness signals). Every address carries provenance and a
 `verified_count`. `entities.rb` reads the 16 entity slots and the room object table and gives each a kind from
 `data/entities.json` (`npc`, `enemy`, `creature`, `object`, `unknown`; objects: `sign`, `door`, `chest`, `stone`, …).
-`items.rb` and `data/items.json` name item ids; the engine's `ItemWatch` emits `item_gained`. The probes under `probes/`
+`items.rb` and `data/items.json` name item ids; the engine's `ItemWatch` emits `item_gained`. The engine also watches the room
+objects every frame and emits `floor_gave_way` when a crumbling floor object turns into a hole; the skills see that object as
+crumbling only in places where this was seen. The probes under `probes/`
 (`bin/koholint census …`) measure these files on throwaway copies; they are the only code that writes RAM.
 
 **Game modes** — `modes.rb` and `data/modes.json` catalogue the game's screens by their mode tuple, each with the engine
@@ -51,7 +53,8 @@ enemies, creatures, unknown entities, signs, objects, doors, chests, exits). `wo
 the talk log.
 
 **Vision** (`vision/`) — what RAM does not give. `screen_vision` and `screen_snapshot` read the screen; `grid_builder` probes
-neighbouring cells (the only place that snapshots and restores the emulator) and builds the collision `grid`; `beliefs` and
+neighbouring cells (the only place that snapshots and restores the emulator) and builds the collision `grid`, where a cell whose
+room object is catalogued as a hole is a hole whatever its look; `beliefs` and
 `world` accumulate per-place knowledge; `capabilities` records what Link can do; `dialogue_shot` crops dialogue boxes for the
 model. Unknown cells are unknown, not walls.
 
@@ -91,7 +94,8 @@ Every policy inherits the no-op hooks of `policies/base.rb` (`observe`, `prepare
   concerns are mixed in from `policies/delegated/`: `dialogue.rb` (pages, sheets, cached readings), `waits.rb` (screens,
   locks, hemmed), `outcomes.rb` (what each result teaches the memory) and `guidance.rb` (loop breaks, zero caps, objective
   follow-up, alerts). Before asking the model it lets the harness answer: screen waits, game over, dialogue advance, lock and
-  settle waits, revisits, hemmed probes, loop breaks, zero caps, the explore autopilot (`autopilot.rb`) and automatic
+  settle waits, revisits, hemmed probes, loop breaks, zero caps, the explore autopilot (`autopilot.rb`, which also fights
+  one-strike enemies on sight through a `fight` hook in the skill context that explore checks every frame) and automatic
   objectives. An invalid answer falls back to a wait; 5 fallbacks in a row stop the run.
 - `policies/start_game.rb` runs the intro and wraps the policy of every CLI run, forwarding the hooks to it.
 - `policies/walk_and_talk.rb` is the deterministic baseline.

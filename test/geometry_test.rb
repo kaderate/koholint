@@ -45,6 +45,12 @@ class GeometryTest < Minitest::Test
     assert raw['verified_count'].positive?
     refute_empty raw['provenance']
   end
+
+  def test_the_footprint_covers_the_cells_of_its_measured_row_band
+    assert_equal [[0, 4]], Koholint::Geometry.footprint_cells(76, 16)
+    assert_equal [[0, 4], [1, 4]], Koholint::Geometry.footprint_cells(76, 20)
+    assert_equal [[1, 4]], Koholint::Geometry.footprint_cells(76, 32)
+  end
 end
 
 class GeometryFootprintTest < Minitest::Test
