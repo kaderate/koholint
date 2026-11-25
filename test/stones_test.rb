@@ -264,6 +264,17 @@ class StonesTest < Minitest::Test
     assert_includes [room.objects[2][5], room.objects[4][5]], FIXED
     assert_equal FLOOR, room.objects[3][6]
   end
+  # Gate run 1d73, 171/10: walks into cells pushes had emptied left the stone's look believed walkable, so routes ran through stones.
+  class StaleGrid < LiveGrid
+    def passable(row, col, _direction) = @rows[row][col] == '#' ? :no : :yes
+  end
+
+  def test_a_stone_believed_walkable_is_still_opened_with_the_pushes_the_search_found
+    room = Room.new(JAM, start: at([3, 1]), exits: [[[3, 9], :right]])
+    result, = play('explore', {}, room, JAM, limit: 1500, grid: StaleGrid.new(room, JAM))
+    assert_equal :push, result.dig(:target, :kind), result.slice(:stopped_by, :target).inspect
+  end
+
   class StuckRoom < Room
     private
 

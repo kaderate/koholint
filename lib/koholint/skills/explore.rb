@@ -22,14 +22,18 @@ module Koholint
                 left: ->(_row, col) { col.zero? }, right: ->(_row, col) { col == Geometry::COLS - 1 } }.freeze
 
       class Known
-        def initialize(grid, walked)
+        # A stone's look is believed walkable from the walks into cells a push emptied, so a stone on screen is never walked into.
+        def initialize(grid, walked, stones = [])
           @grid = grid
           @walked = walked
+          @stones = stones
         end
 
         def static_sprite(row, col) = @grid.static_sprite(row, col)
 
         def passable(row, col, direction)
+          return :no if @stones.include?([row, col])
+
           belief = @grid.passable(row, col, direction)
           belief != :no && @walked.include?([row, col]) ? :yes : belief
         end
@@ -69,10 +73,11 @@ module Koholint
           @ledger = context[:ledger]
           @talk_log = context[:talk_log]
           @log = context[:explore_log]
-          @walked = ((@log ? @log.walked(@place) | @log.stood(@place) : []) - stone_cells(context)) | [@start.cell].compact
+          stones = stone_cells(context)
+          @walked = ((@log ? @log.walked(@place) | @log.stood(@place) : []) - stones) | [@start.cell].compact
           @fresh = @log && !@log.surveyed?(@place)
           grid = context[:grid]
-          @known = grid && Known.new(grid, @walked)
+          @known = grid && Known.new(grid, @walked, stones - [@start.cell])
           @planner = @known && Navigation::Planner.new(grid: @known, ledger: @ledger, place: @place, triggers: context[:triggers], mode: :free_only, danger: danger_of(context), pushable: pushable_of(context, stones: false), contact: contact_of(context), away: away_of(context))
           @pushable = Array(pushable_of(context)&.call)
           @grid = grid
