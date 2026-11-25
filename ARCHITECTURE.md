@@ -86,10 +86,10 @@ digest.
 publish|retire` moves an entry to or from `operational`, which changes the capabilities digest; operational entries become
 `Composite` skills offered while their object is on screen and their item held.
 
-**Souvenirs** (offline build, `souvenirs.rb`, `data/souvenirs.json`) — `koholint souvenirs` rebuilds from the archived bundles
+**Souvenirs** (offline build, `souvenirs.rb`, `data/souvenirs.json`) — `koholint souvenirs` rebuilds from the sealed bundles
 only the texts people said through a talk, each with the first sighting per run (run, frame, items the reader held), every run counted
 from its fork frame; a test keeps the committed file equal to a rebuild. Each run records in its manifest the cutoff of what it may
-remember (sightings in runs created before its parent, outside its parent's batch of sibling forks) and its digest; the agent policy
+remember (sightings in runs created before its parent, outside its parent's sibling arms and their forks) and its digest; the agent policy
 receives those texts, and `candidates.rb` turns one naming a held item into a souvenir candidate. Souvenirs never count as texts read.
 
 **Decision points and policies** — `decision.rb` defines the points (`choose_objective`, `choose_skill`, `move`, macros) with
