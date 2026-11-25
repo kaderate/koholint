@@ -144,13 +144,16 @@ The skills, protocols and harness behaviours the agent works with. Versioned wit
   Within a place, explore takes a side known only as the assumed way back (flow-78) after the place's other reachable untried exits, doors and frontiers;
   it is still a frontier, taken when nothing else here is reachable, before a route to another place. An explore that stops `no_frontier`
   in at most one frame is answered by the harness at the next decision, not after three, since from the same cell it would find none again.
-- flow-97: an item gained takes its name from its pickup text, the capitalised words of the first sentence of the text read at that
-  place just before the gain (`Items.name_words`; from the trace on resume). After a gain, the people and unidentified things of other
-  places this lineage never read are all candidates, nearest first, past the cap of four. At an objective choice, a person whose recorded
-  text holds every word of the name of an item Link holds, and who never talked with Link holding it, becomes the objective (picked by
-  the harness): Link talks to them holding it, then the harness uses it facing them; the use ends the objective. A step of explore
-  that a hostile knocks back is barred for that call only: it is no wall, no blocked edge and no tried exit, and the place's work
-  stays pending, so the way is tried again later.
+- flow-97: an item gained takes its name from its pickup text, the first text transcribed at its place after it shows as held (within
+  600 frames, never an earlier text): the first run of capitalised words of its first sentence, past the first word (`Items.name_words`;
+  the same rule rebuilds it from the trace on resume). After a gain, the people and unidentified things of other places this lineage
+  never read are all candidates past the cap of four, nearest first, then those of places no known route reaches yet, nearest on the
+  map; without a gain the cap holds. At an objective choice, a person whose recorded text holds that name as whole words in a row, and
+  who never talked with Link holding the item, becomes the objective (picked by the harness): Link talks to them holding it, then the
+  harness uses it facing them; only that item used after the talk ends the objective. It is picked again for that person only once
+  Link read a new text from them or a route to them appeared. A step of explore a hostile knocked Link back from just before it failed
+  (`knocked_edges` in the result) is barred for that call only: it is no wall, no blocked edge and no tried exit, and the place's work
+  stays pending; from the third knock on that step in one visit it is learned like any failed step.
 - flow-96: an examine- objective is achieved only once the thing at its place is tried: talk_to first, then touch when the talk drew
   no answer (an answered talk, or a dialogue that opens as Link walks up to it, is a try); the agent is told so; the autopilot follows each of those steps once, even when the model's own explore brought Link
   there. The walk probe records a way, like a wall, only from a start lined up with the row or column
