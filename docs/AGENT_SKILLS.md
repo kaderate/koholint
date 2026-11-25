@@ -144,6 +144,9 @@ The skills, protocols and harness behaviours the agent works with. Versioned wit
   Within a place, explore takes a side known only as the assumed way back (flow-78) after the place's other reachable untried exits, doors and frontiers;
   it is still a frontier, taken when nothing else here is reachable, before a route to another place. An explore that stops `no_frontier`
   in at most one frame is answered by the harness at the next decision, not after three, since from the same cell it would find none again.
+- flow-99: the harness never waits beside a hostile at any health: when explore finds no way out while a hostile's contact zone
+  reaches Link's cell or a neighbour, it sends explore back by the side Link came in at once (once per cell, until Link changes
+  place or heals).
 - flow-99: souvenirs. A text a person said in another branch (`data/souvenirs.json`, the run's `souvenirs` cutoff) whose words hold the
   name of an item Link holds, by flow-97's rule or a name of `data/items.json` that the item's observed pickup text quotes, read by
   someone who did not hold it, from a person this lineage never heard say it nor talked to holding the item, at a place this lineage's
