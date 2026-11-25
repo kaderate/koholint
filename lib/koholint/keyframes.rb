@@ -14,6 +14,8 @@ module Koholint
 
     def save(emulator)
       path = File.join(@dir, format('kf-%09d.zlib', emulator.frame))
+      return path if File.exist?(path)
+
       tmp = "#{path}.#{Process.pid}-#{SecureRandom.hex(4)}.tmp"
       File.binwrite(tmp, Zlib::Deflate.deflate(emulator.dump))
       File.rename(tmp, path)
