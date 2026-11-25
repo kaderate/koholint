@@ -73,6 +73,7 @@ module Koholint
       DEADLOCK_WAITS = 3
       DROPPED = %w[need- souvenir-].freeze
       REOFFERS = 2
+      HEAL_DETOURS = 2
       EXPLORE = { skill: 'explore', params: {} }.freeze
       AUTO_OBJECTIVE = { title: 'Explore the nearest untried exits (picked by the harness)', predicate: { kind: 'new_place' } }.freeze
 
@@ -80,6 +81,8 @@ module Koholint
         @exits = exits
         @souvenirs = souvenirs
         @cards = memory.cards.dup
+        @healers = memory.healers
+        @heal_detours = 0
         @loop_watch = memory.loop_watch
         @zero_watch = memory.zero_watch
         @candidates = []
@@ -153,6 +156,8 @@ module Koholint
         note_gains(state)
         @retreated = nil if @retreated && (@retreated[:spot][0] != state.place || state.health > @retreated[:hp])
         @retreated[:hp] = [@retreated[:hp], state.health].min if @retreated
+        @healers.saw(place: state.place, health: state.health) unless state.loading?
+        @healers.heard(state.place) if state.dialog_open?
         @held = Dialogues.items(state.inventory, state.item_a, state.item_b)
         release_hemmed(state)
         track_locked(state)
@@ -228,6 +233,9 @@ module Koholint
           broken = loop_break(decision_point, state, context)
           return broken if broken
 
+          detour = heal_detour(decision_point, state, context)
+          return detour if detour
+
           capped = zero_cap(decision_point, state, context)
           return capped if capped
 
@@ -278,6 +286,7 @@ module Koholint
         return unless choice.key?(:skill)
 
         @autopilot&.acted(skill: choice[:skill], outcome:) unless @revisit_acting
+        @healers.moved if outcome[:moved_cells].to_i.positive?
         @zero_watch.note(place: Ledger.place_of(outcome[:from]) || state.place, skill: choice[:skill], stop: outcome[:stopped_by], frames: outcome[:frames],
                          cells: outcome[:cells_walked], to: Ledger.place_of(outcome[:to]))
         @frame = frame
@@ -389,6 +398,7 @@ module Koholint
         signs = objects_for(state)
         if state.phase(booted: true) == :playing
           @cards[place] = (@cards[place] || {}).merge(people: @entities.select { |entity| entity[:kind].to_s == 'npc' && entity[:cell] }.map { |entity| entity.slice(:type, :cell) },
+                                                      enemies: @entities.select { |entity| entity[:kind].to_s == 'enemy' && entity[:cell] }.map { |entity| entity.slice(:type, :cell) },
                                                       signs: signs.select { |object| object[:kind].to_s == 'sign' }.map { |object| object.slice(:cell) },
                                                       chests: signs.select { |object| object[:reachable] }.map { |object| object[:cell] })
         end

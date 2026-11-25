@@ -1,4 +1,5 @@
 require 'koholint/explore_log'
+require 'koholint/healers'
 require 'koholint/items'
 require 'koholint/leads'
 require 'koholint/ledger'
@@ -10,17 +11,19 @@ require 'koholint/zero_watch'
 
 module Koholint
   module Policies
-    Memory = Data.define(:ledger, :triggers, :talk_log, :explore_log, :leads, :cards, :loop_watch, :zero_watch, :item_names, :item_tries, :stalled) do
+    Memory = Data.define(:ledger, :triggers, :talk_log, :explore_log, :leads, :cards, :loop_watch, :zero_watch, :item_names, :item_tries, :stalled, :healers) do
       def initialize(ledger: nil, triggers: nil, talk_log: nil, explore_log: nil, leads: nil, cards: {}, loop_watch: nil, zero_watch: nil, item_names: {},
-                     item_tries: {}, stalled: [])
+                     item_tries: {}, stalled: [], healers: nil)
         super(ledger: ledger || Ledger.new, triggers: triggers || Triggers.new, talk_log: talk_log || TalkLog.new, explore_log: explore_log || ExploreLog.new,
-              leads: leads || Leads.new, cards:, loop_watch: loop_watch || LoopWatch.new, zero_watch: zero_watch || ZeroWatch.new, item_names:, item_tries:, stalled:)
+              leads: leads || Leads.new, cards:, loop_watch: loop_watch || LoopWatch.new, zero_watch: zero_watch || ZeroWatch.new, item_names:, item_tries:, stalled:,
+              healers: healers || Healers.new)
       end
 
       def self.from_events(events)
         new(ledger: Ledger.from_events(events), triggers: Triggers.from_events(events), talk_log: TalkLog.from_events(events),
             explore_log: ExploreLog.from_events(events), leads: Leads.from_events(events), cards: PlaceCard.latest(events),
-            loop_watch: LoopWatch.from_events(events), zero_watch: ZeroWatch.from_events(events), item_names: Items.pickup_names(events), item_tries: item_tries(events), stalled: stalled(events))
+            loop_watch: LoopWatch.from_events(events), zero_watch: ZeroWatch.from_events(events), item_names: Items.pickup_names(events), item_tries: item_tries(events), stalled: stalled(events),
+            healers: Healers.from_events(events))
       end
 
       # The candidates whose objective was abandoned on a stall.

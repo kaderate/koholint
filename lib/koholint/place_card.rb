@@ -52,6 +52,7 @@ module Koholint
         chests = Array(event['chests']).reject { |chest| chest['open'] }.map { |chest| chest['cell'] } - later
         cards[event['place']] = { people: Array(event['people']).map { |person| { type: person['type'], cell: person['cell'] } },
                                   signs: Array(event['signs']).map { |sign| { cell: sign['cell'] } }, chests:,
+                                  enemies: Array(event['enemies']).map { |enemy| { type: enemy['type'], cell: enemy['cell'] } },
                                   unknown: stillness(cards.dig(event['place'], :unknown), Array(event['unknown']).map { |thing| { type: thing['type'], cell: thing['cell'] } }), held: }
       end
     end

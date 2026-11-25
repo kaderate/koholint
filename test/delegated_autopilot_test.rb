@@ -423,6 +423,37 @@ class DelegatedAutopilotTest < Minitest::Test
     assert_equal ['delegated', 'souvenir-162-14-t64', target], [again[:agent], @objectives.current[:candidate], @objectives.current[:target]]
   end
 
+  # Gate run 15df: at 8 hp after 82/0, the way to the hut crossed 66/0's enemies; 83/0, where a talk had healed Link at 88340, was a room away.
+  def test_at_one_heart_a_way_through_enemies_first_goes_to_heal_where_a_talk_healed_link_then_takes_the_objective_up_again
+    log = Koholint::ExploreLog.new
+    log.absorb({ from: { room: 163, map: 16 }, exits: [{ row: 3, col: 0, direction: :left, outcome: :left, to: [164, 16] }, { row: 0, col: 5, direction: :up, outcome: :left, to: [165, 16] }],
+                 survey: { sides: { left: [{ row: 3, col: 0 }], up: [{ row: 0, col: 5 }] }, doors: [] } })
+    log.absorb({ from: { room: 164, map: 16 }, exits: [{ row: 3, col: 9, direction: :right, outcome: :left, to: [163, 16] }], survey: { sides: { right: [{ row: 3, col: 9 }] }, doors: [] } })
+    healers = Koholint::Healers.new
+    healers.saw(place: [164, 16], health: 8)
+    healers.heard([164, 16])
+    healers.saw(place: [164, 16], health: 24)
+    cards = { [165, 16] => { enemies: [{ type: 27, cell: [4, 5] }] }, [164, 16] => { unknown: [{ type: 132, cell: [3, 5] }] } }
+    @objectives = Koholint::Objectives.new(trace: trace)
+    @objectives.start(frame: 100, title: 'Bring the champignon', predicate: { kind: 'reach_place', place: [165, 16] }, candidate: 'souvenir-165-16-t64', target: { kind: 'person', place: [165, 16], type: 64, cell: [4, 4], try: true, item: 12 })
+    p = Koholint::Policies::Delegated.new(client: ScriptedClient.new(objective: new_place, default: explore), registry: Koholint::Skills::Registry.default, objectives: @objectives, manual: '',
+                                          memory: Koholint::Policies::Memory.new(explore_log: log, cards:, healers:))
+    full = state(frame: 200, hp: 24)
+    p.observe(full, frame: 200)
+    refute_match(/heal/, p.decide(p.decision_point_for(full), full, { grid: })[:justification].to_s, 'not at full health')
+    low = state(frame: 300, hp: 8)
+    p.observe(low, frame: 300)
+    context = { grid: }
+    detour = p.decide(p.decision_point_for(low), low, context)
+    assert_match(/heal in 164-16 first/, detour[:justification])
+    assert_equal [{ place: [164, 16] }, { kind: 'person', place: [164, 16], type: 132, cell: [3, 5] }, 'heal'], [context[:aim], @objectives.current[:target], @objectives.history.last[:reason]]
+    @objectives.abandon(frame: 400, reason: 'test')
+    healed = state(frame: 500, hp: 24, room_id: 164)
+    p.observe(healed, frame: 500)
+    p.decide(p.decision_point_for(healed), healed, { grid: })
+    assert_equal 'souvenir-165-16-t64', @objectives.current[:candidate]
+  end
+
   def test_a_loop_with_no_untried_work_anywhere_goes_to_the_least_entered_place_outside_it_on_every_detection
     log = Koholint::ExploreLog.new
     log.absorb({ from: { room: 163, map: 16 }, exits: [{ row: 3, col: 0, direction: :left, outcome: :left, to: [164, 16] }, { row: 0, col: 5, direction: :up, outcome: :left, to: [165, 16] }],

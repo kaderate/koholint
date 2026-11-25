@@ -234,8 +234,8 @@ module Koholint
         end
 
         # A delivery the loop break dropped is a lead the loop says nothing about, so it is taken up again once the loop is cut, REOFFERS times at most.
-        def note_dropped(objective)
-          return unless objective && DROPPED.any? { |prefix| objective[:candidate].to_s.start_with?(prefix) }
+        def note_dropped(objective, any: false)
+          return unless objective && (any || DROPPED.any? { |prefix| objective[:candidate].to_s.start_with?(prefix) })
 
           offers = @dropped&.dig(:objective, :candidate) == objective[:candidate] ? @dropped[:offers] : 0
           @dropped = { objective: objective.slice(:title, :predicate, :candidate, :target), offers: }
@@ -249,6 +249,33 @@ module Koholint
           @objectives.start(frame: state.frame, **objective, autopilot: true)
           @autopilot&.adopt(@objectives.current)
           DecisionPoint.harness_choice(objective.slice(:title, :predicate), "the loop is cut: #{objective[:candidate]}, dropped by the loop break, is taken up again (#{@dropped[:offers]}/#{REOFFERS})", autopilot: true)
+        end
+
+        # At one heart or less, a route to the objective through a place where enemies were seen first goes to the nearest place a talk healed Link;
+        # the objective is taken up again afterwards. A place card with one person or unknown thing names who to talk to there.
+        def heal_detour(decision_point, state, context)
+          return unless decision_point.name == :choose_skill && !@sequence && state.health <= Perception::HP_PER_HEART && state.max_hp.to_i > state.health
+
+          current = @objectives.current or return
+          return if current[:heal] || @heal_detours >= HEAL_DETOURS
+
+          goal = current.dig(:predicate, :place) or return
+          hops = @explore_log.path(state.place, goal:) or return
+          return unless hops.any? { |hop| Array(@cards.dig(hop[:to], :enemies)).any? }
+
+          place, = (@healers.places - [state.place]).filter_map { |at| [at, @explore_log.path(state.place, goal: at)] }.select(&:last).min_by { |_, path| path.size }
+          return unless place
+
+          @heal_detours += 1
+          note_dropped(current, any: true)
+          @objectives.abandon(frame: state.frame, reason: 'heal')
+          who = Array(@cards.dig(place, :people)) + Array(@cards.dig(place, :unknown))
+          target = who.size == 1 ? { kind: 'person', place:, type: who.first[:type], cell: who.first[:cell] } : { kind: 'place', place: }
+          @objectives.start(frame: state.frame, title: "Heal in #{place.join('-')}, where a talk healed Link before", predicate: { kind: 'reach_place', place: }, target:, autopilot: true)
+          @objectives.current[:heal] = true
+          @autopilot&.adopt(@objectives.current)
+          context[:aim] = { place: }
+          DecisionPoint.harness_choice(EXPLORE, "#{state.health} hp and the way to #{goal.join('-')} crosses enemies: heal in #{place.join('-')} first (#{@heal_detours}/#{HEAL_DETOURS})", autopilot: true)
         end
 
         def zero_cap(decision_point, state, context)
