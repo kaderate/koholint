@@ -187,7 +187,7 @@ module Koholint
 
     def unmet(place) = Array(@unmet[place]).reject { |type| met?(place, type) || Entities.catalogue.key?(type) }
 
-    def work?(place) = untried?(place) || unmet(place).any?
+    def work?(place, came = nil, lifted = []) = untried?(place, came, lifted) || unmet(place).any?
 
     def note_met(place, result)
       return unless Ledger.pick(result, :skill).to_s == 'talk_to'
@@ -352,17 +352,21 @@ module Koholint
     # A door Link has walked through, recognised or not as a door object (98/0's way into 189/10 is not one).
     def door_edge?(place, cell) = ways(place).key?(cell)
 
-    def untried?(place)
-      surveyed_untried?(place) || inferred_clearable(place).any?
+    def untried?(place, came = nil, lifted = [])
+      surveyed_untried?(place, came, lifted) || inferred_clearable(place).any?
     end
 
-    def surveyed_untried?(place)
+    # came: the side a route lands by; untried ways all cut off from that landing are no work for it, whatever the survey left pending.
+    def surveyed_untried?(place, came = nil, lifted = [])
       survey = @surveys[place] or return true
       return true if survey[:provisional]
+
+      ways = survey[:sides].filter_map { |side, cells| side if !side_crossed?(place, side) && cells.any? { |cell| !tried?(place, cell, side) } } +
+             survey[:doors].reject { |cell| door_tried?(place, cell) }
+      return false if came && ways.any? && ways.all? { |way| cut?(place, came, way) && !lifted.include?([place, came, way]) }
       return survey[:pending] unless survey[:pending].nil?
 
-      survey[:sides].any? { |side, cells| !side_crossed?(place, side) && cells.any? { |cell| !tried?(place, cell, side) } } ||
-        survey[:doors].any? { |cell| !door_tried?(place, cell) }
+      ways.any?
     end
 
     # skip: places not to aim at (a loop's own places), still crossed on the way.
@@ -416,7 +420,7 @@ module Koholint
       until queue.empty?
         state = queue.shift
         place, came = state
-        return hops_to(seen, state) if place != from && (goal ? place == goal : work?(place) && !skip.include?(place))
+        return hops_to(seen, state) if place != from && (goal ? place == goal : work?(place, came, lifted) && !skip.include?(place))
 
         ways(place).each do |key, to|
           ahead = [to, entry(place, key)]

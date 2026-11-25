@@ -975,6 +975,32 @@ class ExploreTest < Minitest::Test
     assert_equal [18, 0], log.route([17, 0], goal: [19, 0])[:next], 'a crossing from that side reopens the way'
   end
 
+  # 64/0 and 65/0 (run 20261125-035532-e8c3, from frame 97527): each one's only untried side was cut off from the side Link entered it by,
+  # and each routed him to the other.
+  def test_a_place_whose_untried_ways_are_all_cut_off_from_the_landing_a_route_reaches_is_no_goal
+    log = Koholint::ExploreLog.new
+    walk = ->(from, to, direction) { log.note({ skill: 'walk', params: { direction: }, from: { room: from, map: 0, row: 3, col: 5 }, to: { room: to, map: 0, row: 3, col: 5 } }) }
+    survey = ->(room, side) { log.absorb({ from: { room:, map: 0, row: 3, col: 5 }, survey: { sides: { side => [{ row: 0, col: 4 }] }, doors: [], pending: true } }) }
+    walk.(17, 18, 'right')
+    survey.(18, 'up')
+    walk.(18, 17, 'left')
+    survey.(17, 'down')
+    assert_equal [18, 0], log.route([17, 0])[:goal]
+    2.times do
+      walk.(17, 18, 'right')
+      log.absorb({ from: { room: 18, map: 0 }, unreachable: ['up'] })
+      walk.(18, 17, 'left')
+      log.absorb({ from: { room: 17, map: 0 }, unreachable: ['down'] })
+    end
+    assert log.route([17, 0])[:lifted], 'each cut is still lifted once'
+    walk.(17, 18, 'right')
+    log.absorb({ from: { room: 18, map: 0 }, unreachable: ['up'] })
+    walk.(18, 17, 'left')
+    log.absorb({ from: { room: 17, map: 0 }, unreachable: ['down'] })
+    assert_nil log.route([17, 0])
+    assert_nil log.route([18, 0])
+  end
+
   def test_a_place_cut_off_from_one_side_is_still_routed_through_from_another
     log = Koholint::ExploreLog.new
     walk = ->(from, to, direction) { log.note({ skill: 'walk', params: { direction: }, from: { room: from, map: 0, row: 3, col: 5 }, to: { room: to, map: 0, row: 3, col: 5 } }) }
