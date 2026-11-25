@@ -49,7 +49,15 @@ class GridTest < Minitest::Test
   def test_a_sprite_partly_off_the_grid_does_not_raise
     grid = grid([{ 'x' => 4, 'y' => 8, 'pattern' => 'edge' }, { 'x' => 166, 'y' => 140, 'pattern' => 'far' }])
     assert_equal 'edge', grid.static_sprite(0, 0)
-    assert_equal 'far', grid.static_sprite(7, 9)
+    assert_nil grid.static_sprite(7, 9), 'a sprite mostly off the grid stands on no cell'
+  end
+
+  # 81/0 (run 20261125-065151-869d, frame 101046): the speaker 8 px below Link walled off every way but the edge that opens its text.
+  def test_a_still_sprite_stands_only_where_it_covers_half_a_cell_and_never_on_link
+    sprites = [{ 'x' => 100, 'y' => 39, 'pattern' => 'p' }, { 'x' => 108, 'y' => 39, 'pattern' => 'p' }]
+    grid = Koholint::Vision::Grid.new(cells: Array.new(8) { Array.new(10) { 'floor' } }, static_sprites: sprites, beliefs: Koholint::Vision::Beliefs.new,
+                                      capabilities: Koholint::Vision::Capabilities.new, link: [1, 6])
+    assert_equal [[1, 5]], (0...8).to_a.product((0...10).to_a).select { |row, col| grid.static_sprite(row, col) }
   end
 
   def test_a_covered_cell_is_not_answered_from_the_floor
