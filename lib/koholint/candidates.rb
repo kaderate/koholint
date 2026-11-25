@@ -21,7 +21,7 @@ module Koholint
       back, fresh = exits(place, grid, explore_log, named).partition { |exit| explore_log.side_left?(place, exit.dig(:target, :direction)) }
       leaving = puzzles(place, hops, explore_log, leads, named) + fresh + doors(place, signs, explore_log, link) + back + places(place, hops, explore_log, named) +
                 needs.reject { |need| need[:target][:place] == place } +
-                people_away(place, hops, cards, talk_log, named, stamp).reject { |person| asked.include?(person[:target].values_at(:place, :type)) } +
+                people_away(place, hops, cards, talk_log, named, stamp, explore_log).reject { |person| asked.include?(person[:target].values_at(:place, :type)) } +
                 signs_away(place, hops, cards, talk_log, named) + chests_away(place, hops, cards, named) +
                 lead_places(place, hops, leads, named)
       people + signs_here(place, signs, talk_log) + chests_here(place, signs) + unidentified(place, grid, entities, talk_log, link) +
@@ -116,14 +116,20 @@ module Koholint
       end
     end
 
-    # After a gain, people and things this lineage never read pass the cap, nearest first like the rest.
-    def people_away(place, hops, cards, talk_log, named, stamp = nil)
+    # After a gain, people and things this lineage never read pass the cap, and places no known route reaches yet: those come after the
+    # reachable ones, nearest first on the map.
+    def people_away(place, hops, cards, talk_log, named, stamp = nil, explore_log = nil)
       kept = 0
-      found = away(place, hops).flat_map do |where|
+      unrouted = cards.keys.reject { |where| where == place || hops.key?(where) }
+      unrouted = unrouted.sort_by { |where| [map_distance(place, where, explore_log) || Float::INFINITY, where] }
+      found = (away(place, hops) + unrouted).flat_map do |where|
         gained = stamp && cards.dig(where, :held) && cards.dig(where, :held) != Array(stamp)[1]
+        next [] unless hops.key?(where) || gained
+
         Array(cards.dig(where, :people)).uniq { |person| person[:type] }.filter_map do |person|
           stale = talk_log.stale?(place: where, entity: person[:type], stamp:)
           next unless stale || AWAY_WORTH.include?(talk_log.last_status(place: where, entity: person[:type]))
+          next unless hops.key?(where) || talk_log.talks_with(where, person[:type]).empty?
 
           who = talk_log.name_of(where, person[:type]) || "person (type #{person[:type]})"
           why = stale ? 'Link holds other items than at the last talk' : 'not exhausted'
@@ -223,7 +229,22 @@ module Koholint
 
     def describe(where, named) = (name = named.(where)) ? "#{name} (#{where.join('-')})" : "place #{where.join('-')}"
 
-    def moves(count) = "#{count} #{count == 1 ? 'move' : 'moves'} away"
+    def moves(count) = count ? "#{count} #{count == 1 ? 'move' : 'moves'} away" : 'no known route'
+
+    # Screens apart on the overworld map; an interior stands where a way out of it leads.
+    def map_distance(from, to, explore_log)
+      a = overworld(from, explore_log)
+      b = overworld(to, explore_log)
+      return unless a && b
+
+      ((a[0] / 16) - (b[0] / 16)).abs + ((a[0] % 16) - (b[0] % 16)).abs
+    end
+
+    def overworld(place, explore_log)
+      return place if place[1].zero?
+
+      explore_log&.ways(place)&.values&.find { |to| to[1].zero? }
+    end
 
     def status_text(status)
       { never: 'never talked to', new: 'last talk gave new text', changed: 'something changed since the last talk',
