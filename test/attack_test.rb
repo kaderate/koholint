@@ -224,6 +224,27 @@ class AttackTest < Minitest::Test
     refute(inputs.take_while { |buttons| !buttons.include?(:a) }.any? { |buttons| buttons.include?(:left) }, 'no back-off into the wall')
   end
 
+  def test_the_walk_to_an_enemy_walking_at_link_ends_once_it_is_in_reach
+    foe = enemy(4, 5, health: 3)
+    start = foe[:x]
+    link_at = []
+    walk = ->(enemies, frame, link) { enemies[0][:x] -= 1 if enemies[0][:status] == 5 && frame.odd?; link_at << link[0] }
+    result, inputs = fight([4, 5], [foe], from: [4, 2], knockback: 8, moves: walk)
+    assert result[:killed]
+    assert_operator start - link_at[inputs.index([:a])], :>=, Koholint::Skills::Attack::REACH[:along], 'the first strike comes a sword reach short of where it started'
+  end
+
+  def test_the_walk_ends_only_inside_the_measured_sword_reach
+    run = registry.start('attack', state(x: 40, y: 80), { row: 4, col: 2 }, { grid: FakeGrid.new, entities: -> { [enemy(4, 2)] } }).__getobj__
+    ex, ey = run.instance_variable_get(:@enemy).values_at(:x, :y)
+    reach = ->(dx, dy) { run.send(:in_reach?, state(x: ex - dx, y: ey - dy)) }
+    assert reach.(22, 8)
+    assert reach.(-8, -22)
+    refute reach.(23, 0)
+    refute reach.(20, 9)
+    refute reach.(12, 12)
+  end
+
   def test_while_striking_an_enemy_nearer_than_the_target_is_struck_instead
     approach = ->(enemies, frame, _link) { enemies[1][:y] = 80 - 24 if frame == 3 }
     result, = fight([4, 4], [enemy(4, 4), enemy(0, 2, slot: 4)], moves: approach)

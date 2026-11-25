@@ -185,7 +185,7 @@ module Koholint
           return if distance.(nearer) > FAR
 
           @enemy = nearer.slice(:slot, :type, :x, :y, :cell, :status, :health, :contact)
-          @gap = nil
+          @gap = @rushed = nil
           @lineup = 0
           @axis = nil
           true
