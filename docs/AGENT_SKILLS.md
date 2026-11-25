@@ -147,9 +147,10 @@ The skills, protocols and harness behaviours the agent works with. Versioned wit
 - flow-101: explore never plans a walk into a stone on screen, even one whose look was walked on after a push emptied its cell, so
   the stone search's pushes open the way. At one heart or less, an objective whose route crosses a place where enemies were seen
   first goes to the nearest place where a talk healed Link (read from the hp rises after a dialogue), up to twice, and the heal
-  objective holds until the healer answered a talk. Sent back by the same side of a place twice within 3000 frames, the third time
+  objective holds until Link's hp rises, however many people the place shows. Sent back by the same side of a place twice within 3000 frames, the third time
   marks the place guarded: the objective is set aside and explore heads for work elsewhere. A need or souvenir objective a loop break,
-  heal detour or guard set aside is offered again, up to twice, once the loop is cut. A souvenir is retired once its item, used in
+  heal detour or guard set aside is offered again once per drop, up to twice, while the menu still offers it. The heal
+  detours, retreats and re-offers are read back from the trace on resume. A souvenir is retired once its item, used in
   its place, opened a dialogue and left both buttons. A frontier whose walk opened a dialogue twice, on any visits, is no work there.
 - flow-100: the harness never waits beside a hostile at any health: when explore finds no way out while a hostile's contact zone
   reaches Link's cell or a neighbour, it sends explore back by the side Link came in at once (once per cell, until Link changes
