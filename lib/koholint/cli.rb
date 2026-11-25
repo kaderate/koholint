@@ -23,6 +23,7 @@ require 'koholint/place_shots'
 require 'koholint/replay'
 require 'koholint/pacer'
 require 'koholint/run'
+require 'koholint/souvenirs'
 require 'koholint/summary'
 require 'koholint/viewer'
 
@@ -30,9 +31,9 @@ module Koholint
   module CLI
     USAGE = 'usage: koholint run|resume <run_dir>|fork <run_dir> --at-frame N|branch <run_dir> --at FRAME|CHECKPOINT|verify <run_dir>|summary <run_dir>|watch <run_dir>|' \
             'archive|star <run_dir> WHY|prune-heavy|census boot|<run_dir> FRAME...|entities <run_dir> FRAME...|objects <run_dir> FRAME...|doors <run_dir> FRAME...|sword <run_dir> FRAME...|ready <run_dir>|' \
-            'ab-plan <run_dir> --at-frame N|ab-report PREFIX|atlas [--root DIR]...|check-leads <run_dir>...|check-pickups <run_dir>...|learn <run_dir> [--limit N --object ID]|bench exits <run_dir> [--place R/M --at-frame N]|capability list|publish ID WHY|retire ID WHY ' \
+            'ab-plan <run_dir> --at-frame N|ab-report PREFIX|atlas [--root DIR]...|souvenirs [--root DIR]...|check-leads <run_dir>...|check-pickups <run_dir>...|learn <run_dir> [--limit N --object ID]|bench exits <run_dir> [--place R/M --at-frame N]|capability list|publish ID WHY|retire ID WHY ' \
             '[--frames N --minutes N --steps N --dollars X --root DIR --runs-root DIR --tag NAME --realtime --grid --port N --host H --from live|start|DIR ' \
-            '--speed X --agent --autopilot on|off --capabilities on|off --exits on|off --model M --max-dollars X --claude-command PATH --keep-viewer --commit --full --keep N --yes --arms A,B --forks N --crawl N]'.freeze
+            '--speed X --agent --autopilot on|off --capabilities on|off --exits on|off --souvenirs before|none --model M --max-dollars X --claude-command PATH --keep-viewer --commit --full --keep N --yes --arms A,B --forks N --crawl N]'.freeze
 
     DEFAULT_MODEL = 'sonnet'.freeze
     DEFAULT_MAX_DOLLARS = 1.5
@@ -64,6 +65,7 @@ module Koholint
         o.on('--autopilot MODE', %w[on off]) { |v| options[:autopilot] = v == 'on' }
         o.on('--capabilities MODE', %w[on off]) { |v| options[:capabilities] = v == 'on' }
         o.on('--exits MODE', %w[on off]) { |v| options[:exits] = v == 'on' }
+        o.on('--souvenirs MODE', %w[before none]) { |v| options[:souvenirs] = v == 'before' }
         o.on('--arms LIST', Array) { |v| options[:arms] = v }
         o.on('--forks N', Integer) { |v| options[:forks] = v.positive? ? v : raise(OptionParser::InvalidArgument, v.to_s) }
         o.on('--crawl N', Integer) { |v| options[:crawl] = v.positive? ? v : raise(OptionParser::InvalidArgument, v.to_s) }
@@ -103,13 +105,13 @@ module Koholint
       when 'run'
         factory = policy_factory(options, budget, probe: true)
         run = Run.create(root: options.fetch(:root, 'runs'), flow_version: flow, budget: limits, tag: options[:tag],
-                         model: options[:agent] ? options.fetch(:model, DEFAULT_MODEL) : nil, autopilot: (options.fetch(:autopilot, true) if options[:agent]))
+                         model: options[:agent] ? options.fetch(:model, DEFAULT_MODEL) : nil, autopilot: (options.fetch(:autopilot, true) if options[:agent]), souvenirs: options.fetch(:souvenirs, true))
         play(Engine.new(run:, policy: factory.call(run), budget:, **engine_options(options)), run, out)
       when 'resume' then resume(run_dir(args), options, budget, flow, out)
       when 'branch' then branch(run_dir(args), options, budget, flow, out, viewer)
       when 'fork'
         at_frame = options.fetch(:at_frame) { raise OptionParser::MissingArgument, '--at-frame' }
-        child = parent_run(run_dir(args)).fork(at_frame:, flow_version: flow, **options.slice(:tag, :autopilot, :capabilities, :exits, :root))
+        child = parent_run(run_dir(args)).fork(at_frame:, flow_version: flow, **options.slice(:tag, :autopilot, :capabilities, :exits, :souvenirs, :root))
         out.puts "run #{child.dir}"
         0
       when 'watch'
@@ -125,6 +127,7 @@ module Koholint
         out.print AB.markdown(AB.report(prefix: args.first || raise(OptionParser::MissingArgument, 'prefix'), root: options.fetch(:root, 'runs')))
         0
       when 'atlas' then atlas(options.fetch(:roots, ['runs']), out)
+      when 'souvenirs' then souvenirs(options.fetch(:roots, ['runs']), out)
       when 'check-leads'
         require 'koholint/lead_check'
         LeadCheck.check(args.empty? ? raise(OptionParser::MissingArgument, 'run_dir') : args, out:)
@@ -160,7 +163,7 @@ module Koholint
     def branch(dir, options, budget, flow, out, viewer)
       parent = parent_run(dir)
       at_frame = Checkpoints.frame_for(parent, options.fetch(:at) { raise OptionParser::MissingArgument, '--at' })
-      child = parent.fork(at_frame:, flow_version: flow, **options.slice(:tag, :autopilot, :capabilities, :exits, :root))
+      child = parent.fork(at_frame:, flow_version: flow, **options.slice(:tag, :autopilot, :capabilities, :exits, :souvenirs, :root))
       out.puts "branch #{child.dir} from #{parent.id} at frame #{at_frame}"
       pid = viewer.call(child.dir, options.slice(:port, :host, :speed))
       code = resume(child.dir, options, budget, flow, out)
@@ -183,6 +186,16 @@ module Koholint
       rescue Errno::ESRCH, Errno::ECHILD
         nil
       end
+    end
+
+    def souvenirs(roots, out)
+      empty = roots.find { |root| Archive.runs(root).empty? }
+      raise Error, "no runs under #{empty}" if empty
+
+      data = Souvenirs.build(roots)
+      Souvenirs.write(data)
+      out.puts "souvenirs: #{data['texts'].size} texts from #{data['runs'].size} runs under #{roots.join(', ')}"
+      0
     end
 
     def atlas(roots, out)
@@ -323,7 +336,8 @@ module Koholint
         learned = run.manifest['capabilities'] == false ? [] : Capabilities.operational.map { |entry| Skills::Composite.new(entry) }
         delegated = Policies::Delegated.new(client:, autopilot:, registry: Skills::Registry.default(extra: learned), objectives: objectives_for(run, events),
                                             memory: Policies::Memory.from_events(events), manual:, on_step: budget.method(:step_done), budget:,
-                                            exits: (Exits.load if run.exits?), on_activity: run.method(:write_activity))
+                                            exits: (Exits.load if run.exits?), souvenirs: Souvenirs.for_manifest(run.manifest),
+                                            on_activity: run.method(:write_activity))
         Policies::StartGame.new(delegated, ready: ->(state) { %i[playing dialogue].include?(state.phase) }, probe:, played: GameState.played?(events))
       end
     end

@@ -64,6 +64,17 @@ class ABTest < Minitest::Test
     end
   end
 
+  def test_report_refuses_forks_remembering_different_souvenirs
+    Dir.mktmpdir do |root|
+      fixture(root, 'ab-off-1', cost: 0.01, places: 1, autopilot: false)
+      fixture(root, 'ab-autopilot-1', cost: 0.01, places: 1, autopilot: true)
+      path = File.join(root, 'ab-off-1', 'manifest.json')
+      File.write(path, JSON.generate(JSON.parse(File.read(path)).merge('souvenirs' => { 'before' => 'p', 'digest' => 'abc' })))
+      error = assert_raises(Koholint::Error) { Koholint::AB.report(prefix: 'ab', root:) }
+      assert_match(/different souvenirs/, error.message)
+    end
+  end
+
   def test_report_counts_only_places_new_to_the_whole_lineage
     Dir.mktmpdir do |root|
       fixture(root, 'ab-off-1', cost: 0.01, places: 3, autopilot: false)

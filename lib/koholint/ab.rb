@@ -3,6 +3,7 @@ require 'json'
 require 'shellwords'
 require 'koholint/game_state'
 require 'koholint/perception'
+require 'koholint/souvenirs'
 require 'koholint/summary'
 require 'koholint/trace'
 
@@ -59,8 +60,10 @@ module Koholint
       measured = Dir.glob(File.join(root, '*', 'manifest.json')).sort.filter_map do |path|
         manifest = Summary.read_json(path)
         arm = manifest['tag'].to_s[pattern, 1] or next
-        measure(File.dirname(path), manifest).merge(arm:)
+        [manifest, measure(File.dirname(path), manifest).merge(arm:)]
       end
+      Souvenirs.comparable!(measured.map(&:first))
+      measured = measured.map(&:last)
       arms = measured.group_by { |run| run[:arm] }.sort.to_h { |arm, runs| [arm, pooled(runs)] }
       { prefix:, root:, arms:, criterion: criterion(arms) }
     end

@@ -1,0 +1,734 @@
+{
+  "runs": {
+    "20261024-145820-cdd2": null,
+    "20261024-150951-de0c": null,
+    "20261024-184627-b97e": null,
+    "20261024-211104-7315": null,
+    "20261101-122743-1fec": null,
+    "20261101-140253-3cc4": null,
+    "20261102-070805-4168": null,
+    "20261102-075426-e333": null,
+    "20261112-103604-0c64": [
+      "20261111-194737-9ba1",
+      60404
+    ],
+    "20261113-090835-21b0": [
+      "20261112-103604-0c64",
+      68444
+    ],
+    "20261114-080624-03f8": [
+      "20261113-090835-21b0",
+      84235
+    ],
+    "20261118-142325-20ea": [
+      "20261113-090835-21b0",
+      84235
+    ],
+    "20261120-151729-2ce4": [
+      "20261114-093702-a0dc",
+      90638
+    ],
+    "20261124-190747-626d": [
+      "20261114-084732-45ba",
+      90581
+    ]
+  },
+  "texts": [
+    {
+      "place": [
+        80,
+        0
+      ],
+      "entity": 58,
+      "cell": [
+        3,
+        2
+      ],
+      "text": "Tu as trouvé le Champignon! Un arôme subtil exalte ton sens de l'odorat.",
+      "seen": [
+        {
+          "run": "20261124-190747-626d",
+          "frame": 91353,
+          "held": [
+            1,
+            4,
+            12
+          ]
+        }
+      ]
+    },
+    {
+      "place": [
+        81,
+        0
+      ],
+      "entity": 63,
+      "cell": [
+        3,
+        7
+      ],
+      "text": "J'suis un raton-laveur espiègle. laveur espiègle. Et j'aime pas du tout c'qu'est poudreux...",
+      "seen": [
+        {
+          "run": "20261113-090835-21b0",
+          "frame": 73376,
+          "held": [
+            1,
+            4
+          ]
+        },
+        {
+          "run": "20261118-142325-20ea",
+          "frame": 95317,
+          "held": [
+            1,
+            4
+          ]
+        }
+      ]
+    },
+    {
+      "place": [
+        146,
+        0
+      ],
+      "entity": 62,
+      "cell": [
+        4,
+        2
+      ],
+      "text": "Bonjour A ! Tarkin est parti dans la forêt chercher des champignons. Moi, je préfère chanter. Ecoute ceci: c'est la Ballade du Poisson-Rêve.",
+      "seen": [
+        {
+          "run": "20261120-151729-2ce4",
+          "frame": 95429,
+          "held": [
+            1,
+            4
+          ]
+        }
+      ]
+    },
+    {
+      "place": [
+        146,
+        0
+      ],
+      "entity": 111,
+      "cell": [
+        6,
+        3
+      ],
+      "text": "GRRR...",
+      "seen": [
+        {
+          "run": "20261101-140253-3cc4",
+          "frame": 7503,
+          "held": [
+            4
+          ]
+        },
+        {
+          "run": "20261102-070805-4168",
+          "frame": 7354,
+          "held": [
+            4
+          ]
+        },
+        {
+          "run": "20261102-075426-e333",
+          "frame": 9087,
+          "held": [
+            4
+          ]
+        },
+        {
+          "run": "20261120-151729-2ce4",
+          "frame": 95257,
+          "held": [
+            1,
+            4
+          ]
+        }
+      ]
+    },
+    {
+      "place": [
+        161,
+        0
+      ],
+      "entity": 111,
+      "cell": [
+        1,
+        7
+      ],
+      "text": "GRRR...",
+      "seen": [
+        {
+          "run": "20261101-140253-3cc4",
+          "frame": 8002,
+          "held": [
+            4
+          ]
+        },
+        {
+          "run": "20261102-070805-4168",
+          "frame": 7749,
+          "held": [
+            4
+          ]
+        },
+        {
+          "run": "20261112-103604-0c64",
+          "frame": 68778,
+          "held": [
+            1,
+            4
+          ]
+        },
+        {
+          "run": "20261120-151729-2ce4",
+          "frame": 94020,
+          "held": [
+            1,
+            4
+          ]
+        }
+      ]
+    },
+    {
+      "place": [
+        162,
+        14
+      ],
+      "entity": 64,
+      "cell": [
+        4,
+        4
+      ],
+      "text": "C' est une perte de temps! Pour ma poudre, il me faut le Champignon de la forêt.",
+      "seen": [
+        {
+          "run": "20261114-080624-03f8",
+          "frame": 85321,
+          "held": [
+            1,
+            4
+          ]
+        }
+      ]
+    },
+    {
+      "place": [
+        163,
+        16
+      ],
+      "entity": 62,
+      "cell": [
+        3,
+        5
+      ],
+      "text": "Suis la route du Sud, vers la plage là où je t'ai trouvé. Depuis que tu as échoué ici, des monstres terribles rôdent dans le coin. Soi dans le coin. Soïs prudent...",
+      "seen": [
+        {
+          "run": "20261024-145820-cdd2",
+          "frame": 1852,
+          "held": []
+        },
+        {
+          "run": "20261024-150951-de0c",
+          "frame": 1852,
+          "held": []
+        },
+        {
+          "run": "20261024-184627-b97e",
+          "frame": 1852,
+          "held": []
+        },
+        {
+          "run": "20261102-075426-e333",
+          "frame": 1746,
+          "held": []
+        }
+      ]
+    },
+    {
+      "place": [
+        163,
+        16
+      ],
+      "entity": 62,
+      "cell": [
+        3,
+        5
+      ],
+      "text": "Suis la route du Sud, vers la plage là où je t'ai trouvé. Depuis que tu as échoué ici, des monstres terribles rôdent dans le coin. Soi prudent...",
+      "seen": [
+        {
+          "run": "20261102-070805-4168",
+          "frame": 1746,
+          "held": []
+        }
+      ]
+    },
+    {
+      "place": [
+        163,
+        16
+      ],
+      "entity": 62,
+      "cell": [
+        3,
+        5
+      ],
+      "text": "Suis la route du Sud, vers la plage là où je t'ai trouvé. Depuis que tu as échoué ici, des monstres terribles rôdent dans le coin. Soi prudent... Suis la route du Sud, vers la plage là où je t'ai trouvé. Depuis que tu as échoué ici, des monstres terribles rôdent dans le coin. Soi dans le coin. Soïs prudent...",
+      "seen": [
+        {
+          "run": "20261101-140253-3cc4",
+          "frame": 1746,
+          "held": []
+        }
+      ]
+    },
+    {
+      "place": [
+        163,
+        16
+      ],
+      "entity": 62,
+      "cell": [
+        3,
+        5
+      ],
+      "text": "Suis la route du Sud, vers la plage là où je t'ai trouvé. Depuis que tu as échoué ici, des monstres terribles rôdent dans le coin. Soi s prudent... Depuis que tu as échoué ici, des monstres terribles rôdent dans le coin. Soïs prudent...",
+      "seen": [
+        {
+          "run": "20261101-122743-1fec",
+          "frame": 1838,
+          "held": []
+        }
+      ]
+    },
+    {
+      "place": [
+        163,
+        16
+      ],
+      "entity": 62,
+      "cell": [
+        3,
+        5
+      ],
+      "text": "Suis la route du Sud, vers la plage là où je t'ai trouvé. Depuis que tu as échoué ici, des monstres terribles rôdent dans le coin. Soïs prudent...",
+      "seen": [
+        {
+          "run": "20261024-211104-7315",
+          "frame": 1838,
+          "held": []
+        }
+      ]
+    },
+    {
+      "place": [
+        163,
+        16
+      ],
+      "entity": 63,
+      "cell": [
+        4,
+        7
+      ],
+      "text": "Au fait! Y'a un autre bidule qui est resté sur la plage. Si tu y vas, fais attention aux monstres! Car, depuis que t'es ici A , des monstres, y'en a partout!",
+      "seen": [
+        {
+          "run": "20261024-145820-cdd2",
+          "frame": 3825,
+          "held": [
+            4
+          ]
+        },
+        {
+          "run": "20261024-150951-de0c",
+          "frame": 3825,
+          "held": [
+            4
+          ]
+        },
+        {
+          "run": "20261024-184627-b97e",
+          "frame": 3825,
+          "held": [
+            4
+          ]
+        },
+        {
+          "run": "20261024-211104-7315",
+          "frame": 3811,
+          "held": [
+            4
+          ]
+        },
+        {
+          "run": "20261102-070805-4168",
+          "frame": 4747,
+          "held": [
+            4
+          ]
+        }
+      ]
+    },
+    {
+      "place": [
+        163,
+        16
+      ],
+      "entity": 63,
+      "cell": [
+        4,
+        7
+      ],
+      "text": "Salut A ! T'es réveillé... J'suis Tarkin... Tu t'sens mieux? Quoi? Com j's Quoi? Comment j'sais ton nom? Ben, c'est gravé sur le Bouclier! Ben, d'ailleurs il est à toi! J'te l'donne! Vous récupérez votre bouclier! Utilisez-le pour repousser vos ennemis!",
+      "seen": [
+        {
+          "run": "20261102-075426-e333",
+          "frame": 5288,
+          "held": [
+            4
+          ]
+        }
+      ]
+    },
+    {
+      "place": [
+        163,
+        16
+      ],
+      "entity": 63,
+      "cell": [
+        4,
+        7
+      ],
+      "text": "Salut A ! T'es réveillé... J'suis Tarkin... Tu t'sens mieux? Quoi? Comment j'sais ton nom? Ben, c'est gravé sur le Bouclier! Ben, d'ailleurs il est à toi! J'te l'donne! Vous récupérez votre bouclier! Utilisez-le pour repousser vos ennemis!",
+      "seen": [
+        {
+          "run": "20261024-150951-de0c",
+          "frame": 2848,
+          "held": [
+            4
+          ]
+        },
+        {
+          "run": "20261024-211104-7315",
+          "frame": 2834,
+          "held": [
+            4
+          ]
+        },
+        {
+          "run": "20261101-122743-1fec",
+          "frame": 6680,
+          "held": [
+            4
+          ]
+        },
+        {
+          "run": "20261101-140253-3cc4",
+          "frame": 3604,
+          "held": [
+            4
+          ]
+        }
+      ]
+    },
+    {
+      "place": [
+        163,
+        16
+      ],
+      "entity": 63,
+      "cell": [
+        4,
+        7
+      ],
+      "text": "Salut A ! T'es rêve Salut A ! T'es réveillé... J'suis To J'suis Tarkin... Tu t'sens mieux? Quoi? Comment j'sais ton nom? Ben, c'est gravé sur le Bouclier! Ben, d'ailleurs il est à toi! J'te l'donne! Vous récup^ Vous récupérez votre bouclier! Utilisez-le pour repousser vos ennemis!",
+      "seen": [
+        {
+          "run": "20261024-184627-b97e",
+          "frame": 2848,
+          "held": [
+            4
+          ]
+        }
+      ]
+    },
+    {
+      "place": [
+        163,
+        16
+      ],
+      "entity": 63,
+      "cell": [
+        4,
+        7
+      ],
+      "text": "Salut A...! T'es réveillé... J'suis Tarkin... Tu t'sens mieux? Quoi? Comment j'sais ton nom? Ben, c'est gravé sur le Bouclier! Ben, d'ailleurs il est à toi! J'te l'donne!",
+      "seen": [
+        {
+          "run": "20261102-070805-4168",
+          "frame": 3822,
+          "held": []
+        }
+      ]
+    },
+    {
+      "place": [
+        163,
+        16
+      ],
+      "entity": 63,
+      "cell": [
+        4,
+        7
+      ],
+      "text": "Salut Link ! T'es réveillé... J'suis Tarkin... Tu t'sens mieux? Quoi? Comment j'sais ton nom? Ben, c'est gravé sur le Bouclier! Ben, d'ailleurs il est à toi! J'te l'donne! Vous récupérez votre bouclier! Utilisez-le pour repousser vos ennemis!",
+      "seen": [
+        {
+          "run": "20261024-145820-cdd2",
+          "frame": 2848,
+          "held": [
+            4
+          ]
+        }
+      ]
+    },
+    {
+      "place": [
+        177,
+        0
+      ],
+      "entity": 117,
+      "cell": [
+        5,
+        7
+      ],
+      "text": "YOUPI! J'ai la pêche! Et toi?",
+      "seen": [
+        {
+          "run": "20261024-184627-b97e",
+          "frame": 9620,
+          "held": [
+            4
+          ]
+        },
+        {
+          "run": "20261112-103604-0c64",
+          "frame": 70296,
+          "held": [
+            1,
+            4
+          ]
+        }
+      ]
+    },
+    {
+      "place": [
+        178,
+        18
+      ],
+      "entity": 120,
+      "cell": [
+        4,
+        4
+      ],
+      "text": "Ouaf Ouaf! Je suis un chien très branché! J'aimerais avoir des accessoires à la mode!",
+      "seen": [
+        {
+          "run": "20261112-103604-0c64",
+          "frame": 73370,
+          "held": [
+            1,
+            4
+          ]
+        }
+      ]
+    },
+    {
+      "place": [
+        179,
+        0
+      ],
+      "entity": 111,
+      "cell": [
+        2,
+        2
+      ],
+      "text": "GRRR...",
+      "seen": [
+        {
+          "run": "20261102-075426-e333",
+          "frame": 8054,
+          "held": [
+            4
+          ]
+        },
+        {
+          "run": "20261120-151729-2ce4",
+          "frame": 101804,
+          "held": [
+            1,
+            4
+          ]
+        }
+      ]
+    },
+    {
+      "place": [
+        179,
+        0
+      ],
+      "entity": 111,
+      "cell": [
+        5,
+        2
+      ],
+      "text": "M' sieu! Pour sauvegarder, appuyez sur tous les boutons à la fois! Heu, je n'en sais pas plus, je ne suis qu'un gosse!",
+      "seen": [
+        {
+          "run": "20261101-122743-1fec",
+          "frame": 13847,
+          "held": [
+            4
+          ]
+        }
+      ]
+    },
+    {
+      "place": [
+        179,
+        0
+      ],
+      "entity": 115,
+      "cell": [
+        5,
+        2
+      ],
+      "text": "Ben... Après une sauvegarde, vous pouvez redémarrer à la dernière porte par laquelle vous êtes passé! Pourquoi? Je n'en sais rien, je suis un môme!",
+      "seen": [
+        {
+          "run": "20261024-184627-b97e",
+          "frame": 14720,
+          "held": [
+            4
+          ]
+        },
+        {
+          "run": "20261101-122743-1fec",
+          "frame": 25964,
+          "held": [
+            4
+          ]
+        },
+        {
+          "run": "20261101-140253-3cc4",
+          "frame": 9928,
+          "held": [
+            4
+          ]
+        },
+        {
+          "run": "20261120-151729-2ce4",
+          "frame": 100564,
+          "held": [
+            1,
+            4
+          ]
+        }
+      ]
+    },
+    {
+      "place": [
+        179,
+        0
+      ],
+      "entity": 115,
+      "cell": [
+        5,
+        2
+      ],
+      "text": "Consultez la carte de l'île en appuyant sur SELECT. Après, je ne sais pas trop car je ne suis qu'un gosse!",
+      "seen": [
+        {
+          "run": "20261101-122743-1fec",
+          "frame": 26505,
+          "held": [
+            4
+          ]
+        },
+        {
+          "run": "20261120-151729-2ce4",
+          "frame": 101049,
+          "held": [
+            1,
+            4
+          ]
+        }
+      ]
+    },
+    {
+      "place": [
+        179,
+        0
+      ],
+      "entity": 115,
+      "cell": [
+        5,
+        2
+      ],
+      "text": "M' sieu! Pour sauvegarder, appuyez sur tous les boutons à la fois! Heu, je n'en sais pas plus, je ne suis qu'un gosse!",
+      "seen": [
+        {
+          "run": "20261024-184627-b97e",
+          "frame": 6727,
+          "held": [
+            4
+          ]
+        },
+        {
+          "run": "20261101-140253-3cc4",
+          "frame": 6546,
+          "held": [
+            4
+          ]
+        },
+        {
+          "run": "20261102-075426-e333",
+          "frame": 8121,
+          "held": [
+            4
+          ]
+        }
+      ]
+    },
+    {
+      "place": [
+        179,
+        0
+      ],
+      "entity": 115,
+      "cell": [
+        5,
+        2
+      ],
+      "text": "Si vos Coeurs diminuent trop, entrez dans une maison ou une grotte. Pourquoi? Je ne sais pas, je suis trop petit!",
+      "seen": [
+        {
+          "run": "20261101-122743-1fec",
+          "frame": 26916,
+          "held": [
+            4
+          ]
+        }
+      ]
+    }
+  ]
+}

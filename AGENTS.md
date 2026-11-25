@@ -16,8 +16,9 @@ High-level architecture: `ARCHITECTURE.md` (update it in the same commit as any 
 - CI runs the whole suite with the ROM on every pull request (`rom` shards) and the ROM-free set (`rake test:ci`); locally, `rake test:fast` and targeted files, no full `rake test` before a merge.
 - Only the engine writes a run's `trace.jsonl` and `save/`; a fork may add keyframes to its parent's git-ignored `keyframes/` as a cache. A run resumes only with the same
   `flow_version`, ROM hash, capabilities digest (the operational entries of `data/capabilities.json`) and exits digest (the
-  measured edges and benches of `data/exits.json`). A change to the play flow in code means a new `flow_version`; publishing or
-  retiring a capability, or running the exit bench, changes a digest, never `flow_version`.
+  measured edges and benches of `data/exits.json`) and souvenirs digest (the texts of `data/souvenirs.json` before its cutoff). A
+  change to the play flow in code means a new `flow_version`; publishing or retiring a capability, running the exit bench, or
+  rebuilding the souvenirs changes a digest, never `flow_version`. Forks compared in one experiment must share a souvenirs digest.
 - A rule a script can check is a validator, not a paragraph.
 - Game facts live in typed data with provenance (`data/addresses.json`, a run's `world.json`),
   never in prose. `verified` needs `verified_count >= 2` from independent checks. `data/capabilities.json` follows the same
