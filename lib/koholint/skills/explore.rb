@@ -78,6 +78,7 @@ module Koholint
           @objects = grid ? TalkLog.objects(grid) : []
           objects = Array(context[:objects]&.call)
           @doors = objects.select { |object| object[:kind].to_s == 'door' && object[:cell][0] < Geometry::ROWS - 1 }.map { |object| object[:cell] }
+          @crumbling = objects.select { |object| object[:kind].to_s == 'crumbling' }.map { |object| object[:cell] }
           @survey = @known && survey
           @route = @unreachable = @dead_end = nil
           @entering = 0
@@ -381,6 +382,8 @@ module Koholint
           return order(frontier) if frontier.any? && (@fresh || untried(from, nil).any? || @log&.untried?(@place))
           return order(back) if back.any?
 
+          stranded = @crumbling.any? ? [] : untried(from, nil).reject { |candidate| way_back?(candidate) || path_to.(candidate[:cell]) }
+          @unreachable = (@unreachable || []) | stranded.map { |candidate| candidate[:kind] == :door ? candidate[:cell] : candidate[:direction] }.uniq if stranded.any?
           routed = routed(from, path_to)
           return order(routed) if routed.any?
 

@@ -1156,6 +1156,14 @@ class ExploreTest < Minitest::Test
     assert_equal [[80, 0], [171, 10], [172, 10]], log.path([171, 10], goal: [172, 10]).map { |hop| hop[:to] }, 'round through the door, whose landing reaches it'
   end
 
+  def test_an_untried_exit_no_path_reaches_is_unreachable_unless_the_room_has_crumbling_floor
+    rows = with(CLOSED, [7, 5], '.', [6, 5], '#')
+    result, = explore(rows, explore_log: Koholint::ExploreLog.new, limit: 200)
+    assert_equal [:down], result[:unreachable], result.inspect
+    result, = explore(rows, explore_log: Koholint::ExploreLog.new, objects: -> { [{ kind: :crumbling, cell: [2, 2] }] }, limit: 200)
+    assert_nil result[:unreachable]
+  end
+
   def test_a_fall_and_an_enemy_to_fight_stop_explore
     falling = Koholint::GameState.new(**state.to_h, link_motion_state: Koholint::FALL_MOTION)
     execution = registry.start('explore', state, {}, { grid: MapGrid.new(with(CLOSED, [2, 5], '?')) })
