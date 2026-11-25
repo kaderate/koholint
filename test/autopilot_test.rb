@@ -351,6 +351,21 @@ class AutopilotTest < Minitest::Test
     assert_equal 'last stop not an explore', pilot.hold_reason(state: state, objective: target, follow:)
   end
 
+  # Run 20261125-173713-76f7: the model's explore reached 83/0 for a thing to try, and the talk the target called for was held as already followed.
+  def test_a_target_reached_by_the_models_explore_is_talked_to_then_touched_once_each
+    talk = { skill: 'talk_to', params: { row: 3, col: 5 } }
+    touch = { skill: 'touch', params: { row: 3, col: 5, type: 132 } }
+    thing = objective('reach_place').merge(target: { kind: 'person', place: [83, 0], type: 132, try: true })
+    pilot = Koholint::Autopilot.new
+    pilot.model_called(state: state, objective: thing)
+    pilot.acted(skill: 'explore', outcome: { stopped_by: :known_place })
+    assert_equal talk, pilot.next_choice(state: state, objective: thing, follow: talk)[:choice]
+    pilot.acted(skill: 'talk_to', outcome: { stopped_by: :frame_cap })
+    assert_equal touch, pilot.next_choice(state: state, objective: thing, follow: touch)[:choice]
+    pilot.acted(skill: 'touch', outcome: { stopped_by: :done })
+    assert pilot.hold_reason(state: state, objective: thing, follow: touch), 'one touch'
+  end
+
   def test_the_next_objective_is_picked_after_a_chain_arrives_and_achieves_the_objective
     pilot = primed
     done = { id: 'obj-1', outcome: :achieved }

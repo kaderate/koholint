@@ -60,6 +60,7 @@ module Koholint
       @news = news
       @stop = nil
       @acted = false
+      @last_skill = nil
       @returns = Hash.new(0)
       @fight = 0
       @attack_stop = nil
@@ -74,6 +75,7 @@ module Koholint
 
     def acted(skill:, outcome:)
       @acted = true
+      @last_skill = skill.to_s unless %w[wait advance_dialogue].include?(skill.to_s)
       @attack_stop = skill.to_s == 'attack' && outcome.is_a?(Hash) && !@sighted ? outcome[:stopped_by].to_s : nil unless skill.to_s == 'wait'
       @sighted = false unless skill.to_s == 'wait'
       @fight_hurt = [outcome[:from][:room], outcome[:from][:map]] if skill.to_s == 'attack' && outcome.is_a?(Hash) && outcome[:stopped_by].to_s == 'damage' && outcome[:from].is_a?(Hash)
@@ -99,9 +101,10 @@ module Koholint
       return 'no model call yet' unless @since
 
       target = objective&.dig(:target)
-      first = follow && target && !@acted
+      fresh = follow && follow[:skill] != 'explore' && follow[:skill] != @last_skill
+      first = follow && target && (!@acted || fresh)
       return "last stop #{@stop || 'not an explore'}" unless first || BENIGN.include?(@stop) || @stop == TALKED
-      return 'target followed' if target && @acted && follow && follow[:skill] != 'explore'
+      return 'target followed' if target && @acted && follow && follow[:skill] != 'explore' && !fresh
 
       common = common_hold(state, news: !target || @stop == TALKED)
       return common if common
