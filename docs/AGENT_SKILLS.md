@@ -1,6 +1,6 @@
 # Agent skills
 
-The skills, protocols and harness behaviours the agent works with. Versioned with the play flow (currently `flow-98`): update this page, not the README, when a flow changes. Layers and data flow are in [ARCHITECTURE.md](../ARCHITECTURE.md).
+The skills, protocols and harness behaviours the agent works with. Versioned with the play flow (currently `flow-99`): update this page, not the README, when a flow changes. Layers and data flow are in [ARCHITECTURE.md](../ARCHITECTURE.md).
 
 
 - Learned capabilities (`data/capabilities.json`, `bin/koholint capability list`): an `operational` entry is a composite of the skills below, offered in the skill schema and listed under "Learned skills" only while its trigger item is held (flow-49) and its object is on screen (today `sword_on_object_92 row col direction`: stand next to object 92, face it, use the sword, step into its cell). `explore` and `goto` also run it themselves when blocked facing such a cell, and the planner routes through those cells as a last resort. `learn` and `capability publish|retire` are offline commands.
@@ -144,6 +144,15 @@ The skills, protocols and harness behaviours the agent works with. Versioned wit
   Within a place, explore takes a side known only as the assumed way back (flow-78) after the place's other reachable untried exits, doors and frontiers;
   it is still a frontier, taken when nothing else here is reachable, before a route to another place. An explore that stops `no_frontier`
   in at most one frame is answered by the harness at the next decision, not after three, since from the same cell it would find none again.
+- flow-99: souvenirs. A text a person said in another branch (`data/souvenirs.json`, the run's `souvenirs` cutoff) whose words hold the
+  name of an item Link holds, by flow-97's rule or a name of `data/items.json` that the item's observed pickup text quotes, read by
+  someone who did not hold it, from a person this lineage never heard say it nor talked to holding the item, at a place this lineage's
+  own routes reach, becomes candidate `souvenir-<place>-t<type>`: its label quotes the text as a souvenir of another playthrough, never
+  heard in this one, and its target is flow-97's delivery (talk holding the item, then use it). It takes the slot of the candidate for
+  the same place and person or thing; with none it joins the people here or ends the list. Souvenirs appear nowhere else in the context
+  and never count as texts read for leads. A picked candidate whose target is still to try is not refused for its place being reached.
+  A pickup name is the capitalised words right after an article in the first sentence; one letter is no name, and a text opened more
+  than 600 frames before the gain names nothing.
 - flow-98: at one heart or less, when explore finds no way out of a place (every route crosses a hostile's contact zone), the harness
   sends explore back by the side Link came in, as from a closed pocket: at once while a hostile's contact zone reaches Link's cell or
   a neighbour, else after three waits at the same cell that changed nothing; once per cell until Link changes place or heals above

@@ -1,5 +1,6 @@
 require 'koholint/entities'
 require 'koholint/geometry'
+require 'koholint/items'
 require 'koholint/leads'
 require 'koholint/place_card'
 require 'koholint/place_kinds'
@@ -13,7 +14,7 @@ module Koholint
 
     module_function
 
-    def build(place:, grid:, explore_log:, talk_log:, leads:, cards: {}, entities: [], signs: [], stamp: nil, link: nil)
+    def build(place:, grid:, explore_log:, talk_log:, leads:, cards: {}, entities: [], signs: [], stamp: nil, link: nil, souvenirs: [], item_names: {})
       hops = explore_log.hops(place)
       named = ->(where) { leads.name_of(where) }
       needs = needs(place, hops, leads, talk_log, named, stamp)
@@ -25,8 +26,45 @@ module Koholint
                 people_away(place, hops, cards, talk_log, named, stamp, explore_log).reject { |person| asked.include?(person[:target].values_at(:place, :type)) } +
                 signs_away(place, hops, cards, talk_log, named) + chests_away(place, hops, cards, named) +
                 lead_places(place, hops, leads, named)
-      people + signs_here(place, signs, talk_log) + chests_here(place, signs) + unidentified(place, grid, entities, talk_log, link) +
-        warn(leaving, people)
+      things = unidentified(place, grid, entities, talk_log, link)
+      remembered = souvenirs(place, hops, souvenirs, item_names, talk_log, named, stamp)
+      people, things, leaving = remember(remembered, people, things, leaving, place)
+      people + signs_here(place, signs, talk_log) + chests_here(place, signs) + things + warn(leaving, people)
+    end
+
+    def remember(remembered, people, things, leaving, place)
+      same = ->(candidate, souvenir) { candidate[:target][:type] && candidate[:target].values_at(:place, :type) == souvenir[:target].values_at(:place, :type) }
+      swap = ->(list) { list.map { |candidate| remembered.find { |souvenir| same.(candidate, souvenir) } || candidate }.uniq { |candidate| candidate[:id] } }
+      people, things, leaving = [people, things, leaving].map(&swap)
+      things -= people
+      here, away = (remembered - people - things - leaving).partition { |souvenir| souvenir[:target][:place] == place }
+      [people + here, things, leaving + away]
+    end
+
+    def souvenirs(place, hops, souvenirs, item_names, talk_log, named, stamp)
+      held = Array(Array(stamp)[1])
+      souvenirs.filter_map do |entry|
+        where = entry['place']
+        type = entry['entity']
+        next unless where == place || hops.key?(where)
+
+        key = Dialogues.key(entry['text'])
+        next if talk_log.talks_with(where, type).any? { |talk| talk[:key] == key }
+
+        words = Dialogues.words(entry['text'])
+        item, name = held.lazy.flat_map { |id| [item_names[id], *Items.pickup_text_names[id]].compact.map { |item_words| [id, item_words] } }.find do |id, item_words|
+          TalkLog.names?(words, item_words) && !talk_log.talked_holding?(where, type, id) && entry['seen'].any? { |sighting| !sighting['held'].include?(id) }
+        end
+        next unless item
+
+        who = talk_log.name_of(where, type) || "person (type #{type})"
+        thing = name.join(' ')
+        at = where == place ? "at (#{Array(entry['cell']).join(',')})" : "in #{describe(where, named)}, #{moves(hops[where])}"
+        { id: "souvenir-#{where.join('-')}-t#{type}", who:,
+          label: "talk to #{who} #{at}, holding the #{thing}: a souvenir of another playthrough, never heard in this one: « #{Dialogues.clean(entry['text'], 200)} »",
+          title: "Bring the #{thing} to #{who}"[0, 80], predicate: { kind: 'reach_place', place: where },
+          target: { kind: 'person', place: where, type:, cell: entry['cell'], try: true, item:, name: thing } }
+      end.uniq { |candidate| candidate[:id] }
     end
 
     def warn(leaving, people)

@@ -24,7 +24,7 @@ module Koholint
     STATUSES = %w[open refuted tested].freeze
     INHERITED = 'inherited'.freeze
     DATA = File.expand_path('../../data', __dir__)
-    FACTS = %w[addresses entities items modes place_kinds geometry exits capabilities checkpoints vocabulary].freeze
+    FACTS = %w[addresses entities items modes place_kinds geometry exits capabilities checkpoints vocabulary souvenirs].freeze
     VERIFIED_AT = 2
     HEAT_COLS = Geometry::COLS
     HEAT_ROWS = Geometry::ROWS
@@ -87,6 +87,12 @@ module Koholint
       case name
       when 'exits' then exit_rows(data)
       when 'capabilities' then data.map { |entry| capability_row(entry) }
+      when 'souvenirs'
+        data['texts'].map do |entry|
+          first = entry['seen'].first
+          { label: "#{label(entry['place'])} t#{entry['entity']}", status: 'souvenir', verified_count: nil,
+            source: "read in #{entry['seen'].size} run(s), first #{first['run']} at frame #{first['frame']}", note: first['text'] }
+        end
       when 'checkpoints'
         data.map { |entry| { label: entry['name'], status: nil, verified_count: nil, source: entry['source'], note: "run #{entry['run']}, frame #{entry['frame']}, #{entry['flow']}" } }
       when 'geometry'

@@ -58,6 +58,8 @@ class ItemsTest < Minitest::Test
     assert_equal %w[Clé Dorée], Items.name_words('Tu as la Clé Dorée.')
     assert_equal %w[Arc], Items.name_words("Tu as trouvé l'Arc de Link!"), 'a name later in the sentence is not part of it'
     assert_empty Items.name_words('Bonjour, petit!')
+    assert_empty Items.name_words("Salut A ! T' es réveillé..."), 'a capital outside the object phrase is no name'
+    assert_empty Items.name_words('Tu as trouvé le X!'), 'one letter is no name'
   end
 
   # Run 626d, 80/0: the pickup sheet opened at 91353, item 12 showed as held at 91615, and the sheet's dialogue events follow the gain.
@@ -72,6 +74,21 @@ class ItemsTest < Minitest::Test
               { 'type' => 'perception', 'frame' => 93_000 },
               { 'type' => 'dialogue', 'frame' => 92_900, 'place' => [81, 0], 'text' => 'Tu as la Clé Dorée.' }]
     assert_equal({ 12 => %w[Champignon] }, Items.pickup_names(events), 'a text transcribed more than PICKUP_FRAMES after its gain names nothing')
+  end
+
+  # Lineage of 626d, 163/16: Tarkin's greeting opened at 3259 was transcribed after the shield showed as held at 3906.
+  def test_a_text_opened_more_than_pickup_frames_before_the_gain_or_with_no_object_phrase_names_nothing
+    events = [{ 'type' => 'item_gained', 'frame' => 3906, 'place' => [163, 16], 'item' => 4 },
+              { 'type' => 'dialogue', 'frame' => 3259, 'place' => [163, 16], 'text' => "Ben, c' est gravé sur le Bouclier!" },
+              { 'type' => 'dialogue', 'frame' => 3900, 'place' => [163, 16], 'text' => "Salut A ! T' es réveillé..." }]
+    assert_empty Items.pickup_names(events)
+  end
+
+  def test_only_names_from_an_observed_pickup_text_count_from_data
+    names = Items.pickup_text_names
+    assert_equal [%w[champignon]], names.fetch(12), 'only the names the quoted pickup text says, not its plural or its gloss'
+    refute names.key?(13), 'a hypothesis from general knowledge'
+    refute names.key?(1), 'a name measured by another probe than a pickup text'
   end
 
   def test_held_items_cover_both_buttons_and_the_slots

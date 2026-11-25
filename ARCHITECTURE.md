@@ -86,6 +86,12 @@ digest.
 publish|retire` moves an entry to or from `operational`, which changes the capabilities digest; operational entries become
 `Composite` skills offered while their object is on screen and their item held.
 
+**Souvenirs** (offline build, `souvenirs.rb`, `data/souvenirs.json`) — `koholint souvenirs` rebuilds from the sealed bundles
+only the texts people said through a talk, each with the first sighting per run (run, frame, items the reader held), every run counted
+from its fork frame; a test keeps the committed file equal to a rebuild. Each run records in its manifest the cutoff of what it may
+remember (sightings in runs created before its parent, outside its parent's sibling arms and their forks) and its digest; the agent policy
+receives those texts, and `candidates.rb` turns one naming a held item into a souvenir candidate. Souvenirs never count as texts read.
+
 **Decision points and policies** — `decision.rb` defines the points (`choose_objective`, `choose_skill`, `move`, macros) with
 their output schema and validation; `DecisionPoint.harness_choice` builds every answer the harness gives in place of the model.
 Every policy inherits the no-op hooks of `policies/base.rb` (`observe`, `prepare`, `decision_point_for`, `after_action`,
@@ -106,7 +112,8 @@ Every policy inherits the no-op hooks of `policies/base.rb` (`observe`, `prepare
 
 **Candidates** — `candidates.rb` builds the `choose_objective` menu: people, signs and unidentified things here, exits and
 doors, chests, known places with untried work, people and signs of other places from their last card, unidentified things
-seen still in one place, people who asked Link for something (`need` leads), and places that leads point to. Each candidate has an id, a label, a predicate and a `target`; an unknown id is a refusal.
+seen still in one place, people who asked Link for something (`need` leads), places that leads point to, and souvenirs: a person whose
+text in another branch names an item Link holds, in place of that person's own candidate. Each candidate has an id, a label, a predicate and a `target`; an unknown id is a refusal.
 
 **Objectives and leads** — `objectives.rb`: a short goal with a predicate the harness checks from memory (`leave_place`,
 `reach_place`, `reach_cell`, `dialogue_closed`, `new_place`, `new_text`, …); the engine traces started, achieved, abandoned and
@@ -120,11 +127,11 @@ results, plan), `prompts.rb` holds the system prompts, `claude_cli.rb` calls `cl
 and latency.
 
 **Run storage** — `run.rb`: `runs/<id>/` holds `manifest.json` (flow version, ROM hash, harness sha and dirty flag, model,
-autopilot, capabilities and exits digests), `inputs.log`, `trace.jsonl` (events validated by `trace.rb`), `keyframes/`,
+autopilot, capabilities and exits digests, souvenirs cutoff and digest), `inputs.log`, `trace.jsonl` (events validated by `trace.rb`), `keyframes/`,
 `save/`, `screens/` (one capture per place, observability only), `world.json` (`goal`, `leads`, `places`, `pickups`), `summary.json`
 (written by `summary.rb` from the trace at every stop), `activity.json`, `suggestions.md`, `star.json` and `notes.md`.
 `budget.rb` enforces frames, minutes, dollars and steps. `archive.rb` keeps a light bundle per run in git. A run resumes only
-with the same `flow_version`, ROM hash, capabilities digest and exits digest.
+with the same `flow_version`, ROM hash, capabilities digest, exits digest and souvenirs digest.
 
 **Atlas** (`atlas.rb`) — what every run under one or more roots observed, merged per place, lead and flow, read only from what
 the engine wrote; each fork counts from its fork frame. `Atlas.facts` lists every entry of the typed `data/` files with its status
@@ -138,7 +145,7 @@ frame-stamped thoughts, objectives, places, body, items, skills and merged dialo
 `starred` and `notes.md`.
 
 **CLI** — `cli.rb`, `bin/koholint`: `run`, `resume`, `fork`, `branch`, `verify`, `summary`, `watch`, `archive`, `star`,
-`prune-heavy`, `atlas`, `census`, `ab-plan` and `ab-report` (`ab.rb`), `check-leads`, `check-pickups`, `learn`, `capability` and
+`prune-heavy`, `atlas`, `souvenirs`, `census`, `ab-plan` and `ab-report` (`ab.rb`), `check-leads`, `check-pickups`, `learn`, `capability` and
 `bench exits`. `docs/OPERATING.md` documents each.
 
 ## Data flow of one decision

@@ -14,6 +14,7 @@ module Koholint
     SHIELD = 4
     SWORD = 1
     PICKUP_FRAMES = 600
+    ARTICLES = %w[le la l les un une des du d].freeze
 
     module_function
 
@@ -76,10 +77,24 @@ module Koholint
 
     def slot_of(state, id) = slots(state).index { |item| item.to_i == id }
 
-    # The name a pickup sentence gives: the first run of capitalised words in the text's first sentence, past its first word.
+    # One letter is the hero's name in a greeting, never an item.
     def name_words(text)
-      sentence = text.to_s.split(/(?<=[.!?])\s/).first.to_s
-      sentence.scan(/[\p{L}\p{N}-]+/).drop(1).slice_when { |a, b| a.match?(/\A\p{Lu}/) != b.match?(/\A\p{Lu}/) }.find { |run| run.first.match?(/\A\p{Lu}/) }.to_a
+      words = text.to_s.split(/(?<=[.!?])\s/).first.to_s.scan(/[\p{L}\p{N}-]+/)
+      capital = ->(word) { word.match?(/\A\p{Lu}/) }
+      start = (1...words.size).find { |index| ARTICLES.include?(words[index - 1].downcase) && capital.(words[index]) } or return []
+      name = words.drop(start).take_while(&capital)
+      name.join.length > 1 ? name : []
+    end
+
+    # Only names the quoted pickup text says: a plural alias or a gloss comes from elsewhere.
+    def pickup_text_names(catalogue = self.catalogue)
+      catalogue.values.filter_map do |entry|
+        next unless %w[observed verified].include?(entry['confidence']) && entry['source'].to_s.match?(/pickup text/i)
+
+        said = entry['source'].scan(/"([^"]+)"/).flatten.map { |text| Dialogues.words(text) }
+        found = names(entry).map { |name| Dialogues.words(name) }.select { |words| said.any? { |text| text.each_cons(words.size).include?(words) } }
+        [entry['id'], found] unless found.empty?
+      end.to_h
     end
 
     # Each gained item's name words, from its pickup text: the first text transcribed at its place after the gain shows as held, within
@@ -91,7 +106,7 @@ module Koholint
       now = 0
       events.each_with_index do |event, index|
         if event['type'] == 'dialogue'
-          gain = pending.find { |waiting| waiting['place'] == event['place'] } or next
+          gain = pending.find { |waiting| waiting['place'] == event['place'] && waiting['frame'].to_i - event['frame'].to_i <= PICKUP_FRAMES } or next
           pending.delete(gain)
           pages = events.drop(index).take_while { |page| page['type'] == 'dialogue' && page.values_at('frame', 'place') == event.values_at('frame', 'place') }
           words = name_words(Dialogues.text(pages.map { |page| page['text'].to_s }))

@@ -37,6 +37,7 @@ module Koholint
       run = Run.open(run_path, flow_version: flow_version)
       run.check_capabilities!
       run.check_exits!
+      run.check_souvenirs!
       run.lock!
       run.truncate_trace!(run.inputs.frames)
       run.truncate_prompts!(run.inputs.frames)

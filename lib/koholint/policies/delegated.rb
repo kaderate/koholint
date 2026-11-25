@@ -74,8 +74,9 @@ module Koholint
       EXPLORE = { skill: 'explore', params: {} }.freeze
       AUTO_OBJECTIVE = { title: 'Explore the nearest untried exits (picked by the harness)', predicate: { kind: 'new_place' } }.freeze
 
-      def initialize(client:, registry:, objectives:, memory: Memory.new, manual: '', on_step: nil, on_activity: nil, revisit: nil, budget: nil, autopilot: nil, exits: nil)
+      def initialize(client:, registry:, objectives:, memory: Memory.new, manual: '', on_step: nil, on_activity: nil, revisit: nil, budget: nil, autopilot: nil, exits: nil, souvenirs: [])
         @exits = exits
+        @souvenirs = souvenirs
         @cards = memory.cards.dup
         @loop_watch = memory.loop_watch
         @zero_watch = memory.zero_watch
@@ -351,7 +352,7 @@ module Koholint
         if predicate[:kind].to_s == 'leave_place' && predicate[:place] != place
           raise Refusal, "leave_place must name the current place #{place.inspect}, not #{predicate[:place].inspect}"
         end
-        raise Refusal, 'predicate is already true in the current state' if satisfied?(predicate, state, place)
+        raise Refusal, 'predicate is already true in the current state' if satisfied?(predicate, state, place) && !@candidate&.dig(:target, :try)
         if trivial?(predicate, state, place, context)
           raise Refusal, 'reach_cell target is already reachable over cells observed free; choose a goal that needs exploration'
         end
@@ -386,7 +387,8 @@ module Koholint
                                                       chests: signs.select { |object| object[:reachable] }.map { |object| object[:cell] })
         end
         @candidates = Candidates.build(place:, grid: context[:grid], explore_log: @explore_log, talk_log: @talk_log, leads: @leads, cards: @cards,
-                                       entities: @entities, signs:, stamp: stamp(state), link: state.cell)
+                                       entities: @entities, signs:, stamp: stamp(state), link: state.cell, souvenirs: @souvenirs,
+                                       item_names: @item_names)
         # A candidate no known route reaches is not offered again after its objective stalled, until a route to it appears.
         stalled = @stalled | @objectives.history.filter_map { |done| done[:candidate] if done[:reason] == 'stall' }
         hops = @explore_log.hops(place)

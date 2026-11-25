@@ -7,6 +7,7 @@ require 'koholint'
 require 'koholint/agents/prompts'
 require 'koholint/capabilities'
 require 'koholint/exits'
+require 'koholint/souvenirs'
 require 'koholint/trace'
 require 'koholint/input_log'
 
@@ -16,12 +17,14 @@ module Koholint
     class RomMismatch < Error; end
     class CapabilitiesMismatch < Error; end
     class ExitsMismatch < Error; end
+    class SouvenirsMismatch < Error; end
 
     attr_reader :dir, :manifest
 
     def self.create(root: 'runs', flow_version:, budget:, parent: nil, seed: 0, rom_path: Koholint.rom_path, tag: nil, model: nil, autopilot: nil, capabilities: Capabilities.digest,
-                    exits: Exits.digest)
+                    exits: Exits.digest, souvenirs: true)
       dir = unique_dir(root)
+      souvenirs = { 'before' => File.basename(dir) } if souvenirs == true
       FileUtils.mkdir_p(File.join(dir, 'save'))
       FileUtils.mkdir_p(File.join(dir, 'keyframes'))
       File.write(File.join(dir, 'trace.jsonl'), '')
@@ -31,7 +34,8 @@ module Koholint
       manifest = { 'flow_version' => flow_version, 'rom_sha256' => rom_hash(rom_path), 'seed' => seed,
                    'budget' => JSON.parse(JSON.generate(budget)), 'status' => 'created', 'parent' => parent,
                    'tag' => tag, 'harness_sha' => harness_sha, 'harness_dirty' => harness_dirty, 'prompts_sha' => Agents::Prompts.digest, 'model' => model,
-                   'autopilot' => autopilot, 'capabilities' => capabilities, 'exits' => exits }
+                   'autopilot' => autopilot, 'capabilities' => capabilities, 'exits' => exits,
+                   'souvenirs' => souvenirs && Souvenirs.record(before: souvenirs['before'], batch: souvenirs['batch']) }
       new(dir, manifest).tap(&:write_manifest)
     end
 
@@ -103,6 +107,7 @@ module Koholint
       loads = overrides.fetch(:capabilities) { manifest['capabilities'] != false }
       inherited[:capabilities] = loads ? Capabilities.digest : false
       inherited[:exits] = overrides.fetch(:exits) { manifest['exits'] != false } ? Exits.digest : false
+      inherited[:souvenirs] = overrides.fetch(:souvenirs, true) && { 'before' => id, 'batch' => manifest['parent'].is_a?(Hash) ? manifest['parent'].values_at('id', 'frame') : nil }
       child = self.class.create(root:, flow_version:, budget: manifest['budget'], parent: { 'id' => id, 'frame' => at_frame }, seed: manifest['seed'],
                                 rom_path:, **inherited)
       journal = InputLog.new(File.join(child.dir, 'inputs.log'))
@@ -141,6 +146,18 @@ module Koholint
     end
 
     def exits? = manifest.fetch('exits', false) != false
+
+    # false (--souvenirs none) or a run older than the key loads none.
+    def check_souvenirs!(data = Souvenirs.load)
+      recorded = manifest.fetch('souvenirs', false)
+      return if recorded == false
+
+      current = Souvenirs.record(before: recorded['before'], batch: recorded['batch'], data:)['digest']
+      return if recorded['digest'] == current
+
+      raise SouvenirsMismatch, "run #{id} was recorded with souvenirs #{recorded['digest']}, current is #{current}; " \
+                               "fork it (koholint fork #{dir} --at-frame #{inputs.frames}) to continue with the current data"
+    end
 
     def lock!
       return if @lock_file

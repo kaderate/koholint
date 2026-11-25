@@ -166,11 +166,14 @@ module Koholint
 
     # The people whose recorded texts hold these words in a row, as whole words: [place, type, cell], once each.
     def mentioning(words)
-      name = Dialogues.words(words.join(' '))
-      return [] if name.empty?
-
-      @texts.select { |talk| talk[:entity] && talk[:words].each_cons(name.size).include?(name) }
+      @texts.select { |talk| talk[:entity] && TalkLog.names?(talk[:words], words) }
             .map { |talk| [talk[:place], talk[:entity], talk[:cell]] }.uniq { |place, type, _| [place, type] }
+    end
+
+    # Whether a text's words hold the name words in a row, as whole words.
+    def self.names?(text_words, words)
+      name = Dialogues.words(words.join(' '))
+      !name.empty? && text_words.each_cons(name.size).include?(name)
     end
 
     # Whether Link talked to that person while holding the item.

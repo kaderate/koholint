@@ -701,6 +701,23 @@ class DelegatedAutopilotTest < Minitest::Test
     assert_nil p.send(:follow_choice, state(room_id: 9))
   end
 
+  def test_a_souvenir_candidate_here_starts_its_delivery_and_is_followed_with_a_talk
+    entities = -> { [{ type: 64, kind: 'npc', cell: [2, 3] }] }
+    souvenirs = [{ 'place' => [163, 16], 'entity' => 64, 'cell' => [2, 3], 'text' => 'Pour ma poudre, il me faut le Champignon de la forêt.',
+                   'seen' => [{ 'run' => '20261101-000000-aaaa', 'frame' => 1, 'held' => [1, 4] }] }]
+    client = ScriptedClient.new(objective: ok('candidate' => 'souvenir-163-16-t64', 'plan' => 'x', 'goal' => 'g'))
+    @objectives = Koholint::Objectives.new(trace:)
+    p = Koholint::Policies::Delegated.new(client:, registry: Koholint::Skills::Registry.default, objectives: @objectives, manual: '', autopilot: Koholint::Autopilot.new,
+                                          revisit: QuietRevisit.new(talk_log: Koholint::TalkLog.new), souvenirs:)
+    holding = state(item_a: 1, item_b: 4, inventory: [12, 0, 0, 0, 0, 0, 0, 0, 0, 0])
+    picked = p.decide(p.decision_point_for(holding), holding, { grid:, entities: })
+    refute picked[:refused], picked[:justification]
+    refute_includes client.calls.first[:prompt], '- person-t64:'
+    assert_equal({ kind: 'person', place: [163, 16], type: 64, cell: [2, 3], try: true, item: 12, name: 'champignon' }, @objectives.current[:target])
+    talk = p.decide(p.decision_point_for(holding), holding, { grid:, entities: })
+    assert_equal({ skill: 'talk_to', params: { row: 2, col: 3 } }, talk[:choice])
+  end
+
   def test_a_picked_examine_candidate_starts_its_objective_and_is_followed_with_a_talk
     sprite = Koholint::Vision::Grid.new(cells: Array.new(8) { Array.new(10) { 'floor' } }, static_sprites: [{ 'x' => 72, 'y' => 48, 'pattern' => 'p', 'height' => 16 }],
                                         beliefs: Koholint::Vision::Beliefs.new, capabilities: Koholint::Vision::Capabilities.new)
