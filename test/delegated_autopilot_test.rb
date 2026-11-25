@@ -446,7 +446,7 @@ class DelegatedAutopilotTest < Minitest::Test
     context = { grid: }
     detour = p.decide(p.decision_point_for(low), low, context)
     assert_match(/heal in 164-16 first/, detour[:justification])
-    assert_equal [{ place: [164, 16] }, { kind: 'person', place: [164, 16], type: 132, cell: [3, 5] }, 'heal'], [context[:aim], @objectives.current[:target], @objectives.history.last[:reason]]
+    assert_equal [{ place: [164, 16] }, { kind: 'person', place: [164, 16], type: 132, cell: [3, 5], try: true }, 'heal'], [context[:aim], @objectives.current[:target], @objectives.history.last[:reason]]
     @objectives.abandon(frame: 400, reason: 'test')
     healed = state(frame: 500, hp: 24, room_id: 164)
     p.observe(healed, frame: 500)

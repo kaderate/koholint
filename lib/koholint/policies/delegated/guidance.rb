@@ -271,7 +271,7 @@ module Koholint
           note_dropped(current, any: true)
           @objectives.abandon(frame: state.frame, reason: 'heal')
           who = Array(@cards.dig(place, :people)) + Array(@cards.dig(place, :unknown))
-          target = who.size == 1 ? { kind: 'person', place:, type: who.first[:type], cell: who.first[:cell] } : { kind: 'place', place: }
+          target = who.size == 1 ? { kind: 'person', place:, type: who.first[:type], cell: who.first[:cell], try: true } : { kind: 'place', place: }
           @objectives.start(frame: state.frame, title: "Heal in #{place.join('-')}, where a talk healed Link before", predicate: { kind: 'reach_place', place: }, target:, autopilot: true)
           @objectives.current[:heal] = true
           @autopilot&.adopt(@objectives.current)
