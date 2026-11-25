@@ -484,6 +484,11 @@ class DelegatedAutopilotTest < Minitest::Test
     p.instance_variable_set(:@retreated, { spot: [low.place, low.cell], hp: 8 })
     p.observe(state(hp: 8, room_id: 9), frame: 410)
     assert_nil p.instance_variable_get(:@retreated), 'another place lifts it'
+    p.instance_variable_set(:@retreated, { spot: [low.place, low.cell], hp: 24 })
+    p.observe(state(hp: 20), frame: 420)
+    refute_nil p.instance_variable_get(:@retreated), 'damage does not lift it'
+    p.observe(state(hp: 24), frame: 430)
+    assert_nil p.instance_variable_get(:@retreated), 'a heal back to the health it was sent at lifts it'
   end
 
   def test_repeated_zero_frame_results_in_one_place_are_answered_by_the_harness

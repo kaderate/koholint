@@ -150,6 +150,7 @@ module Koholint
         @screen_since = nil unless screen(state)
         note_gains(state)
         @retreated = nil if @retreated && (@retreated[:spot][0] != state.place || state.health > @retreated[:hp])
+        @retreated[:hp] = [@retreated[:hp], state.health].min if @retreated
         @held = Dialogues.items(state.inventory, state.item_a, state.item_b)
         release_hemmed(state)
         track_locked(state)
