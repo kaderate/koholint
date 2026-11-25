@@ -1,6 +1,6 @@
 # Agent skills
 
-The skills, protocols and harness behaviours the agent works with. Versioned with the play flow (currently `flow-97`): update this page, not the README, when a flow changes. Layers and data flow are in [ARCHITECTURE.md](../ARCHITECTURE.md).
+The skills, protocols and harness behaviours the agent works with. Versioned with the play flow (currently `flow-98`): update this page, not the README, when a flow changes. Layers and data flow are in [ARCHITECTURE.md](../ARCHITECTURE.md).
 
 
 - Learned capabilities (`data/capabilities.json`, `bin/koholint capability list`): an `operational` entry is a composite of the skills below, offered in the skill schema and listed under "Learned skills" only while its trigger item is held (flow-49) and its object is on screen (today `sword_on_object_92 row col direction`: stand next to object 92, face it, use the sword, step into its cell). `explore` and `goto` also run it themselves when blocked facing such a cell, and the planner routes through those cells as a last resort. `learn` and `capability publish|retire` are offline commands.
@@ -144,6 +144,13 @@ The skills, protocols and harness behaviours the agent works with. Versioned wit
   Within a place, explore takes a side known only as the assumed way back (flow-78) after the place's other reachable untried exits, doors and frontiers;
   it is still a frontier, taken when nothing else here is reachable, before a route to another place. An explore that stops `no_frontier`
   in at most one frame is answered by the harness at the next decision, not after three, since from the same cell it would find none again.
+- flow-98: at one heart or less, when explore finds no way out of a place (every route crosses a hostile's contact zone), the harness
+  sends explore back by the side Link came in, as from a closed pocket: at once while a hostile's contact zone reaches Link's cell or
+  a neighbour, else after three waits at the same cell that changed nothing; once per cell until Link changes place or heals above
+  one heart, so a way back out of reach too falls back to the waits. A disengage step takes Link farther from every enemy in
+  touch, never into or beside another hostile's contact zone, and never in a direction the grid or a blocked walk from that cell shows
+  walled (kept across model calls; a danger stop is not a wall); with no such step, none is taken. An enemy an attack only could not
+  reach is fought on sight again once it comes within a cell, twice a visit at most.
 - flow-97: an item gained takes its name from its pickup text, the first text transcribed at its place after it shows as held (within
   600 frames, never an earlier text): the first run of capitalised words of its first sentence, past the first word (`Items.name_words`;
   the same rule rebuilds it from the trace on resume). After a gain, the people and unidentified things of other places this lineage

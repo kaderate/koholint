@@ -17,6 +17,7 @@ module Koholint
     EXPLORING = %w[new_place leave_place new_text].freeze
     CHOICE = { skill: 'explore', params: {} }.freeze
     FIGHT_LIMIT = 8
+    REFIGHTS = 2
     TRY_LIMIT = 6
     NOTHING = %w[no_response no_path frame_cap blocked target_free].freeze
     FIGHT_FRAMES = 900
@@ -42,7 +43,8 @@ module Koholint
       @returns = Hash.new(0)
       @fight = 0
       @struck = { place: nil, types: [] }
-      @missed = { place: nil, slots: [] }
+      @missed = { place: nil, slots: [], far: Hash.new(0) }
+      @walled = { spot: nil, directions: [] }
       @untried = []
       @trying = false
       @aimed = Set.new
@@ -65,7 +67,6 @@ module Koholint
       @fight = 0
       @attack_stop = nil
       @disengaged = 0
-      @walled = []
       @untried = []
       @tries = 0
       @goto_done = false
@@ -81,7 +82,7 @@ module Koholint
       @fight_hurt = [outcome[:from][:room], outcome[:from][:map]] if skill.to_s == 'attack' && outcome.is_a?(Hash) && outcome[:stopped_by].to_s == 'damage' && outcome[:from].is_a?(Hash)
       note_missed(outcome) if skill.to_s == 'attack' && outcome.is_a?(Hash)
       note_struck(skill, outcome) if outcome.is_a?(Hash)
-      @walled |= [outcome[:params][:direction].to_s] if skill.to_s == 'walk' && outcome.is_a?(Hash) && outcome[:params].is_a?(Hash) && walled?(outcome)
+      note_walled(outcome) if skill.to_s == 'walk' && outcome.is_a?(Hash) && outcome[:params].is_a?(Hash) && walled?(outcome)
       explored = skill.to_s == 'explore' && outcome.is_a?(Hash)
       @stop = stop_after(skill.to_s, outcome.is_a?(Hash) ? outcome[:stopped_by].to_s : nil) unless @heart_touch && skill.to_s == 'touch' && outcome.is_a?(Hash) && HEART_ENDS.include?(outcome[:stopped_by].to_s)
       @heart_touch = false
@@ -209,10 +210,12 @@ module Koholint
       return if state.health <= Perception::HP_PER_HEART || @fight >= FIGHT_LIMIT || @fight_hurt
       return if Array(objects).any? { |object| object[:kind].to_s == 'crumbling' && Geometry.footprint_cells(state.x, state.y).include?(object[:cell]) }
 
-      missed = @missed[:place] == state.place ? @missed[:slots] : []
+      here = @missed[:place] == state.place
+      missed = here ? @missed[:slots] : []
       missed += [@struck[:slot]] if @struck[:place] == state.place
       distance = ->(entity) { [(entity[:x] - state.x).abs, (entity[:y] - state.y).abs].max }
-      Array(entities).select { |entity| entity[:kind].to_s == 'enemy' && entity[:sword_hits] == 1 && entity[:cell] && !missed.include?(entity[:slot]) }
+      far = ->(entity) { here && @missed[:far].key?(entity[:slot]) && distance.(entity) > Geometry::CELL }
+      Array(entities).select { |entity| entity[:kind].to_s == 'enemy' && entity[:sword_hits] == 1 && entity[:cell] && !missed.include?(entity[:slot]) && !far.(entity) }
                      .select { |entity| distance.(entity) <= FIGHT_SIGHT }
                      .min_by { |entity| [distance.(entity), entity[:slot]] }
     end
@@ -225,7 +228,15 @@ module Koholint
       return if near.empty?
 
       holes = grid.respond_to?(:hole_margin) ? grid.hole_margin + Geometry::ROWS.times.to_a.product(Geometry::COLS.times.to_a).select { |cell| grid.hole?(*cell) } : []
-      direction = STEP.reject { |name, (dx, dy)| Array(@walled).include?(name.to_s) || holes.include?([state.cell[0] + dy, state.cell[1] + dx]) || near.any? { |threat| ((threat[:x] - state.x) * dx) + ((threat[:y] - state.y) * dy) > 0 } }
+      zone = Navigation::Threat.zone(Navigation::Threat.of(Array(entities)) - near, margin: Entities::DANGER_MARGIN)
+      beside = zone.flat_map { |row, col| [[row, col], [row - 1, col], [row + 1, col], [row, col - 1], [row, col + 1]] }
+      farther = ->(dx, dy) { near.all? { |threat| Navigation::Threat.distance(threat, state.x + (dx * Geometry::CELL), state.y + (dy * Geometry::CELL)) > Navigation::Threat.distance(threat, state.x, state.y) } }
+      walled = @walled[:spot] == [*state.place, *state.cell] ? @walled[:directions] : []
+      wall = lambda do |name|
+        ahead = Geometry.step(state.cell, name)
+        walled.include?(name.to_s) || (ahead && grid.respond_to?(:passable) && grid.passable(*ahead, name) == :no)
+      end
+      direction = STEP.reject { |name, (dx, dy)| wall.(name) || (holes + beside).include?([state.cell[0] + dy, state.cell[1] + dx]) || !farther.(dx, dy) }
                       .max_by { |_, (dx, dy)| near.map { |threat| Navigation::Threat.distance(threat, state.x + (dx * Geometry::CELL), state.y + (dy * Geometry::CELL)) }.min }
                       &.first or return
       @disengaged += 1
@@ -291,14 +302,16 @@ module Koholint
       nil
     end
 
-    # An enemy an attack could not reach or strike is not fought on sight again in that place.
+    # An enemy an attack could not reach or strike is not fought on sight again in that place, save one only out of reach, once in touch.
     def note_missed(outcome)
       from = outcome[:from]
       return unless from.is_a?(Hash) && outcome[:target].is_a?(Hash) && MISSED.include?(outcome[:stopped_by].to_s)
 
       here = [from[:room], from[:map]]
-      @missed = { place: here, slots: [] } unless @missed[:place] == here
-      @missed[:slots] |= [outcome[:target][:slot]]
+      slot = outcome[:target][:slot]
+      @missed = { place: here, slots: [], far: Hash.new(0) } unless @missed[:place] == here
+      @missed[:far][slot] += 1 if outcome[:stopped_by].to_s == 'out_of_reach'
+      @missed[:slots] |= [slot] if outcome[:stopped_by].to_s != 'out_of_reach' || @missed[:far][slot] > REFIGHTS
     end
 
     # The types struck count for the visit only: leaving the place forgets them, as a resume (which starts with none) would.
@@ -309,7 +322,7 @@ module Koholint
         here = [from[:room], from[:map]]
         @struck = { place: here, types: [] } unless @struck[:place] == here
         @struck[:types] |= [target[:type]]
-        @struck[:slot] = target[:slot]
+        @struck[:slot] = target[:slot] unless MISSED.include?(outcome[:stopped_by].to_s)
       end
       to = outcome[:to]
       @struck = { place: nil, types: [] } if to.is_a?(Hash) && @struck[:place] && [to[:room], to[:map]] != @struck[:place]
@@ -324,7 +337,18 @@ module Koholint
       nil
     end
 
-    def walled?(outcome) = outcome[:stopped_by].to_s == 'blocked' || (outcome[:stopped_by].to_s == 'danger' && outcome[:frames].to_i.zero?)
+    # A walk blocked from a cell stays blocked from it, across model calls, until Link stands somewhere else.
+    def note_walled(outcome)
+      from = outcome[:from]
+      return unless from.is_a?(Hash)
+
+      at = outcome[:blocked_at].is_a?(Hash) ? outcome[:blocked_at] : from
+      spot = [from[:room], from[:map], at[:row], at[:col]]
+      @walled = { spot:, directions: [] } unless @walled[:spot] == spot
+      @walled[:directions] |= [outcome[:params][:direction].to_s]
+    end
+
+    def walled?(outcome) = outcome[:stopped_by].to_s == 'blocked'
 
     def cap_hold(state)
       return 'chain cap' if @chain >= @chain_limit

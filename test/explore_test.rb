@@ -261,6 +261,22 @@ class ExploreTest < Minitest::Test
     assert_includes result[:knocked_edges], { row: 3, col: 5, direction: :up }
   end
 
+  def test_sent_back_by_a_deadlock_explore_leaves_by_the_side_link_came_in_though_it_was_left_before
+    rows = with(CLOSED, [7, 5], '.', [4, 0], '.', *(1..6).flat_map { |row| [[row, 2], '#'] })
+    log = Koholint::ExploreLog.new
+    [[[1, 0], { row: 4, col: 0, direction: :left }, [3, 0]], [[3, 0], { row: 4, col: 9, direction: :right }, [1, 0]],
+     [[1, 0], { row: 7, col: 5, direction: :down }, [2, 0]], [[2, 0], { row: 0, col: 5, direction: :up }, [1, 0]]].each do |(room, map), exit, to|
+      log.note({ from: { room:, map: }, to: { room: to[0], map: to[1] } })
+      log.absorb({ from: { room:, map: }, exits: [exit.merge(outcome: :left, to:)] })
+    end
+    log.absorb({ from: { room: 2, map: 0 }, survey: { sides: { up: [{ row: 0, col: 5 }] }, doors: [] } })
+    assert_equal :down, log.entered([1, 0])
+    stay, = explore(rows, exits: [[[7, 5], :down]], explore_log: log, limit: 400)
+    assert_equal :no_frontier, stay[:stopped_by]
+    back, = explore(rows, exits: [[[7, 5], :down]], explore_log: log, retreat: true, limit: 400)
+    assert back[:place_changed], back.inspect
+  end
+
   def test_an_aim_at_a_place_no_known_route_reaches_explores_as_without_an_aim
     rows = with(CLOSED, [4, 9], '?', [0, 3], '?')
     plain, plain_inputs = explore(rows, explore_log: Koholint::ExploreLog.new, limit: 300)

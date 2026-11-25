@@ -70,6 +70,7 @@ module Koholint
       STUCK_STOPS = %w[no_frontier no_path blocked stalled].freeze
       STUCK_AT = 6
       ZERO_WAIT = { skill: 'wait', params: { frames: 120 } }.freeze
+      DEADLOCK_WAITS = 3
       EXPLORE = { skill: 'explore', params: {} }.freeze
       AUTO_OBJECTIVE = { title: 'Explore the nearest untried exits (picked by the harness)', predicate: { kind: 'new_place' } }.freeze
 
@@ -147,6 +148,7 @@ module Koholint
         end
         @screen_since = nil unless screen(state)
         note_gains(state)
+        @retreated = nil if @retreated && (@retreated[0] != state.place || state.health > Perception::HP_PER_HEART)
         @held = Dialogues.items(state.inventory, state.item_a, state.item_b)
         release_hemmed(state)
         track_locked(state)

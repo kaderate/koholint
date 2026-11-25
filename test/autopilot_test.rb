@@ -461,14 +461,40 @@ class AutopilotTest < Minitest::Test
     assert_equal 'left', pilot.disengage_choice(state: state(frame: 210, hp: 4, x: 68, y: 60), entities: [threat(74, 60)])[:choice][:params][:direction]
   end
 
-  def test_a_disengage_step_into_a_wall_is_not_tried_again_before_the_next_model_call
+  # Run f741, 172/10: up was walled, so the step went right, beside the type 155 below, and took a hit (8 -> 4 hp).
+  def test_a_disengage_step_that_takes_link_no_farther_from_the_enemy_is_not_taken
+    pilot = primed
+    link = state(frame: 200, hp: 8, x: 68, y: 60)
+    pilot.acted(skill: 'walk', outcome: { stopped_by: :blocked, params: { direction: :up, cells: 1 }, from: { room: 163, map: 16, row: 3, col: 4 } })
+    assert_nil pilot.disengage_choice(state: link, entities: [threat(66, 84, type: 155)])
+  end
+
+  def test_a_disengage_step_never_lands_in_or_beside_another_hostiles_contact_zone
+    link = state(frame: 200, hp: 8, x: 68, y: 60)
+    assert_equal 'up', primed.disengage_choice(state: link, entities: [threat(68, 72)])[:choice][:params][:direction]
+    step = primed.disengage_choice(state: link, entities: [threat(68, 72), threat(68, 20).merge(slot: 4)])[:choice][:params][:direction]
+    assert_includes %w[left right], step
+  end
+
+  # Run 5e81, 172/10: up was walled at (2,4), a model call in between forgot it, and the second walk up took a hit (8 -> 4 hp).
+  def test_a_disengage_step_into_a_wall_is_not_tried_again_from_that_cell_even_after_a_model_call
     pilot = primed
     link = state(frame: 200, hp: 8, x: 68, y: 60)
     assert_equal 'up', pilot.disengage_choice(state: link, entities: [threat(70, 64)])[:choice][:params][:direction]
-    pilot.acted(skill: 'walk', outcome: { stopped_by: :blocked, params: { direction: :up, cells: 1 } })
+    pilot.acted(skill: 'walk', outcome: { stopped_by: :blocked, params: { direction: :up, cells: 1 }, from: { room: 163, map: 16, row: 3, col: 4 } })
     assert_equal 'left', pilot.disengage_choice(state: link, entities: [threat(70, 64)])[:choice][:params][:direction]
     pilot.model_called(state: link, objective: objective)
-    assert_equal 'up', pilot.disengage_choice(state: link, entities: [threat(70, 64)])[:choice][:params][:direction]
+    assert_equal 'left', pilot.disengage_choice(state: link, entities: [threat(70, 64)])[:choice][:params][:direction]
+    pilot.acted(skill: 'walk', outcome: { stopped_by: :blocked, params: { direction: :right, cells: 3 }, from: { room: 163, map: 16, row: 3, col: 2 },
+                                          blocked_at: { row: 3, col: 4, direction: :right } })
+    assert_equal 'down', pilot.disengage_choice(state: link, entities: [threat(60, 64)])[:choice][:params][:direction], 'a longer walk is barred where it stopped'
+    moved = state(frame: 300, hp: 8, x: 52, y: 60)
+    assert_equal 'up', pilot.disengage_choice(state: moved, entities: [threat(54, 64)])[:choice][:params][:direction], 'from another cell up is tried'
+  end
+
+  def test_a_disengage_step_the_grid_shows_blocked_is_not_taken
+    grid = Struct.new(:none) { def passable(row, col, direction) = [row, col, direction] == [2, 4, :up] ? :no : :yes }.new
+    assert_equal 'left', primed.disengage_choice(state: state(frame: 200, hp: 8, x: 68, y: 60), entities: [threat(70, 64)], grid:)[:choice][:params][:direction]
   end
 
   class HoledGrid
@@ -483,13 +509,14 @@ class AutopilotTest < Minitest::Test
     assert_equal 'left', primed.disengage_choice(state: link, entities: [threat(70, 64)], grid: HoledGrid.new([[2, 4]]))[:choice][:params][:direction]
   end
 
-  def test_a_walk_refused_at_once_for_danger_counts_as_walled
-    pilot = primed
+  def test_a_danger_stop_or_a_blocked_walk_without_its_cell_is_not_counted_as_walled
     link = state(frame: 200, hp: 8, x: 68, y: 60)
-    pilot.acted(skill: 'walk', outcome: { stopped_by: :danger, frames: 0, params: { direction: :up, cells: 1 } })
-    assert_equal 'left', pilot.disengage_choice(state: link, entities: [threat(70, 64)])[:choice][:params][:direction]
+    here = { room: 163, map: 16, row: 3, col: 4 }
+    pilot = primed
+    pilot.acted(skill: 'walk', outcome: { stopped_by: :danger, frames: 0, params: { direction: :up, cells: 1 }, from: here })
+    assert_equal 'up', pilot.disengage_choice(state: link, entities: [threat(70, 64)])[:choice][:params][:direction]
     other = primed
-    other.acted(skill: 'walk', outcome: { stopped_by: :danger, frames: 9, params: { direction: :up, cells: 1 } })
+    other.acted(skill: 'walk', outcome: { stopped_by: :blocked, params: { direction: :up, cells: 1 } })
     assert_equal 'up', other.disengage_choice(state: link, entities: [threat(70, 64)])[:choice][:params][:direction]
   end
 
@@ -548,6 +575,25 @@ class AutopilotTest < Minitest::Test
     assert_nil pilot.fight_choice(state: state(frame: 200), entities: [sighted(0, 16, slot: 7)])
   end
 
+  # Run 5e81, 172/10: the attack on the second type 155 ended out_of_reach, and the explore after it walked into that 155 at 12 hp.
+  def test_an_enemy_an_attack_could_only_not_reach_is_fought_again_once_within_a_cell
+    pilot = primed
+    pilot.acted(skill: 'attack', outcome: { stopped_by: :out_of_reach, target: { slot: 4, type: 155, cell: [3, 6] }, from: { room: 163, map: 16 } })
+    assert_nil pilot.fight_choice(state: state(frame: 200), entities: [sighted(32, 0)]), 'still two cells away'
+    assert_equal({ row: 3, col: 5 }, pilot.fight_choice(state: state(frame: 210), entities: [sighted(16, 0)])[:choice][:params])
+  end
+
+  def test_an_enemy_only_out_of_reach_is_fought_again_at_most_twice_a_visit
+    pilot = primed
+    miss = { stopped_by: :out_of_reach, target: { slot: 4, type: 155, cell: [3, 5] }, from: { room: 163, map: 16 } }
+    2.times do
+      pilot.acted(skill: 'attack', outcome: miss)
+      refute_nil pilot.fight_choice(state: state(frame: 210), entities: [sighted(16, 0)])
+    end
+    pilot.acted(skill: 'attack', outcome: miss)
+    assert_nil pilot.fight_choice(state: state(frame: 220), entities: [sighted(16, 0)])
+  end
+
   def test_a_fight_on_sight_never_starts_the_chain_of_fights_after_a_kill
     pilot = primed
     refute_nil pilot.fight_choice(state: state(frame: 200), entities: [sighted(16, 0)])
@@ -570,10 +616,10 @@ class AutopilotTest < Minitest::Test
     refute_nil pilot.fight_choice(state: state(frame: 220), entities: [sighted(16, 0)])
   end
 
-  def test_an_enemy_an_attack_could_not_reach_is_not_fought_on_sight_again_there
+  def test_an_enemy_an_attack_could_not_reach_is_not_fought_on_sight_again_there_beyond_a_cell
     pilot = primed
     pilot.acted(skill: 'attack', outcome: { stopped_by: :out_of_reach, target: { slot: 4, type: 25, cell: [3, 5] }, from: { room: 163, map: 16 } })
     pilot.acted(skill: 'attack', outcome: { stopped_by: :no_target, target: { slot: 7, type: 25, cell: [1, 1] }, from: { room: 163, map: 16 } })
-    assert_nil pilot.fight_choice(state: state(frame: 200), entities: [sighted(16, 0)])
+    assert_nil pilot.fight_choice(state: state(frame: 200), entities: [sighted(32, 0)])
   end
 end

@@ -63,6 +63,7 @@ module Koholint
         def initialize(direction:, context:, **rest)
           super(**rest)
           @aim = context[:aim] || {}
+          @retreat = context[:retreat]
           @hint = direction || @aim[:direction]
           @place = @start.place
           @ledger = context[:ledger]
@@ -499,9 +500,15 @@ module Koholint
           end
           @route = { goal: first[:goal], next: first[:next] } if first
           @dead_end = true if first
-          side = @log&.pocket_side(@place, from) or return []
+          side = @log&.pocket_side(@place, from) || retreat_side or return []
 
           gather(from, path_to) { |cell, direction| :exit if direction == side && Geometry.step(cell, direction).nil? }
+        end
+
+        # Sent back by a deadlock (no route out at low health that waits changed), the side Link came in by is a way out like a pocket's.
+        def retreat_side
+          side = @retreat && @log&.entered(@place)
+          side if Geometry::OPPOSITE.key?(side)
         end
 
         # An exit or door that only pushes open: the first of the fewest pushes that open it, from a stand Link walks to without pushing.
