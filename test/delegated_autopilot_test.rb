@@ -658,7 +658,9 @@ class DelegatedAutopilotTest < Minitest::Test
     outcome = { skill: 'talk_to', params: { row: 3, col: 4 }, stopped_by: :dialogue, dialog_after: true, talked: false, target_type: 132, moved_cells: 2,
                 from: { room: here[0], map: here[1], row: 5, col: 4 }, to: { room: here[0], map: here[1], row: 4, col: 4 } }
     p.after_action(choice: { skill: 'talk_to', params: { row: 3, col: 4 } }, outcome:, state:, frame: 20)
-    assert_equal :achieved, @objectives.update(state, frame: 21)
+    @objectives.update(state, frame: 21)
+    assert_nil @objectives.current
+    assert_equal :achieved, @objectives.history.last[:outcome]
   end
 
   def test_a_sign_of_another_place_is_walked_to_and_read_before_its_objective_ends
