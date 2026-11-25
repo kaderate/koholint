@@ -16,7 +16,7 @@ class PickupCheckTest < Minitest::Test
 
   def data(root, confidence, verified_count)
     path = File.join(root, 'items.json')
-    File.write(path, JSON.generate([{ 'id' => 12, 'name' => 'magic powder', 'source' => 'x', 'confidence' => 'hypothesis', 'verified_count' => 0,
+    File.write(path, JSON.generate([{ 'id' => 12, 'name' => 'mushroom', 'source' => 'x', 'confidence' => 'hypothesis', 'verified_count' => 0,
                                       'pickups' => { 'value' => [], 'confidence' => confidence, 'verified_count' => verified_count, 'source' => 'x' } }]))
     path
   end
@@ -32,7 +32,7 @@ class PickupCheckTest < Minitest::Test
       dirs = [run_dir(root, 'a', parent: 'ck', tag: 'one'), run_dir(root, 'b', parent: 'ck', tag: 'two')]
       code, text = check(root, dirs)
       assert_equal 0, code
-      assert_includes text, 'item 12 (magic powder?): 2 gain(s) in 2 run(s), 1 lineage(s) (ck) holding [[1, 4, 12]], so the data may claim observed with verified_count 1'
+      assert_includes text, 'item 12 (mushroom?): 2 gain(s) in 2 run(s), 1 lineage(s) (ck) holding [[1, 4, 12]], so the data may claim observed with verified_count 1'
       assert_includes text, '2 item(s) gained across 2 run(s)'
     end
   end
