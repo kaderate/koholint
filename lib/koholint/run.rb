@@ -147,8 +147,7 @@ module Koholint
 
     def exits? = manifest.fetch('exits', false) != false
 
-    # A run resumes with the souvenirs it was recorded with: the same texts left by its cutoff and batch; false (--souvenirs none) or a
-    # run older than the key loads none.
+    # false (--souvenirs none) or a run older than the key loads none.
     def check_souvenirs!(data = Souvenirs.load)
       recorded = manifest.fetch('souvenirs', false)
       return if recorded == false

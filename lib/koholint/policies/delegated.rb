@@ -350,7 +350,7 @@ module Koholint
         if predicate[:kind].to_s == 'leave_place' && predicate[:place] != place
           raise Refusal, "leave_place must name the current place #{place.inspect}, not #{predicate[:place].inspect}"
         end
-        raise Refusal, 'predicate is already true in the current state' if satisfied?(predicate, state, place)
+        raise Refusal, 'predicate is already true in the current state' if satisfied?(predicate, state, place) && !@candidate&.dig(:target, :try)
         if trivial?(predicate, state, place, context)
           raise Refusal, 'reach_cell target is already reachable over cells observed free; choose a goal that needs exploration'
         end

@@ -1,5 +1,6 @@
 require 'koholint/entities'
 require 'koholint/geometry'
+require 'koholint/items'
 require 'koholint/leads'
 require 'koholint/place_card'
 require 'koholint/place_kinds'
@@ -25,25 +26,21 @@ module Koholint
                 people_away(place, hops, cards, talk_log, named, stamp, explore_log).reject { |person| asked.include?(person[:target].values_at(:place, :type)) } +
                 signs_away(place, hops, cards, talk_log, named) + chests_away(place, hops, cards, named) +
                 lead_places(place, hops, leads, named)
+      things = unidentified(place, grid, entities, talk_log, link)
       remembered = souvenirs(place, hops, souvenirs, item_names, talk_log, named, stamp)
-      people, leaving = remember(remembered, people, leaving, place)
-      people + signs_here(place, signs, talk_log) + chests_here(place, signs) + unidentified(place, grid, entities, talk_log, link) +
-        warn(leaving, people)
+      people, things, leaving = remember(remembered, people, things, leaving, place)
+      people + signs_here(place, signs, talk_log) + chests_here(place, signs) + things + warn(leaving, people)
     end
 
-    # A souvenir takes the slot of the candidate for the same place and person; one with none joins the people here or ends the list.
-    def remember(remembered, people, leaving, place)
+    def remember(remembered, people, things, leaving, place)
       same = ->(candidate, souvenir) { candidate[:target][:type] && candidate[:target].values_at(:place, :type) == souvenir[:target].values_at(:place, :type) }
       swap = ->(list) { list.map { |candidate| remembered.find { |souvenir| same.(candidate, souvenir) } || candidate }.uniq { |candidate| candidate[:id] } }
-      people = swap.(people)
-      leaving = swap.(leaving)
-      rest = remembered - people - leaving
-      here, away = rest.partition { |souvenir| souvenir[:target][:place] == place }
-      [people + here, leaving + away]
+      people, things, leaving = [people, things, leaving].map(&swap)
+      things -= people
+      here, away = (remembered - people - things - leaving).partition { |souvenir| souvenir[:target][:place] == place }
+      [people + here, things, leaving + away]
     end
 
-    # A text a person said in another branch that names an item Link holds, by flow-97's match of its pickup words, read by someone who
-    # did not hold it, from a person this lineage never heard say it nor talked to holding the item, at a place its own routes reach.
     def souvenirs(place, hops, souvenirs, item_names, talk_log, named, stamp)
       held = Array(Array(stamp)[1])
       souvenirs.filter_map do |entry|
@@ -55,9 +52,8 @@ module Koholint
         next if talk_log.talks_with(where, type).any? { |talk| talk[:key] == key }
 
         words = Dialogues.words(entry['text'])
-        item, name = item_names.find do |id, item_words|
-          held.include?(id) && TalkLog.names?(words, item_words) && !talk_log.talked_holding?(where, type, id) &&
-            entry['seen'].any? { |sighting| !sighting['held'].include?(id) }
+        item, name = held.lazy.flat_map { |id| [item_names[id], *Items.pickup_text_names[id]].compact.map { |item_words| [id, item_words] } }.find do |id, item_words|
+          TalkLog.names?(words, item_words) && !talk_log.talked_holding?(where, type, id) && entry['seen'].any? { |sighting| !sighting['held'].include?(id) }
         end
         next unless item
 

@@ -254,7 +254,7 @@ class AtlasTest < Minitest::Test
         Dir.chdir(work) { assert_equal 0, Koholint::CLI.run(['atlas', '--root', root], out:) }
         assert_match(/atlas: 1 runs from #{Regexp.escape(root)} \(0 unreadable\), last #{SWORD}/, out.string)
         assert_match(/wrote tmp\/atlas.json/, out.string)
-        assert_match(/facts: \d+ entries in 10 data files, \d+ verified/, out.string)
+        assert_match(/facts: \d+ entries in 11 data files, \d+ verified/, out.string)
         assert_equal 1, JSON.parse(File.read(File.join(work, Koholint::Atlas::OUT)))['runs']
       end
     end
