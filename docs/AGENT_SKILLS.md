@@ -146,7 +146,8 @@ The skills, protocols and harness behaviours the agent works with. Versioned wit
   in at most one frame is answered by the harness at the next decision, not after three, since from the same cell it would find none again.
 - flow-100: the harness never waits beside a hostile at any health: when explore finds no way out while a hostile's contact zone
   reaches Link's cell or a neighbour, it sends explore back by the side Link came in at once (once per cell, until Link changes
-  place or heals). Fight on sight also takes an enemy whose two sword hits are verified (types 27 and 11 today), not only one-strike ones.
+  place or heals). Fight on sight also takes an enemy whose two sword hits are verified (types 27 and 11 today), not only one-strike ones. A cell
+  doubted on every side (two blocked attempts per side) forgets those doubts: Link stands on it, so it was a hold such as a healing scene, not four walls.
 - flow-99: souvenirs. A text a person said in another branch (`data/souvenirs.json`, the run's `souvenirs` cutoff) whose words hold the
   name of an item Link holds, by flow-97's rule or a name of `data/items.json` that the item's observed pickup text quotes, read by
   someone who did not hold it, from a person this lineage never heard say it nor talked to holding the item, at a place this lineage's
