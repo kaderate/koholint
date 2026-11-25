@@ -422,6 +422,27 @@ class DelegatedAutopilotTest < Minitest::Test
     assert_equal [{ kind: 'reach_place', place: [165, 16] }, { kind: 'place', place: [165, 16] }], [@objectives.current[:predicate], @objectives.current[:target]]
   end
 
+  # Run f741, 172/10 at 4 hp: every route out crossed a type 155's contact zone, and explore and a 120-frame wait alternated 94 times.
+  def test_at_one_heart_after_three_waits_that_changed_nothing_explore_leaves_by_the_side_link_came_in
+    answers = lambda do |hp|
+      client = ScriptedClient.new(objective: new_place, default: explore)
+      p = autopiloted(client, autopilot: nil)
+      low = state(hp:)
+      decide(p)
+      instant = outcome(:no_frontier, 0).merge(frames: 1, moved_cells: 0, cells_walked: 0)
+      (1..4).map do |n|
+        result = p.decide(p.decision_point_for(low), low, { grid: })
+        p.after_action(choice: result[:choice], outcome: instant, state: low, frame: 200 + (n * 300))
+        context = { grid: }
+        result = p.decide(p.decision_point_for(low), low, context)
+        p.after_action(choice: result[:choice], outcome: { skill: 'wait', params: { frames: 120 }, frames: 120, stopped_by: 'done' }, state: low, frame: 300 + (n * 300))
+        [result[:choice][:skill], context[:retreat]]
+      end
+    end
+    assert_equal [['wait', nil]] * 3 + [['explore', true]], answers.(8)
+    assert_equal [['wait', nil]] * 4, answers.(24), 'above one heart the waits go on'
+  end
+
   def test_repeated_zero_frame_results_in_one_place_are_answered_by_the_harness
     client = ScriptedClient.new(objective: new_place, default: explore)
     p = autopiloted(client, autopilot: nil)

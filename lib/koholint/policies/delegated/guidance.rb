@@ -243,10 +243,16 @@ module Koholint
           away = @explore_log.least_visited(place) if @zero_watch.explore? && !route
           goal = (route || away)&.dig(:goal)
           context[:aim] = { place: goal } if goal && !route&.dig(:lifted)
-          choice = goal ? EXPLORE : ZERO_WAIT
+          spot = [place, state.cell]
+          @deadlock = nil unless !goal && state.health <= Perception::HP_PER_HEART && @deadlock&.dig(:spot) == spot
+          retreat = @deadlock && @deadlock[:waits] >= DEADLOCK_WAITS
+          context[:retreat] = true if retreat
+          @deadlock = { spot:, waits: (@deadlock&.dig(:waits) || 0) + 1 } if !goal && !retreat && state.health <= Perception::HP_PER_HEART
+          choice = goal || retreat ? EXPLORE : ZERO_WAIT
           @zero_watch.capping(choice[:skill])
           what = if route then "explore toward #{goal.join('-')}, the nearest place with untried work"
                  elsif away then "no place has untried work: explore toward #{goal.join('-')}, the reachable place entered least"
+                 elsif retreat then "no way out at one heart after #{DEADLOCK_WAITS} waits: leave by the side Link came in"
                  else "wait #{ZERO_WAIT[:params][:frames]} frames before asking again"
                  end
           DecisionPoint.harness_choice(choice, "#{skill} ended #{stop} #{mark} #{count} times here: #{what}", autopilot: true)
