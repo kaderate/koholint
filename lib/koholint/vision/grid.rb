@@ -17,8 +17,7 @@ module Koholint
         static_sprites.each { |sprite| (self.class.sprite_cells(sprite) - [link]).each { |cell| @sprites[cell] ||= sprite['pattern'] } }
       end
 
-      # A sprite stands on the cells holding at least half of it each way, so one that pokes a few pixels into a cell does not wall it off;
-      # a person straddling a cell edge evenly still stands on both sides.
+      # Half of the sprite each way, so a few pixels poking into a cell do not wall it off.
       def self.sprite_cells(sprite)
         height = sprite['height'] || SPRITE_HEIGHT
         rows = halves(sprite['y'] - 16, height).select { |row| row.between?(0, ROWS - 1) }

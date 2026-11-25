@@ -52,8 +52,7 @@ class GridTest < Minitest::Test
     assert_nil grid.static_sprite(7, 9), 'a sprite mostly off the grid stands on no cell'
   end
 
-  # 81/0 (run 20261125-065151-869d, frame 101046): after the text Link stood still at (1,6) with the speaker 8 px below him; its sprites
-  # poke 7 px into row 2 and 4 px into column 5, and walled off every way but the edge that opens the text.
+  # 81/0 (run 20261125-065151-869d, frame 101046): the speaker 8 px below Link walled off every way but the edge that opens its text.
   def test_a_still_sprite_stands_only_where_it_covers_half_a_cell_and_never_on_link
     sprites = [{ 'x' => 100, 'y' => 39, 'pattern' => 'p' }, { 'x' => 108, 'y' => 39, 'pattern' => 'p' }]
     grid = Koholint::Vision::Grid.new(cells: Array.new(8) { Array.new(10) { 'floor' } }, static_sprites: sprites, beliefs: Koholint::Vision::Beliefs.new,
