@@ -892,6 +892,21 @@ class ExploreTest < Minitest::Test
     assert log.untried?(PLACE)
   end
 
+  # 66/0 in 15df: walking to a frontier opened the same dialogue on every visit, so the place stayed untried and explore came back from 65/0 each time.
+  def test_a_frontier_whose_walk_opened_a_dialogue_twice_is_no_work_on_the_next_visit
+    rows = with(CLOSED, [4, 7], '?', [1, 5], '?')
+    log = Koholint::ExploreLog.new
+    2.times do
+      result, = explore(rows, callouts: [[4, 6]], explore_log: log)
+      assert_equal :dialogue, result[:stopped_by]
+      assert_equal({ kind: :frontier, row: 4, col: 6, direction: :right }, result[:dialogue_frontier])
+      log.absorb(result)
+    end
+    assert_equal [[[4, 6], :right]], log.dialogue_frontiers(PLACE)
+    result, = explore(rows, explore_log: log, limit: 3)
+    assert_equal({ kind: :frontier, row: 2, col: 5, direction: :up }, result[:target])
+  end
+
   def test_a_dialogue_the_game_opens_on_an_outward_step_bars_that_edge
     rows = with(CLOSED, [3, 3], '?')
     result, = explore(rows, truth: with(CLOSED, [3, 3], '.'), rocks: [[3, 3]], start: Koholint::Geometry.center_of(3, 2))

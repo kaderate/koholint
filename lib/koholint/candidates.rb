@@ -53,7 +53,7 @@ module Koholint
 
         words = Dialogues.words(entry['text'])
         item, name = held.lazy.flat_map { |id| [item_names[id], *Items.pickup_text_names[id]].compact.map { |item_words| [id, item_words] } }.find do |id, item_words|
-          TalkLog.names?(words, item_words) && !talk_log.talked_holding?(where, type, id) && entry['seen'].any? { |sighting| !sighting['held'].include?(id) }
+          TalkLog.names?(words, item_words) && !talk_log.talked_holding?(where, type, id) && !talk_log.gave?(where, id) && entry['seen'].any? { |sighting| !sighting['held'].include?(id) }
         end
         next unless item
 

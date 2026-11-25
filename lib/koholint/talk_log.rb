@@ -15,12 +15,27 @@ module Koholint
       Ledger.pick(result, :talked) == true || ATTEMPT_STOPS.include?(Ledger.pick(result, :stopped_by).to_s)
     end
 
+    # An item used in front of someone that opened a dialogue and left both buttons: it was handed over.
+    def self.given(result)
+      return unless result.is_a?(Hash) && Ledger.pick(result, :stopped_by).to_s == 'dialogue'
+
+      item = Ledger.pick(result, :item)
+      item if item && !Ledger.pick(result, :item_a).eql?(item) && !Ledger.pick(result, :item_b).eql?(item)
+    end
+
     def self.from_events(events)
       log = new
       events.each do |event|
-        next unless Ledger.pick(event, :type).to_s == 'action' && Ledger.pick(event, :skill).to_s == 'talk_to'
+        next unless Ledger.pick(event, :type).to_s == 'action'
 
         result = Ledger.pick(event, :result)
+        if Ledger.pick(event, :skill).to_s == 'use_item'
+          item = given(result)
+          place = item && Ledger.place_of(Ledger.pick(result, :from))
+          log.give(place:, item:) if place
+        end
+        next unless Ledger.pick(event, :skill).to_s == 'talk_to'
+
         params = Ledger.pick(event, :params)
         place = result.is_a?(Hash) ? Ledger.place_of(Ledger.pick(result, :from)) : nil
         row = Ledger.pick(params, :row)
@@ -98,7 +113,12 @@ module Koholint
       @silent = Hash.new { |hash, key| hash[key] = [] }
       @texts = []
       @pages = {}
+      @given = []
     end
+
+    def give(place:, item:) = @given |= [[place, item]]
+
+    def gave?(place, item) = @given.include?([place, item])
 
     def remember(place:, cell:, text:, stamp:, entity: nil, conversation: nil, speaker: nil)
       key = Dialogues.key(text)

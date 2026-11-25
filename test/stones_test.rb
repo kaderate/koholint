@@ -264,6 +264,35 @@ class StonesTest < Minitest::Test
     assert_includes [room.objects[2][5], room.objects[4][5]], FIXED
     assert_equal FLOOR, room.objects[3][6]
   end
+  # Gate run 1d73, 171/10: walks into cells pushes had emptied left the stone's look believed walkable, so routes ran through stones.
+  class StaleGrid < LiveGrid
+    def passable(row, col, _direction) = @rows[row][col] == '#' ? :no : :yes
+  end
+
+  def test_a_stone_believed_walkable_is_still_opened_with_the_pushes_the_search_found
+    room = Room.new(JAM, start: at([3, 1]), exits: [[[3, 9], :right]])
+    result, = play('explore', {}, room, JAM, limit: 1500, grid: StaleGrid.new(room, JAM))
+    assert_equal :push, result.dig(:target, :kind), result.slice(:stopped_by, :target).inspect
+  end
+
+  # A push ends its call (stopped_by pushed), so the next call reads the stones afresh: the vacated cell is open, the landed stone is not.
+  def test_after_a_push_the_next_call_walks_through_the_vacated_cell_and_never_into_the_landed_stone
+    room = Room.new(JAM, start: at([3, 1]), exits: [[[3, 9], :right]])
+    results = []
+    6.times do
+      break if room.room_id == 2
+
+      result, = play('explore', {}, room, JAM, limit: 1500, grid: StaleGrid.new(room, JAM))
+      results << result
+    end
+    assert_equal :pushed, results.first[:stopped_by]
+    landed = [[2, 5], [4, 5]].find { |cell| room.objects.dig(*cell) == FIXED }
+    crossed = results.drop(1).flat_map { |result| result[:crossed] }
+    assert_equal 2, room.room_id, results.map { |r| r.slice(:stopped_by, :target) }.inspect
+    assert(crossed.any? { |row, col, _| [row, col] == [3, 5] }, 'the vacated cell is walked through')
+    refute(crossed.any? { |row, col, direction| Koholint::Geometry.step([row, col], direction) == landed }, 'the landed stone is never walked into')
+  end
+
   class StuckRoom < Room
     private
 

@@ -22,14 +22,18 @@ module Koholint
                 left: ->(_row, col) { col.zero? }, right: ->(_row, col) { col == Geometry::COLS - 1 } }.freeze
 
       class Known
-        def initialize(grid, walked)
+        # A stone's look is believed walkable from the walks into cells a push emptied, so a stone on screen is never walked into.
+        def initialize(grid, walked, stones = [])
           @grid = grid
           @walked = walked
+          @stones = stones
         end
 
         def static_sprite(row, col) = @grid.static_sprite(row, col)
 
         def passable(row, col, direction)
+          return :no if @stones.include?([row, col])
+
           belief = @grid.passable(row, col, direction)
           belief != :no && @walked.include?([row, col]) ? :yes : belief
         end
@@ -69,10 +73,11 @@ module Koholint
           @ledger = context[:ledger]
           @talk_log = context[:talk_log]
           @log = context[:explore_log]
-          @walked = ((@log ? @log.walked(@place) | @log.stood(@place) : []) - stone_cells(context)) | [@start.cell].compact
+          stones = stone_cells(context)
+          @walked = ((@log ? @log.walked(@place) | @log.stood(@place) : []) - stones) | [@start.cell].compact
           @fresh = @log && !@log.surveyed?(@place)
           grid = context[:grid]
-          @known = grid && Known.new(grid, @walked)
+          @known = grid && Known.new(grid, @walked, stones - [@start.cell])
           @planner = @known && Navigation::Planner.new(grid: @known, ledger: @ledger, place: @place, triggers: context[:triggers], mode: :free_only, danger: danger_of(context), pushable: pushable_of(context, stones: false), contact: contact_of(context), away: away_of(context))
           @pushable = Array(pushable_of(context)&.call)
           @grid = grid
@@ -96,7 +101,7 @@ module Koholint
           @knocked_edges = []
           @since_knock = KNOCK_FRAMES + 1
           @crossed = []
-          @excluded = []
+          @excluded = @log ? @log.dialogue_frontiers(@place) : []
           # Runs without the capability logged clearable objects as walls.
           @failed = @log ? @log.failed_clears(@place) : []
           @walls = (@log ? @log.walls(@place) : []) - (Array(@clearing&.cells&.keys) - @failed)
@@ -109,7 +114,7 @@ module Koholint
           @found = false
           @legs = 0
           @locked = 0
-          @leg = @outward = @target = @stop = @heading = @idle = @fail_cause = nil
+          @leg = @outward = @target = @stop = @heading = @idle = @fail_cause = @dialogue_frontier = nil
         end
 
         def result(state = @last)
@@ -126,6 +131,7 @@ module Koholint
           merged[:dead_end] = true if @dead_end
           merged[:failed_push] = @failed_push if @failed_push
           merged[:too_heavy] = @too_heavy if @too_heavy
+          merged[:dialogue_frontier] = @dialogue_frontier if @dialogue_frontier
           merged[:stone_search] = 'cut short' if @search_cut
           merged[:cause] = @fail_cause if @stopped_by == :blocked && @fail_cause
           merged[:untried_objects] = @untried.map { |row, col| { row:, col: } } if @stopped_by == :untried_object
@@ -192,6 +198,7 @@ module Koholint
             block(edge)
             @too_heavy = edge if unprompted?(Geometry.step(@cell, @heading))
           end
+          @dialogue_frontier = target_summary if @target&.dig(:kind) == :frontier
           stop_now(:dialogue)
         end
 

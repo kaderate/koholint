@@ -68,7 +68,7 @@ is the threat interface; `navigation/stones.rb` searches the pushes that open a 
 `composite` (learned capabilities). Every skill reports how it stopped (`done`, `blocked`, `no_path`, …).
 `explore_log.rb` keeps per place what explore walked, the exits and doors tried and their destinations, surveys and the exit
 graph, and cuts a way found unreachable from the landing Link entered by (dropped when Link leaves a room where a stone was pushed); `ledger.rb` counts blocked edges, `triggers.rb` forbids inputs that re-fire a scripted event, `talk_log.rb` remembers
-what each person and sign said, `revisit.rb` drives the harness's own talks to people, signs and chests, and `dialogues.rb`
+what each person and sign said and which items were handed over where, `healers.rb` finds the places where a talk raised Link's hp, `revisit.rb` drives the harness's own talks to people, signs and chests, and `dialogues.rb`
 stitches dialogue pages into texts. Their behaviour per flow is in `docs/AGENT_SKILLS.md`.
 
 **Exit graph and puzzles** (`explore_log.rb`) — every crossing is an observation `(place, way) -> place`. A first crossing that

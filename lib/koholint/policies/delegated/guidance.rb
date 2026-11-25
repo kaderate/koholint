@@ -219,6 +219,7 @@ module Koholint
           end
 
           @loop_watch.act!
+          note_dropped(@objectives.current)
           @objectives.abandon(frame: state.frame, reason: 'loop')
           objective = away ? { title: "Leave the loop for #{away[:goal].join('-')}, the reachable place entered least", predicate: { kind: 'reach_place', place: away[:goal] } } : AUTO_OBJECTIVE
           @objectives.start(frame: state.frame, **objective, target: ({ kind: 'place', place: away[:goal] } if away), autopilot: true)
@@ -230,6 +231,56 @@ module Koholint
                  else "explore #{route ? "toward #{goal.join('-')}" : 'here'}, the nearest place with untried work outside the loop"
                  end
           DecisionPoint.harness_choice(choice, "#{LoopWatch::BREAK} #{hint[:places].join(', ')}: #{what}", autopilot: true)
+        end
+
+        # A delivery the loop break dropped is a lead the loop says nothing about, so it is taken up again once the loop is cut, REOFFERS times at most.
+        def note_dropped(objective, any: false)
+          return unless objective && (any || DROPPED.any? { |prefix| objective[:candidate].to_s.start_with?(prefix) })
+
+          @dropped = objective.slice(:title, :predicate, :candidate, :target)
+        end
+
+        # Taken up once per drop, and only while the menu still offers it: a delivery that fired retires its candidate.
+        def dropped_objective(decision_point, state, context)
+          return unless @dropped && decision_point.name == :choose_objective && !@loop_watch.pending_hint
+
+          objective = @dropped
+          @dropped = nil
+          key = objective[:candidate] || objective[:title]
+          return if @reoffers[key] >= REOFFERS
+          return if objective[:candidate] && build_candidates(state, context).none? { |candidate| candidate[:id] == objective[:candidate] }
+
+          @reoffers[key] += 1
+          @objectives.start(frame: state.frame, **objective, autopilot: true)
+          @autopilot&.adopt(@objectives.current)
+          DecisionPoint.harness_choice(objective.slice(:title, :predicate), "the loop is cut: #{key}, set aside, is taken up again (#{@reoffers[key]}/#{REOFFERS})", autopilot: true)
+        end
+
+        # At one heart or less, a route to the objective through a place where enemies were seen first goes to the nearest place a talk healed Link;
+        # the objective is taken up again afterwards. A place card with one person or unknown thing names who to talk to there.
+        def heal_detour(decision_point, state, context)
+          return unless decision_point.name == :choose_skill && !@sequence && state.health <= Perception::HP_PER_HEART && state.max_hp.to_i > state.health
+
+          current = @objectives.current or return
+          return if current[:heal] || @heal_detours >= HEAL_DETOURS
+
+          goal = current.dig(:predicate, :place) or return
+          hops = @explore_log.path(state.place, goal:) or return
+          return unless hops.any? { |hop| Array(@cards.dig(hop[:to], :enemies)).any? }
+
+          place, = (@healers.places - [state.place]).filter_map { |at| [at, @explore_log.path(state.place, goal: at)] }.select(&:last).min_by { |_, path| path.size }
+          return unless place
+
+          @heal_detours += 1
+          note_dropped(current, any: true)
+          @objectives.abandon(frame: state.frame, reason: 'heal')
+          who = Array(@cards.dig(place, :people)) + Array(@cards.dig(place, :unknown))
+          target = (who.size == 1 ? { kind: 'person', place:, type: who.first[:type], cell: who.first[:cell] } : { kind: 'place', place: }).merge(heal_below: state.health)
+          @objectives.start(frame: state.frame, title: "Heal in #{place.join('-')}, where a talk healed Link before", predicate: { kind: 'reach_place', place: }, target:, autopilot: true)
+          @objectives.current[:heal] = true
+          @autopilot&.adopt(@objectives.current)
+          context[:aim] = { place: }
+          DecisionPoint.harness_choice(EXPLORE, "#{state.health} hp and the way to #{goal.join('-')} crosses enemies: heal in #{place.join('-')} first (#{@heal_detours}/#{HEAL_DETOURS})", autopilot: true)
         end
 
         def zero_cap(decision_point, state, context)
@@ -249,7 +300,10 @@ module Koholint
           zone = !goal && state.cell ? Entities.danger_cells(entities_now) : []
           pressed = ([state.cell] + Geometry::DELTAS.values.map { |dr, dc| [state.cell[0] + dr, state.cell[1] + dc] }).intersect?(zone) if zone.any?
           retreat = @retreated&.dig(:spot) != spot && (pressed || (low && @deadlock && @deadlock[:waits] >= DEADLOCK_WAITS))
+          return guarded(state, context) if retreat && retreats(state) >= RETREAT_CAP
           @retreated = { spot:, hp: state.health } if retreat
+          side = Array(@explore_log.entered(place)).flatten.join('-')
+          @retreats << [place, side, state.frame] if retreat
           context[:retreat] = true if retreat
           @deadlock = { spot:, waits: (@deadlock&.dig(:waits) || 0) + 1 } if low && !retreat
           choice = goal || retreat ? EXPLORE : ZERO_WAIT
@@ -260,7 +314,27 @@ module Koholint
                  elsif retreat then "no way out at one heart after #{DEADLOCK_WAITS} waits: leave by the side Link came in"
                  else "wait #{ZERO_WAIT[:params][:frames]} frames before asking again"
                  end
+          what = "#{what} (retreat by the #{side} side)" if retreat
           DecisionPoint.harness_choice(choice, "#{skill} ended #{stop} #{mark} #{count} times here: #{what}", autopilot: true)
+        end
+
+        def retreats(state)
+          came = Array(@explore_log.entered(state.place)).flatten.join('-')
+          @retreats.count { |place, side, frame| place == state.place && side == came && state.frame - frame < RETREAT_WINDOW }
+        end
+
+        # Sent back by the same side of the same place RETREAT_CAP times within RETREAT_WINDOW frames, the way is guarded: the objective is set
+        # aside (taken up again later) and explore heads for work elsewhere instead of coming back to retreat again.
+        def guarded(state, context)
+          place = state.place
+          @notes << { kind: 'stuck', detail: "guarded: sent back by the #{@explore_log.entered(place)} side of #{place.join('-')} #{RETREAT_CAP} times in #{RETREAT_WINDOW} frames" }
+          note_dropped(@objectives.current, any: true)
+          @objectives.abandon(frame: state.frame, reason: 'guarded')
+          @objectives.start(frame: state.frame, **AUTO_OBJECTIVE, autopilot: true)
+          @autopilot&.adopt(@objectives.current)
+          route = @explore_log.route(place, skip: [place])
+          context[:aim] = { place: route[:goal] } if route && !route[:lifted]
+          DecisionPoint.harness_choice(EXPLORE, "#{place.join('-')} is guarded (#{RETREAT_CAP} retreats in #{RETREAT_WINDOW} frames): explore #{route ? "toward #{route[:goal].join('-')}" : 'elsewhere'}", autopilot: true)
         end
 
         # A person whose recorded text names an item Link holds, by the words of its pickup text, is tried with it: talk while holding it,

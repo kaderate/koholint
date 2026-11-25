@@ -227,7 +227,7 @@ module Koholint
       target = predicate[:place]
       case predicate[:kind].to_s
       when 'leave_place' then place != target
-      when 'reach_place' then place == target && (!@current.dig(:target, :try) || @tried)
+      when 'reach_place' then place == target && (!@current.dig(:target, :try) || @tried) && state.health > @current.dig(:target, :heal_below).to_i
       when 'reach_cell' then place == target && cell == [predicate[:row], predicate[:col]]
       when 'dialogue_closed' then @dialogue_seen && !state.dialog_open?
       when 'new_place' then first_visit
