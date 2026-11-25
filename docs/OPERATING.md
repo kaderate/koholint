@@ -60,7 +60,7 @@ place, so the grid went dark). The live view has a grid toggle that overlays the
 
 **Resume and fork.** `resume` continues a run with the same `flow_version` and ROM hash and rebuilds the ledger and
 visited places from the trace; `fork` branches a run at a frame (the parent may be of an older flow; `--tag`, `--autopilot` and `--root` set the child's). Both work on an archived run, also on a fresh clone
-(see Run storage). `branch <run_dir> --at FRAME|CHECKPOINT` forks, starts `watch` on the child (`--port`, `--host`,
+(see Run storage). A fork of a run without keyframes or saves replays once from boot (about half an hour to frame 57519 on the Mac), rebuilding the missing saves and leaving keyframes in the parent's local `keyframes/` (every 1800 frames, at each save and the frame before the fork); a later fork of that run, or a resume of the child, starts from them in under a second. `branch <run_dir> --at FRAME|CHECKPOINT` forks, starts `watch` on the child (`--port`, `--host`,
 `--speed`) and resumes it with the `resume` options (`--agent`, budgets) in one command, then stops the viewer and exits;
 `--keep-viewer` keeps it serving after the stop until Ctrl-C (if it could not start, for example on a busy port, `branch` says so and still plays). A checkpoint is a name from `data/checkpoints.json` (`name`, `run`, `frame`, `flow`, `source`),
 checked against the run id and its flow, e.g. `bin/koholint branch runs/20261111-194737-9ba1 --at sword-obtained --frames 3000`.

@@ -20,17 +20,19 @@ module Koholint
         held, idle = schedule(method, frames)
         bytes = emulator.dump
         probe = Emulator.restore(bytes)
-        control = Emulator.restore(bytes)
         before = Perception.read(probe)
-        held.times do
-          probe.step([direction])
-          control.step
-        end
-        idle.times do
-          probe.step
-          control.step
-        end
-        summarize(direction, before, Perception.read(probe), Perception.read(control), held + idle)
+        held.times { probe.step([direction]) }
+        idle.times { probe.step }
+        summarize(direction, before, Perception.read(probe), control(bytes, held + idle), held + idle)
+      end
+
+      # The idle control run from one state is the same for every direction probed from it, so the last one is kept.
+      def control(bytes, frames)
+        return @control[:after] if @control && @control[:frames] == frames && @control[:bytes] == bytes
+
+        emulator = Emulator.restore(bytes)
+        frames.times { emulator.step }
+        (@control = { bytes:, frames:, after: Perception.read(emulator) })[:after]
       end
 
       def schedule(method, frames)

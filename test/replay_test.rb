@@ -52,7 +52,8 @@ class ReplayTest < Minitest::Test
       before = Dir.glob("#{run.dir}/**/*").select { |f| File.file?(f) }.to_h { |f| [f, File.binread(f)] }
       child = run.fork(at_frame: 600, flow_version: 'f2')
       after = Dir.glob("#{run.dir}/**/*").select { |f| File.file?(f) }.to_h { |f| [f, File.binread(f)] }
-      assert_equal before, after
+      assert_equal before, after.slice(*before.keys)
+      assert_equal [File.join(run.dir, 'keyframes', 'kf-000000599.zlib')], after.keys - before.keys
       assert_equal 600, child.inputs.frames
       assert_equal({ 'id' => run.id, 'frame' => 600 }, child.manifest['parent'])
       assert_equal 'f2', child.manifest['flow_version']

@@ -1,9 +1,12 @@
 require 'fileutils'
+require 'securerandom'
 require 'zlib'
 require 'koholint/emulator'
 
 module Koholint
   class Keyframes
+    EVERY = 1800
+
     def initialize(dir)
       @dir = dir
       FileUtils.mkdir_p(dir)
@@ -11,8 +14,11 @@ module Koholint
 
     def save(emulator)
       path = File.join(@dir, format('kf-%09d.zlib', emulator.frame))
-      File.binwrite("#{path}.tmp", Zlib::Deflate.deflate(emulator.dump))
-      File.rename("#{path}.tmp", path)
+      return path if File.exist?(path)
+
+      tmp = "#{path}.#{Process.pid}-#{SecureRandom.hex(4)}.tmp"
+      File.binwrite(tmp, Zlib::Deflate.deflate(emulator.dump))
+      File.rename(tmp, path)
       path
     end
 

@@ -106,13 +106,16 @@ module Koholint
       child = self.class.create(root:, flow_version:, budget: manifest['budget'], parent: { 'id' => id, 'frame' => at_frame }, seed: manifest['seed'],
                                 rom_path:, **inherited)
       journal = InputLog.new(File.join(child.dir, 'inputs.log'))
-      inputs.each_frame.first(at_frame).each { |buttons| journal.append(buttons) }
+      frames = inputs.each_frame.first(at_frame)
+      frames.each { |buttons| journal.append(buttons) }
       journal.flush
       events = Trace.read(File.join(dir, 'trace.jsonl')).select do |event|
         event['frame'] < at_frame && !%w[stop budget_stop].include?(event['type'])
       end
       rewrite_trace(File.join(child.dir, 'trace.jsonl'), events)
-      events.select { |event| event['type'] == 'save' }.each { |event| copy_save(event, File.join(child.dir, 'save')) }
+      saves, missing = events.select { |event| event['type'] == 'save' }.partition { |event| File.file?(File.join(dir, 'save', event['path'])) }
+      saves.each { |event| FileUtils.cp(File.join(dir, 'save', event['path']), File.join(child.dir, 'save')) }
+      rebuild(frames, missing, at_frame, File.join(child.dir, 'save'), rom_path)
       Dir.glob(File.join(dir, 'keyframes', 'kf-*.zlib')).each do |path|
         FileUtils.cp(path, File.join(child.dir, 'keyframes')) if File.basename(path)[/\d+/].to_i <= at_frame
       end
@@ -197,15 +200,30 @@ module Koholint
 
     def decided_at_resume?(event) = %w[perception decision lead goal].include?(event['type']) || (event['type'] == 'notable' && %w[death lead_rejected not_ready_wait revisit].include?(event['kind']))
 
-    def copy_save(event, into)
-      path = File.join(dir, 'save', event['path'])
-      return FileUtils.cp(path, into) if File.file?(path)
+    # One pass from the nearest local keyframe rebuilds the missing saves and keyframes the frame before the fork, where a resume starts.
+    def rebuild(frames, saves, at_frame, into, rom_path)
+      require 'koholint/keyframes'
+      local = Keyframes.new(File.join(dir, 'keyframes'))
+      targets = saves.map { |event| [event['frame'], event] }
+      targets << [at_frame - 1, nil] if at_frame.positive?
+      emulator = nil
+      targets.sort_by(&:first).each do |frame, save|
+        nearest = local.nearest_at_or_before(frame)
+        if emulator.nil? || emulator.frame > frame || (nearest && nearest.first > emulator.frame)
+          emulator = nearest ? Keyframes.load(nearest.last) : Emulator.boot(rom_path)
+        end
+        while emulator.frame < frame
+          emulator.step(frames.fetch(emulator.frame))
+          local.save(emulator) if (emulator.frame % Keyframes::EVERY).zero?
+        end
+        local.save(emulator) unless nearest&.first == frame
+        next unless save
 
-      require 'koholint/replay'
-      ram = Replay.to(self, event['frame']).cartridge_ram
-      raise Error, "save #{event['path']} of run #{id} cannot be rebuilt by replay" unless Digest::SHA256.hexdigest(ram) == event['sav_sha256']
+        ram = emulator.cartridge_ram
+        raise Error, "save #{save['path']} of run #{id} cannot be rebuilt by replay" unless Digest::SHA256.hexdigest(ram) == save['sav_sha256']
 
-      File.binwrite(File.join(into, event['path']), ram)
+        File.binwrite(File.join(into, save['path']), ram)
+      end
     end
 
     def wall_clock = Time.now.to_f

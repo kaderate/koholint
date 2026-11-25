@@ -32,6 +32,21 @@ class WalkProbeTest < Minitest::Test
     DIRECTIONS.each { |direction| %i[tap hold].each { |method| refute probe(direction, method:)[:inconclusive] } }
   end
 
+  def test_probes_from_one_state_share_one_control_run_and_give_the_same_results
+    evict = -> { Koholint::Calibration::WalkProbe.run(EmulatorCache.playable, direction: :up, method: :tap) }
+    cold = DIRECTIONS.to_h do |direction|
+      evict.call
+      before = FrameCount.frames
+      [direction, [probe(direction, method: :hold), FrameCount.frames - before]]
+    end
+    evict.call
+    before = FrameCount.frames
+    warm = DIRECTIONS.to_h { |direction| [direction, probe(direction, method: :hold)] }
+    assert_equal cold.transform_values(&:first), warm
+    assert_equal [260] * 4, cold.values.map(&:last)
+    assert_equal 650, FrameCount.frames - before
+  end
+
   def test_probe_leaves_the_emulator_untouched
     hash = @emulator.state_hash
     frame = @emulator.frame

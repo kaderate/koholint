@@ -14,7 +14,7 @@ High-level architecture: `ARCHITECTURE.md` (update it in the same commit as any 
 - Time is the frame. No `sleep`, no wall clock in game logic; wait for a state condition.
 - The ROM and the game manual are never committed (`$KOHOLINT_ROM`, `manual/`).
 - CI runs the whole suite with the ROM on every pull request (`rom` shards) and the ROM-free set (`rake test:ci`); locally, `rake test:fast` and targeted files, no full `rake test` before a merge.
-- Only the engine writes a run's `trace.jsonl` and `save/`. A run resumes only with the same
+- Only the engine writes a run's `trace.jsonl` and `save/`; a fork may add keyframes to its parent's git-ignored `keyframes/` as a cache. A run resumes only with the same
   `flow_version`, ROM hash, capabilities digest (the operational entries of `data/capabilities.json`) and exits digest (the
   measured edges and benches of `data/exits.json`). A change to the play flow in code means a new `flow_version`; publishing or
   retiring a capability, or running the exit bench, changes a digest, never `flow_version`.

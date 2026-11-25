@@ -159,6 +159,48 @@ class ResilienceTest < Minitest::Test
     end
   end
 
+  def test_a_fork_rebuilds_missing_saves_in_one_pass_and_its_child_resumes_from_a_keyframe
+    skip_without_rom!
+    with_run do |_dir, run|
+      new_engine(run, budget: Koholint::Budget.new(frames: 300), keyframe_every: 120).run
+      FileUtils.rm_rf(File.join(run.dir, 'save'))
+      Dir.glob(File.join(run.dir, 'keyframes', '*')).reject { |path| path.end_with?('kf-000000120.zlib') }.each { |path| File.delete(path) }
+      before = FrameCount.frames
+      child = run.fork(at_frame: 250, flow_version: FLOW)
+      saves = Koholint::Trace.read(File.join(child.dir, 'trace.jsonl')).select { |e| e['type'] == 'save' }
+      assert_equal [60], saves.map { |save| save['frame'] }
+      assert_equal 60 + (249 - 120), FrameCount.frames - before, 'one pass, reloading kf-120 after the save at 60'
+      assert_equal %w[60 120 249], Dir.children(File.join(run.dir, 'keyframes')).map { |name| name[/\d+/].to_i.to_s }.sort_by(&:to_i)
+      saves.each { |save| assert_equal save['sav_sha256'], Digest::SHA256.file(File.join(child.dir, 'save', save['path'])).hexdigest }
+      assert_equal 249, Koholint::Keyframes.new(File.join(child.dir, 'keyframes')).nearest_at_or_before(249)&.first
+      booted = Koholint::Emulator.boot
+      run.inputs.each_frame.first(249).each { |buttons| booted.step(buttons) }
+      assert_equal booted.state_hash, Koholint::Replay.to(child, 249).state_hash
+      Koholint::Engine.resume(child.dir, policy: Koholint::Policies::WalkAndTalk.new, budget: Koholint::Budget.new(frames: 30)).run
+      assert_equal [], Koholint::Replay.verify(Koholint::Run.open(child.dir, flow_version: FLOW), every: 60).reject(&:last)
+    end
+  end
+
+  def test_a_fork_keyframes_its_parent_every_1800_frames_on_the_way
+    skip_without_rom!
+    with_run do |_dir, run|
+      journal = Koholint::InputLog.new(File.join(run.dir, 'inputs.log'))
+      1900.times { journal.append([]) }
+      journal.flush
+      before = FrameCount.frames
+      child = run.fork(at_frame: 1900, flow_version: FLOW)
+      assert_equal 1899, FrameCount.frames - before
+      assert_equal %w[kf-000001800.zlib kf-000001899.zlib], Dir.children(File.join(run.dir, 'keyframes')).sort
+      assert_equal %w[kf-000001800.zlib kf-000001899.zlib], Dir.children(File.join(child.dir, 'keyframes')).sort
+      booted = Koholint::Emulator.boot
+      1800.times { booted.step([]) }
+      assert_equal booted.state_hash, Koholint::Keyframes.load(File.join(run.dir, 'keyframes', 'kf-000001800.zlib')).state_hash
+      again = FrameCount.frames
+      run.fork(at_frame: 1900, flow_version: FLOW)
+      assert_equal again, FrameCount.frames, 'a second fork replays nothing'
+    end
+  end
+
   def test_fork_fails_clearly_when_a_missing_save_does_not_replay
     skip_without_rom!
     with_run do |_dir, run|

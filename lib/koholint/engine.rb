@@ -47,7 +47,7 @@ module Koholint
       new(run: run, policy: policy, budget: budget, emulator:, previous:, **options)
     end
 
-    def initialize(run:, policy:, budget:, keyframe_every: 1800, decision_point: DecisionPoint.move, emulator: nil, pacer: nil, grid: false,
+    def initialize(run:, policy:, budget:, keyframe_every: Keyframes::EVERY, decision_point: DecisionPoint.move, emulator: nil, pacer: nil, grid: false,
                    previous: nil)
       @run = run
       @policy = policy
