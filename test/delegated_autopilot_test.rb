@@ -681,6 +681,24 @@ class DelegatedAutopilotTest < Minitest::Test
     assert_equal({ choice: { skill: 'touch', params: { row: 3, col: 4, type: 132 } } }, p.send(:follow_choice, state))
   end
 
+  def test_a_person_whose_text_named_a_held_item_becomes_the_objective_talked_to_holding_it_then_given_it
+    here = [state.room_id, state.map_id]
+    entities = [{ type: 64, kind: 'person', cell: [3, 4] }]
+    p = autopiloted(ScriptedClient.new(objective: []))
+    p.instance_variable_set(:@entities_reader, -> { entities })
+    p.instance_variable_set(:@item_names, { 12 => %w[Champignon] })
+    talk_log = p.instance_variable_get(:@talk_log)
+    talk_log.remember(place: here, cell: [3, 4], text: 'Il me faut le Champignon de la forêt.', stamp: Koholint::Dialogues.stamp(milestone: :sword, items: [1, 4], leads: 0), entity: 64)
+    holding = state(inventory: [12] + Array.new(9, 0))
+    assert_nil p.send(:item_objective, p.decision_point_for(state), state), 'not while Link does not hold it'
+    picked = p.send(:item_objective, p.decision_point_for(holding), holding)
+    assert picked[:autopilot]
+    assert_equal({ kind: 'person', place: here, type: 64, cell: [3, 4], try: true, item: 12, name: 'Champignon' }, @objectives.current[:target])
+    assert_equal({ choice: { skill: 'talk_to', params: { row: 3, col: 4 } } }, p.send(:follow_choice, holding))
+    @objectives.note_try(place: here, type: 64, skill: 'talk_to', answered: true)
+    assert_equal({ choice: { skill: 'use_item', params: { item: Koholint::Items.name(12) } } }, p.send(:follow_choice, holding))
+  end
+
   # Run 20261125-175039-96c6, 83/0: the thing spoke as Link walked up to it, so talk_to stopped on that dialogue without a talk of its own.
   def test_a_dialogue_that_stops_the_talk_to_a_thing_to_try_is_its_answer
     here = [state.room_id, state.map_id]

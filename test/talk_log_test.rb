@@ -23,6 +23,20 @@ class TalkLogTest < Minitest::Test
     assert_equal [[[1, 1]], [[2, 2]]], Koholint::TalkLog.objects(grid([sprite(1, 1), sprite(2, 2)]))
   end
 
+  def test_people_whose_texts_name_an_item_are_found_once_and_known_as_asked_holding_it
+    log = Koholint::TalkLog.new
+    before = Koholint::Dialogues.stamp(milestone: :sword, items: [1, 4], leads: 0)
+    2.times { log.remember(place: PLACE, cell: [2, 3], text: 'Il me faut le Champignon de la forêt.', stamp: before, entity: 64) }
+    log.remember(place: [3, 0], cell: [1, 1], text: 'Bonjour, petit!', stamp: before, entity: 70)
+    log.remember(place: [4, 0], cell: [5, 5], text: 'Un champignon!', stamp: before)
+    assert_equal [[PLACE, 64, [2, 3]]], log.mentioning(%w[Champignon])
+    assert_empty log.mentioning(%w[Champignon Doré])
+    assert_empty log.mentioning([])
+    refute log.talked_holding?(PLACE, 64, 12)
+    log.remember(place: PLACE, cell: [2, 3], text: 'Merci!', stamp: Koholint::Dialogues.stamp(milestone: :sword, items: [1, 4, 12], leads: 0), entity: 64)
+    assert log.talked_holding?(PLACE, 64, 12)
+  end
+
   def test_counts_map_a_cell_to_its_object
     log = Koholint::TalkLog.new
     log.record(place: PLACE, row: 3, col: 5, talked: true)

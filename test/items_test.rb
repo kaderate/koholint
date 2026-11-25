@@ -53,6 +53,17 @@ class ItemsTest < Minitest::Test
     end
   end
 
+  def test_a_gained_item_is_named_by_the_capitalised_words_of_its_pickup_text_read_just_before_at_its_place
+    assert_equal %w[Champignon], Items.name_words('Tu as trouvé le Champignon! Il sent bon.')
+    assert_equal %w[Clé Dorée], Items.name_words('Tu as la Clé Dorée.')
+    events = [{ 'type' => 'dialogue', 'frame' => 100, 'place' => [80, 0], 'text' => 'Tu as trouvé le Champignon!' },
+              { 'type' => 'item_gained', 'frame' => 400, 'place' => [80, 0], 'item' => 12 },
+              { 'type' => 'dialogue', 'frame' => 500, 'place' => [81, 0], 'text' => 'Tu as la Clé Dorée.' },
+              { 'type' => 'item_gained', 'frame' => 520, 'place' => [82, 0], 'item' => 13 },
+              { 'type' => 'item_gained', 'frame' => 2000, 'place' => [81, 0], 'item' => 14 }]
+    assert_equal({ 12 => %w[Champignon] }, Items.pickup_names(events), 'only a text at the place of the gain, at most PICKUP_FRAMES before it')
+  end
+
   def test_held_items_cover_both_buttons_and_the_slots
     held = state(item_b: 4, inventory: [0, 0, 2, 0, 0, 0, 0, 0, 0, 0])
     assert_equal [4, 2], Items.held(held)
