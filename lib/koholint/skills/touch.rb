@@ -1,3 +1,4 @@
+require 'koholint/entities'
 require 'koholint/items'
 require 'koholint/skills/goto'
 
@@ -13,10 +14,12 @@ module Koholint
       HOLD_FRAMES = 60
 
       class Run < Goto::Run
-        def initialize(type:, thing:, safe: false, **rest)
+        def initialize(type:, thing:, safe: false, slot: nil, **rest)
           @type = type
           @thing = thing
           @safe = safe
+          @slot = slot
+          @entities = rest[:context][:entities] if slot
           @sides = []
           @hold = nil
           super(**rest)
@@ -30,7 +33,8 @@ module Koholint
             @frames += 1
             return off
           end
-          return begin_landing(state) if !@landing && !@stopped_by && state.health > @start.health
+          return begin_landing(state) if !@landing && !@stopped_by && (state.health > @start.health || (gone? && state.pending_heal.to_i.positive?))
+          return end_touch(:target_gone) if !@landing && !@stopped_by && gone?
           return land(state) if @landing
           return hold(state) if @holding
 
@@ -56,6 +60,9 @@ module Koholint
         def initial_plan = next_side(@start.cell)
 
         def strict? = @safe
+
+        # The aimed slot no longer holds the thing: taken, despawned or replaced.
+        def gone? = @entities && Array(@entities.call).none? { |entity| entity[:slot] == @slot && entity[:type] == @type }
 
         # The nearest cell next to the thing that a path reaches, among the sides not held yet; holding from it faces the thing.
         def next_side(from)
@@ -145,25 +152,27 @@ module Koholint
           properties: { row: { type: 'integer', minimum: 0, maximum: Geometry::ROWS - 1 },
                         col: { type: 'integer', minimum: 0, maximum: Geometry::COLS - 1 },
                         type: { type: 'integer', minimum: 0, maximum: 255 },
-                        safe: { type: 'boolean' } },
+                        safe: { type: 'boolean' },
+                        slot: { type: 'integer', minimum: 0, maximum: Entities::SLOTS - 1 } },
           required: %w[row col type], additionalProperties: false }
       end
 
       def normalize(params)
-        params = Skills.symbolize(params, %i[row col type safe])
+        params = Skills.symbolize(params, %i[row col type safe slot])
         raise ArgumentError, "touch: row must be 0..#{Geometry::ROWS - 1}" unless params[:row].is_a?(Integer) && params[:row].between?(0, Geometry::ROWS - 1)
         raise ArgumentError, "touch: col must be 0..#{Geometry::COLS - 1}" unless params[:col].is_a?(Integer) && params[:col].between?(0, Geometry::COLS - 1)
         raise ArgumentError, 'touch: type must be 0..255' unless params[:type].is_a?(Integer) && params[:type].between?(0, 255)
 
         raise ArgumentError, 'touch: safe must be true or false' unless [nil, true, false].include?(params[:safe])
+        raise ArgumentError, "touch: slot must be 0..#{Entities::SLOTS - 1}" unless params[:slot].nil? || (params[:slot].is_a?(Integer) && params[:slot].between?(0, Entities::SLOTS - 1))
 
-        { row: params[:row], col: params[:col], type: params[:type], **(params[:safe] ? { safe: true } : {}) }
+        { row: params[:row], col: params[:col], type: params[:type], **(params[:safe] ? { safe: true } : {}), **(params[:slot] ? { slot: params[:slot] } : {}) }
       end
 
       def start(state, params, context = {})
         params = normalize(params)
         thing = [params[:row], params[:col]]
-        Run.new(skill: name, params:, state:, target: thing, thing:, type: params[:type], safe: params[:safe] || false, context:)
+        Run.new(skill: name, params:, state:, target: thing, thing:, type: params[:type], safe: params[:safe] || false, slot: params[:slot], context:)
       end
     end
   end

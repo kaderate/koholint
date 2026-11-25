@@ -146,9 +146,11 @@ The skills, protocols and harness behaviours the agent works with. Versioned wit
   in at most one frame is answered by the harness at the next decision, not after three, since from the same cell it would find none again.
 - flow-92: below full health (`health < max_hp`, one heart or less included) the harness walks to a heart on screen with no model call, right after
   the disengage step and before any fight: the nearest entity whose catalogued `heals` is verified (type 45), visible (a still sprite on its cell,
-  whose background tile was walked before; a heart hidden under a pot or a bush has no sprite) and outside every enemy contact zone, by a
-  safe touch, which walks to a cell beside it on a route that never crosses a contact zone (or gives up) and holds into it; any heal
-  settles a touch at once, so no other side is tried. Each slot is aimed at once per visit of a place, 2 at most per visit.
+  whose background tile was walked before; a heart hidden under a pot or a bush has no sprite) and outside every enemy contact zone (a cell wider at
+  one heart or less, as the planner draws them then), by a safe touch of its slot, which walks to a cell beside it on a route that never
+  crosses a contact zone (or gives up) and holds into it; any heal settles a touch at once, so no other side is tried, and the touch ends
+  `target_gone` when the slot stops holding the heart with no heal counted. A pickup that ends `done` or `target_gone` keeps the
+  autopilot chain going, as if the touch had not happened. Each slot is aimed at once per visit of a place, 2 at most per visit.
 - flow-91: no skill stands on floor that gives way past its time. The game counts the frames the cell under Link's foot point
   (`link_foot`, 4 px below him) has been crumbling floor (`crumble_timer`), starts over when that cell changes and drops the cell
   into a hole at its `give_way` value (40 for object 223). While the game is in play, every skill's step (goto, explore, touch with

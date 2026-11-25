@@ -707,6 +707,31 @@ class SkillsTest < Minitest::Test
     refute walked.key?(:picked_up)
   end
 
+  def test_a_heart_slot_that_empties_ends_the_touch_unless_the_game_counts_a_heal
+    gone = false
+    context = { grid: OpenGrid.new, entities: -> { gone ? [] : [{ slot: 3, type: 45, x: 136, y: 80, cell: [4, 8] }] } }
+    execution = registry.start('touch', touch_state(88, 80, 0, {}), { row: 4, col: 8, type: 45, slot: 3 }, context)
+    execution.next_input(touch_state(88, 80, 1, {}))
+    gone = true
+    assert_nil execution.next_input(touch_state(89, 80, 2, {}))
+    assert_equal :target_gone, execution.result[:stopped_by]
+    gone = false
+    taken = registry.start('touch', touch_state(88, 80, 0, {}), { row: 4, col: 8, type: 45, slot: 3 }, context)
+    taken.next_input(touch_state(88, 80, 1, {}))
+    gone = true
+    assert_equal [], taken.next_input(touch_state(89, 80, 2, { pending_heal: 8 })), 'the heal is counted down: settle'
+  end
+
+  def test_a_safe_touch_never_crosses_a_contact_zone_where_a_plain_one_would
+    foe = [{ slot: 1, kind: :enemy, type: 9, x: 120, y: 80, cell: [4, 7] }]
+    walls = [[3, 6], [5, 6], [3, 7], [5, 7], [3, 9], [5, 9], [4, 9], [3, 8], [5, 8]]
+    plain = registry.start('touch', touch_state(88, 80, 0, {}), { row: 4, col: 8, type: 58 }, { grid: OpenGrid.new(walls:), entities: -> { foe } })
+    assert plain.next_input(touch_state(88, 80, 1, {})), 'the plain planner falls back through the zone'
+    safe = registry.start('touch', touch_state(88, 80, 0, {}), { row: 4, col: 8, type: 58, safe: true }, { grid: OpenGrid.new(walls:), entities: -> { foe } })
+    nil while safe.next_input(touch_state(88, 80, 1, {}))
+    assert_equal 'no_path', safe.result[:stopped_by].to_s
+  end
+
   def test_a_room_change_during_a_hold_ends_the_touch
     left = nil
     result = touch(->(frame, held) { held > 3 ? (left ||= frame) && { room_id: 2 } : {} })
@@ -734,7 +759,7 @@ class SkillsTest < Minitest::Test
   end
 
   def test_touch_params_are_validated
-    [{ row: 4, col: 8 }, { row: 4, col: 8, type: 256 }, { row: 8, col: 0, type: 1 }, { row: 4, col: 8, type: 1, x: 1 }, { row: 4, col: 8, type: 1, safe: 1 }].each do |bad|
+    [{ row: 4, col: 8 }, { row: 4, col: 8, type: 256 }, { row: 8, col: 0, type: 1 }, { row: 4, col: 8, type: 1, x: 1 }, { row: 4, col: 8, type: 1, safe: 1 }, { row: 4, col: 8, type: 1, slot: 16 }].each do |bad|
       assert_raises(ArgumentError, bad.inspect) { registry.start('touch', state, bad, { grid: OpenGrid.new }) }
     end
   end

@@ -32,6 +32,12 @@ class EntitiesTest < Minitest::Test
                   { slot: 4, type: 200, x: 250, y: 20, status: 5, state: 0, health: 0, cell: nil, kind: :unknown, verified: false, moves: nil }], found
   end
 
+  def test_a_read_slot_carries_the_catalogued_heal
+    reader = FakeReader.new
+    put(reader, 2, x: 40, y: 48, type: 45)
+    assert_equal 8, Koholint::Entities.read(reader).first[:heals]
+  end
+
   def test_the_catalogue_validates_kinds_and_provenance
     assert_equal({ kind: :npc, verified: true, moves: false }, Koholint::Entities.catalogue.fetch(63))
     assert_equal({ kind: :npc, verified: false, moves: false }, Koholint::Entities.catalogue.fetch(117))
