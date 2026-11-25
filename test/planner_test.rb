@@ -132,6 +132,8 @@ class PlannerTest < Minitest::Test
     boxed = [[1, 2], [2, 2], [3, 2]]
     walled = Planner.new(grid: FakeGrid.new(walls: [[0, 2], [4, 2], [5, 2], [6, 2], [7, 2]]), ledger: Koholint::Ledger.new, place: PLACE, danger: -> { boxed })
     assert_includes walled.path(from: [2, 1], to: [2, 3]), [2, 2]
+    strict = Planner.new(grid: FakeGrid.new(walls: [[0, 2], [4, 2], [5, 2], [6, 2], [7, 2]]), ledger: Koholint::Ledger.new, place: PLACE, danger: -> { boxed }, strict: true)
+    assert_nil strict.path(from: [2, 1], to: [2, 3]), 'a strict planner never falls back'
   end
 
   class HoledGrid < FakeGrid

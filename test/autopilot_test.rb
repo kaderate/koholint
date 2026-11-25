@@ -401,11 +401,19 @@ class AutopilotTest < Minitest::Test
     far = { slot: 6, kind: :creature, type: 45, x: 136, y: 120, cell: [7, 8], heals: 8 }
     assert_nil pilot.heart_choice(state: state(frame: 400), entities: [near, far], grid: FLOOR), 'full health'
     result = pilot.heart_choice(state: state(frame: 400, hp: 16), entities: [near, far], grid: FLOOR)
-    assert_equal({ skill: 'touch', params: { row: 3, col: 2, type: 45 } }, result[:choice])
+    assert_equal({ skill: 'touch', params: { row: 3, col: 2, type: 45, safe: true } }, result[:choice])
     assert_equal [0.0, true], result.values_at(:cost_usd, :autopilot)
-    assert_equal({ row: 7, col: 8, type: 45 }, pilot.heart_choice(state: state(frame: 500, hp: 16), entities: [near, far], grid: FLOOR)[:choice][:params])
+    assert_equal({ row: 7, col: 8, type: 45, safe: true }, pilot.heart_choice(state: state(frame: 500, hp: 16), entities: [near, far], grid: FLOOR)[:choice][:params])
     assert_nil pilot.heart_choice(state: state(frame: 600, hp: 16), entities: [near, far], grid: FLOOR), 'each slot once'
-    assert_equal({ row: 3, col: 2, type: 45 }, pilot.heart_choice(state: state(frame: 700, hp: 16, room_id: 164), entities: [near], grid: FLOOR)[:choice][:params], 'a new visit')
+    assert_equal({ row: 3, col: 2, type: 45, safe: true }, pilot.heart_choice(state: state(frame: 700, hp: 16, room_id: 164), entities: [near], grid: FLOOR)[:choice][:params], 'a new visit')
+  end
+
+  def test_a_visit_at_full_health_elsewhere_still_starts_a_new_visit
+    pilot = primed
+    heart = { slot: 5, kind: :creature, type: 45, x: 40, y: 56, cell: [3, 2], heals: 8 }
+    assert pilot.heart_choice(state: state(frame: 400, hp: 16), entities: [heart], grid: FLOOR)
+    assert_nil pilot.heart_choice(state: state(frame: 500, room_id: 164), entities: [], grid: FLOOR)
+    assert pilot.heart_choice(state: state(frame: 600, hp: 16), entities: [heart], grid: FLOOR), 'back in the first place after a full-health visit elsewhere'
   end
 
   def test_no_heart_is_aimed_at_inside_a_contact_zone_past_the_limit_or_without_a_verified_heal

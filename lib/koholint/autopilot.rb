@@ -228,12 +228,12 @@ module Koholint
     end
 
     # Below full health, the nearest heart on screen outside every contact zone is walked to before any fight; the walk routes around the zones.
-    # A heart counts only when visible, a still sprite on known floor, since one hidden under a pot or a bush has no sprite; touch walks beside it and holds into it.
+    # A heart counts only when visible, a still sprite on known floor, since one hidden under a pot or a bush has no sprite; touch walks beside it, never across a contact zone, and holds into it.
     # Each slot is aimed at once per visit and HEART_LIMIT bounds a visit, so a heart goto cannot reach is not chased.
     def heart_choice(state:, entities:, grid: nil)
+      @hearts = { place: state.place, slots: [] } unless @hearts&.dig(:place) == state.place
       return unless @since && state.phase == :playing && state.cell && state.max_hp && state.health < state.max_hp
 
-      @hearts = { place: state.place, slots: [] } unless @hearts&.dig(:place) == state.place
       return if @hearts[:slots].size >= HEART_LIMIT
 
       danger = Entities.danger_cells(Array(entities))
@@ -241,7 +241,7 @@ module Koholint
       heart = Array(entities).select { |entity| entity[:heals] && entity[:cell] && grid&.static_sprite(*entity[:cell]) && grid.floor?(*entity[:cell]) && !danger.include?(entity[:cell]) && !@hearts[:slots].include?(entity[:slot]) }
                              .min_by { |entity| [(entity[:cell][0] - row).abs + (entity[:cell][1] - col).abs, entity[:slot]] } or return
       @hearts[:slots] << heart[:slot]
-      DecisionPoint.harness_choice({ skill: 'touch', params: { row: heart[:cell][0], col: heart[:cell][1], type: heart[:type] } },
+      DecisionPoint.harness_choice({ skill: 'touch', params: { row: heart[:cell][0], col: heart[:cell][1], type: heart[:type], safe: true } },
                                    "autopilot: pick up the heart at (#{heart[:cell].join(',')}) at #{state.health}/#{state.max_hp} hp (#{@hearts[:slots].size}/#{HEART_LIMIT})", autopilot: true)
     end
 

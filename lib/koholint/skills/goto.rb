@@ -54,8 +54,10 @@ module Koholint
           grid = context[:grid]
           return nil unless grid
 
-          Navigation::Planner.new(grid:, ledger: context[:ledger], place: @start.place, triggers: context[:triggers], danger: danger_of(context), pushable: pushable_of(context), contact: contact_of(context), away: away_of(context))
+          Navigation::Planner.new(grid:, ledger: context[:ledger], place: @start.place, triggers: context[:triggers], danger: danger_of(context), pushable: pushable_of(context), contact: contact_of(context), away: away_of(context), strict: strict?)
         end
+
+        def strict? = false
 
         def cross_margin? = true
 

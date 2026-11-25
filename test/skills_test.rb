@@ -698,6 +698,15 @@ class SkillsTest < Minitest::Test
     refute result.key?(:picked_up)
   end
 
+  def test_a_heal_settles_the_touch_at_once_whether_on_the_walk_or_in_the_hold
+    held = touch(->(_, held) { held > 3 ? { hp: 32 } : {} })
+    assert_equal [:done, %w[], true], held.values_at(:stopped_by, :sides, :settled)
+    assert_equal touch(->(_, held) { held > 3 ? { rupees: 5 } : {} })[:frames], held[:frames], 'settles like an item pickup'
+    walked = touch(->(frame, _) { frame > 1 ? { hp: 32 } : {} })
+    assert_equal [:done, %w[], true], walked.values_at(:stopped_by, :sides, :settled)
+    refute walked.key?(:picked_up)
+  end
+
   def test_a_room_change_during_a_hold_ends_the_touch
     left = nil
     result = touch(->(frame, held) { held > 3 ? (left ||= frame) && { room_id: 2 } : {} })
@@ -725,7 +734,7 @@ class SkillsTest < Minitest::Test
   end
 
   def test_touch_params_are_validated
-    [{ row: 4, col: 8 }, { row: 4, col: 8, type: 256 }, { row: 8, col: 0, type: 1 }, { row: 4, col: 8, type: 1, x: 1 }].each do |bad|
+    [{ row: 4, col: 8 }, { row: 4, col: 8, type: 256 }, { row: 8, col: 0, type: 1 }, { row: 4, col: 8, type: 1, x: 1 }, { row: 4, col: 8, type: 1, safe: 1 }].each do |bad|
       assert_raises(ArgumentError, bad.inspect) { registry.start('touch', state, bad, { grid: OpenGrid.new }) }
     end
   end

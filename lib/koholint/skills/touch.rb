@@ -13,9 +13,10 @@ module Koholint
       HOLD_FRAMES = 60
 
       class Run < Goto::Run
-        def initialize(type:, thing:, **rest)
+        def initialize(type:, thing:, safe: false, **rest)
           @type = type
           @thing = thing
+          @safe = safe
           @sides = []
           @hold = nil
           super(**rest)
@@ -29,6 +30,7 @@ module Koholint
             @frames += 1
             return off
           end
+          return begin_landing(state) if !@landing && !@stopped_by && state.health > @start.health
           return land(state) if @landing
           return hold(state) if @holding
 
@@ -52,6 +54,8 @@ module Koholint
         private
 
         def initial_plan = next_side(@start.cell)
+
+        def strict? = @safe
 
         # The nearest cell next to the thing that a path reaches, among the sides not held yet; holding from it faces the thing.
         def next_side(from)
@@ -140,23 +144,26 @@ module Koholint
         { type: 'object', title: name,
           properties: { row: { type: 'integer', minimum: 0, maximum: Geometry::ROWS - 1 },
                         col: { type: 'integer', minimum: 0, maximum: Geometry::COLS - 1 },
-                        type: { type: 'integer', minimum: 0, maximum: 255 } },
+                        type: { type: 'integer', minimum: 0, maximum: 255 },
+                        safe: { type: 'boolean' } },
           required: %w[row col type], additionalProperties: false }
       end
 
       def normalize(params)
-        params = Skills.symbolize(params, %i[row col type])
+        params = Skills.symbolize(params, %i[row col type safe])
         raise ArgumentError, "touch: row must be 0..#{Geometry::ROWS - 1}" unless params[:row].is_a?(Integer) && params[:row].between?(0, Geometry::ROWS - 1)
         raise ArgumentError, "touch: col must be 0..#{Geometry::COLS - 1}" unless params[:col].is_a?(Integer) && params[:col].between?(0, Geometry::COLS - 1)
         raise ArgumentError, 'touch: type must be 0..255' unless params[:type].is_a?(Integer) && params[:type].between?(0, 255)
 
-        { row: params[:row], col: params[:col], type: params[:type] }
+        raise ArgumentError, 'touch: safe must be true or false' unless [nil, true, false].include?(params[:safe])
+
+        { row: params[:row], col: params[:col], type: params[:type], **(params[:safe] ? { safe: true } : {}) }
       end
 
       def start(state, params, context = {})
         params = normalize(params)
         thing = [params[:row], params[:col]]
-        Run.new(skill: name, params:, state:, target: thing, thing:, type: params[:type], context:)
+        Run.new(skill: name, params:, state:, target: thing, thing:, type: params[:type], safe: params[:safe] || false, context:)
       end
     end
   end

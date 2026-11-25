@@ -9,8 +9,9 @@ module Koholint
         Geometry::DELTAS.find { |_, (dr, dc)| [from[0] + dr, from[1] + dc] == to }&.first
       end
 
-      def initialize(grid:, ledger:, place:, triggers: nil, mode: :explore, danger: nil, pushable: nil, contact: nil, away: nil)
+      def initialize(grid:, ledger:, place:, triggers: nil, mode: :explore, danger: nil, pushable: nil, contact: nil, away: nil, strict: false)
         @danger = danger
+        @strict = strict
         @contact = contact
         @away = away
         @pushable = pushable
@@ -31,6 +32,8 @@ module Koholint
         zones = Array(@danger&.call)
         kept = Array(@contact&.call)
         pushable = Array(@pushable&.call)
+        return search(from:, to:, mode:, doubt:, forbid:, zones: zones | kept, margin:) if @strict
+
         [([zones, margin] if zones.any?), [kept, margin], ([kept, []] if margin.any? && cross_margin)].compact.each do |danger, beside|
           route = search(from:, to:, mode:, doubt:, forbid:, zones: danger, margin: beside)
           return route if route
