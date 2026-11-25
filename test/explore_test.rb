@@ -946,6 +946,34 @@ class ExploreTest < Minitest::Test
     refute log.surveyed_untried?(PLACE)
   end
 
+  # 64/0 (run 20261125-035532-e8c3, from frame 97527): its never crossed way back down was out of reach from the right landing too,
+  # yet only the side up was reported while the route went right, so 64/0 kept work for a route that landed there from the right.
+  def test_an_assumed_way_back_no_path_reaches_is_unreachable_while_a_route_leads_elsewhere
+    log = Koholint::ExploreLog.new
+    log.absorb({ from: { room: 17, map: 0 }, exits: [{ row: 0, col: 5, direction: :up, outcome: :left, to: [1, 0] }] })
+    log.absorb({ from: { room: 1, map: 0 }, exits: [{ row: 3, col: 9, direction: :right, outcome: :left, to: [2, 0] }] })
+    log.absorb({ from: { room: 17, map: 0 }, survey: { sides: {}, doors: [], pending: false } })
+    rows = with(CLOSED, [7, 5], '.', [6, 5], '#', [3, 9], '.', [3, 6], '.', [3, 7], '.', [3, 8], '.')
+    result, = explore(rows, exits: [[[7, 5], :down], [[3, 9], :right]], explore_log: log, limit: 1)
+    assert_equal [2, 0], result.dig(:route, :goal), result.inspect
+    assert_equal [[:down], [:down]], result.values_at(:unreachable, :held)
+  end
+
+  def test_an_assumed_way_back_held_out_of_reach_on_two_dead_end_visits_is_cut_never_dropped
+    log = Koholint::ExploreLog.new
+    walk = ->(from, to, direction) { log.note({ skill: 'walk', params: { direction: }, from: { room: from, map: 0, row: 3, col: 5 }, to: { room: to, map: 0, row: 3, col: 5 } }) }
+    walk.(17, 18, 'right')
+    visit = lambda do |result|
+      walk.(18, 19, 'right')
+      walk.(19, 18, 'left')
+      log.absorb({ from: { room: 18, map: 0, row: 3, col: 5 }, unreachable: ['left'], dead_end: true }.merge(result))
+    end
+    2.times { visit.({ held: ['left'] }) }
+    assert log.side_left?([18, 0], :left), 'health returning or the enemy leaving can bring it back'
+    2.times { visit.({}) }
+    refute log.side_left?([18, 0], :left), 'a way back a route found out of reach on two visits is still dropped'
+  end
+
   def test_an_assumed_way_back_ranks_after_the_other_reachable_work_of_the_place
     log = Koholint::ExploreLog.new
     log.absorb({ from: { room: 17, map: 0 }, exits: [{ row: 0, col: 5, direction: :up, outcome: :left, to: [1, 0] }] })
@@ -973,6 +1001,32 @@ class ExploreTest < Minitest::Test
     assert_equal [17, 0], log.route([18, 0], goal: [19, 0])[:next], 'inside the place too, the way is not taken from that side'
     walk.(18, 19, 'right')
     assert_equal [18, 0], log.route([17, 0], goal: [19, 0])[:next], 'a crossing from that side reopens the way'
+  end
+
+  # 64/0 and 65/0 (run 20261125-035532-e8c3, from frame 97527): each one's only untried side was cut off from the side Link entered it by,
+  # and each routed him to the other.
+  def test_a_place_whose_untried_ways_are_all_cut_off_from_the_landing_a_route_reaches_is_no_goal
+    log = Koholint::ExploreLog.new
+    walk = ->(from, to, direction) { log.note({ skill: 'walk', params: { direction: }, from: { room: from, map: 0, row: 3, col: 5 }, to: { room: to, map: 0, row: 3, col: 5 } }) }
+    survey = ->(room, side) { log.absorb({ from: { room:, map: 0, row: 3, col: 5 }, survey: { sides: { side => [{ row: 0, col: 4 }] }, doors: [], pending: true } }) }
+    walk.(17, 18, 'right')
+    survey.(18, 'up')
+    walk.(18, 17, 'left')
+    survey.(17, 'down')
+    assert_equal [18, 0], log.route([17, 0])[:goal]
+    2.times do
+      walk.(17, 18, 'right')
+      log.absorb({ from: { room: 18, map: 0 }, unreachable: ['up'] })
+      walk.(18, 17, 'left')
+      log.absorb({ from: { room: 17, map: 0 }, unreachable: ['down'] })
+    end
+    assert log.route([17, 0])[:lifted], 'each cut is still lifted once'
+    walk.(17, 18, 'right')
+    log.absorb({ from: { room: 18, map: 0 }, unreachable: ['up'] })
+    walk.(18, 17, 'left')
+    log.absorb({ from: { room: 17, map: 0 }, unreachable: ['down'] })
+    assert_nil log.route([17, 0])
+    assert_nil log.route([18, 0])
   end
 
   def test_a_place_cut_off_from_one_side_is_still_routed_through_from_another

@@ -104,7 +104,8 @@ module Koholint
             return refuse('the sword is on neither A nor B') unless @button
             return idle(:no_target) unless @enemy
           end
-          @phase = :strike if @phase == :walk && @frames.positive? && turn_to(Array(@entities.call), state)
+          @phase = :strike if @phase == :walk && @frames.positive? && (turn_to(Array(@entities.call), state) || in_reach?(state))
+          @rushed ||= closing?(state)
           return super if @phase == :walk
           return finish(:room_change) if state.place != @start.place
 
@@ -142,8 +143,8 @@ module Koholint
           cross = horizontal ? dy : dx
           move = if cross.abs > REACH[:cross] then horizontal ? (cross.positive? ? :down : :up) : (cross.positive? ? :right : :left)
                  elsif along > REACH[:along] then facing
-                 elsif along < closest then Geometry::OPPOSITE.fetch(facing)
-                 elsif @facing != facing then along > closest ? facing : Geometry::OPPOSITE.fetch(facing)
+                 elsif along < closest && !@rushed then Geometry::OPPOSITE.fetch(facing)
+                 elsif @facing != facing then along > closest || @rushed ? facing : Geometry::OPPOSITE.fetch(facing)
                  end
           return begin_swing unless move
           return finish(:hole) if hole_ahead?(state, move)
@@ -184,9 +185,29 @@ module Koholint
           return if distance.(nearer) > FAR
 
           @enemy = nearer.slice(:slot, :type, :x, :y, :cell, :status, :health, :contact)
+          @gap = @rushed = nil
           @lineup = 0
           @axis = nil
           true
+        end
+
+        def in_reach?(state)
+          return false unless @enemy
+
+          dx = (@enemy[:x] - state.x.to_i).abs
+          dy = (@enemy[:y] - state.y.to_i).abs
+          [dx, dy].max <= REACH[:along] && [dx, dy].min <= REACH[:cross]
+        end
+
+        def gap(state) = [(@enemy[:x] - state.x.to_i).abs, (@enemy[:y] - state.y.to_i).abs].max
+
+        # Backing off from an enemy that walks at Link never opens the gap, so he turns and strikes instead.
+        def closing?(state)
+          return false unless @enemy
+
+          was = @gap
+          @gap = gap(state)
+          !!was && @gap < was
         end
 
         def far?(state) = [(@enemy[:x] - state.x.to_i).abs, (@enemy[:y] - state.y.to_i).abs].max > FAR

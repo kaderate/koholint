@@ -22,7 +22,7 @@ class AttackTest < Minitest::Test
   end
 
   # Link moves 1 px per direction frame; an A press lands a hit when he faces the enemy within 24 px along and 8 px across.
-  def fight(target, enemies, from: [4, 2], sword: 1, immune: false, knockback: 0, hurt_at: nil, cap: nil, limit: 1000, ceiling: nil, at: nil, grid: FakeGrid.new, moves: nil)
+  def fight(target, enemies, from: [4, 2], sword: 1, immune: false, knockback: 0, hurt_at: nil, cap: nil, limit: 1000, ceiling: nil, left_wall: nil, at: nil, grid: FakeGrid.new, moves: nil)
     x, y = at || Koholint::Geometry.center_of(*from)
     hp = 24
     reader = -> { enemies.map { |e| e.merge(cell: Koholint::Geometry.cell_for(e[:x], e[:y])) } }
@@ -32,11 +32,11 @@ class AttackTest < Minitest::Test
     inputs = []
     limit.times do
       hp = 20 if hurt_at && inputs.size >= hurt_at
-      moves&.call(enemies, inputs.size)
+      moves&.call(enemies, inputs.size, [x, y])
       buttons = execution.next_input(state(x:, y:, sword:, hp:)) or break
       inputs << buttons
       direction = (buttons & VECTORS.keys).first
-      if direction && !(ceiling && direction == :up && y <= ceiling)
+      if direction && !(ceiling && direction == :up && y <= ceiling) && !(left_wall && direction == :left && x <= left_wall)
         facing = direction
         x += VECTORS[direction][0]
         y += VECTORS[direction][1]
@@ -209,8 +209,44 @@ class AttackTest < Minitest::Test
     assert_equal [true, 3], [result[:killed], result[:target][:slot]]
   end
 
+  # 172/10 (run 20261125-051543-0c86, frames 94976-94984): a wall left of Link and a type 155 walking at him from the right, which hit him
+  # at 6 px.
+  def test_an_enemy_walking_at_link_against_a_wall_is_struck_before_it_touches_him
+    foe = enemy(4, 4).except(:contact).merge(x: 65, y: 80)
+    touched = nil
+    walk = lambda do |enemies, frame, link|
+      enemies[0][:x] -= 1 if enemies[0][:status] == 5
+      touched ||= frame if enemies[0][:status] == 5 && (enemies[0][:x] - link[0]).abs <= 6
+    end
+    result, inputs = fight([4, 4], [foe], at: [53, 80], left_wall: 52, moves: walk)
+    assert result[:killed]
+    assert_nil touched, 'killed before it came within the 6 px where it hit him'
+    refute(inputs.take_while { |buttons| !buttons.include?(:a) }.any? { |buttons| buttons.include?(:left) }, 'no back-off into the wall')
+  end
+
+  def test_the_walk_to_an_enemy_walking_at_link_ends_once_it_is_in_reach
+    foe = enemy(4, 5, health: 3)
+    start = foe[:x]
+    link_at = []
+    walk = ->(enemies, frame, link) { enemies[0][:x] -= 1 if enemies[0][:status] == 5 && frame.odd?; link_at << link[0] }
+    result, inputs = fight([4, 5], [foe], from: [4, 2], knockback: 8, moves: walk)
+    assert result[:killed]
+    assert_operator start - link_at[inputs.index([:a])], :>=, Koholint::Skills::Attack::REACH[:along], 'the first strike comes a sword reach short of where it started'
+  end
+
+  def test_the_walk_ends_only_inside_the_measured_sword_reach
+    run = registry.start('attack', state(x: 40, y: 80), { row: 4, col: 2 }, { grid: FakeGrid.new, entities: -> { [enemy(4, 2)] } }).__getobj__
+    ex, ey = run.instance_variable_get(:@enemy).values_at(:x, :y)
+    reach = ->(dx, dy) { run.send(:in_reach?, state(x: ex - dx, y: ey - dy)) }
+    assert reach.(22, 8)
+    assert reach.(-8, -22)
+    refute reach.(23, 0)
+    refute reach.(20, 9)
+    refute reach.(12, 12)
+  end
+
   def test_while_striking_an_enemy_nearer_than_the_target_is_struck_instead
-    approach = ->(enemies, frame) { enemies[1][:y] = 80 - 24 if frame == 3 }
+    approach = ->(enemies, frame, _link) { enemies[1][:y] = 80 - 24 if frame == 3 }
     result, = fight([4, 4], [enemy(4, 4), enemy(0, 2, slot: 4)], moves: approach)
     assert_equal [true, 4, { row: 4, col: 2 }], [result[:killed], result[:target][:slot], result[:standing_cell]]
   end
