@@ -24,7 +24,8 @@ class LeadCheckTest < Minitest::Test
   def test_aliases_in_the_games_language_plurals_and_short_names_count_on_both_sides
     assert_empty Koholint::LeadCheck.leaks([lead('the shield costs 20', quote: 'Bouclier: 20 rubis')])
     assert_empty Koholint::LeadCheck.leaks([lead('pegasus boots are sold', quote: 'Des bottes de Pégase!')])
-    assert_equal ['magic powder'], Koholint::LeadCheck.leaks([lead('he wants some powder', quote: "J'aime pas du tout c'qu'est poudreux")]).first[:items]
+    assert_equal ['mushroom'], Koholint::LeadCheck.leaks([lead('he wants a mushroom', quote: "J'aime pas du tout c'qu'est poudreux")]).first[:items]
+    assert_empty Koholint::LeadCheck.leaks([lead('the mushroom is here', quote: 'Tu as trouvé le Champignon!')])
     assert_equal ['bombs'], Koholint::LeadCheck.leaks([lead('blow it up with a bomb')]).first[:items]
   end
 
