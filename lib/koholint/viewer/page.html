@@ -1025,7 +1025,8 @@
     if (!lastSkills) return;
     var onlyObjective = document.getElementById('skills-objective').checked;
     var rows = onlyObjective ? lastSkills.objective : lastSkills.recent;
-    document.getElementById('skills-count').textContent = rows.length + (onlyObjective ? ' de l\'objectif' : ' récents');
+    var total = lastSkills.objective_total || 0;
+    document.getElementById('skills-count').textContent = !onlyObjective ? rows.length + ' récents' : total > rows.length ? rows.length + ' dernières sur ' + total : total + ' de l\'objectif';
     var table = document.getElementById('skills-table');
     table.replaceChildren();
     rows.forEach(function (row) {

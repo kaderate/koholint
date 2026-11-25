@@ -502,7 +502,8 @@ class FeedTest < Minitest::Test
       assert_equal [[90, 'stub'], [30, 'model']], shown.map { |row| row.values_at(:frame, :by) }
       assert_equal doc[:status][:objective_attempts], shown.size
       assert_equal({ frame: 30, place: [228, 0], skill: 'explore', params: { 'direction' => 'up' }, by: 'model', counted: true }, shown.last)
-      assert_equal 'autopilot', Koholint::Viewer::Feed.skills(Koholint::Trace.read(File.join(dir, 'trace.jsonl')).first(7), 'o1')[:recent].find { |row| row[:frame] == 50 }[:by]
+      assert_equal 2, doc[:skills][:objective_total]
+      assert_equal 'autopilot', Koholint::Viewer::Feed.skill_row(Koholint::Trace.read(File.join(dir, 'trace.jsonl')), 6, false)[:by]
     end
   end
 

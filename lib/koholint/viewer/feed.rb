@@ -36,11 +36,13 @@ module Koholint
         trace = upto ? full.select { |e| e['frame'].is_a?(Integer) && e['frame'] <= upto } : full
         summary = Summary.from_events(trace, since: manifest.dig('parent', 'frame').to_i)
         summary[:health] = 'unknown' if trace.none? { |e| Summary.progress?(e) } && %w[progressing stalled].include?(summary[:health])
+        start = objective_start(trace, summary[:objective])
+        counted = start ? counted_actions(trace, start) : []
         {
           status: summary.merge(run_id: File.basename(run_dir), flow_version: manifest['flow_version'],
                                 manifest_status: manifest['status'], budget: manifest['budget'], calls: calls(trace),
                                 objective_title: objective_title(trace, summary[:objective]), mode: Insights.mode(trace),
-                                alerts: Insights.alerts(trace)).merge(objective_view(trace, summary[:objective]), memory(trace)),
+                                alerts: Insights.alerts(trace)).merge(objective_view(trace, start, counted), memory(trace)),
           replay: { frame: follower.frame, journal_frames: follower.journal_frames, lag: follower.lag, sync: follower.sync },
           events: events(trace, limit),
           grid: grid(run_dir, full, follower.frame),
@@ -49,7 +51,7 @@ module Koholint
           latency: latency(trace),
           budget: budget(manifest, trace, summary),
           dialogues: dialogues(trace),
-          skills: skills(trace, summary[:objective])
+          skills: skills(trace, counted)
         }
       end
 
@@ -140,11 +142,10 @@ module Koholint
 
       AUTOMATIC = ['automatic dialogue advance', 'deterministic hemmed-in', 'locked: waiting', 'autopilot:'].freeze
 
-      def objective_view(trace, id)
-        index = objective_start(trace, id)
-        return { objective_predicate: nil, objective_attempts: nil } unless index
+      def objective_view(trace, start, counted)
+        return { objective_predicate: nil, objective_attempts: nil } unless start
 
-        { objective_predicate: trace[index]['predicate'], objective_attempts: counted_actions(trace, index).size }
+        { objective_predicate: trace[start]['predicate'], objective_attempts: counted.size }
       end
 
       def objective_start(trace, id) = id && trace.rindex { |e| e['type'] == 'objective' && e['id'] == id && e['status'] == 'started' }
@@ -160,19 +161,24 @@ module Koholint
 
       SKILLS_SHOWN = 50
 
-      def skills(trace, id)
-        index = objective_start(trace, id)
-        counted = index ? counted_actions(trace, index).to_set : Set.new
-        decision = nil
-        rows = trace.each_with_index.filter_map do |e, at|
-          decision = e if e['type'] == 'decision'
-          next unless e['type'] == 'action'
-
-          result = e['result'].is_a?(Hash) ? e['result'] : {}
-          from = result['from'].is_a?(Hash) ? [result['from']['room'], result['from']['map']] : nil
-          { frame: e['frame'].to_i - result['frames'].to_i, place: from, skill: e['skill'], params: e['params'] || {}, by: chooser(decision), counted: counted.include?(at) }
+      # The latest calls, read backwards from the end so a poll never walks the whole trace; counted are the counter's indices.
+      def skills(trace, counted)
+        recent = []
+        (trace.size - 1).downto(0) do |at|
+          recent << at if trace[at]['type'] == 'action'
+          break if recent.size == SKILLS_SHOWN
         end
-        { recent: rows.last(SKILLS_SHOWN).reverse, objective: rows.select { |row| row[:counted] }.last(SKILLS_SHOWN).reverse }
+        objective = counted.last(SKILLS_SHOWN).reverse
+        shown = (recent | objective).to_h { |at| [at, skill_row(trace, at, counted.include?(at))] }
+        { recent: recent.map { |at| shown[at] }, objective: objective.map { |at| shown[at] }, objective_total: counted.size }
+      end
+
+      def skill_row(trace, at, counted)
+        action = trace[at]
+        result = action['result'].is_a?(Hash) ? action['result'] : {}
+        from = result['from'].is_a?(Hash) ? [result['from']['room'], result['from']['map']] : nil
+        decision = (at - 1).downto(0).lazy.map { |before| trace[before] }.find { |e| e['type'] == 'decision' }
+        { frame: action['frame'].to_i - result['frames'].to_i, place: from, skill: action['skill'], params: action['params'] || {}, by: chooser(decision), counted: }
       end
 
       def chooser(decision)
@@ -180,6 +186,7 @@ module Koholint
         return 'autopilot' if decision['autopilot']
         return 'harness' unless Summary.model_call?(decision)
 
+        # The $0 stub agents of the gate scripts (outside lib) answer every call with the justification 'stub'.
         decision['justification'] == 'stub' ? 'stub' : 'model'
       end
 
