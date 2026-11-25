@@ -509,6 +509,29 @@ class DelegatedAutopilotTest < Minitest::Test
     assert_equal 2, client.calls.size
   end
 
+  def test_below_full_health_a_visible_heart_is_taken_with_a_safe_touch_and_the_chain_goes_on
+    client = ScriptedClient.new(objective: new_place, default: explore)
+    p = autopiloted(client)
+    beliefs = Koholint::Vision::Beliefs.new
+    beliefs.record(appearance: 'floor', action: :walk, direction: :up, result: :yes, method: 't', context: Koholint::Vision::Capabilities.new, frame: 1, source: 't')
+    seen = Koholint::Vision::Grid.new(cells: Array.new(8) { Array.new(10) { 'floor' } }, static_sprites: [{ 'x' => 40, 'y' => 48, 'pattern' => 'heart' }], beliefs:,
+                                      capabilities: Koholint::Vision::Capabilities.new)
+    heart = { slot: 3, kind: :creature, type: 45, x: 40, y: 48, cell: [2, 2], heals: 8 }
+    tours(p, 2)
+    ctx = { grid: seen, entities: -> { [heart] } }
+    calls = client.calls.size
+    result = p.decide(p.decision_point_for(state(frame: 800, hp: 16)), state(frame: 800, hp: 16), ctx)
+    touch = { skill: 'touch', params: { row: 2, col: 2, type: 45, safe: true, slot: 3 } }
+    assert_equal ['delegated', true, touch], result.values_at(:agent, :autopilot, :choice)
+    assert_equal touch, result[:decision_point].validate(result[:choice])
+    p.after_action(choice: result[:choice], outcome: { skill: 'touch', params: touch[:params], stopped_by: 'done', hp_delta: 8,
+                                                       from: { room: 163, map: 16, row: 3, col: 4 }, to: { room: 163, map: 16, row: 2, col: 3 } },
+                   state: state(frame: 830, hp: 24), frame: 830)
+    after = p.decide(p.decision_point_for(state(frame: 840)), state(frame: 840), { grid: seen, entities: -> { [] } })
+    assert_equal [{ skill: 'explore', params: {} }, true], after.values_at(:choice, :autopilot)
+    assert_equal calls, client.calls.size
+  end
+
   def test_untried_objects_continue_and_other_stops_go_to_the_model
     client = ScriptedClient.new(objective: new_place, default: explore)
     results = tours(autopiloted(client), 4, stop: :untried_object)

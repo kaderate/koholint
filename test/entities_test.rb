@@ -32,6 +32,12 @@ class EntitiesTest < Minitest::Test
                   { slot: 4, type: 200, x: 250, y: 20, status: 5, state: 0, health: 0, cell: nil, kind: :unknown, verified: false, moves: nil }], found
   end
 
+  def test_a_read_slot_carries_the_catalogued_heal
+    reader = FakeReader.new
+    put(reader, 2, x: 40, y: 48, type: 45)
+    assert_equal 8, Koholint::Entities.read(reader).first[:heals]
+  end
+
   def test_the_catalogue_validates_kinds_and_provenance
     assert_equal({ kind: :npc, verified: true, moves: false }, Koholint::Entities.catalogue.fetch(63))
     assert_equal({ kind: :npc, verified: false, moves: false }, Koholint::Entities.catalogue.fetch(117))
@@ -44,6 +50,14 @@ class EntitiesTest < Minitest::Test
         assert_raises(Koholint::Entities::Invalid) { Koholint::Entities.load(path) }
       end
     end
+  end
+
+  def test_only_a_verified_heal_reaches_the_catalogue
+    assert_equal 8, Koholint::Entities.catalogue[45][:heals]
+    path = File.join(Dir.mktmpdir, 'entities.json')
+    heals = { 'value' => 8, 'confidence' => 'hypothesis', 'verified_count' => 1, 'source' => 's' }
+    File.write(path, JSON.generate([{ 'type' => 7, 'kind' => 'creature', 'source' => 's', 'confidence' => 'hypothesis', 'verified_count' => 1, 'heals' => heals }]))
+    assert_nil Koholint::Entities.load(path)[7][:heals]
   end
 
   def test_a_heals_fact_needs_its_provenance

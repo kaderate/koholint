@@ -29,7 +29,7 @@ module Koholint
         type = at.(:entity_type)
         known = kinds[type]
         { slot:, type:, x:, y:, status:, state: at.(:entity_state), health: at.(:entity_health), cell: Geometry.cell_for(x, y), kind: known ? known[:kind] : :unknown,
-          verified: known ? known[:verified] : false, moves: known&.dig(:moves), **(known || {}).slice(:contact, :sword_hits, :sword_verified) }
+          verified: known ? known[:verified] : false, moves: known&.dig(:moves), **(known || {}).slice(:contact, :sword_hits, :sword_verified, :heals) }
       end
     end
 
@@ -65,7 +65,8 @@ module Koholint
       JSON.parse(File.read(path)).reject { |entry| entry.key?('object') }.to_h do |entry|
         validate!(entry)
         [Integer(entry.fetch('type')), { kind: entry.fetch('kind').to_sym, verified: entry['confidence'] == 'verified', moves: entry['moves'], contact: entry['contact_px'],
-                                         sword_hits: entry.dig('sword_hits', 'value'), sword_verified: (entry['sword_hits']['confidence'] == 'verified' if entry.key?('sword_hits')) }.compact]
+                                         sword_hits: entry.dig('sword_hits', 'value'), sword_verified: (entry['sword_hits']['confidence'] == 'verified' if entry.key?('sword_hits')),
+                                         heals: (entry.dig('heals', 'value') if entry.dig('heals', 'confidence') == 'verified') }.compact]
       end
     end
 

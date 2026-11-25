@@ -160,6 +160,9 @@ module Koholint
           disengage = @autopilot.disengage_choice(state:, entities: entities_now, grid: context[:grid])
           return disengage.tap { @autopilot_acting = true } if disengage
 
+          heart = @autopilot.heart_choice(state:, entities: entities_now, grid: context[:grid])
+          return heart.merge(decision_point: @touch_point).tap { @autopilot_acting = true } if heart
+
           fight = @autopilot.fight_choice(state:, entities: entities_now, objects: objects_now)
           return fight.tap { @autopilot_acting = true } if fight
 

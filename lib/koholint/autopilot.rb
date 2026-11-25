@@ -1,5 +1,6 @@
 require 'set'
 require 'koholint/decision'
+require 'koholint/entities'
 require 'koholint/navigation/threat'
 require 'koholint/perception'
 
@@ -26,6 +27,8 @@ module Koholint
     FIGHT_SIGHT = 2 * Geometry::CELL
     MISSED = %w[blocked no_path out_of_reach no_kill hole].freeze
     DISENGAGE_LIMIT = 3
+    HEART_LIMIT = 2
+    HEART_ENDS = %w[done target_gone].freeze
     STEP = { up: [0, -1], down: [0, 1], left: [-1, 0], right: [1, 0] }.freeze
 
     attr_reader :chain, :chain_limit, :chain_frames
@@ -78,7 +81,8 @@ module Koholint
       note_struck(skill, outcome) if outcome.is_a?(Hash)
       @walled |= [outcome[:params][:direction].to_s] if skill.to_s == 'walk' && outcome.is_a?(Hash) && outcome[:params].is_a?(Hash) && walled?(outcome)
       explored = skill.to_s == 'explore' && outcome.is_a?(Hash)
-      @stop = stop_after(skill.to_s, outcome.is_a?(Hash) ? outcome[:stopped_by].to_s : nil)
+      @stop = stop_after(skill.to_s, outcome.is_a?(Hash) ? outcome[:stopped_by].to_s : nil) unless @heart_touch && skill.to_s == 'touch' && outcome.is_a?(Hash) && HEART_ENDS.include?(outcome[:stopped_by].to_s)
+      @heart_touch = false
       trial = @trying && @trial
       @trial = nil
       if trial && skill.to_s == 'talk_to' && outcome.is_a?(Hash) && NOTHING.include?(outcome[:stopped_by].to_s)
@@ -223,6 +227,25 @@ module Koholint
                       &.first or return
       @disengaged += 1
       DecisionPoint.harness_choice({ skill: 'walk', params: { direction: direction.to_s, cells: 1 } }, "autopilot: disengage at #{state.health} hp, step #{direction} away from #{near.map { |threat| threat[:type] }.join(', ')} (#{@disengaged}/#{DISENGAGE_LIMIT})", autopilot: true)
+    end
+
+    # Below full health, the nearest heart on screen outside every contact zone is walked to before any fight; the walk routes around the zones.
+    # A heart counts only when visible, a still sprite on known floor, since one hidden under a pot or a bush has no sprite; touch walks beside it, never across a contact zone, and holds into it.
+    # Each slot is aimed at once per visit and HEART_LIMIT bounds a visit, so a heart goto cannot reach is not chased.
+    def heart_choice(state:, entities:, grid: nil)
+      @hearts = { place: state.place, slots: [] } unless @hearts&.dig(:place) == state.place
+      return unless @since && state.phase == :playing && state.cell && state.max_hp && state.health < state.max_hp
+
+      return if @hearts[:slots].size >= HEART_LIMIT
+
+      danger = Entities.danger_cells(Array(entities), margin: Entities::DANGER_MARGIN + (state.health <= Perception::HP_PER_HEART ? Geometry::CELL : 0))
+      row, col = state.cell
+      heart = Array(entities).select { |entity| entity[:heals] && entity[:cell] && grid&.static_sprite(*entity[:cell]) && grid.floor?(*entity[:cell]) && !danger.include?(entity[:cell]) && !@hearts[:slots].include?(entity[:slot]) }
+                             .min_by { |entity| [(entity[:cell][0] - row).abs + (entity[:cell][1] - col).abs, entity[:slot]] } or return
+      @hearts[:slots] << heart[:slot]
+      @heart_touch = true
+      DecisionPoint.harness_choice({ skill: 'touch', params: { row: heart[:cell][0], col: heart[:cell][1], type: heart[:type], safe: true, slot: heart[:slot] } },
+                                   "autopilot: pick up the heart at (#{heart[:cell].join(',')}) at #{state.health}/#{state.max_hp} hp (#{@hearts[:slots].size}/#{HEART_LIMIT})", autopilot: true)
     end
 
     # After a goto that ended on the cell right below a door, step through the door without a call.

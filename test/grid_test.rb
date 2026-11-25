@@ -10,6 +10,14 @@ class GridTest < Minitest::Test
     Koholint::Vision::Grid.new(cells:, static_sprites: sprites, beliefs:, capabilities: Koholint::Vision::Capabilities.new)
   end
 
+  def test_floor_is_read_from_the_background_tile_under_any_sprite
+    beliefs = Koholint::Vision::Beliefs.new
+    beliefs.record(appearance: 'floor', action: :walk, direction: :up, result: :yes, method: 't', context: Koholint::Vision::Capabilities.new, frame: 1, source: 't')
+    grid = grid([{ 'x' => 72, 'y' => 48, 'pattern' => 'heart' }], beliefs:)
+    assert grid.floor?(2, 4)
+    refute grid(nil.to_a).floor?(2, 4), 'an appearance never walked is not floor'
+  end
+
   def test_a_sprite_straddling_two_rows_marks_both
     grid = grid([{ 'x' => 72, 'y' => 56, 'pattern' => 'npc' }])
     assert_equal 'npc', grid.static_sprite(2, 4)
