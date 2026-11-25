@@ -463,6 +463,11 @@ class DelegatedAutopilotTest < Minitest::Test
     context = { grid: }
     result = p.decide(p.decision_point_for(low), low, context)
     assert_equal ['wait', nil], [result[:choice][:skill], context[:retreat]], 'a way back that is out of reach too is not sent again from that cell'
+    p.observe(state(hp: 24), frame: 400)
+    assert_nil p.instance_variable_get(:@retreated), 'health back above one heart lifts it'
+    p.instance_variable_set(:@retreated, [low.place, low.cell])
+    p.observe(state(hp: 8, room_id: 9), frame: 410)
+    assert_nil p.instance_variable_get(:@retreated), 'another place lifts it'
   end
 
   def test_repeated_zero_frame_results_in_one_place_are_answered_by_the_harness

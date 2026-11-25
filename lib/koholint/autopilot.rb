@@ -17,6 +17,7 @@ module Koholint
     EXPLORING = %w[new_place leave_place new_text].freeze
     CHOICE = { skill: 'explore', params: {} }.freeze
     FIGHT_LIMIT = 8
+    REFIGHTS = 2
     TRY_LIMIT = 6
     NOTHING = %w[no_response no_path frame_cap blocked target_free].freeze
     FIGHT_FRAMES = 900
@@ -42,7 +43,7 @@ module Koholint
       @returns = Hash.new(0)
       @fight = 0
       @struck = { place: nil, types: [] }
-      @missed = { place: nil, slots: [], far: [] }
+      @missed = { place: nil, slots: [], far: Hash.new(0) }
       @walled = { spot: nil, directions: [] }
       @untried = []
       @trying = false
@@ -213,7 +214,7 @@ module Koholint
       missed = here ? @missed[:slots] : []
       missed += [@struck[:slot]] if @struck[:place] == state.place
       distance = ->(entity) { [(entity[:x] - state.x).abs, (entity[:y] - state.y).abs].max }
-      far = ->(entity) { here && @missed[:far].include?(entity[:slot]) && distance.(entity) > Geometry::CELL }
+      far = ->(entity) { here && @missed[:far].key?(entity[:slot]) && distance.(entity) > Geometry::CELL }
       Array(entities).select { |entity| entity[:kind].to_s == 'enemy' && entity[:sword_hits] == 1 && entity[:cell] && !missed.include?(entity[:slot]) && !far.(entity) }
                      .select { |entity| distance.(entity) <= FIGHT_SIGHT }
                      .min_by { |entity| [distance.(entity), entity[:slot]] }
@@ -231,7 +232,7 @@ module Koholint
       zone = Navigation::Threat.zone(Navigation::Threat.of(Array(entities)) - near, margin: Entities::DANGER_MARGIN)
       beside = zone.flat_map { |row, col| [[row, col], [row - 1, col], [row + 1, col], [row, col - 1], [row, col + 1]] }
       farther = ->(dx, dy) { near.all? { |threat| Navigation::Threat.distance(threat, state.x + (dx * Geometry::CELL), state.y + (dy * Geometry::CELL)) > Navigation::Threat.distance(threat, state.x, state.y) } }
-      walled = @walled[:spot].nil? || @walled[:spot] == [*state.place, *state.cell] ? @walled[:directions] : []
+      walled = @walled[:spot] == [*state.place, *state.cell] ? @walled[:directions] : []
       wall = ->(name) { walled.include?(name.to_s) || (grid.respond_to?(:passable) && grid.passable(*state.cell, name) == :no) }
       direction = STEP.reject { |name, (dx, dy)| wall.(name) || (holes + beside).include?([state.cell[0] + dy, state.cell[1] + dx]) || !farther.(dx, dy) }
                       .max_by { |_, (dx, dy)| near.map { |threat| Navigation::Threat.distance(threat, state.x + (dx * Geometry::CELL), state.y + (dy * Geometry::CELL)) }.min }
@@ -300,14 +301,16 @@ module Koholint
     end
 
     # An enemy an attack could not reach or strike is not fought on sight again in that place; one that was only out of reach is, once
-    # it comes within a cell of Link.
+    # it comes within a cell of Link, REFIGHTS times a visit.
     def note_missed(outcome)
       from = outcome[:from]
       return unless from.is_a?(Hash) && outcome[:target].is_a?(Hash) && MISSED.include?(outcome[:stopped_by].to_s)
 
       here = [from[:room], from[:map]]
-      @missed = { place: here, slots: [], far: [] } unless @missed[:place] == here
-      @missed[outcome[:stopped_by].to_s == 'out_of_reach' ? :far : :slots] |= [outcome[:target][:slot]]
+      slot = outcome[:target][:slot]
+      @missed = { place: here, slots: [], far: Hash.new(0) } unless @missed[:place] == here
+      @missed[:far][slot] += 1 if outcome[:stopped_by].to_s == 'out_of_reach'
+      @missed[:slots] |= [slot] if outcome[:stopped_by].to_s != 'out_of_reach' || @missed[:far][slot] > REFIGHTS
     end
 
     # The types struck count for the visit only: leaving the place forgets them, as a resume (which starts with none) would.
@@ -335,12 +338,14 @@ module Koholint
 
     # A walk blocked from a cell stays blocked from it, across model calls, until Link stands somewhere else.
     def note_walled(outcome)
-      from = outcome[:from].is_a?(Hash) ? outcome[:from].values_at(:room, :map, :row, :col) : nil
+      return unless outcome[:from].is_a?(Hash)
+
+      from = outcome[:from].values_at(:room, :map, :row, :col)
       @walled = { spot: from, directions: [] } unless @walled[:spot] == from
       @walled[:directions] |= [outcome[:params][:direction].to_s]
     end
 
-    def walled?(outcome) = outcome[:stopped_by].to_s == 'blocked' || (outcome[:stopped_by].to_s == 'danger' && outcome[:frames].to_i.zero?)
+    def walled?(outcome) = outcome[:stopped_by].to_s == 'blocked'
 
     def cap_hold(state)
       return 'chain cap' if @chain >= @chain_limit

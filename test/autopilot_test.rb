@@ -465,7 +465,7 @@ class AutopilotTest < Minitest::Test
   def test_a_disengage_step_that_takes_link_no_farther_from_the_enemy_is_not_taken
     pilot = primed
     link = state(frame: 200, hp: 8, x: 68, y: 60)
-    pilot.acted(skill: 'walk', outcome: { stopped_by: :blocked, params: { direction: :up, cells: 1 } })
+    pilot.acted(skill: 'walk', outcome: { stopped_by: :blocked, params: { direction: :up, cells: 1 }, from: { room: 163, map: 16, row: 3, col: 4 } })
     assert_nil pilot.disengage_choice(state: link, entities: [threat(66, 84, type: 155)])
   end
 
@@ -506,13 +506,14 @@ class AutopilotTest < Minitest::Test
     assert_equal 'left', primed.disengage_choice(state: link, entities: [threat(70, 64)], grid: HoledGrid.new([[2, 4]]))[:choice][:params][:direction]
   end
 
-  def test_a_walk_refused_at_once_for_danger_counts_as_walled
-    pilot = primed
+  def test_a_danger_stop_or_a_blocked_walk_without_its_cell_is_not_counted_as_walled
     link = state(frame: 200, hp: 8, x: 68, y: 60)
-    pilot.acted(skill: 'walk', outcome: { stopped_by: :danger, frames: 0, params: { direction: :up, cells: 1 } })
-    assert_equal 'left', pilot.disengage_choice(state: link, entities: [threat(70, 64)])[:choice][:params][:direction]
+    here = { room: 163, map: 16, row: 3, col: 4 }
+    pilot = primed
+    pilot.acted(skill: 'walk', outcome: { stopped_by: :danger, frames: 0, params: { direction: :up, cells: 1 }, from: here })
+    assert_equal 'up', pilot.disengage_choice(state: link, entities: [threat(70, 64)])[:choice][:params][:direction]
     other = primed
-    other.acted(skill: 'walk', outcome: { stopped_by: :danger, frames: 9, params: { direction: :up, cells: 1 } })
+    other.acted(skill: 'walk', outcome: { stopped_by: :blocked, params: { direction: :up, cells: 1 } })
     assert_equal 'up', other.disengage_choice(state: link, entities: [threat(70, 64)])[:choice][:params][:direction]
   end
 
@@ -577,6 +578,17 @@ class AutopilotTest < Minitest::Test
     pilot.acted(skill: 'attack', outcome: { stopped_by: :out_of_reach, target: { slot: 4, type: 155, cell: [3, 6] }, from: { room: 163, map: 16 } })
     assert_nil pilot.fight_choice(state: state(frame: 200), entities: [sighted(32, 0)]), 'still two cells away'
     assert_equal({ row: 3, col: 5 }, pilot.fight_choice(state: state(frame: 210), entities: [sighted(16, 0)])[:choice][:params])
+  end
+
+  def test_an_enemy_only_out_of_reach_is_fought_again_at_most_twice_a_visit
+    pilot = primed
+    miss = { stopped_by: :out_of_reach, target: { slot: 4, type: 155, cell: [3, 5] }, from: { room: 163, map: 16 } }
+    2.times do
+      pilot.acted(skill: 'attack', outcome: miss)
+      refute_nil pilot.fight_choice(state: state(frame: 210), entities: [sighted(16, 0)])
+    end
+    pilot.acted(skill: 'attack', outcome: miss)
+    assert_nil pilot.fight_choice(state: state(frame: 220), entities: [sighted(16, 0)])
   end
 
   def test_a_fight_on_sight_never_starts_the_chain_of_fights_after_a_kill

@@ -148,6 +148,7 @@ module Koholint
         end
         @screen_since = nil unless screen(state)
         note_gains(state)
+        @retreated = nil if @retreated && (@retreated[0] != state.place || state.health > Perception::HP_PER_HEART)
         @held = Dialogues.items(state.inventory, state.item_a, state.item_b)
         release_hemmed(state)
         track_locked(state)
