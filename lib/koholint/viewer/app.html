@@ -445,8 +445,11 @@
   }
 
   function json(url) { return fetch(url, { cache: 'no-store' }).then(function (r) { if (!r.ok) throw new Error(r.status); return r.json(); }); }
+  let islandText = null;
   function loadIsland() {
-    return json('/island.json').then(function (data) {
+    return fetch('/island.json', { cache: 'no-store' }).then(function (r) { if (!r.ok) throw new Error(r.status); return r.text(); }).then(function (text) {
+      if (text === islandText) return;
+      islandText = text; const data = JSON.parse(text);
       island = data; islandGen++; P = {}; data.places.forEach(function (p) { P[p.label] = p; });
       grid = data.places.filter(function (p) { return p.grid; });
       days = Array.from(new Set(data.places.map(function (p) { return p.first.date; }))).sort();
@@ -508,15 +511,15 @@
     const lines = [], st = [], labels = [], cks = [];
     list.forEach(function (n) {
       const p = n.parent ? nodes[n.parent] : null, y = Y(n.lane), x1 = X(n.fork), x2 = X(Math.max(n.end, n.fork + 800));
-      const py = p ? Y(p.lane) : y, dy = Math.abs(y - py);
-      const d = p && dy ? 'M' + x1 + ',' + py + 'L' + (x1 + dy) + ',' + y + 'L' + Math.max(x2, x1 + dy) + ',' + y : 'M' + x1 + ',' + y + 'L' + x2 + ',' + y;
+      const py = p ? Y(p.lane) : y, dy = Math.abs(y - py), bend = p && dy ? Math.min(dy, Math.max(4, (x2 - x1) / 2)) : 0, on = function (f) { return Math.max(X(f), x1 + bend); };
+      const d = bend ? 'M' + x1 + ',' + py + 'L' + (x1 + bend) + ',' + y + 'L' + x2 + ',' + y : 'M' + x1 + ',' + y + 'L' + x2 + ',' + y;
       const dim = state.msel && nodes[state.msel] && !path.has(n.run) ? 'dim' : null;
       lines.push(s('path', { class: 'ln' + (n.main ? ' main' : '') + (dim ? ' dim' : ''), d: d, stroke: n.main ? '#b83a3a' : pal[(n.lane + 40) % pal.length], 'data-m': n.run }, s('title', { text: short(n.run) + ' · ' + n.flow })));
       if (!n.main || n === end) st.push(s('circle', { class: 'term' + (dim ? ' dim' : ''), cx: x2, cy: y, r: 4.5 }));
       if (n.deaths && !n.main) st.push(use('skull', { class: dim, x: x2 + 5, y: y - 7, width: 13, height: 13 }));
-      if (n.main) st.push(s('circle', { class: 'st' + (dim ? ' dim' : ''), cx: p && dy ? x1 + dy : x1, cy: y, r: 7, 'data-m': n.run }));
-      n.gains.forEach(function (g) { const gx = X(g[1]); st.push(s('g', { class: dim, 'data-m': n.run }, s('title', { text: itemName(g[0]) }), s('circle', { class: 'xch', cx: gx, cy: y, r: 17 }), use($('s-item-' + g[0]) ? 'item-' + g[0] : 'item-0', { x: gx - 12, y: y - 12, width: 24, height: 24 }))); });
-      n.checkpoints.forEach(function (c) { const cx = X(c.frame); st.push(s('circle', { class: 'st' + (dim ? ' dim' : ''), cx: cx, cy: y, r: 10, 'stroke-width': 4, 'data-m': n.run })); cks.push({ x: cx, y: y, name: c.name.replace(/-/g, ' '), dim: dim }); });
+      if (n.main) st.push(s('circle', { class: 'st' + (dim ? ' dim' : ''), cx: x1 + bend, cy: y, r: 7, 'data-m': n.run }));
+      n.gains.forEach(function (g) { const gx = on(g[1]); st.push(s('g', { class: dim, 'data-m': n.run }, s('title', { text: itemName(g[0]) }), s('circle', { class: 'xch', cx: gx, cy: y, r: 17 }), use($('s-item-' + g[0]) ? 'item-' + g[0] : 'item-0', { x: gx - 12, y: y - 12, width: 24, height: 24 }))); });
+      n.checkpoints.forEach(function (c) { const cx = on(c.frame); st.push(s('circle', { class: 'st' + (dim ? ' dim' : ''), cx: cx, cy: y, r: 10, 'stroke-width': 4, 'data-m': n.run })); cks.push({ x: cx, y: y, name: c.name.replace(/-/g, ' '), dim: dim }); });
       if (n.hidden) labels.push(s('text', { class: 'hid' + (dim ? ' dim' : ''), x: n.main ? X(n.end) - 4 : x2 + (n.deaths ? 22 : 9), y: n.main ? y - 12 : y + 4, 'text-anchor': n.main ? 'end' : null, text: '+' + n.hidden }));
     });
     const band = Y(lo) - 70; let lastX = -1e9;
@@ -540,8 +543,8 @@
   }
 
   /* ---------- Tiroirs ---------- */
-  let islandGen = 0, runsGen = 0, drawn = null;
-  const notesOf = {};
+  let islandGen = 0, runsGen = 0, drawn = null, drawnKind = null;
+  const notesOf = {}, drafts = {};
   const RANK = { high: 0, normal: 1, low: 2, tip: 3 }, LEADCOL = { open: 'var(--warn)', tested: 'var(--acc)', refuted: 'var(--bad)' }, LEADWORD = { open: 'ouverte', tested: 'vérifiée', refuted: 'réfutée' };
   function loadRuns() { return json('/runs.json').then(function (rows) { runs = rows; runsGen++; drawer(); }).catch(function () { runs = []; runsGen++; drawer(); }); }
   function post(path, id, fields) {
@@ -552,11 +555,15 @@
     const d = state.drawer;
     $('scrim').classList.toggle('on', !!d); $('drawer').classList.toggle('on', !!d);
     document.querySelectorAll('header .tool[data-drawer]').forEach(function (b) { b.setAttribute('aria-pressed', String(b.dataset.drawer === d)); });
-    if (!d) { drawn = null; return; }
+    if (!d) { drawn = null; drawnKind = null; return; }
     const key = d === 'runs' ? JSON.stringify([d, state.q, state.starOnly, state.runsAt, state.more, runsGen, islandGen]) : d + '|' + islandGen;
     if (drawn === key) return;
+    const focus = document.activeElement, body = document.querySelector('#drawer .body');
+    if (body && focus && body.contains(focus) && /^(INPUT|TEXTAREA)$/.test(focus.tagName)) return;
+    const scroll = body && drawnKind === d ? body.scrollTop : 0;
     if (d === 'runs') runsDrawer(drawn && drawn.indexOf('["runs"') === 0); else if (d === 'leads') leadsDrawer(); else peopleDrawer();
-    drawn = key;
+    const after = document.querySelector('#drawer .body'); if (after) after.scrollTop = scroll;
+    drawn = key; drawnKind = d;
   }
   function runsDrawer(kept) {
     if (!kept) fill('drawer', [h('div', { class: 'h' }, h('input', { class: 'search', id: 'q', placeholder: 'run, flow, tag, arrêt, étoile…', value: state.q, 'aria-label': 'chercher une run' }), h('button', { type: 'button', class: 'tool', id: 'starOnly', title: 'étoilées seulement', text: '★' })), h('div', { class: 'body', id: 'dbody' })]);
@@ -578,12 +585,12 @@
       state.more === id && moreBox(r)];
   }
   function moreBox(r) {
-    const id = r.run_id;
-    if (notesOf[id] == null) { notesOf[id] = ''; json('/header.json?run=' + encodeURIComponent(id)).then(function (hd) { notesOf[id] = hd.notes || ''; const ta = $('notesT'); if (ta && state.more === id && !ta.value) ta.value = notesOf[id]; }).catch(function () { }); }
+    const id = r.run_id, draft = drafts[id] || {};
+    if (notesOf[id] == null) { notesOf[id] = ''; json('/header.json?run=' + encodeURIComponent(id)).then(function (hd) { notesOf[id] = hd.notes || ''; const ta = $('notesT'); if (ta && state.more === id && draft.notes == null && !ta.value) ta.value = notesOf[id]; }).catch(function () { }); }
     return h('div', { class: 'runmore' },
-      h('label', null, 'étoile : pourquoi', h('input', { id: 'whyI', maxlength: 500, value: r.why || '', placeholder: 'ce que cette run montre' })),
+      h('label', null, 'étoile : pourquoi', h('input', { id: 'whyI', maxlength: 500, value: draft.why != null ? draft.why : r.why || '', placeholder: 'ce que cette run montre' })),
       h('div', { class: 'btns' }, h('button', { type: 'button', class: 'xbtn', id: 'starGo', 'data-run': id, text: r.starred ? '★ mettre à jour' : '★ étoiler' })),
-      h('label', null, 'notes', h('textarea', { id: 'notesT', maxlength: 8192 }, notesOf[id])),
+      h('label', null, 'notes', h('textarea', { id: 'notesT', maxlength: 8192 }, draft.notes != null ? draft.notes : notesOf[id])),
       h('div', { class: 'btns' }, h('button', { type: 'button', class: 'xbtn', id: 'notesGo', 'data-run': id, text: 'enregistrer les notes' }), h('span', { class: 'mut', id: 'moreMsg' })));
   }
   function leadsDrawer() {
@@ -637,9 +644,9 @@
     if (t.closest('#unat')) { state.runsAt = null; return drawer(); }
     const mo = t.closest('[data-more]'); if (mo) { state.more = state.more === mo.dataset.more ? null : mo.dataset.more; return drawer(); }
     const sg = t.closest('#starGo'); if (sg) { const id = sg.dataset.run, why = $('whyI').value;
-      return post('/star', id, { why: why }).then(function (b) { const r = runs.find(function (x) { return x.run_id === id; }); if (r) { r.starred = true; r.why = b.why; } runsGen++; drawer(); }).catch(function (err) { const m = $('moreMsg'); if (m) m.textContent = err.message; }); }
+      return post('/star', id, { why: why }).then(function (b) { const r = runs.find(function (x) { return x.run_id === id; }); if (r) { r.starred = true; r.why = b.why; } if (drafts[id]) delete drafts[id].why; runsGen++; drawer(); }).catch(function (err) { const m = $('moreMsg'); if (m) m.textContent = err.message; }); }
     const ng = t.closest('#notesGo'); if (ng) { const id = ng.dataset.run, text = $('notesT').value;
-      return post('/notes', id, { text: text }).then(function () { notesOf[id] = text; const m = $('moreMsg'); if (m) m.textContent = 'enregistré'; }).catch(function (err) { const m = $('moreMsg'); if (m) m.textContent = err.message; }); }
+      return post('/notes', id, { text: text }).then(function () { notesOf[id] = text; if (drafts[id]) delete drafts[id].notes; const m = $('moreMsg'); if (m) m.textContent = 'enregistré'; }).catch(function (err) { const m = $('moreMsg'); if (m) m.textContent = err.message; }); }
     const ra = t.closest('[data-runs-at]'); if (ra) { state.runsAt = ra.dataset.runsAt; state.q = ''; return openDrawer('runs'); }
     const dg = t.closest('[data-direct]'); if (dg && !t.closest('input, textarea')) { stopReplay(); state.drawer = null; drawer(); location.hash = '#direct/' + encodeURIComponent(dg.dataset.direct); return; }
     const tg = t.closest('[data-trail]'); if (tg) return showTrail(tg.dataset.trail);
@@ -680,6 +687,7 @@
   });
   document.addEventListener('input', function (e) {
     if (e.target.id === 'q') { state.q = e.target.value; save(); return drawer(); }
+    if ((e.target.id === 'whyI' || e.target.id === 'notesT') && state.more) { const draft = drafts[state.more] = drafts[state.more] || {}; draft[e.target.id === 'whyI' ? 'why' : 'notes'] = e.target.value; return; }
     if (e.target.id === 'dayA') { stopReplay(); state.day = days[+e.target.value]; render(); }
     if (e.target.id === 'frameD') { state.scrub = +e.target.value; direct(); const el = $('frameD'); if (el) el.focus(); }
   });

@@ -8,6 +8,8 @@ class IslandTest < Minitest::Test
   FIRST = '20261101-100000-aaaa'.freeze
   FORK = '20261102-100000-bbbb'.freeze
   IDLE = '20261103-100000-cccc'.freeze
+  FOLD = '20261104-100000-dddd'.freeze
+  FOLD_KID = '20261105-100000-eeee'.freeze
 
   def make_run(root, id, events, parent: nil)
     dir = File.join(root, id)
@@ -26,8 +28,10 @@ class IslandTest < Minitest::Test
       make_run(root, FORK, [at(1, 161), at(60, 162), at(61, 163), [:item_gained, { frame: 62, place: [163, 0], item: 1, name: 'sword', held: [1, 4] }]],
           parent: { 'id' => FIRST, 'frame' => 50 })
       make_run(root, IDLE, [at(1, 162), at(20, 161)], parent: { 'id' => FIRST, 'frame' => 5 })
+      make_run(root, FOLD, [at(1, 162)], parent: { 'id' => FIRST, 'frame' => 5 })
+      make_run(root, FOLD_KID, [at(1, 162)], parent: { 'id' => FOLD, 'frame' => 2 })
       checkpoints = File.join(root, 'checkpoints.json')
-      File.write(checkpoints, JSON.generate([{ name: 'shield-obtained', run: FIRST, frame: 6 }, { name: 'elsewhere', run: 'unread', frame: 1 }]))
+      File.write(checkpoints, JSON.generate([{ name: 'shield-obtained', run: FIRST, frame: 6 }, { name: 'idle-place', run: IDLE, frame: 20 }, { name: 'elsewhere', run: 'unread', frame: 1 }]))
       return Koholint::Viewer::Island.build([root], checkpoints:)
     end
   end
@@ -39,7 +43,7 @@ class IslandTest < Minitest::Test
 
   def test_the_furthest_run_holds_the_most_items
     built = island
-    assert_equal [3, FORK, [1, 4]], built.values_at(:runs, :furthest, :held)
+    assert_equal [5, FORK, [1, 4]], built.values_at(:runs, :furthest, :held)
     assert(built[:items].any? { |item| item[:id] == 1 && item[:name] == 'sword' })
   end
 
@@ -57,9 +61,10 @@ class IslandTest < Minitest::Test
 
   def test_the_metro_draws_the_lineages_that_reached_something_and_folds_the_other_forks
     lines = island[:metro].to_h { |line| [line[:run], line] }
-    assert_equal [FIRST, FORK], lines.keys
-    assert(lines.values.all? { |line| line[:main] })
-    assert_equal [nil, 0, 10, 2, [[4, 6]], [{ name: 'shield-obtained', frame: 6 }], 1], lines[FIRST].values_at(:parent, :fork, :end, :deaths, :gains, :checkpoints, :hidden)
+    assert_equal [FIRST, FORK, IDLE], lines.keys
+    assert_equal [true, true, false], lines.values.map { |line| line[:main] }
+    assert_equal [nil, 0, 10, 2, [[4, 6]], [{ name: 'shield-obtained', frame: 6 }], 2], lines[FIRST].values_at(:parent, :fork, :end, :deaths, :gains, :checkpoints, :hidden)
+    assert_equal [FIRST, 5, 20, [{ name: 'idle-place', frame: 20 }], 0], lines[IDLE].values_at(:parent, :fork, :end, :checkpoints, :hidden)
     assert_equal [FIRST, 50, 62, [[1, 62]], 1], lines[FORK].values_at(:parent, :fork, :end, :gains, :screens)
   end
 
@@ -67,10 +72,11 @@ class IslandTest < Minitest::Test
     place = { label: 'C11', grid: true, opens_from: [], texts: [
       { text: 'Suis la route du Sud, vers la plage là où je t\'ai trouvé. Soi prudent', run: FIRST, frame: 1 },
       { text: 'Suis la route du Sud, vers la plage là où je t\'ai trouvé. Soit prudent...', run: FORK, frame: 3 },
-      { text: 'Salut A !', speaker: 'Tarkin', run: FIRST, frame: 5 }
+      { text: 'Salut A !', speaker: 'Tarkin', run: FIRST, frame: 5 },
+      { text: 'Suis la route du Sud, vers la plage là où je t\'ai trouvé. Puis remonte au village voir le vieux.', run: FIRST, frame: 9 }
     ] }
     people = Koholint::Viewer::Island.people([place], { 'C11' => 'C11' })
-    assert_equal [[nil, 'C11', 1, ['Suis la route du Sud, vers la plage là où je t\'ai trouvé. Soit prudent...']], ['Tarkin', 'C11', 1, ['Salut A !']]],
+    assert_equal [[nil, 'C11', 2, ['Suis la route du Sud, vers la plage là où je t\'ai trouvé. Soit prudent...', 'Suis la route du Sud, vers la plage là où je t\'ai trouvé. Puis remonte au village voir le vieux.']], ['Tarkin', 'C11', 1, ['Salut A !']]],
                  people.map { |person| [person[:name], person[:screen], person[:count], person[:texts].map { |text| text[:text] }] }
   end
 

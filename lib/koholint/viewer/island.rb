@@ -13,7 +13,7 @@ module Koholint
       IMPORTANCE = %w[high normal low tip].freeze
       RECENT = 12
       PERSON_TEXTS = 6
-      SAME_TEXT = 40
+      SAME_TEXT = 0.85
 
       module_function
 
@@ -86,12 +86,24 @@ module Koholint
               .group_by { |text| text[:speaker] || "@#{screen_of[text[:place]] || text[:place]}" }
               .map do |key, texts|
                 read = texts.group_by { |text| text[:run] }.flat_map { |_, run| Story.merged(run) }
-                talks = read.each_with_index.sort_by { |talk, index| [-talk[:text].size, index] }.uniq { |talk, _| Dialogues.compact(talk[:text])[0, SAME_TEXT] }
-                            .sort_by(&:last).map(&:first)
+                kept = []
+                read.each_with_index.sort_by { |talk, index| [-talk[:text].size, index] }.each do |talk, index|
+                  grams = bigrams(talk[:text])
+                  kept << [talk, index, grams] unless kept.any? { |_, _, other| similar?(grams, other) }
+                end
+                talks = kept.sort_by { |_, index, _| index }.map(&:first)
                 { name: key.start_with?('@') ? nil : key, screen: screen_of[texts.first[:place]] || texts.first[:place], count: talks.size,
                   texts: talks.last(PERSON_TEXTS).reverse.map { |talk| talk.slice(:text, :place, :frame) } }
               end
               .sort_by { |person| [-person[:count], person[:name].to_s] }
+      end
+
+      def bigrams(text) = Dialogues.compact(text).each_char.each_cons(2).map(&:join).tally
+
+      # Dice coefficient of the two texts' character pairs.
+      def similar?(grams, other)
+        shared = grams.sum { |gram, count| [count, other.fetch(gram, 0)].min }
+        2.0 * shared / [grams.values.sum + other.values.sum, 1].max >= SAME_TEXT
       end
 
       def lineage(digest, by_run)
@@ -112,8 +124,7 @@ module Koholint
                                  .map { |lead| { quote: lead[:quote], claim: lead[:claim], importance: lead[:importance], place: lead[:place], screen: screen_of[lead[:place]] || lead[:place], run: lead[:run], date: date(lead[:run]) } }
       end
 
-      # The lines worth drawing: the furthest lineage, and every lineage that reached a checkpoint, a first gain or a new screen;
-      # the other forks of a drawn run are only counted.
+      # The furthest lineage and every lineage that reached a checkpoint, a first gain or a new screen; other forks are only counted.
       def metro(digests, places, furthest, checkpoints)
         by_run = digests.to_h { |digest| [digest[:run], digest] }
         chain = furthest ? lineage(furthest, by_run).map { |digest| digest[:run] } : []
@@ -122,6 +133,7 @@ module Koholint
         screens = places.select { |place| place[:grid] }.group_by { |place| place[:first][:run] }
         keep = (chain + stations.keys + firsts.keys + screens.keys).flat_map { |run| lineage(by_run[run], by_run).map { |digest| digest[:run] } }.to_set
         kids = digests.group_by { |digest| digest[:parent] }
+        folded = ->(run) { kids.fetch(run, []).sum { |kid| 1 + folded.(kid[:run]) } }
         keep.sort.map do |run|
           digest = by_run[run]
           { run:, parent: by_run.key?(digest[:parent]) ? digest[:parent] : nil, fork: digest[:fork], end: digest[:fork] + digest[:frames], main: chain.include?(run),
@@ -129,7 +141,7 @@ module Koholint
             screens: screens.fetch(run, []).size, held: digest[:held], deaths: digest[:places].sum { |_, found| found[:deaths] },
             gains: firsts.fetch(run, []).map { |item| [item[:item], item[:frame]] },
             checkpoints: stations.fetch(run, []).map { |checkpoint| { name: checkpoint['name'], frame: checkpoint['frame'] } },
-            hidden: kids.fetch(run, []).count { |kid| !keep.include?(kid[:run]) } }
+            hidden: kids.fetch(run, []).reject { |kid| keep.include?(kid[:run]) }.sum { |kid| 1 + folded.(kid[:run]) } }
         end
       end
     end
