@@ -1,6 +1,6 @@
 # Agent skills
 
-The skills, protocols and harness behaviours the agent works with. Versioned with the play flow (currently `flow-89`): update this page, not the README, when a flow changes. Layers and data flow are in [ARCHITECTURE.md](../ARCHITECTURE.md).
+The skills, protocols and harness behaviours the agent works with. Versioned with the play flow (currently `flow-90`): update this page, not the README, when a flow changes. Layers and data flow are in [ARCHITECTURE.md](../ARCHITECTURE.md).
 
 
 - Learned capabilities (`data/capabilities.json`, `bin/koholint capability list`): an `operational` entry is a composite of the skills below, offered in the skill schema and listed under "Learned skills" only while its trigger item is held (flow-49) and its object is on screen (today `sword_on_object_92 row col direction`: stand next to object 92, face it, use the sword, step into its cell). `explore` and `goto` also run it themselves when blocked facing such a cell, and the planner routes through those cells as a last resort. `learn` and `capability publish|retire` are offline commands.
@@ -143,6 +143,17 @@ The skills, protocols and harness behaviours the agent works with. Versioned wit
   Within a place, explore takes a side known only as the assumed way back (flow-78) after the place's other reachable untried exits, doors and frontiers;
   it is still a frontier, taken when nothing else here is reachable, before a route to another place. An explore that stops `no_frontier`
   in at most one frame is answered by the harness at the next decision, not after three, since from the same cell it would find none again.
+- flow-90: holes and crumbling floor are read from the live room objects. Objects 174 and 175 are holes wherever they appear
+  (the grid's `hole_objects`, never walked, with their margin); object 223 is a crumbling floor that becomes a hole when Link stands
+  on it about half a second, and the room restores it on re-entry. Above one heart the harness fights on sight with no model call:
+  the nearest `enemy` within 32 px whose `sword_hits` is 1 (explore stops `enemy`, a stop the autopilot treats as benign), up to
+  8 attacks per call, never while Link's footprint (his measured row band) covers a crumbling cell, never again in a place where an
+  attack stopped `damage`, and never again a slot an attack missed there (`blocked`, `no_path`, `out_of_reach`, `no_kill`, `hole`).
+  The attack strikes from where Link stands when its target is within 2 cells of him, turns to any enemy that comes nearer than its
+  target within 2 cells, and stops `hole` before a lineup step enters a hole. Explore stops `fell` as soon as Link starts to fall.
+  An untried exit or door that no path reaches and that is not the way back is reported `unreachable`, so it is cut, except in a
+  room with crumbling floor, whose holes come and go. The least-visited place explore heads for skips one whose landing from here
+  is a pocket.
 - flow-81: a closed treasure chest (object 160) is untried work like an unread sign, but only while a route on the current grid reaches the cell below it:
   the revisit opens it with `talk_to` (walk up into it from below, then A; no model call, 2 rounds per chest), it is a `chest-R-C` objective candidate
   (`chest-R-M-R-C` for a place where one was seen reachable), and the things on screen list each chest as open or closed with the cell to open it from
