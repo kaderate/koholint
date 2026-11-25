@@ -86,6 +86,10 @@ module Koholint
         @ledger = memory.ledger
         @triggers = memory.triggers
         @talk_log = memory.talk_log
+        @item_names = memory.item_names.dup
+        @pending_gains = []
+        @item_tries = memory.item_tries.dup
+        @stalled = memory.stalled.dup
         @revisit = revisit || Revisit.new(talk_log: @talk_log)
         @entities = []
         @refusals = []
@@ -142,6 +146,7 @@ module Koholint
           @triggers.reset_unless(state.place)
         end
         @screen_since = nil unless screen(state)
+        note_gains(state)
         @held = Dialogues.items(state.inventory, state.item_a, state.item_b)
         release_hemmed(state)
         track_locked(state)
@@ -222,6 +227,9 @@ module Koholint
 
           autopilot = autopilot_choice(decision_point, state, context)
           return autopilot if autopilot
+
+          wanted = item_objective(decision_point, state)
+          return wanted if wanted
 
           auto = auto_objective(decision_point, state)
           return auto if auto
@@ -377,6 +385,10 @@ module Koholint
         end
         @candidates = Candidates.build(place:, grid: context[:grid], explore_log: @explore_log, talk_log: @talk_log, leads: @leads, cards: @cards,
                                        entities: @entities, signs:, stamp: stamp(state), link: state.cell)
+        # A candidate no known route reaches is not offered again after its objective stalled, until a route to it appears.
+        stalled = @stalled | @objectives.history.filter_map { |done| done[:candidate] if done[:reason] == 'stall' }
+        hops = @explore_log.hops(place)
+        @candidates.reject! { |candidate| stalled.include?(candidate[:id]) && (where = candidate.dig(:target, :place)) && where != place && !hops.key?(where) }
         @candidates.each { |candidate| offer_puzzle(candidate[:target][:place]) if candidate[:id].start_with?('puzzle-') }
         @candidates
       end
@@ -498,14 +510,31 @@ module Koholint
       end
 
       # Any talk_to aimed at a chest takes it off the away list; one that drew no response leaves it closed for this visit.
+      # An item newly held takes its name from its pickup text, the first text transcribed at its place after the gain shows as held
+      # (the rule of Items.pickup_names).
+      def note_gains(state)
+        held = Dialogues.items(state.inventory, state.item_a, state.item_b)
+        @pending_gains += (held - @held).map { |item| { item:, place: state.place, frame: state.frame } } if @held
+        @pending_gains.reject! do |gain|
+          read = @last_read if @last_read && @last_read[:place] == gain[:place] && @last_read[:frame] > gain[:frame]
+          words = Items.name_words(read&.dig(:text))
+          @item_names[gain[:item]] ||= words if words.any?
+          read || state.frame - gain[:frame] > Items::PICKUP_FRAMES
+        end
+      end
+
       # Only a talk that reached the thing, or a touch that held against it, tries it.
       def note_try(choice, outcome, state)
         skill = choice[:skill].to_s
-        return unless %w[talk_to touch].include?(skill)
+        return unless %w[talk_to touch use_item].include?(skill)
 
         answered = outcome[:talked] == true || outcome[:dialog_after] == true
-        reached = skill == 'touch' ? outcome.key?(:arrival_frame) : answered || TalkLog.attempt?(outcome)
-        @objectives.note_try(place: state.place, type: outcome[:target_type], skill:, answered:) if reached
+        reached = case skill
+                  when 'touch' then outcome.key?(:arrival_frame)
+                  when 'use_item' then outcome[:item] && !%w[refused wrong_mode].include?(outcome[:stopped_by].to_s)
+                  else answered || TalkLog.attempt?(outcome)
+                  end
+        @objectives.note_try(place: state.place, type: outcome[:target_type], skill:, answered:, item: outcome[:item]) if reached
       end
 
       def note_chest_attempt(choice, outcome, state)

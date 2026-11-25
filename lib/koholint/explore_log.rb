@@ -71,6 +71,7 @@ module Koholint
       @spent_cuts = Set.new
       @pushed_rooms = Set.new
       @failed_pushes = {}
+      @knocks = {}
     end
 
     # The exit bench's measured edges and benches for the current context (Exits.for_context); they fill ways this run never crossed.
@@ -165,6 +166,7 @@ module Koholint
       to = Ledger.place_of(Ledger.pick(result, :to))
       @pushed_rooms << from if from && Ledger.pick(result, :pushed)
       note_failed_push(from, result) if from
+      note_knocks(from, result) if from
       left = @at if @at && @at != (to || from)
       @entered[from] = :landed if from && @at && from != @at
       @at = to || from
@@ -528,6 +530,15 @@ module Koholint
       push = Ledger.pick(result, :failed_push) or return
       (@failed_pushes[place] ||= []) << [@visits[place], [Ledger.pick(push, :row), Ledger.pick(push, :col)], Ledger.pick(push, :direction).to_sym]
     end
+
+    def note_knocks(place, result)
+      Array(Ledger.pick(result, :knocked_edges)).each do |edge|
+        (@knocks[place] ||= []) << [@visits[place], [Ledger.pick(edge, :row), Ledger.pick(edge, :col)], Ledger.pick(edge, :direction).to_sym]
+      end
+    end
+
+    # The steps of this visit a hostile knocked Link back from: [cell, direction], once per knock.
+    def knocked(place) = Array(@knocks[place]).select { |visit, _, _| visit == @visits[place] }.map { |_, cell, direction| [cell, direction] }
 
     # The pushes of this visit that left their stone in place: [stone cell, direction].
     def failed_pushes(place) = Array(@failed_pushes[place]).select { |visit, _, _| visit == @visits[place] }.map { |_, cell, direction| [cell, direction] }

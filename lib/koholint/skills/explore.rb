@@ -14,6 +14,8 @@ module Koholint
       FRUITLESS_ATTEMPTS = 3
       OBJECT_RANGE = 3
       ENTER_FRAMES = 120
+      KNOCK_FRAMES = 60
+      KNOCK_TRIES = 2
       SPEAKERS = %w[npc unknown].freeze
       UNKNOWN = %i[unknown stale].freeze
       SIDES = { up: ->(row, _col) { row.zero? }, down: ->(row, _col) { row == Geometry::ROWS - 1 },
@@ -90,6 +92,8 @@ module Koholint
           @untried = []
           @exits = []
           @blocked = []
+          @knocked_edges = []
+          @since_knock = KNOCK_FRAMES + 1
           @crossed = []
           @excluded = []
           # Runs without the capability logged clearable objects as walls.
@@ -109,8 +113,9 @@ module Koholint
 
         def result(state = @last)
           merged = super.merge(place_changed: state.place != @place, cells_walked: @cells_walked, legs: @legs, target: target_summary,
-                               crossed: @crossed.map(&:dup), walls: @new_walls.map { |row, col| { row:, col: } }, blocked_edges: @blocked.map(&:dup), exits: @exits.map(&:dup),
+                               crossed: @crossed.map(&:dup), walls: @new_walls.map { |row, col| { row:, col: } }, blocked_edges: (@blocked - @knocked_edges).map(&:dup), exits: @exits.map(&:dup),
                                offered: @offered.map { |row, col| { row:, col: } })
+          merged[:knocked_edges] = @knocked_edges.map(&:dup) if @knocked_edges.any?
           merged[:clears] = @clearing.uses if @clearing&.uses&.any?
           merged[:survey] = @survey.merge(pending: pending?) if @survey
           merged[:route] = @route if @route
@@ -139,6 +144,7 @@ module Koholint
 
           @still = [state.x, state.y] == @position ? @still + 1 : 0
           @position = [state.x, state.y]
+          @since_knock = state.link_knockback.to_i.positive? ? 0 : @since_knock + 1
           return @clearing.step(state) if @clearing&.active? && !@leg
           return depart(state) if state.place != @place
           return stop_now(:fell) if state.falling?
@@ -347,15 +353,25 @@ module Koholint
           attempt_over(state)
         end
 
+        # A step a hostile knocked back just before it failed is barred for this call only and stays to do, KNOCK_TRIES times a visit.
         def fail_step(cell, direction)
           edge = { row: cell[0], col: cell[1], direction: }
+          knocked = @since_knock <= KNOCK_FRAMES && knocks(cell, direction) < KNOCK_TRIES
+          @since_knock = KNOCK_FRAMES + 1
           block(edge)
+          return @knocked_edges << edge if knocked
+
           @exits << edge.merge(outcome: :blocked) if %i[exit door].include?(@target[:kind])
           @failed_push = { row: @target[:stone][0], col: @target[:stone][1], direction: } if @target[:kind] == :push
           return unless @target[:kind] == :frontier
 
           @new_walls << Geometry.step(cell, direction)
           @walls << Geometry.step(cell, direction)
+        end
+
+        def knocks(cell, direction)
+          earlier = @log ? @log.knocked(@place).count([cell, direction]) : 0
+          earlier + @knocked_edges.count { |edge| edge[:row] == cell[0] && edge[:col] == cell[1] && edge[:direction] == direction }
         end
 
         def block(edge)
@@ -416,6 +432,7 @@ module Koholint
 
         def pending?
           return false unless @planner && @cell
+          return true if @knocked_edges.any?
 
           path_to = ->(cell) { @planner.path(from: @cell, to: cell) }
           safe_to = ->(cell) { @planner.path(from: @cell, to: cell, cross_margin: false) }

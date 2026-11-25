@@ -681,6 +681,75 @@ class DelegatedAutopilotTest < Minitest::Test
     assert_equal({ choice: { skill: 'touch', params: { row: 3, col: 4, type: 132 } } }, p.send(:follow_choice, state))
   end
 
+  def test_a_person_whose_text_named_a_held_item_becomes_the_objective_talked_to_holding_it_then_given_it
+    here = [state.room_id, state.map_id]
+    entities = [{ type: 64, kind: 'person', cell: [3, 4] }]
+    p = autopiloted(ScriptedClient.new(objective: []))
+    p.instance_variable_set(:@entities_reader, -> { entities })
+    p.instance_variable_set(:@item_names, { 12 => %w[Champignon] })
+    talk_log = p.instance_variable_get(:@talk_log)
+    talk_log.remember(place: here, cell: [3, 4], text: 'Il me faut le Champignon de la forêt.', stamp: Koholint::Dialogues.stamp(milestone: :sword, items: [1, 4], leads: 0), entity: 64)
+    holding = state(inventory: [12] + Array.new(9, 0))
+    assert_nil p.send(:item_objective, p.decision_point_for(state), state), 'not while Link does not hold it'
+    picked = p.send(:item_objective, p.decision_point_for(holding), holding)
+    assert picked[:autopilot]
+    assert_equal({ kind: 'person', place: here, type: 64, cell: [3, 4], try: true, item: 12, name: 'Champignon', seen: [1, true] }, @objectives.current[:target])
+    assert_equal({ choice: { skill: 'talk_to', params: { row: 3, col: 4 } } }, p.send(:follow_choice, holding))
+    @objectives.note_try(place: here, type: 64, skill: 'talk_to', answered: true)
+    assert_equal({ choice: { skill: 'use_item', params: { item: Koholint::Items.name(12) } } }, p.send(:follow_choice, holding))
+  end
+
+  def test_an_item_objective_whose_try_drew_no_text_is_not_picked_again_until_a_new_text_from_that_person
+    here = [state.room_id, state.map_id]
+    p = autopiloted(ScriptedClient.new(objective: []))
+    p.instance_variable_set(:@entities_reader, -> { [{ type: 64, kind: 'person', cell: [3, 4] }] })
+    p.instance_variable_set(:@item_names, { 12 => %w[Champignon] })
+    talk_log = p.instance_variable_get(:@talk_log)
+    before = Koholint::Dialogues.stamp(milestone: :sword, items: [1, 4], leads: 0)
+    talk_log.remember(place: here, cell: [3, 4], text: 'Il me faut le Champignon de la forêt.', stamp: before, entity: 64)
+    holding = state(inventory: [12] + Array.new(9, 0))
+    assert p.send(:item_objective, p.decision_point_for(holding), holding)
+    @objectives.note_try(place: here, type: 64, skill: 'talk_to', answered: false)
+    @objectives.note_try(place: here, type: nil, skill: 'use_item', answered: false, item: 12)
+    assert_equal :achieved, @objectives.update(holding, frame: 50)
+    assert_nil p.send(:item_objective, p.decision_point_for(holding), holding), 'a silent try is not repeated'
+    talk_log.remember(place: here, cell: [3, 4], text: 'Ah, il est si loin.', stamp: before, entity: 64)
+    assert p.send(:item_objective, p.decision_point_for(holding), holding), 'a new text from them reopens it'
+    started = Koholint::Trace.read(File.join(@dir, 'trace.jsonl')).select { |e| e['type'] == 'objective' && e['status'] == 'started' }
+    assert_equal({ [12, here, 64] => [2, true] }, Koholint::Policies::Memory.item_tries(started), 'a resumed run keeps the tries')
+  end
+
+  # Run f089, 172/10: examine-68-0-t53, with no known route, was picked five times and stalled each time.
+  def test_a_candidate_no_known_route_reaches_is_not_offered_again_after_it_stalled_until_a_route_appears
+    p = autopiloted(ScriptedClient.new(objective: []))
+    p.instance_variable_get(:@cards)[[9, 0]] = { people: [{ type: 70, cell: [1, 1] }], held: [] }
+    holding = state(inventory: [12] + Array.new(9, 0))
+    offered = -> { p.send(:build_candidates, holding, { grid: }).map { |c| c[:id] } }
+    assert_includes offered.(), 'person-9-0-t70'
+    @objectives.start(frame: 100, title: 'Go talk', predicate: { kind: 'reach_place', place: [9, 0] }, candidate: 'person-9-0-t70',
+                      target: { kind: 'person', place: [9, 0], type: 70, cell: [1, 1] })
+    @objectives.update(holding, frame: 101)
+    assert_equal :abandoned, @objectives.update(holding, frame: 2000)
+    refute_includes offered.(), 'person-9-0-t70'
+    p.instance_variable_get(:@explore_log).absorb({ from: { room: 163, map: 16 }, exits: [{ row: 0, col: 5, direction: :up, outcome: :left, to: [9, 0] }] })
+    assert_includes offered.(), 'person-9-0-t70', 'a route to it reopens it'
+    events = Koholint::Trace.read(File.join(@dir, 'trace.jsonl'))
+    assert_equal ['person-9-0-t70'], Koholint::Policies::Memory.stalled(events), 'a resumed run keeps it'
+  end
+
+  # Run 626d, 80/0: item 12 is held at 91617 but its pickup sheet is transcribed only at 91633, once it closed.
+  def test_a_gained_item_is_named_by_the_pickup_text_transcribed_after_it_is_held
+    here = [state.room_id, state.map_id]
+    p = autopiloted(ScriptedClient.new(objective: []))
+    p.instance_variable_set(:@last_read, { text: 'Bonjour, petit!', place: here, frame: 80 })
+    p.observe(state(frame: 90), frame: 90)
+    p.observe(state(frame: 100, inventory: [12] + Array.new(9, 0)), frame: 100)
+    assert_nil p.instance_variable_get(:@item_names)[12]
+    p.instance_variable_set(:@last_read, { text: 'Tu as trouvé le Champignon! Un arôme subtil.', place: here, frame: 116 })
+    p.observe(state(frame: 120, inventory: [12] + Array.new(9, 0)), frame: 120)
+    assert_equal %w[Champignon], p.instance_variable_get(:@item_names)[12]
+  end
+
   # Run 20261125-175039-96c6, 83/0: the thing spoke as Link walked up to it, so talk_to stopped on that dialogue without a talk of its own.
   def test_a_dialogue_that_stops_the_talk_to_a_thing_to_try_is_its_answer
     here = [state.room_id, state.map_id]

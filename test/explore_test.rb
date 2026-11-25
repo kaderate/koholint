@@ -22,8 +22,8 @@ class ExploreTest < Minitest::Test
 
   def registry = @registry ||= Koholint::Skills::Registry.default
 
-  def state(x: 88, y: 80, room_id: 1, hp: 24, dialog_state: 0)
-    Koholint::GameState.new(frame: 0, room_id:, map_id: 0, x:, y:, hp:, dialog_state:, game_mode: 0x0B, game_submode: 7, milestone: :none)
+  def state(x: 88, y: 80, room_id: 1, hp: 24, dialog_state: 0, knockback: 0)
+    Koholint::GameState.new(frame: 0, room_id:, map_id: 0, x:, y:, hp:, dialog_state:, game_mode: 0x0B, game_submode: 7, milestone: :none, link_knockback: knockback)
   end
 
   def with(rows, *edits)
@@ -32,17 +32,19 @@ class ExploreTest < Minitest::Test
     rows
   end
 
-  def explore(rows, truth: rows, exits: [], harm: [], rocks: [], callouts: [], start: [88, 80], params: {}, limit: 1000, **context)
+  def explore(rows, truth: rows, exits: [], harm: [], rocks: [], callouts: [], guards: [], bumps: [], start: [88, 80], params: {}, limit: 1000, **context)
     walls = truth.each_with_index.flat_map { |line, row| line.chars.each_index.select { |col| '#o'.include?(line[col]) }.map { |col| [row, col] } }
     execution = registry.start('explore', state(x: start[0], y: start[1]), params, { grid: MapGrid.new(rows), **context })
     x, y = start
     room_id = 1
     hp = 24
     dialog_state = 0
+    knockback = 0
     inputs = []
     limit.times do
       hp = 20 if harm.include?(Koholint::Geometry.cell_for(x, y))
-      buttons = execution.next_input(state(x:, y:, room_id:, hp:, dialog_state:)) or break
+      buttons = execution.next_input(state(x:, y:, room_id:, hp:, dialog_state:, knockback:)) or break
+      knockback = 0
       inputs << buttons
       dx, dy = DELTA.fetch(buttons.first, [0, 0])
       next if dx.zero? && dy.zero?
@@ -53,11 +55,20 @@ class ExploreTest < Minitest::Test
       ox, oy = Koholint::Geometry.offset(x + dx, y + dy, [row, col])
       pushed = rocks.include?([row + dy, col + dx]) && ((dx * ox) > 4 || (dy * oy) > 6)
       dialog_state = 1 if pushed
+      if guards.include?(ahead)
+        knockback = 8
+        x -= dx * 4
+        y -= dy * 4
+        next
+      end
       next if ahead.nil? || walls.include?(ahead) || pushed
 
       x += dx
       y += dy
       dialog_state = 1 if callouts.include?(Koholint::Geometry.cell_for(x, y))
+      bumped = bumps.include?(Koholint::Geometry.cell_for(x, y))
+      bumps -= [Koholint::Geometry.cell_for(x, y)]
+      knockback = 8 if bumped
     end
     [execution.result(state(x:, y:, room_id:, hp:, dialog_state:)), inputs]
   end
@@ -236,6 +247,44 @@ class ExploreTest < Minitest::Test
     assert_empty inferring_log(clears: [{ 'target' => { 'row' => 3, 'col' => 8 }, 'effect' => true }, failed]).inferred_clearable([3, 0])
     looks = [{ 'target' => { 'row' => 3, 'col' => 8 }, 'effect' => true, 'look' => 'bush' }, { 'target' => { 'row' => 2, 'col' => 4 }, 'effect' => true, 'look' => 'bush' }, failed]
     assert_equal [2, 1], inferring_log(clears: looks).inferred_clearable([3, 0]).first.values_at(:wins, :losses)
+  end
+
+  # Run 20261125-183611-c75d, 98/0: a hostile on the exit knocked Link back off his shield, and the cells it guarded were logged as walls.
+  def test_a_step_a_hostile_knocks_back_is_no_wall_and_leaves_the_work_pending
+    rows = with(CLOSED, [0, 5], '.', [1, 5], '#', [1, 4], '#', [1, 6], '#', [2, 5], '?', [7, 5], '.')
+    log = Koholint::ExploreLog.new
+    log.absorb({ from: { room: 1, map: 0 }, exits: [{ row: 7, col: 5, direction: :down, outcome: :left, to: [2, 0] }] })
+    result, = explore(rows, truth: with(rows, [2, 5], '.'), guards: [[2, 5]], explore_log: log, limit: 400)
+    refute_includes result[:walls], { row: 2, col: 5 }, result.inspect
+    refute_includes result[:blocked_edges], { row: 3, col: 5, direction: :up }
+    assert result[:survey][:pending]
+    assert_includes result[:knocked_edges], { row: 3, col: 5, direction: :up }
+  end
+
+  def test_an_aim_at_a_place_no_known_route_reaches_explores_as_without_an_aim
+    rows = with(CLOSED, [4, 9], '?', [0, 3], '?')
+    plain, plain_inputs = explore(rows, explore_log: Koholint::ExploreLog.new, limit: 300)
+    aimed, aimed_inputs = explore(rows, explore_log: Koholint::ExploreLog.new, aim: { place: [9, 0] }, limit: 300)
+    assert_equal plain_inputs, aimed_inputs
+    assert_equal plain[:stopped_by], aimed[:stopped_by]
+  end
+
+  def test_a_wall_met_well_after_a_knock_back_in_the_same_attempt_is_still_a_wall
+    rows = with(CLOSED, [4, 9], '?')
+    result, = explore(rows, truth: with(rows, [4, 9], '#'), bumps: [[4, 2]], start: [24, 80], limit: 400)
+    assert_includes result[:walls], { row: 4, col: 9 }, result.inspect
+    assert_nil result[:knocked_edges]
+  end
+
+  def test_a_step_knocked_back_twice_this_visit_is_learned_like_any_failed_step
+    rows = with(CLOSED, [0, 5], '.', [1, 5], '#', [1, 4], '#', [1, 6], '#', [2, 5], '?', [7, 5], '.')
+    log = Koholint::ExploreLog.new
+    log.absorb({ from: { room: 1, map: 0 }, exits: [{ row: 7, col: 5, direction: :down, outcome: :left, to: [2, 0] }] })
+    2.times { log.note({ from: { room: 1, map: 0 }, to: { room: 1, map: 0 }, knocked_edges: [{ row: 3, col: 5, direction: :up }] }) }
+    assert_equal [[[3, 5], :up]] * 2, log.knocked([1, 0])
+    result, = explore(rows, truth: with(rows, [2, 5], '.'), guards: [[2, 5]], explore_log: log, limit: 400)
+    assert_includes result[:walls], { row: 2, col: 5 }, result.inspect
+    assert_nil result[:knocked_edges]
   end
 
   def test_untried_exits_that_cannot_be_reached_yet_send_explore_to_the_frontier_before_another_place

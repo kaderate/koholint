@@ -263,6 +263,20 @@ class ObjectivesTest < Minitest::Test
     assert_equal :achieved, @objectives.update(state(frame: 7, room: 7, map: 8), frame: 7), 'an answer is a try'
   end
 
+  def test_a_person_brought_an_item_is_reached_only_once_the_item_is_used_after_the_talk
+    @objectives.start(frame: 1, title: 'Bring the Champignon', predicate: { kind: 'reach_place', place: [7, 8] },
+                      target: { kind: 'person', place: [7, 8], type: 64, cell: [3, 4], try: true, item: 12, name: 'Champignon' })
+    @objectives.note_try(place: [7, 8], type: nil, skill: 'use_item', answered: false, item: 12)
+    assert_nil @objectives.update(state(frame: 2, room: 7, map: 8), frame: 2), 'a use before the talk'
+    @objectives.note_try(place: [7, 8], type: 64, skill: 'talk_to', answered: true)
+    assert @objectives.talked_to?
+    assert_nil @objectives.update(state(frame: 2, room: 7, map: 8), frame: 2), 'an answer alone does not bring the item'
+    @objectives.note_try(place: [7, 8], type: nil, skill: 'use_item', answered: false, item: 1)
+    assert_nil @objectives.update(state(frame: 3, room: 7, map: 8), frame: 3), 'another item'
+    @objectives.note_try(place: [7, 8], type: nil, skill: 'use_item', answered: false, item: 12)
+    assert_equal :achieved, @objectives.update(state(frame: 3, room: 7, map: 8), frame: 3)
+  end
+
   def test_a_sign_objective_ends_on_that_signs_text_only_even_when_the_text_is_known
     @objectives.note_text('Attention au plancher')
     @objectives.start(frame: 1, title: 'Go read the sign', predicate: { kind: 'new_text' }, target: { kind: 'sign', place: [101, 0], cell: [4, 8], remote: true })

@@ -63,6 +63,7 @@ module Koholint
           return if pages.empty?
 
           text = Dialogues.text(pages)
+          @last_read = { text:, place: state.place, frame: state.frame }
           @objectives.note_text(text)
           source = @images || @reading ? @read_at[:source] : @talk_source
           place = @images || @reading ? @read_at[:place] : state.place

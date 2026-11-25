@@ -1,6 +1,7 @@
 require 'json'
 require 'set'
 require 'koholint'
+require 'koholint/dialogues'
 
 module Koholint
   module Items
@@ -12,6 +13,7 @@ module Koholint
     SLOTS = 10
     SHIELD = 4
     SWORD = 1
+    PICKUP_FRAMES = 600
 
     module_function
 
@@ -73,6 +75,35 @@ module Koholint
     end
 
     def slot_of(state, id) = slots(state).index { |item| item.to_i == id }
+
+    # The name a pickup sentence gives: the first run of capitalised words in the text's first sentence, past its first word.
+    def name_words(text)
+      sentence = text.to_s.split(/(?<=[.!?])\s/).first.to_s
+      sentence.scan(/[\p{L}\p{N}-]+/).drop(1).slice_when { |a, b| a.match?(/\A\p{Lu}/) != b.match?(/\A\p{Lu}/) }.find { |run| run.first.match?(/\A\p{Lu}/) }.to_a
+    end
+
+    # Each gained item's name words, from its pickup text: the first text transcribed at its place after the gain shows as held, within
+    # PICKUP_FRAMES. A sheet is transcribed once it closes, so its dialogue events follow the gain in the trace though they carry the
+    # frame the sheet opened.
+    def pickup_names(events)
+      names = {}
+      pending = []
+      now = 0
+      events.each_with_index do |event, index|
+        if event['type'] == 'dialogue'
+          gain = pending.find { |waiting| waiting['place'] == event['place'] } or next
+          pending.delete(gain)
+          pages = events.drop(index).take_while { |page| page['type'] == 'dialogue' && page.values_at('frame', 'place') == event.values_at('frame', 'place') }
+          words = name_words(Dialogues.text(pages.map { |page| page['text'].to_s }))
+          names[gain['item'].to_i] ||= words if words.any?
+          next
+        end
+        now = [now, event['frame'].to_i].max
+        pending.reject! { |waiting| now - waiting['frame'].to_i > PICKUP_FRAMES }
+        pending << event if event['type'] == 'item_gained'
+      end
+      names
+    end
 
     def find(query)
       return Integer(query) if query.is_a?(Integer) || query.to_s.match?(/\A\d+\z/)

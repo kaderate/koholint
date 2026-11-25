@@ -53,6 +53,27 @@ class ItemsTest < Minitest::Test
     end
   end
 
+  def test_a_gained_item_is_named_by_the_capitalised_words_of_its_pickup_text_read_just_before_at_its_place
+    assert_equal %w[Champignon], Items.name_words('Tu as trouvé le Champignon! Il sent bon.')
+    assert_equal %w[Clé Dorée], Items.name_words('Tu as la Clé Dorée.')
+    assert_equal %w[Arc], Items.name_words("Tu as trouvé l'Arc de Link!"), 'a name later in the sentence is not part of it'
+    assert_empty Items.name_words('Bonjour, petit!')
+  end
+
+  # Run 626d, 80/0: the pickup sheet opened at 91353, item 12 showed as held at 91615, and the sheet's dialogue events follow the gain.
+  def test_a_resumed_run_names_a_gain_by_the_text_transcribed_after_it_and_never_by_an_earlier_one
+    events = [{ 'type' => 'dialogue', 'frame' => 91_000, 'place' => [80, 0], 'text' => 'Le Village est au Sud.' },
+              { 'type' => 'perception', 'frame' => 91_353 },
+              { 'type' => 'item_gained', 'frame' => 91_615, 'place' => [80, 0], 'item' => 12 },
+              { 'type' => 'perception', 'frame' => 91_633 },
+              { 'type' => 'dialogue', 'frame' => 91_353, 'place' => [80, 0], 'text' => 'Tu as trouvé le Champignon!' },
+              { 'type' => 'dialogue', 'frame' => 91_353, 'place' => [80, 0], 'text' => 'Un arôme subtil.' },
+              { 'type' => 'item_gained', 'frame' => 92_000, 'place' => [81, 0], 'item' => 13 },
+              { 'type' => 'perception', 'frame' => 93_000 },
+              { 'type' => 'dialogue', 'frame' => 92_900, 'place' => [81, 0], 'text' => 'Tu as la Clé Dorée.' }]
+    assert_equal({ 12 => %w[Champignon] }, Items.pickup_names(events), 'a text transcribed more than PICKUP_FRAMES after its gain names nothing')
+  end
+
   def test_held_items_cover_both_buttons_and_the_slots
     held = state(item_b: 4, inventory: [0, 0, 2, 0, 0, 0, 0, 0, 0, 0])
     assert_equal [4, 2], Items.held(held)

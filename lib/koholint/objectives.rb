@@ -115,12 +115,15 @@ module Koholint
     end
 
     # A thing an objective came to try is tried once a talk draws an answer, or once Link walks onto it after a talk that drew none.
-    def note_try(place:, type:, skill:, answered:)
+    # An item brought to a person is tried only by using that item after the talk.
+    def note_try(place:, type:, skill:, answered:, item: nil)
       target = @current&.dig(:target) or return
-      return unless target[:try] && target[:place] == place && target[:type] == type
+      return unless target[:try] && target[:place] == place
+      return @tried = (@talked_to && item == target[:item]) || @tried if skill == 'use_item'
+      return unless target[:type] == type
 
       @talked_to = true if skill == 'talk_to'
-      @tried = true if skill == 'touch' || answered
+      @tried = true if !target[:item] && (skill == 'touch' || answered)
     end
 
     def talked_to? = @talked_to
@@ -239,7 +242,7 @@ module Koholint
       fields[:reason] = reason if reason
       @trace.emit(:objective, frame:, **fields)
       @history << { id: done[:id], title: done[:title], predicate: done[:predicate], outcome:, reason:,
-                    started_frame: done[:started_frame], ended_frame: frame, **done.slice(:target, :autopilot, :because) }
+                    started_frame: done[:started_frame], ended_frame: frame, **done.slice(:target, :autopilot, :because, :candidate) }
       outcome
     end
   end
