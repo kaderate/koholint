@@ -478,6 +478,20 @@ class ExploreTest < Minitest::Test
     assert_equal [:exit, 7, 9], result[:target].values_at(:kind, :row, :col)
   end
 
+  def test_a_landing_whose_only_reachable_way_on_is_the_side_link_came_in_by_is_a_dead_end
+    log = Koholint::ExploreLog.new
+    log.absorb({ from: { room: 1, map: 0 }, exits: [{ row: 3, col: 9, direction: :right, outcome: :left, to: [2, 0] }, { row: 3, col: 0, direction: :left, outcome: :left, to: [0, 0] }] })
+    log.absorb({ from: { room: 2, map: 0 }, survey: { sides: { up: [{ row: 0, col: 3 }] }, doors: [], pending: true } })
+    log.absorb({ from: { room: 0, map: 0 }, exits: [{ row: 3, col: 9, direction: :right, outcome: :left, to: [1, 0] }, { row: 7, col: 5, direction: :down, outcome: :left, to: [16, 0] }] })
+    log.absorb({ from: { room: 16, map: 0 }, survey: { sides: { down: [{ row: 7, col: 4 }] }, doors: [], pending: true } })
+    assert_equal({ goal: [2, 0], next: [2, 0], via: :right }, log.route([1, 0]))
+    pocket = with(CLOSED, [3, 0], '.', [3, 9], '.', [1, 2], '#', [2, 2], '#', [3, 2], '#', [4, 2], '#', [5, 2], '#', [6, 2], '#')
+    result, = explore(pocket, start: Koholint::Geometry.center_of(3, 0), exits: [[[3, 0], :left]], explore_log: log)
+    assert_equal [:exit, 3, 0, :left, true], result[:target].values_at(:kind, :row, :col, :direction) + [result[:dead_end]]
+    2.times { log.absorb(result.merge(skill: 'explore', from: { room: 1, map: 0, row: 3, col: 0 })) }
+    assert_equal :left, log.pocket_side([1, 0], [3, 0])
+  end
+
   def test_least_visited_skips_a_place_whose_landing_from_here_is_a_pocket
     log = Koholint::ExploreLog.new
     log.absorb({ from: { room: 2, map: 1 }, exits: [{ row: 0, col: 9, direction: :up, outcome: :left, to: [1, 0] }, { row: 3, col: 9, direction: :right, outcome: :left, to: [3, 1] }], survey: { sides: {}, doors: [] } })
