@@ -81,6 +81,7 @@ module Koholint
 
       validate_fact!(entry['sword_hits'], "entity #{entry['type']} sword_hits") if entry.key?('sword_hits')
       validate_fact!(entry['push'], "object #{entry['object']} push") if entry.key?('push')
+      validate_fact!(entry['heals'], "entity #{entry['type']} heals") if entry.key?('heals')
     end
 
     def validate_fact!(fact, label)
