@@ -1,4 +1,5 @@
 require 'koholint/entities'
+require 'koholint/footing'
 require 'koholint/geometry'
 require 'koholint/items'
 require 'koholint/perception'
@@ -13,9 +14,13 @@ module Koholint
       EDGE_FRAMES = 120
       PUSH_MARGIN = 8
       PUSH_SETTLE = 48
+      GIVE_WAY_SLACK = 8
+      STEP_OFF_PIXELS = 24
+      STILL_STEPS = 2
+      HOLE_LOOK = 2
 
       attr_reader :frames, :stopped_by
-      attr_writer :triggers
+      attr_writer :triggers, :footing, :footing_grid
 
       def initialize(skill:, params:, state:)
         @skill = skill
@@ -34,6 +39,8 @@ module Koholint
         @room_objects = nil
         @push = nil
         @pushed = nil
+        @stepping = nil
+        @walled_off = []
       end
 
       def next_input(state)
@@ -47,9 +54,11 @@ module Koholint
                   elsif state.scene? && !@start.scene? then finish(:scene)
                   elsif @pushed then settle_push
                   elsif waits_through_doors? && door_walk?(state) then []
+                  elsif (off = step_off(state)) then off
                   elsif @centring then centre(state)
                   else input_for(state)
                   end
+        buttons = finish(:hole) if buttons && !off && into_hole?(state, buttons)
         watch_push(state, buttons)
         note_exit(state, buttons)
         @frames += 1 if buttons
@@ -148,6 +157,64 @@ module Koholint
 
         @stopped_by = :pushed
         nil
+      end
+
+      # No skill keeps Link on floor that gives way: when the shortest step that takes his foot point onto another floor cell, where the game's
+      # count starts over, would just fit in the frames left, he takes it to the end.
+      def step_off(state)
+        under = @footing&.under(state) or return
+        if under.empty? || state.dialog_open? || state.locked?
+          @stepping = nil
+          @walled_off = []
+          return
+        end
+        return [@stepping[:direction]] if stepping_on?(state)
+
+        cells = under.map { |at| at[:cell] }
+        best = (Geometry::DIRECTIONS - @walled_off).filter_map { |d| (pixels = clearance(state, cells, d)) && [pixels, d] }.min_by(&:first)
+        return unless best && under.any? { |at| at[:left] <= best[0] + GIVE_WAY_SLACK }
+
+        @stepping = { direction: best[1], cells:, frames: 0, at: [state.x, state.y], still: 0 }
+        [best[1]]
+      end
+
+      # A step off that leaves Link where he was for STILL_STEPS frames runs into something the grid did not show; another way is tried.
+      def stepping_on?(state)
+        return false unless @stepping && Footing.feet(state.x, state.y).intersect?(@stepping[:cells]) && (@stepping[:frames] += 1) <= STEP_OFF_PIXELS
+
+        @stepping[:still] = [state.x, state.y] == @stepping[:at] ? @stepping[:still] + 1 : 0
+        @stepping[:at] = [state.x, state.y]
+        return true if @stepping[:still] < STILL_STEPS
+
+        @walled_off = @walled_off | [@stepping[:direction]]
+        @stepping = nil
+        false
+      end
+
+      def clearance(state, cells, direction)
+        dr, dc = Geometry::DELTAS.fetch(direction)
+        (1..STEP_OFF_PIXELS).each do |pixels|
+          feet = Footing.feet(state.x + (dc * pixels), state.y + (dr * pixels))
+          next if feet.intersect?(cells)
+
+          return feet.all? { |cell| safe_floor?(state, cell) } ? pixels : nil
+        end
+        nil
+      end
+
+      # A hole that opened after the skill planned is missing from its grid: the step that would put Link's foot point in it ends the skill.
+      def into_hole?(state, buttons)
+        direction = (buttons & Geometry::DIRECTIONS).first
+        return false unless @footing && direction && state.x
+
+        dr, dc = Geometry::DELTAS.fetch(direction)
+        (Footing.feet(state.x + (dc * HOLE_LOOK), state.y + (dr * HOLE_LOOK)) - Footing.feet(state.x, state.y)).any? { |cell| @footing.hole?(state, cell) }
+      end
+
+      def safe_floor?(state, cell)
+        return false unless @footing_grid
+
+        Geometry::DIRECTIONS.any? { |way| @footing_grid.passable(*cell, way) == :yes } && !@footing.hole?(state, cell) && !(@footing_grid.respond_to?(:hole?) && @footing_grid.hole?(*cell))
       end
 
       # At one heart or less, every enemy contact zone grows by a cell and is never crossed.
