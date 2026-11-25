@@ -31,6 +31,7 @@ module Koholint
           @approaches = 0
           @axis = nil
           @backoff = 0
+          @grid = context[:grid]
           super(target: nil, context:, **rest)
         end
 
@@ -74,6 +75,7 @@ module Koholint
         def approach(from)
           return nil unless @enemy && from && @planner
           return beside(from) if (from[0] - @enemy[:cell][0]).abs + (from[1] - @enemy[:cell][1]).abs <= 1
+          return beside(from) if from == @start.cell && [(@enemy[:x] - @start.x.to_i).abs, (@enemy[:y] - @start.y.to_i).abs].max <= FAR
 
           zones = Array(@danger&.call)
           options = Geometry::DELTAS.values.filter_map do |dr, dc|
@@ -102,6 +104,7 @@ module Koholint
             return refuse('the sword is on neither A nor B') unless @button
             return idle(:no_target) unless @enemy
           end
+          @phase = :strike if @phase == :walk && @frames.positive? && turn_to(Array(@entities.call), state)
           return super if @phase == :walk
           return finish(:room_change) if state.place != @start.place
 
@@ -109,7 +112,8 @@ module Koholint
         end
 
         def strike(state)
-          now = Array(@entities.call).find { |entity| entity.values_at(:slot, :type) == @enemy.values_at(:slot, :type) }
+          all = Array(@entities.call)
+          now = all.find { |entity| entity.values_at(:slot, :type) == @enemy.values_at(:slot, :type) }
           @hits += 1 if now && now[:health].to_i < @enemy[:health].to_i
           return finish(:target_gone) unless now&.dig(:cell)
           return killed unless now[:status] == @enemy[:status]
@@ -118,6 +122,7 @@ module Koholint
           return finish(:damage) if state.health < @start.health
           return swing if @swing
           return finish(:no_kill) if @strikes >= MAX_STRIKES
+          turn_to(all, state)
           return reapproach(state) if far?(state) && @approaches < APPROACHES
 
           lineup(state)
@@ -141,6 +146,7 @@ module Koholint
                  elsif @facing != facing then along > closest ? facing : Geometry::OPPOSITE.fetch(facing)
                  end
           return begin_swing unless move
+          return finish(:hole) if hole_ahead?(state, move)
           return finish(:out_of_reach) if (@lineup += 1) > LINEUP_FRAMES
 
           note_backoff(state, along < closest && move == Geometry::OPPOSITE.fetch(facing), horizontal)
@@ -157,6 +163,30 @@ module Koholint
 
           @axis = horizontal ? :vertical : :horizontal
           @backoff = 0
+        end
+
+        # Lining up moves Link a few pixels at a time with no plan, so it checks the cell his next pixels enter.
+        def hole_ahead?(state, move)
+          dx, dy = Geometry::DELTAS.fetch(move).reverse
+          ahead = Geometry.cell_for(state.x.to_i + (dx * Geometry::CELL / 2), state.y.to_i + (dy * Geometry::CELL / 2))
+          ahead && @grid.respond_to?(:hole?) && @grid.hole?(*ahead)
+        end
+
+        # An enemy that comes closer to Link than the target is the one to strike: it touches first.
+        def turn_to(all, state)
+          return unless @enemy
+
+          current = all.find { |entity| entity.values_at(:slot, :type) == @enemy.values_at(:slot, :type) }
+          @enemy = @enemy.merge(current.slice(:x, :y, :cell)) if current
+          distance = ->(entity) { [(entity[:x] - state.x.to_i).abs, (entity[:y] - state.y.to_i).abs].max }
+          nearer = all.select { |entity| entity[:kind].to_s == 'enemy' && entity[:cell] && entity[:slot] != @enemy[:slot] && distance.(entity) < distance.(@enemy) }
+                      .min_by { |entity| [distance.(entity), entity[:slot]] } or return
+          return if distance.(nearer) > FAR
+
+          @enemy = nearer.slice(:slot, :type, :x, :y, :cell, :status, :health, :contact)
+          @lineup = 0
+          @axis = nil
+          true
         end
 
         def far?(state) = [(@enemy[:x] - state.x.to_i).abs, (@enemy[:y] - state.y.to_i).abs].max > FAR
