@@ -27,6 +27,7 @@ module Koholint
       place_name: %i[place name],
       item_gained: %i[item name place held],
       chest_opened: %i[place cell],
+      floor_gave_way: %i[place cell object],
       puzzle: %i[id kind place way expected observed frames]
     }.freeze
     SPEAKER_MAX = 40

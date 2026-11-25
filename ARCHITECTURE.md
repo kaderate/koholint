@@ -34,7 +34,9 @@ observability.
 (position, place, hp and pending damage, rupees, phase, items, readiness signals). Every address carries provenance and a
 `verified_count`. `entities.rb` reads the 16 entity slots and the room object table and gives each a kind from
 `data/entities.json` (`npc`, `enemy`, `creature`, `object`, `unknown`; objects: `sign`, `door`, `chest`, `stone`, …).
-`items.rb` and `data/items.json` name item ids; the engine's `ItemWatch` emits `item_gained`. The probes under `probes/`
+`items.rb` and `data/items.json` name item ids; the engine's `ItemWatch` emits `item_gained`. The engine also watches the room
+objects every frame and emits `floor_gave_way` when a crumbling floor object turns into a hole; the skills see that object as
+crumbling only in places where this was seen. The probes under `probes/`
 (`bin/koholint census …`) measure these files on throwaway copies; they are the only code that writes RAM.
 
 **Game modes** — `modes.rb` and `data/modes.json` catalogue the game's screens by their mode tuple, each with the engine

@@ -18,7 +18,8 @@ The skills, protocols and harness behaviours the agent works with. Versioned wit
   the capability has cleared elsewhere, listed with its source in the route's `clearable`; inferred from the trace when a run is forked or resumed, not during a live run's first visit), else to the nearest frontier (a known cell next to
   an unknown one) (`direction` prefers that side), steps out, re-plans, and returns to the model only at an event:
   `new_place`, `known_place` (a return to a place already seen), `dialogue`, `untried_object` (once per thing never talked to within 3 cells), `blocked`, `stalled` (3
-  attempts in a row walked no new cell), `no_frontier` (with the exits already tried), `locked`, `damage` or `budget` (600 frames).
+  attempts in a row walked no new cell), `no_frontier` (with the exits already tried), `locked`, `damage`, `budget` (600 frames),
+  `enemy` (an enemy to fight on sight, flow-90) or `fell` (Link starts to fall, flow-90).
   flow-68: at one heart or less the autopilot hands every decision to the model; walk, goto and explore keep out of every
   enemy contact zone grown by a cell (the extra ring only as a last resort, the contact zone never, a goal inside one still
   reached), and from inside one Link may take any step that does not head toward an enemy within a cell of its touch
@@ -51,8 +52,8 @@ The skills, protocols and harness behaviours the agent works with. Versioned wit
   and strikes with the sword's button until it dies (up to 6 strikes, walking up again after a knockback; flow-73: never
   from inside the enemy's touch, its `contact_px` or 9 px when unmeasured, plus 2, and when backing off is walled it lines
   up on the other axis); it stops
-  `done` (`killed`), `damage`, `refused` (no sword on A or B), `no_target`, `target_gone` (flow-53: also when a knockback puts it off the grid), `no_kill`, `out_of_reach` or
-  `frame_cap`, and reports `strikes` and `hits`. flow-61: its target is the thing nearest the cell (an enemy only on a tie),
+  `done` (`killed`), `damage`, `refused` (no sword on A or B), `no_target`, `target_gone` (flow-53: also when a knockback puts it off the grid), `no_kill`, `out_of_reach`, `hole`
+  (flow-90: a lineup step would enter a hole) or `frame_cap`, and reports `strikes` and `hits`. flow-61: its target is the thing nearest the cell (an enemy only on a tie),
   and when Link already stands on or next to the target's cell he strikes from there instead of walking to another cell
   next to it, which the pieces of a split enemy can all block. flow-65: after an attack that stops `done` or `target_gone`,
   the harness attacks the nearest other `enemy` within 2 cells itself, or an unidentified type already struck in this
@@ -144,11 +145,13 @@ The skills, protocols and harness behaviours the agent works with. Versioned wit
   it is still a frontier, taken when nothing else here is reachable, before a route to another place. An explore that stops `no_frontier`
   in at most one frame is answered by the harness at the next decision, not after three, since from the same cell it would find none again.
 - flow-90: holes and crumbling floor are read from the live room objects. Objects 174 and 175 are holes wherever they appear
-  (the grid's `hole_objects`, never walked, with their margin); object 223 is a crumbling floor that becomes a hole when Link stands
-  on it about half a second, and the room restores it on re-entry. Above one heart the harness fights on sight with no model call:
+  (the grid's `hole_objects`, never walked, with their margin); object 223 is a floor that becomes a hole when Link stands on it
+  about half a second, and the room restores it on re-entry; it counts as crumbling in a place only once one of its cells there was
+  seen turning into a hole (the engine traces `floor_gave_way` once per place and object), since the same object also fills cells
+  outside the walls of rooms where it never gives way. Above one heart the harness fights on sight with no model call:
   the nearest `enemy` within 32 px whose `sword_hits` is 1 (explore stops `enemy`, a stop the autopilot treats as benign), up to
-  8 attacks per call, never while Link's footprint (his measured row band) covers a crumbling cell, never again in a place where an
-  attack stopped `damage`, and never again a slot an attack missed there (`blocked`, `no_path`, `out_of_reach`, `no_kill`, `hole`)
+  8 attacks per call, never while Link's footprint (his measured row band) covers a crumbling cell, never again in the visit of a place where an
+  attack stopped `damage` (model calls in between included), and never again a slot an attack missed there (`blocked`, `no_path`, `out_of_reach`, `no_kill`, `hole`)
   or the slot just struck; a fight on sight never starts the flow-65 chain of fights after a kill.
   The attack strikes from where Link stands when its target is within 2 cells of him, turns to any enemy that comes nearer than its
   target within 2 cells, and stops `hole` before a lineup step enters a hole. Explore stops `fell` as soon as Link starts to fall.
