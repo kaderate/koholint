@@ -237,19 +237,23 @@ module Koholint
         def note_dropped(objective, any: false)
           return unless objective && (any || DROPPED.any? { |prefix| objective[:candidate].to_s.start_with?(prefix) })
 
-          same = @dropped && @dropped[:objective].values_at(:candidate, :title) == objective.values_at(:candidate, :title)
-          offers = same ? @dropped[:offers] : 0
-          @dropped = { objective: objective.slice(:title, :predicate, :candidate, :target), offers: }
+          @dropped = objective.slice(:title, :predicate, :candidate, :target)
         end
 
-        def dropped_objective(decision_point, state)
-          return unless @dropped && decision_point.name == :choose_objective && @dropped[:offers] < REOFFERS && !@loop_watch.pending_hint
+        # Taken up once per drop, and only while the menu still offers it: a delivery that fired retires its candidate.
+        def dropped_objective(decision_point, state, context)
+          return unless @dropped && decision_point.name == :choose_objective && !@loop_watch.pending_hint
 
-          objective = @dropped[:objective]
-          @dropped[:offers] += 1
+          objective = @dropped
+          @dropped = nil
+          key = objective[:candidate] || objective[:title]
+          return if @reoffers[key] >= REOFFERS
+          return if objective[:candidate] && build_candidates(state, context).none? { |candidate| candidate[:id] == objective[:candidate] }
+
+          @reoffers[key] += 1
           @objectives.start(frame: state.frame, **objective, autopilot: true)
           @autopilot&.adopt(@objectives.current)
-          DecisionPoint.harness_choice(objective.slice(:title, :predicate), "the loop is cut: #{objective[:candidate]}, dropped by the loop break, is taken up again (#{@dropped[:offers]}/#{REOFFERS})", autopilot: true)
+          DecisionPoint.harness_choice(objective.slice(:title, :predicate), "the loop is cut: #{key}, set aside, is taken up again (#{@reoffers[key]}/#{REOFFERS})", autopilot: true)
         end
 
         # At one heart or less, a route to the objective through a place where enemies were seen first goes to the nearest place a talk healed Link;
@@ -271,7 +275,7 @@ module Koholint
           note_dropped(current, any: true)
           @objectives.abandon(frame: state.frame, reason: 'heal')
           who = Array(@cards.dig(place, :people)) + Array(@cards.dig(place, :unknown))
-          target = who.size == 1 ? { kind: 'person', place:, type: who.first[:type], cell: who.first[:cell], try: true } : { kind: 'place', place: }
+          target = (who.size == 1 ? { kind: 'person', place:, type: who.first[:type], cell: who.first[:cell] } : { kind: 'place', place: }).merge(heal_below: state.health)
           @objectives.start(frame: state.frame, title: "Heal in #{place.join('-')}, where a talk healed Link before", predicate: { kind: 'reach_place', place: }, target:, autopilot: true)
           @objectives.current[:heal] = true
           @autopilot&.adopt(@objectives.current)
@@ -298,7 +302,8 @@ module Koholint
           retreat = @retreated&.dig(:spot) != spot && (pressed || (low && @deadlock && @deadlock[:waits] >= DEADLOCK_WAITS))
           return guarded(state, context) if retreat && retreats(state) >= RETREAT_CAP
           @retreated = { spot:, hp: state.health } if retreat
-          @retreats << [place, @explore_log.entered(place), state.frame] if retreat
+          side = Array(@explore_log.entered(place)).flatten.join('-')
+          @retreats << [place, side, state.frame] if retreat
           context[:retreat] = true if retreat
           @deadlock = { spot:, waits: (@deadlock&.dig(:waits) || 0) + 1 } if low && !retreat
           choice = goal || retreat ? EXPLORE : ZERO_WAIT
@@ -309,10 +314,14 @@ module Koholint
                  elsif retreat then "no way out at one heart after #{DEADLOCK_WAITS} waits: leave by the side Link came in"
                  else "wait #{ZERO_WAIT[:params][:frames]} frames before asking again"
                  end
+          what = "#{what} (retreat by the #{side} side)" if retreat
           DecisionPoint.harness_choice(choice, "#{skill} ended #{stop} #{mark} #{count} times here: #{what}", autopilot: true)
         end
 
-        def retreats(state) = @retreats.count { |place, side, frame| place == state.place && side == @explore_log.entered(state.place) && state.frame - frame < RETREAT_WINDOW }
+        def retreats(state)
+          came = Array(@explore_log.entered(state.place)).flatten.join('-')
+          @retreats.count { |place, side, frame| place == state.place && side == came && state.frame - frame < RETREAT_WINDOW }
+        end
 
         # Sent back by the same side of the same place RETREAT_CAP times within RETREAT_WINDOW frames, the way is guarded: the objective is set
         # aside (taken up again later) and explore heads for work elsewhere instead of coming back to retreat again.

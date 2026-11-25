@@ -84,8 +84,9 @@ module Koholint
         @souvenirs = souvenirs
         @cards = memory.cards.dup
         @healers = memory.healers
-        @heal_detours = 0
-        @retreats = []
+        @heal_detours = memory.heal_detours
+        @retreats = memory.retreats.dup
+        @reoffers = Hash.new(0).merge(memory.reoffers)
         @loop_watch = memory.loop_watch
         @zero_watch = memory.zero_watch
         @candidates = []
@@ -245,7 +246,7 @@ module Koholint
           autopilot = autopilot_choice(decision_point, state, context)
           return autopilot if autopilot
 
-          dropped = dropped_objective(decision_point, state)
+          dropped = dropped_objective(decision_point, state, context)
           return dropped if dropped
 
           wanted = item_objective(decision_point, state)

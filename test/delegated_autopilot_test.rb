@@ -406,21 +406,37 @@ class DelegatedAutopilotTest < Minitest::Test
                  survey: { sides: { left: [{ row: 3, col: 0 }], up: [{ row: 0, col: 5 }] }, doors: [] } })
     log.absorb({ from: { room: 164, map: 16 }, exits: [{ row: 3, col: 9, direction: :right, outcome: :left, to: [163, 16] }], survey: { sides: { right: [{ row: 3, col: 9 }] }, doors: [] } })
     @objectives = Koholint::Objectives.new(trace: trace)
-    target = { kind: 'person', place: [162, 14], type: 64, cell: [4, 4], try: true, item: 12, name: 'champignon' }
-    @objectives.start(frame: 100, title: 'Bring the champignon to person (type 64)', predicate: { kind: 'reach_place', place: [162, 14] }, candidate: 'souvenir-162-14-t64', target:)
+    target = { kind: 'person', place: [165, 16], type: 64, cell: [4, 4], try: true, item: 12, name: 'champignon' }
+    souvenirs = [{ 'place' => [165, 16], 'entity' => 64, 'cell' => [4, 4], 'text' => 'Il me faut le champignon de la forêt.', 'seen' => [{ 'run' => '20261101-000000-aaaa', 'frame' => 1, 'held' => [1, 4] }] }]
+    talk_log = Koholint::TalkLog.new
     p = Koholint::Policies::Delegated.new(client: ScriptedClient.new(objective: new_place, default: explore), registry: Koholint::Skills::Registry.default, objectives: @objectives, manual: '',
-                                          memory: Koholint::Policies::Memory.new(explore_log: log))
-    [163, 164, 163, 164, 163, 164, 163, 164, 163].each_with_index do |room, i|
-      now = state(frame: 100 + (i * 300), room_id: room)
-      p.observe(now, frame: now.frame)
+                                          memory: Koholint::Policies::Memory.new(explore_log: log, talk_log:), souvenirs:)
+    loop_in = lambda do |from|
+      @objectives.start(frame: from, title: 'Bring the champignon to person (type 64)', predicate: { kind: 'reach_place', place: [165, 16] }, candidate: 'souvenir-165-16-t64', target:)
+      [163, 164, 163, 164, 163, 164, 163, 164, 163].each_with_index do |room, i|
+        now = state(frame: from + (i * 300), room_id: room, item_b: 12)
+        p.observe(now, frame: now.frame)
+        p.decide(p.decision_point_for(now), now, { grid: })
+      end
+      assert_equal ['souvenir-165-16-t64', 'loop'], @objectives.history.last.values_at(:candidate, :reason)
+      @objectives.abandon(frame: from + 2700, reason: 'test')
+    end
+    choose = lambda do |frame|
+      now = state(frame:, room_id: 163, item_b: 12)
+      p.observe(now, frame:)
       p.decide(p.decision_point_for(now), now, { grid: })
     end
-    assert_equal ['souvenir-162-14-t64', 'loop'], @objectives.history.last.values_at(:candidate, :reason)
-    @objectives.abandon(frame: 2800, reason: 'test')
-    now = state(frame: 2900, room_id: 165)
-    p.observe(now, frame: now.frame)
-    again = p.decide(p.decision_point_for(now), now, { grid: })
-    assert_equal ['delegated', 'souvenir-162-14-t64', target], [again[:agent], @objectives.current[:candidate], @objectives.current[:target]]
+    loop_in.(100)
+    again = choose.(2900)
+    assert_equal ['delegated', 'souvenir-165-16-t64', target], [again[:agent], @objectives.current[:candidate], @objectives.current[:target]]
+    @objectives.abandon(frame: 3000, reason: 'test')
+    choose.(3100)
+    refute_equal 'souvenir-165-16-t64', @objectives.current&.dig(:candidate), 'the re-offer is spent once it started'
+    @objectives.abandon(frame: 3200, reason: 'test') if @objectives.current
+    loop_in.(4000)
+    talk_log.give(place: [165, 16], item: 12)
+    choose.(6800)
+    refute_equal 'souvenir-165-16-t64', @objectives.current&.dig(:candidate), 'the delivery fired: the menu no longer offers it'
   end
 
   # Gate run 15df: at 8 hp after 82/0, the way to the hut crossed 66/0's enemies; 83/0, where a talk had healed Link at 88340, was a room away.
@@ -436,22 +452,32 @@ class DelegatedAutopilotTest < Minitest::Test
     cards = { [165, 16] => { enemies: [{ type: 27, cell: [4, 5] }] }, [164, 16] => { unknown: [{ type: 132, cell: [3, 5] }] } }
     @objectives = Koholint::Objectives.new(trace: trace)
     @objectives.start(frame: 100, title: 'Bring the champignon', predicate: { kind: 'reach_place', place: [165, 16] }, candidate: 'souvenir-165-16-t64', target: { kind: 'person', place: [165, 16], type: 64, cell: [4, 4], try: true, item: 12 })
+    souvenirs = [{ 'place' => [165, 16], 'entity' => 64, 'cell' => [4, 4], 'text' => 'Il me faut le champignon de la forêt.', 'seen' => [{ 'run' => '20261101-000000-aaaa', 'frame' => 1, 'held' => [1, 4] }] }]
     p = Koholint::Policies::Delegated.new(client: ScriptedClient.new(objective: new_place, default: explore), registry: Koholint::Skills::Registry.default, objectives: @objectives, manual: '',
-                                          memory: Koholint::Policies::Memory.new(explore_log: log, cards:, healers:))
-    full = state(frame: 200, hp: 24)
+                                          memory: Koholint::Policies::Memory.new(explore_log: log, cards:, healers:), souvenirs:)
+    full = state(frame: 200, hp: 24, item_b: 12)
     p.observe(full, frame: 200)
     refute_match(/heal/, p.decide(p.decision_point_for(full), full, { grid: })[:justification].to_s, 'not at full health')
-    low = state(frame: 300, hp: 8)
+    low = state(frame: 300, hp: 8, item_b: 12)
     p.observe(low, frame: 300)
     context = { grid: }
     detour = p.decide(p.decision_point_for(low), low, context)
     assert_match(/heal in 164-16 first/, detour[:justification])
-    assert_equal [{ place: [164, 16] }, { kind: 'person', place: [164, 16], type: 132, cell: [3, 5], try: true }, 'heal'], [context[:aim], @objectives.current[:target], @objectives.history.last[:reason]]
+    assert_equal [{ place: [164, 16] }, { kind: 'person', place: [164, 16], type: 132, cell: [3, 5], heal_below: 8 }, 'heal'], [context[:aim], @objectives.current[:target], @objectives.history.last[:reason]]
     @objectives.abandon(frame: 400, reason: 'test')
-    healed = state(frame: 500, hp: 24, room_id: 164)
+    healed = state(frame: 500, hp: 24, room_id: 164, item_b: 12)
     p.observe(healed, frame: 500)
     p.decide(p.decision_point_for(healed), healed, { grid: })
     assert_equal 'souvenir-165-16-t64', @objectives.current[:candidate]
+  end
+
+  def test_a_heal_objective_in_a_place_with_several_people_closes_when_hp_rises_not_on_arrival
+    @objectives = Koholint::Objectives.new(trace: trace)
+    @objectives.start(frame: 100, title: 'Heal in 164-16, where a talk healed Link before', predicate: { kind: 'reach_place', place: [164, 16] }, target: { kind: 'place', place: [164, 16], heal_below: 8 })
+    arrived = state(frame: 200, room_id: 164, hp: 8)
+    assert_nil @objectives.update(arrived, frame: 200), 'arriving heals nothing'
+    healed = state(frame: 300, room_id: 164, hp: 24)
+    assert_equal :achieved, @objectives.update(healed, frame: 300)
   end
 
   def test_a_loop_with_no_untried_work_anywhere_goes_to_the_least_entered_place_outside_it_on_every_detection
@@ -520,6 +546,7 @@ class DelegatedAutopilotTest < Minitest::Test
     p = autopiloted(client, autopilot: nil)
     p.instance_variable_set(:@entities_reader, -> { [{ slot: 2, type: 27, kind: 'enemy', x: 84, y: 60, contact: 11, cell: [3, 5] }] })
     decide(p)
+    events = []
     answers = [300, 800, 1300].map do |frame|
       here = state(frame:, hp: 24)
       p.instance_variable_set(:@retreated, nil)
@@ -527,11 +554,20 @@ class DelegatedAutopilotTest < Minitest::Test
       p.after_action(choice: result[:choice], outcome: outcome(:no_frontier, 0).merge(frames: 1, moved_cells: 0, cells_walked: 0), state: here, frame:)
       context = { grid: }
       result = p.decide(p.decision_point_for(here), here, context)
+      events << { 'type' => 'decision', 'frame' => frame, 'input' => { 'room_id' => here.room_id, 'map_id' => here.map_id }, 'justification' => result[:justification] }
       p.after_action(choice: result[:choice], outcome: outcome(:known_place, 0).merge(frames: 40, moved_cells: 2, cells_walked: 2), state: here, frame: frame + 1)
       [context[:retreat], result[:justification].to_s[/guarded/]]
     end
     assert_equal [[true, nil], [true, nil], [nil, 'guarded']], answers
     assert_equal 'guarded', @objectives.history.last[:reason]
+    assert_equal p.instance_variable_get(:@retreats), Koholint::Policies::Memory.from_events(events).retreats, 'a resume reads the retreats back'
+  end
+
+  def test_a_resume_reads_back_the_heal_detours_and_the_re_offers
+    events = [{ 'type' => 'objective', 'frame' => 10, 'id' => 'obj-1', 'status' => 'abandoned', 'reason' => 'heal' },
+              { 'type' => 'decision', 'frame' => 20, 'input' => {}, 'justification' => 'the loop is cut: souvenir-162-14-t64, set aside, is taken up again (1/2)' }]
+    memory = Koholint::Policies::Memory.from_events(events)
+    assert_equal [1, { 'souvenir-162-14-t64' => 1 }], [memory.heal_detours, memory.reoffers]
   end
 
   # Run 5e81, 172/10 at 4 hp: the type 155 walked up to Link during the first 120-frame wait and killed him.
