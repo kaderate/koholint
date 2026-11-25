@@ -22,8 +22,8 @@ class ExploreTest < Minitest::Test
 
   def registry = @registry ||= Koholint::Skills::Registry.default
 
-  def state(x: 88, y: 80, room_id: 1, hp: 24, dialog_state: 0)
-    Koholint::GameState.new(frame: 0, room_id:, map_id: 0, x:, y:, hp:, dialog_state:, game_mode: 0x0B, game_submode: 7, milestone: :none)
+  def state(x: 88, y: 80, room_id: 1, hp: 24, dialog_state: 0, knockback: 0)
+    Koholint::GameState.new(frame: 0, room_id:, map_id: 0, x:, y:, hp:, dialog_state:, game_mode: 0x0B, game_submode: 7, milestone: :none, link_knockback: knockback)
   end
 
   def with(rows, *edits)
@@ -32,17 +32,19 @@ class ExploreTest < Minitest::Test
     rows
   end
 
-  def explore(rows, truth: rows, exits: [], harm: [], rocks: [], callouts: [], start: [88, 80], params: {}, limit: 1000, **context)
+  def explore(rows, truth: rows, exits: [], harm: [], rocks: [], callouts: [], guards: [], start: [88, 80], params: {}, limit: 1000, **context)
     walls = truth.each_with_index.flat_map { |line, row| line.chars.each_index.select { |col| '#o'.include?(line[col]) }.map { |col| [row, col] } }
     execution = registry.start('explore', state(x: start[0], y: start[1]), params, { grid: MapGrid.new(rows), **context })
     x, y = start
     room_id = 1
     hp = 24
     dialog_state = 0
+    knockback = 0
     inputs = []
     limit.times do
       hp = 20 if harm.include?(Koholint::Geometry.cell_for(x, y))
-      buttons = execution.next_input(state(x:, y:, room_id:, hp:, dialog_state:)) or break
+      buttons = execution.next_input(state(x:, y:, room_id:, hp:, dialog_state:, knockback:)) or break
+      knockback = 0
       inputs << buttons
       dx, dy = DELTA.fetch(buttons.first, [0, 0])
       next if dx.zero? && dy.zero?
@@ -53,6 +55,12 @@ class ExploreTest < Minitest::Test
       ox, oy = Koholint::Geometry.offset(x + dx, y + dy, [row, col])
       pushed = rocks.include?([row + dy, col + dx]) && ((dx * ox) > 4 || (dy * oy) > 6)
       dialog_state = 1 if pushed
+      if guards.include?(ahead)
+        knockback = 8
+        x -= dx * 4
+        y -= dy * 4
+        next
+      end
       next if ahead.nil? || walls.include?(ahead) || pushed
 
       x += dx
@@ -236,6 +244,17 @@ class ExploreTest < Minitest::Test
     assert_empty inferring_log(clears: [{ 'target' => { 'row' => 3, 'col' => 8 }, 'effect' => true }, failed]).inferred_clearable([3, 0])
     looks = [{ 'target' => { 'row' => 3, 'col' => 8 }, 'effect' => true, 'look' => 'bush' }, { 'target' => { 'row' => 2, 'col' => 4 }, 'effect' => true, 'look' => 'bush' }, failed]
     assert_equal [2, 1], inferring_log(clears: looks).inferred_clearable([3, 0]).first.values_at(:wins, :losses)
+  end
+
+  # Run 20261125-183611-c75d, 98/0: a hostile on the exit knocked Link back off his shield, and the cells it guarded were logged as walls.
+  def test_a_step_a_hostile_knocks_back_is_no_wall_and_leaves_the_work_pending
+    rows = with(CLOSED, [0, 5], '.', [1, 5], '#', [1, 4], '#', [1, 6], '#', [2, 5], '?', [7, 5], '.')
+    log = Koholint::ExploreLog.new
+    log.absorb({ from: { room: 1, map: 0 }, exits: [{ row: 7, col: 5, direction: :down, outcome: :left, to: [2, 0] }] })
+    result, = explore(rows, truth: with(rows, [2, 5], '.'), guards: [[2, 5]], explore_log: log, limit: 400)
+    refute_includes result[:walls], { row: 2, col: 5 }, result.inspect
+    refute_includes result[:blocked_edges], { row: 3, col: 5, direction: :up }
+    assert result[:survey][:pending]
   end
 
   def test_untried_exits_that_cannot_be_reached_yet_send_explore_to_the_frontier_before_another_place

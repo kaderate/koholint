@@ -148,7 +148,9 @@ The skills, protocols and harness behaviours the agent works with. Versioned wit
   place just before the gain (`Items.name_words`; from the trace on resume). After a gain, the people and unidentified things of other
   places this lineage never read are all candidates, nearest first, past the cap of four. At an objective choice, a person whose recorded
   text holds every word of the name of an item Link holds, and who never talked with Link holding it, becomes the objective (picked by
-  the harness): Link talks to them holding it, then the harness uses it facing them; the use ends the objective.
+  the harness): Link talks to them holding it, then the harness uses it facing them; the use ends the objective. A step of explore
+  that a hostile knocks back is barred for that call only: it is no wall, no blocked edge and no tried exit, and the place's work
+  stays pending, so the way is tried again later.
 - flow-96: an examine- objective is achieved only once the thing at its place is tried: talk_to first, then touch when the talk drew
   no answer (an answered talk, or a dialogue that opens as Link walks up to it, is a try); the agent is told so; the autopilot follows each of those steps once, even when the model's own explore brought Link
   there. The walk probe records a way, like a wall, only from a start lined up with the row or column

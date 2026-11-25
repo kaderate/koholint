@@ -90,6 +90,7 @@ module Koholint
           @untried = []
           @exits = []
           @blocked = []
+          @knocked_edges = []
           @crossed = []
           @excluded = []
           # Runs without the capability logged clearable objects as walls.
@@ -109,7 +110,7 @@ module Koholint
 
         def result(state = @last)
           merged = super.merge(place_changed: state.place != @place, cells_walked: @cells_walked, legs: @legs, target: target_summary,
-                               crossed: @crossed.map(&:dup), walls: @new_walls.map { |row, col| { row:, col: } }, blocked_edges: @blocked.map(&:dup), exits: @exits.map(&:dup),
+                               crossed: @crossed.map(&:dup), walls: @new_walls.map { |row, col| { row:, col: } }, blocked_edges: (@blocked - @knocked_edges).map(&:dup), exits: @exits.map(&:dup),
                                offered: @offered.map { |row, col| { row:, col: } })
           merged[:clears] = @clearing.uses if @clearing&.uses&.any?
           merged[:survey] = @survey.merge(pending: pending?) if @survey
@@ -139,6 +140,7 @@ module Koholint
 
           @still = [state.x, state.y] == @position ? @still + 1 : 0
           @position = [state.x, state.y]
+          @knocked = true if state.link_knockback.to_i.positive?
           return @clearing.step(state) if @clearing&.active? && !@leg
           return depart(state) if state.place != @place
           return stop_now(:fell) if state.falling?
@@ -267,6 +269,7 @@ module Koholint
 
         def begin_attempt(state)
           @attempt_from = state.cell
+          @knocked = false
           target = @planner && @attempt_from && candidates(@attempt_from).first
           unless target
             @stop = :no_frontier
@@ -347,9 +350,12 @@ module Koholint
           attempt_over(state)
         end
 
+        # A step a hostile knocked back is barred for this call only: nothing is learned about the way, which stays to do.
         def fail_step(cell, direction)
           edge = { row: cell[0], col: cell[1], direction: }
           block(edge)
+          return @knocked_edges << edge if @knocked
+
           @exits << edge.merge(outcome: :blocked) if %i[exit door].include?(@target[:kind])
           @failed_push = { row: @target[:stone][0], col: @target[:stone][1], direction: } if @target[:kind] == :push
           return unless @target[:kind] == :frontier
@@ -416,6 +422,7 @@ module Koholint
 
         def pending?
           return false unless @planner && @cell
+          return true if @knocked_edges.any?
 
           path_to = ->(cell) { @planner.path(from: @cell, to: cell) }
           safe_to = ->(cell) { @planner.path(from: @cell, to: cell, cross_margin: false) }
