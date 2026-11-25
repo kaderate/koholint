@@ -148,7 +148,8 @@ The skills, protocols and harness behaviours the agent works with. Versioned wit
   on it about half a second, and the room restores it on re-entry. Above one heart the harness fights on sight with no model call:
   the nearest `enemy` within 32 px whose `sword_hits` is 1 (explore stops `enemy`, a stop the autopilot treats as benign), up to
   8 attacks per call, never while Link's footprint (his measured row band) covers a crumbling cell, never again in a place where an
-  attack stopped `damage`, and never again a slot an attack missed there (`blocked`, `no_path`, `out_of_reach`, `no_kill`, `hole`).
+  attack stopped `damage`, and never again a slot an attack missed there (`blocked`, `no_path`, `out_of_reach`, `no_kill`, `hole`)
+  or the slot just struck; a fight on sight never starts the flow-65 chain of fights after a kill.
   The attack strikes from where Link stands when its target is within 2 cells of him, turns to any enemy that comes nearer than its
   target within 2 cells, and stops `hole` before a lineup step enters a hole. Explore stops `fell` as soon as Link starts to fall.
   An untried exit or door that no path reaches and that is not the way back is reported `unreachable`, so it is cut, except in a

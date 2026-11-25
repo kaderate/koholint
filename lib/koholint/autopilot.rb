@@ -72,8 +72,9 @@ module Koholint
 
     def acted(skill:, outcome:)
       @acted = true
-      @attack_stop = skill.to_s == 'attack' && outcome.is_a?(Hash) ? outcome[:stopped_by].to_s : nil unless skill.to_s == 'wait'
-      @fight_hurt = [outcome[:from][:room], outcome[:from][:map]] if @attack_stop == 'damage' && outcome[:from].is_a?(Hash)
+      @attack_stop = skill.to_s == 'attack' && outcome.is_a?(Hash) && !@sighted ? outcome[:stopped_by].to_s : nil unless skill.to_s == 'wait'
+      @sighted = false unless skill.to_s == 'wait'
+      @fight_hurt = [outcome[:from][:room], outcome[:from][:map]] if skill.to_s == 'attack' && outcome.is_a?(Hash) && outcome[:stopped_by].to_s == 'damage' && outcome[:from].is_a?(Hash)
       note_missed(outcome) if skill.to_s == 'attack' && outcome.is_a?(Hash)
       note_struck(skill, outcome) if outcome.is_a?(Hash)
       @walled |= [outcome[:params][:direction].to_s] if skill.to_s == 'walk' && outcome.is_a?(Hash) && outcome[:params].is_a?(Hash) && walled?(outcome)
@@ -173,6 +174,7 @@ module Koholint
       if sighted
         @fight += 1
         @attack_stop = nil
+        @sighted = true
         return DecisionPoint.harness_choice({ skill: 'attack', params: { row: sighted[:cell][0], col: sighted[:cell][1] } },
                                             "autopilot: fight type #{sighted[:type]} at (#{sighted[:cell].join(',')}), a one-strike kill (#{@fight}/#{FIGHT_LIMIT})", autopilot: true)
       end
@@ -199,6 +201,7 @@ module Koholint
       return if Array(objects).any? { |object| object[:kind].to_s == 'crumbling' && Geometry.footprint_cells(state.x, state.y).include?(object[:cell]) }
 
       missed = @missed[:place] == state.place ? @missed[:slots] : []
+      missed += [@struck[:slot]] if @struck[:place] == state.place
       distance = ->(entity) { [(entity[:x] - state.x).abs, (entity[:y] - state.y).abs].max }
       Array(entities).select { |entity| entity[:kind].to_s == 'enemy' && entity[:sword_hits] == 1 && entity[:cell] && !missed.include?(entity[:slot]) }
                      .select { |entity| distance.(entity) <= FIGHT_SIGHT }

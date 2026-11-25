@@ -474,5 +474,17 @@ class AutopilotTest < Minitest::Test
     pilot.acted(skill: 'attack', outcome: { stopped_by: :damage, target: { slot: 6, type: 25, cell: [4, 4] }, from: { room: 163, map: 16 } })
     assert_nil pilot.fight_choice(state: state(frame: 200), entities: [sighted(0, 16, slot: 7)])
   end
-end
 
+  def test_a_fight_on_sight_never_starts_the_chain_of_fights_after_a_kill
+    pilot = primed
+    refute_nil pilot.fight_choice(state: state(frame: 200), entities: [sighted(16, 0)])
+    pilot.acted(skill: 'attack', outcome: { stopped_by: :done, target: { slot: 4, type: 25, cell: [3, 5] }, from: { room: 163, map: 16 } })
+    assert_nil pilot.fight_choice(state: state(frame: 200), entities: [foe(4, 5, slot: 6)])
+  end
+
+  def test_the_slot_just_struck_is_not_fought_on_sight_while_it_dies
+    pilot = primed
+    pilot.acted(skill: 'attack', outcome: { stopped_by: :done, target: { slot: 4, type: 25, cell: [3, 5] }, from: { room: 163, map: 16 } })
+    assert_nil pilot.fight_choice(state: state(frame: 200), entities: [sighted(16, 0)])
+  end
+end
