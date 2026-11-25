@@ -364,6 +364,22 @@ module Koholint
           nil
         end
 
+        # A reachable souvenir naming a held item by its pickup text is taken up like a lineage text, once; a drop is re-offered by the rules above.
+        def souvenir_objective(decision_point, state, context)
+          return unless decision_point.name == :choose_objective && !@puzzle_ask && @souvenirs.any?
+
+          taken = @souvenirs_taken | @objectives.history.map { |done| done[:candidate] } | [@objectives.current&.dig(:candidate)]
+          souvenir = build_candidates(state, context).find do |candidate|
+            target = candidate[:target]
+            candidate[:id].start_with?('souvenir-') && !taken.include?(candidate[:id]) &&
+              Array(Items.pickup_text_names[target[:item]]).any? { |words| words.join(' ') == target[:name] }
+          end or return
+
+          @objectives.start(frame: state.frame, title: souvenir[:title], predicate: souvenir[:predicate], candidate: souvenir[:id], target: souvenir[:target], autopilot: true)
+          @autopilot&.adopt(@objectives.current)
+          DecisionPoint.harness_choice(souvenir.slice(:title, :predicate), "autopilot: #{souvenir[:id]} names the #{souvenir[:target][:name]} Link holds; talk with it held, then use it", autopilot: true)
+        end
+
         def auto_objective(decision_point, state)
           return unless @autopilot && decision_point.name == :choose_objective && !@puzzle_ask
           return if @autopilot.objective_hold(state:, last: @objectives.history.last)

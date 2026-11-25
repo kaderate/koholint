@@ -87,6 +87,7 @@ module Koholint
         @heal_detours = memory.heal_detours
         @retreats = memory.retreats.dup
         @reoffers = Hash.new(0).merge(memory.reoffers)
+        @souvenirs_taken = memory.souvenirs_taken.dup
         @loop_watch = memory.loop_watch
         @zero_watch = memory.zero_watch
         @candidates = []
@@ -248,6 +249,9 @@ module Koholint
 
           dropped = dropped_objective(decision_point, state, context)
           return dropped if dropped
+
+          remembered = souvenir_objective(decision_point, state, context)
+          return remembered if remembered
 
           wanted = item_objective(decision_point, state)
           return wanted if wanted
