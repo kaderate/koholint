@@ -219,6 +219,7 @@ module Koholint
           end
 
           @loop_watch.act!
+          note_dropped(@objectives.current)
           @objectives.abandon(frame: state.frame, reason: 'loop')
           objective = away ? { title: "Leave the loop for #{away[:goal].join('-')}, the reachable place entered least", predicate: { kind: 'reach_place', place: away[:goal] } } : AUTO_OBJECTIVE
           @objectives.start(frame: state.frame, **objective, target: ({ kind: 'place', place: away[:goal] } if away), autopilot: true)
@@ -230,6 +231,24 @@ module Koholint
                  else "explore #{route ? "toward #{goal.join('-')}" : 'here'}, the nearest place with untried work outside the loop"
                  end
           DecisionPoint.harness_choice(choice, "#{LoopWatch::BREAK} #{hint[:places].join(', ')}: #{what}", autopilot: true)
+        end
+
+        # A delivery the loop break dropped is a lead the loop says nothing about, so it is taken up again once the loop is cut, REOFFERS times at most.
+        def note_dropped(objective)
+          return unless objective && DROPPED.any? { |prefix| objective[:candidate].to_s.start_with?(prefix) }
+
+          offers = @dropped&.dig(:objective, :candidate) == objective[:candidate] ? @dropped[:offers] : 0
+          @dropped = { objective: objective.slice(:title, :predicate, :candidate, :target), offers: }
+        end
+
+        def dropped_objective(decision_point, state)
+          return unless @dropped && decision_point.name == :choose_objective && @dropped[:offers] < REOFFERS && !@loop_watch.pending_hint
+
+          objective = @dropped[:objective]
+          @dropped[:offers] += 1
+          @objectives.start(frame: state.frame, **objective, autopilot: true)
+          @autopilot&.adopt(@objectives.current)
+          DecisionPoint.harness_choice(objective.slice(:title, :predicate), "the loop is cut: #{objective[:candidate]}, dropped by the loop break, is taken up again (#{@dropped[:offers]}/#{REOFFERS})", autopilot: true)
         end
 
         def zero_cap(decision_point, state, context)

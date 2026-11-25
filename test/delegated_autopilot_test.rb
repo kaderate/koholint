@@ -399,6 +399,30 @@ class DelegatedAutopilotTest < Minitest::Test
     assert_equal 'claude', results[9][0][:agent]
   end
 
+  # Gate run 1d73: the loop break at 98777 dropped souvenir-162-14-t64 and the harness kept exploring, so the delivery was never offered again.
+  def test_a_souvenir_objective_a_loop_break_dropped_is_taken_up_again_once_the_loop_is_cut
+    log = Koholint::ExploreLog.new
+    log.absorb({ from: { room: 163, map: 16 }, exits: [{ row: 3, col: 0, direction: :left, outcome: :left, to: [164, 16] }, { row: 0, col: 5, direction: :up, outcome: :left, to: [165, 16] }],
+                 survey: { sides: { left: [{ row: 3, col: 0 }], up: [{ row: 0, col: 5 }] }, doors: [] } })
+    log.absorb({ from: { room: 164, map: 16 }, exits: [{ row: 3, col: 9, direction: :right, outcome: :left, to: [163, 16] }], survey: { sides: { right: [{ row: 3, col: 9 }] }, doors: [] } })
+    @objectives = Koholint::Objectives.new(trace: trace)
+    target = { kind: 'person', place: [162, 14], type: 64, cell: [4, 4], try: true, item: 12, name: 'champignon' }
+    @objectives.start(frame: 100, title: 'Bring the champignon to person (type 64)', predicate: { kind: 'reach_place', place: [162, 14] }, candidate: 'souvenir-162-14-t64', target:)
+    p = Koholint::Policies::Delegated.new(client: ScriptedClient.new(objective: new_place, default: explore), registry: Koholint::Skills::Registry.default, objectives: @objectives, manual: '',
+                                          memory: Koholint::Policies::Memory.new(explore_log: log))
+    [163, 164, 163, 164, 163, 164, 163, 164, 163].each_with_index do |room, i|
+      now = state(frame: 100 + (i * 300), room_id: room)
+      p.observe(now, frame: now.frame)
+      p.decide(p.decision_point_for(now), now, { grid: })
+    end
+    assert_equal ['souvenir-162-14-t64', 'loop'], @objectives.history.last.values_at(:candidate, :reason)
+    @objectives.abandon(frame: 2800, reason: 'test')
+    now = state(frame: 2900, room_id: 165)
+    p.observe(now, frame: now.frame)
+    again = p.decide(p.decision_point_for(now), now, { grid: })
+    assert_equal ['delegated', 'souvenir-162-14-t64', target], [again[:agent], @objectives.current[:candidate], @objectives.current[:target]]
+  end
+
   def test_a_loop_with_no_untried_work_anywhere_goes_to_the_least_entered_place_outside_it_on_every_detection
     log = Koholint::ExploreLog.new
     log.absorb({ from: { room: 163, map: 16 }, exits: [{ row: 3, col: 0, direction: :left, outcome: :left, to: [164, 16] }, { row: 0, col: 5, direction: :up, outcome: :left, to: [165, 16] }],

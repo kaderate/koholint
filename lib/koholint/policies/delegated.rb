@@ -71,6 +71,8 @@ module Koholint
       STUCK_AT = 6
       ZERO_WAIT = { skill: 'wait', params: { frames: 120 } }.freeze
       DEADLOCK_WAITS = 3
+      DROPPED = %w[need- souvenir-].freeze
+      REOFFERS = 2
       EXPLORE = { skill: 'explore', params: {} }.freeze
       AUTO_OBJECTIVE = { title: 'Explore the nearest untried exits (picked by the harness)', predicate: { kind: 'new_place' } }.freeze
 
@@ -231,6 +233,9 @@ module Koholint
 
           autopilot = autopilot_choice(decision_point, state, context)
           return autopilot if autopilot
+
+          dropped = dropped_objective(decision_point, state)
+          return dropped if dropped
 
           wanted = item_objective(decision_point, state)
           return wanted if wanted
