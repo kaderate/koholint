@@ -22,7 +22,7 @@ class AttackTest < Minitest::Test
   end
 
   # Link moves 1 px per direction frame; an A press lands a hit when he faces the enemy within 24 px along and 8 px across.
-  def fight(target, enemies, from: [4, 2], sword: 1, immune: false, knockback: 0, hurt_at: nil, cap: nil, limit: 1000, ceiling: nil, at: nil, grid: FakeGrid.new)
+  def fight(target, enemies, from: [4, 2], sword: 1, immune: false, knockback: 0, hurt_at: nil, cap: nil, limit: 1000, ceiling: nil, at: nil, grid: FakeGrid.new, moves: nil)
     x, y = at || Koholint::Geometry.center_of(*from)
     hp = 24
     reader = -> { enemies.map { |e| e.merge(cell: Koholint::Geometry.cell_for(e[:x], e[:y])) } }
@@ -32,6 +32,7 @@ class AttackTest < Minitest::Test
     inputs = []
     limit.times do
       hp = 20 if hurt_at && inputs.size >= hurt_at
+      moves&.call(enemies, inputs.size)
       buttons = execution.next_input(state(x:, y:, sword:, hp:)) or break
       inputs << buttons
       direction = (buttons & VECTORS.keys).first
@@ -206,5 +207,11 @@ class AttackTest < Minitest::Test
   def test_a_dying_enemy_nearer_than_the_target_is_not_struck_instead
     result, = fight([4, 6], [enemy(4, 6), enemy(2, 2, slot: 4).merge(status: 1)])
     assert_equal [true, 3], [result[:killed], result[:target][:slot]]
+  end
+
+  def test_while_striking_an_enemy_nearer_than_the_target_is_struck_instead
+    approach = ->(enemies, frame) { enemies[1][:y] = 80 - 24 if frame == 3 }
+    result, = fight([4, 4], [enemy(4, 4), enemy(0, 2, slot: 4)], moves: approach)
+    assert_equal [true, 4, { row: 4, col: 2 }], [result[:killed], result[:target][:slot], result[:standing_cell]]
   end
 end

@@ -478,6 +478,18 @@ class ExploreTest < Minitest::Test
     assert_equal [:exit, 7, 9], result[:target].values_at(:kind, :row, :col)
   end
 
+  def test_least_visited_skips_a_place_whose_landing_from_here_is_a_pocket
+    log = Koholint::ExploreLog.new
+    log.absorb({ from: { room: 2, map: 1 }, exits: [{ row: 0, col: 9, direction: :up, outcome: :left, to: [1, 0] }, { row: 3, col: 9, direction: :right, outcome: :left, to: [3, 1] }], survey: { sides: {}, doors: [] } })
+    others = [[3, 1]]
+    assert_equal [1, 0], log.least_visited([2, 1], avoid: others)[:goal]
+    stuck = { skill: 'explore', from: { room: 1, map: 0, row: 7, col: 9 }, stopped_by: 'no_frontier', cells_walked: 0, route: { goal: [3, 1], next: [2, 1] }, dead_end: true }
+    2.times { log.absorb(stuck) }
+    assert log.pocket_side([1, 0], [7, 9])
+    log.note({ skill: 'walk', params: { direction: :up }, from: { room: 2, map: 1, row: 0, col: 9 }, to: { room: 1, map: 0, row: 7, col: 9 } })
+    assert_nil log.least_visited([2, 1], avoid: others)
+  end
+
   def test_a_way_back_never_crossed_is_dropped_when_an_explore_finds_no_exit_for_it
     log = Koholint::ExploreLog.new
     log.absorb({ from: { room: 5, map: 1 }, exits: [{ row: 7, col: 5, direction: :down, outcome: :left, to: [1, 0] }] })
