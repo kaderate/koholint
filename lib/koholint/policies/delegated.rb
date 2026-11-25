@@ -88,6 +88,7 @@ module Koholint
         @talk_log = memory.talk_log
         @item_names = memory.item_names.dup
         @pending_gains = []
+        @item_tries = memory.item_tries.dup
         @revisit = revisit || Revisit.new(talk_log: @talk_log)
         @entities = []
         @refusals = []
@@ -504,21 +505,16 @@ module Koholint
       end
 
       # Any talk_to aimed at a chest takes it off the away list; one that drew no response leaves it closed for this visit.
-      # An item newly held takes its name from its pickup text: the text read at its place right after the gain, as the sheet is
-      # transcribed only once it closes, else the one read there just before.
+      # An item newly held takes its name from its pickup text, the first text transcribed at its place after the gain shows as held
+      # (the rule of Items.pickup_names).
       def note_gains(state)
         held = Dialogues.items(state.inventory, state.item_a, state.item_b)
-        if @held
-          before = @last_read if @last_read && @last_read[:place] == state.place && state.frame - @last_read[:frame] <= Items::PICKUP_FRAMES
-          @pending_gains += (held - @held).map { |item| { item:, place: state.place, frame: state.frame, before: } }
-        end
+        @pending_gains += (held - @held).map { |item| { item:, place: state.place, frame: state.frame } } if @held
         @pending_gains.reject! do |gain|
-          after = @last_read if @last_read && @last_read[:place] == gain[:place] && @last_read[:frame] > gain[:frame]
-          expired = state.frame - gain[:frame] > Items::PICKUP_FRAMES
-          read = after || (gain[:before] if expired)
+          read = @last_read if @last_read && @last_read[:place] == gain[:place] && @last_read[:frame] > gain[:frame]
           words = Items.name_words(read&.dig(:text))
           @item_names[gain[:item]] ||= words if words.any?
-          read || expired
+          read || state.frame - gain[:frame] > Items::PICKUP_FRAMES
         end
       end
 

@@ -76,20 +76,33 @@ module Koholint
 
     def slot_of(state, id) = slots(state).index { |item| item.to_i == id }
 
-    # The words naming an item in its pickup text: the capitalised words of the text's first sentence, past its first word.
+    # The name a pickup sentence gives: the first run of capitalised words in the text's first sentence, past its first word.
     def name_words(text)
       sentence = text.to_s.split(/(?<=[.!?])\s/).first.to_s
-      sentence.scan(/[\p{L}\p{N}'-]+/).drop(1).select { |word| word.match?(/\A\p{Lu}/) }
+      sentence.scan(/[\p{L}\p{N}-]+/).drop(1).slice_when { |a, b| a.match?(/\A\p{Lu}/) != b.match?(/\A\p{Lu}/) }.find { |run| run.first.match?(/\A\p{Lu}/) }.to_a
     end
 
-    # Each gained item's name words, read from the last text at the place of its gain at most PICKUP_FRAMES before it.
+    # Each gained item's name words, from its pickup text: the first text transcribed at its place after the gain shows as held, within
+    # PICKUP_FRAMES. A sheet is transcribed once it closes, so its dialogue events follow the gain in the trace though they carry the
+    # frame the sheet opened.
     def pickup_names(events)
-      dialogues = Dialogues.from_events(events)
-      events.select { |event| event['type'] == 'item_gained' }.to_h do |gain|
-        frame = gain['frame'].to_i
-        read = dialogues.select { |dialogue| dialogue[:place] == gain['place'] && dialogue[:frame].to_i.between?(frame - PICKUP_FRAMES, frame) }.last
-        [gain['item'].to_i, name_words(read&.dig(:text))]
-      end.reject { |_, words| words.empty? }
+      names = {}
+      pending = []
+      now = 0
+      events.each_with_index do |event, index|
+        if event['type'] == 'dialogue'
+          gain = pending.find { |waiting| waiting['place'] == event['place'] } or next
+          pending.delete(gain)
+          pages = events.drop(index).take_while { |page| page['type'] == 'dialogue' && page.values_at('frame', 'place') == event.values_at('frame', 'place') }
+          words = name_words(Dialogues.text(pages.map { |page| page['text'].to_s }))
+          names[gain['item'].to_i] ||= words if words.any?
+          next
+        end
+        now = [now, event['frame'].to_i].max
+        pending.reject! { |waiting| now - waiting['frame'].to_i > PICKUP_FRAMES }
+        pending << event if event['type'] == 'item_gained'
+      end
+      names
     end
 
     def find(query)

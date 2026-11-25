@@ -693,10 +693,30 @@ class DelegatedAutopilotTest < Minitest::Test
     assert_nil p.send(:item_objective, p.decision_point_for(state), state), 'not while Link does not hold it'
     picked = p.send(:item_objective, p.decision_point_for(holding), holding)
     assert picked[:autopilot]
-    assert_equal({ kind: 'person', place: here, type: 64, cell: [3, 4], try: true, item: 12, name: 'Champignon' }, @objectives.current[:target])
+    assert_equal({ kind: 'person', place: here, type: 64, cell: [3, 4], try: true, item: 12, name: 'Champignon', seen: [1, true] }, @objectives.current[:target])
     assert_equal({ choice: { skill: 'talk_to', params: { row: 3, col: 4 } } }, p.send(:follow_choice, holding))
     @objectives.note_try(place: here, type: 64, skill: 'talk_to', answered: true)
     assert_equal({ choice: { skill: 'use_item', params: { item: Koholint::Items.name(12) } } }, p.send(:follow_choice, holding))
+  end
+
+  def test_an_item_objective_whose_try_drew_no_text_is_not_picked_again_until_a_new_text_from_that_person
+    here = [state.room_id, state.map_id]
+    p = autopiloted(ScriptedClient.new(objective: []))
+    p.instance_variable_set(:@entities_reader, -> { [{ type: 64, kind: 'person', cell: [3, 4] }] })
+    p.instance_variable_set(:@item_names, { 12 => %w[Champignon] })
+    talk_log = p.instance_variable_get(:@talk_log)
+    before = Koholint::Dialogues.stamp(milestone: :sword, items: [1, 4], leads: 0)
+    talk_log.remember(place: here, cell: [3, 4], text: 'Il me faut le Champignon de la forêt.', stamp: before, entity: 64)
+    holding = state(inventory: [12] + Array.new(9, 0))
+    assert p.send(:item_objective, p.decision_point_for(holding), holding)
+    @objectives.note_try(place: here, type: 64, skill: 'talk_to', answered: false)
+    @objectives.note_try(place: here, type: nil, skill: 'use_item', answered: false, item: 12)
+    assert_equal :achieved, @objectives.update(holding, frame: 50)
+    assert_nil p.send(:item_objective, p.decision_point_for(holding), holding), 'a silent try is not repeated'
+    talk_log.remember(place: here, cell: [3, 4], text: 'Ah, il est si loin.', stamp: before, entity: 64)
+    assert p.send(:item_objective, p.decision_point_for(holding), holding), 'a new text from them reopens it'
+    started = Koholint::Trace.read(File.join(@dir, 'trace.jsonl')).select { |e| e['type'] == 'objective' && e['status'] == 'started' }
+    assert_equal({ [12, here, 64] => [2, true] }, Koholint::Policies::Memory.item_tries(started), 'a resumed run keeps the tries')
   end
 
   # Run 626d, 80/0: item 12 is held at 91617 but its pickup sheet is transcribed only at 91633, once it closed.

@@ -74,6 +74,15 @@ class CandidatesTest < Minitest::Test
     assert_equal %w[person-3-0-t70 person-5-0-t71], away.([1, 4, 12]).map { |c| c[:id] }, 'a person this lineage read is not offered from afar'
   end
 
+  def test_the_cap_holds_for_unread_people_until_a_gain
+    talk_log = Koholint::TalkLog.new
+    cards = { [3, 0] => { people: (70..75).map { |type| { type:, cell: [1, 1] } }, held: [1, 4] } }
+    stamp = ->(items) { Koholint::Dialogues.stamp(milestone: :sword, items:, leads: 0) }
+    away = ->(items) { build(cards:, talk_log:, stamp: stamp.(items)).count { |c| c[:id].start_with?('person-3-0') } }
+    assert_equal Koholint::Candidates::PER_KIND, away.([1, 4])
+    assert_equal 6, away.([1, 4, 12])
+  end
+
   def test_a_surveyed_place_with_a_thing_never_tried_is_a_place_with_work
     explore_log = log
     explore_log.absorb({ from: { room: 3, map: 0 }, survey: { sides: {}, doors: [], pending: false } })

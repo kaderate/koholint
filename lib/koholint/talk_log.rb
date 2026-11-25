@@ -104,7 +104,7 @@ module Koholint
       key = Dialogues.key(text)
       return if key.empty? || !cell.all?(Integer)
 
-      @texts << { place:, cell:, key:, stamp:, entity:, conversation:, speaker: }.compact
+      @texts << { place:, cell:, key:, words: Dialogues.words(text), stamp:, entity:, conversation:, speaker: }.compact
     end
 
     def store_pages(conversation, pages)
@@ -164,12 +164,13 @@ module Koholint
 
     def talks_with(place, type) = @texts.select { |talk| talk[:place] == place && talk[:entity] == type }
 
-    # The people whose recorded texts hold every one of these words: [place, type, cell], once each.
+    # The people whose recorded texts hold these words in a row, as whole words: [place, type, cell], once each.
     def mentioning(words)
-      keys = words.map { |word| Dialogues.key(word) }.reject(&:empty?)
-      return [] if keys.empty?
+      name = Dialogues.words(words.join(' '))
+      return [] if name.empty?
 
-      @texts.select { |talk| talk[:entity] && keys.all? { |key| talk[:key].include?(key) } }.map { |talk| [talk[:place], talk[:entity], talk[:cell]] }.uniq { |place, type, _| [place, type] }
+      @texts.select { |talk| talk[:entity] && talk[:words].each_cons(name.size).include?(name) }
+            .map { |talk| [talk[:place], talk[:entity], talk[:cell]] }.uniq { |place, type, _| [place, type] }
     end
 
     # Whether Link talked to that person while holding the item.

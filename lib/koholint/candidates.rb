@@ -120,7 +120,7 @@ module Koholint
     # After a gain, people and things this lineage never read pass the cap, and places no known route reaches yet: those come after the
     # reachable ones, nearest first on the map.
     def people_away(place, hops, cards, talk_log, named, stamp = nil, explore_log = nil)
-      kept = 0
+      capped = 0
       unrouted = cards.keys.reject { |where| where == place || hops.key?(where) }
       unrouted = unrouted.sort_by { |where| [map_distance(place, where, explore_log) || Float::INFINITY, where] }
       found = (away(place, hops) + unrouted).flat_map do |where|
@@ -134,13 +134,13 @@ module Koholint
 
           who = talk_log.name_of(where, person[:type]) || "person (type #{person[:type]})"
           why = stale ? 'Link holds other items than at the last talk' : 'not exhausted'
-          unread = gained && talk_log.talks_with(where, person[:type]).empty?
-          { id: "person-#{where.join('-')}-t#{person[:type]}", label: "talk to #{who} in #{describe(where, named)}, #{moves(hops[where])}, #{why}",
-            title: "Go talk to #{who}"[0, 80], predicate: { kind: 'reach_place', place: where },
-            target: { kind: 'person', place: where, type: person[:type], cell: person[:cell] }, unread: }
-        end + things_away(where, hops, cards, talk_log, named, stamp).map { |thing| thing.merge(unread: true) }
+          [{ id: "person-#{where.join('-')}-t#{person[:type]}", label: "talk to #{who} in #{describe(where, named)}, #{moves(hops[where])}, #{why}",
+             title: "Go talk to #{who}"[0, 80], predicate: { kind: 'reach_place', place: where },
+             target: { kind: 'person', place: where, type: person[:type], cell: person[:cell] } },
+           gained && talk_log.talks_with(where, person[:type]).empty?]
+        end + things_away(where, hops, cards, talk_log, named, stamp).map { |thing| [thing, gained] }
       end
-      found.select { |candidate| candidate.delete(:unread) || (kept += 1) <= PER_KIND }
+      found.filter_map { |candidate, unread| candidate if unread || (capped += 1) <= PER_KIND }
     end
 
     # An uncatalogued thing never tried, seen still in its cell while Link held other items than now, may answer what he holds now: offered like a stale person.

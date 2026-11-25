@@ -32,6 +32,9 @@ class TalkLogTest < Minitest::Test
     assert_equal [[PLACE, 64, [2, 3]]], log.mentioning(%w[Champignon])
     assert_empty log.mentioning(%w[Champignon Doré])
     assert_empty log.mentioning([])
+    log.remember(place: [5, 0], cell: [1, 1], text: 'Un trésor dort ici, sous la Clé de voûte.', stamp: before, entity: 71)
+    log.remember(place: [6, 0], cell: [1, 1], text: "Rapporte-moi de l'Or, petit.", stamp: before, entity: 72)
+    assert_equal [[[6, 0], 72, [1, 1]]], log.mentioning(%w[Or]), 'a short name matches a whole word only'
     refute log.talked_holding?(PLACE, 64, 12)
     log.remember(place: PLACE, cell: [2, 3], text: 'Merci!', stamp: Koholint::Dialogues.stamp(milestone: :sword, items: [1, 4, 12], leads: 0), entity: 64)
     assert log.talked_holding?(PLACE, 64, 12)
