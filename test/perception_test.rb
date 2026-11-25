@@ -29,6 +29,13 @@ class PerceptionTest < Minitest::Test
     assert_equal [24, 4, 20], [state.hp, state.pending_damage, state.health]
   end
 
+  def test_reads_the_crumble_timer
+    addresses = Koholint::Addresses.load
+    ram = Hash.new(0).merge(addresses.fetch(:crumble_timer) => 33)
+    emulator = Struct.new(:frame) { define_method(:read) { |addr| ram[addr] } }.new(94753)
+    assert_equal 33, Koholint::Perception.read(emulator).crumble_timer
+  end
+
   def test_reads_the_rupee_count_from_its_bcd_digits
     addresses = Koholint::Addresses.load
     ram = Hash.new(0).merge(addresses.fetch(:rupees) => 0x47, addresses.fetch(:rupees_hundreds) => 0x01)
