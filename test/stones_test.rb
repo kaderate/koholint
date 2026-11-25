@@ -275,6 +275,24 @@ class StonesTest < Minitest::Test
     assert_equal :push, result.dig(:target, :kind), result.slice(:stopped_by, :target).inspect
   end
 
+  # A push ends its call (stopped_by pushed), so the next call reads the stones afresh: the vacated cell is open, the landed stone is not.
+  def test_after_a_push_the_next_call_walks_through_the_vacated_cell_and_never_into_the_landed_stone
+    room = Room.new(JAM, start: at([3, 1]), exits: [[[3, 9], :right]])
+    results = []
+    6.times do
+      break if room.room_id == 2
+
+      result, = play('explore', {}, room, JAM, limit: 1500, grid: StaleGrid.new(room, JAM))
+      results << result
+    end
+    assert_equal :pushed, results.first[:stopped_by]
+    landed = [[2, 5], [4, 5]].find { |cell| room.objects.dig(*cell) == FIXED }
+    crossed = results.drop(1).flat_map { |result| result[:crossed] }
+    assert_equal 2, room.room_id, results.map { |r| r.slice(:stopped_by, :target) }.inspect
+    assert(crossed.any? { |row, col, _| [row, col] == [3, 5] }, 'the vacated cell is walked through')
+    refute(crossed.any? { |row, col, direction| Koholint::Geometry.step([row, col], direction) == landed }, 'the landed stone is never walked into')
+  end
+
   class StuckRoom < Room
     private
 
