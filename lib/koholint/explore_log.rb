@@ -485,6 +485,8 @@ module Koholint
     # A place entered through a door lands where that door leads, so the way through it stands for the landing.
     def entry(place, way) = Geometry::OPPOSITE.key?(way) && !@door_ways.include?([place, way]) ? Geometry::OPPOSITE[way] : [place, way]
 
+    def entered(place) = @entered[place]
+
     def landing_side(place, cell) = @arrivals.find { |(where, _), arrival| where == place && arrival == cell }&.dig(0, 1)
 
     # held: an assumed way back only the survey found out of reach (low-health contact zones can cause that), so it is cut, never dropped;
