@@ -1164,6 +1164,13 @@ class ExploreTest < Minitest::Test
     assert_nil result[:unreachable]
   end
 
+  def test_an_unreachable_door_is_reported_by_its_own_cell
+    rows = with(CLOSED, [2, 5], '#', [3, 4], '#', [3, 6], '#', [4, 5], '#')
+    door = -> { [{ kind: :door, cell: [2, 5] }] }
+    result, = explore(rows, explore_log: Koholint::ExploreLog.new, objects: door, start: [40, 96], limit: 200)
+    assert_equal [[2, 5]], result[:unreachable], result.inspect
+  end
+
   def test_a_fall_and_an_enemy_to_fight_stop_explore
     falling = Koholint::GameState.new(**state.to_h, link_motion_state: Koholint::FALL_MOTION)
     execution = registry.start('explore', state, {}, { grid: MapGrid.new(with(CLOSED, [2, 5], '?')) })

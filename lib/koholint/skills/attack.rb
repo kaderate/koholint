@@ -179,7 +179,7 @@ module Koholint
           current = all.find { |entity| entity.values_at(:slot, :type) == @enemy.values_at(:slot, :type) }
           @enemy = @enemy.merge(current.slice(:x, :y, :cell)) if current
           distance = ->(entity) { [(entity[:x] - state.x.to_i).abs, (entity[:y] - state.y.to_i).abs].max }
-          nearer = all.select { |entity| entity[:kind].to_s == 'enemy' && entity[:cell] && entity[:slot] != @enemy[:slot] && distance.(entity) < distance.(@enemy) }
+          nearer = all.select { |entity| entity[:kind].to_s == 'enemy' && entity[:cell] && entity[:status] == @enemy[:status] && entity[:slot] != @enemy[:slot] && distance.(entity) < distance.(@enemy) }
                       .min_by { |entity| [distance.(entity), entity[:slot]] } or return
           return if distance.(nearer) > FAR
 

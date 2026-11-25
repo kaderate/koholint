@@ -202,5 +202,9 @@ class AttackTest < Minitest::Test
     result, = fight([4, 6], [enemy(4, 6), enemy(2, 2, slot: 4)])
     assert_equal [true, 4], [result[:killed], result[:target][:slot]]
   end
-end
 
+  def test_a_dying_enemy_nearer_than_the_target_is_not_struck_instead
+    result, = fight([4, 6], [enemy(4, 6), enemy(2, 2, slot: 4).merge(status: 1)])
+    assert_equal [true, 3], [result[:killed], result[:target][:slot]]
+  end
+end
