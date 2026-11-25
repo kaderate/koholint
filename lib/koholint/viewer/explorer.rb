@@ -9,6 +9,7 @@ require 'koholint/run_compare'
 require 'koholint/summary'
 require 'koholint/trace'
 require 'koholint/viewer/insights'
+require 'koholint/viewer/island'
 require 'koholint/viewer/registry'
 require 'zlib'
 
@@ -23,6 +24,7 @@ module Koholint
       MAX_WHY = 500
       MAX_NOTES = 8192
       NOTES = 'notes.md'.freeze
+      ISLAND_REFRESH = 30
       HEADER = %w[run_id tag flow_version model harness_sha highest_milestone places_seen frames dollars stop_reason].freeze
       FIELDS = %w[run_id tag flow_version frames dollars calls usd_per_1000f highest_milestone places_seen stop_reason].freeze
 
@@ -33,6 +35,7 @@ module Koholint
         @registry = registry
         @atlas = {}
         @atlas_lock = Mutex.new
+        @island_lock = Mutex.new
       end
 
       def self.default_root(run_dir)
@@ -113,6 +116,19 @@ module Koholint
       end
 
       def atlas = @atlas_lock.synchronize { Atlas.build([@root], cache: @atlas) }
+
+      def island
+        @island_lock.synchronize do
+          now = Process.clock_gettime(Process::CLOCK_MONOTONIC)
+          return @island[:value] if @island && now - @island[:at] < ISLAND_REFRESH
+
+          dirs, digests = @atlas_lock.synchronize { Atlas.read([@root], cache: @atlas) }
+          generation = digests.map(&:object_id)
+          value = @island&.dig(:generation) == generation ? @island[:value] : Island.of(dirs, digests, roots: [@root])
+          @island = { at: now, generation:, value: }
+          value
+        end
+      end
 
       def compare(a, b) = readable("#{a} or #{b}") { RunCompare.compare(resolve(a), resolve(b)) }
 

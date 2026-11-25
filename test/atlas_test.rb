@@ -47,6 +47,14 @@ class AtlasTest < Minitest::Test
     assert_operator alone[:totals][:overworld], :>, forked[:totals][:overworld]
   end
 
+  def test_heat_counts_where_link_stood_in_the_runs_own_events_and_sums_across_runs
+    heat = ->(atlas) { atlas[:places].sum { |entry| entry[:heat].sum } }
+    alone = atlas_of(VAL)
+    assert_operator heat.(atlas_of(VAL, parent: true)), :<, heat.(alone)
+    assert_equal heat.(atlas_of(SWORD)) + heat.(alone), heat.(atlas_of(SWORD, VAL))
+    assert(alone[:places].all? { |entry| entry[:heat].size == Koholint::Atlas::HEAT_COLS * Koholint::Atlas::HEAT_ROWS })
+  end
+
   def test_places_merge_across_runs_with_first_visit_and_counts
     atlas = atlas_of(SWORD, VAL)
     assert_equal 2, atlas[:runs]

@@ -28,13 +28,15 @@ class ServerTest < Minitest::Test
     Net::HTTP.get_response(URI("http://127.0.0.1:#{port}#{path}"))
   end
 
-  def test_root_serves_the_page
+  def test_root_serves_the_cockpit_and_live_the_run_page
     with_server do |_, port|
       response = get(port, '/')
       assert_equal '200', response.code
       assert_match %r{\Atext/html}, response['Content-Type']
-      assert_includes response.body, 'frame.png'
-      assert_includes response.body, 'state.json'
+      assert_equal File.binread(File.expand_path('../lib/koholint/viewer/app.html', __dir__)), response.body.b
+      live = get(port, '/live')
+      assert_equal '200', live.code
+      assert_equal File.binread(File.expand_path('../lib/koholint/viewer/page.html', __dir__)), live.body.b
     end
   end
 

@@ -145,7 +145,7 @@ class ExplorerTest < Minitest::Test
   end
 
   def test_pages_insert_data_with_text_only
-    %w[runs.html compare.html page.html atlas.html].each do |name|
+    %w[runs.html compare.html page.html atlas.html app.html].each do |name|
       html = File.read(File.expand_path("../lib/koholint/viewer/#{name}", __dir__))
       %w[innerHTML outerHTML insertAdjacentHTML document.write].each { |sink| refute_includes html, sink, "#{name} uses #{sink}" }
       refute_match %r{https?://}, html
@@ -162,6 +162,22 @@ class ExplorerTest < Minitest::Test
         assert_equal [root], atlas['roots']
         assert_equal 2, atlas['runs']
         assert_equal(%w[3/1 4/1], atlas['places'].map { |place| place['label'] })
+        assert_empty built
+      end
+    end
+  end
+
+  def test_island_and_story_come_from_the_runs_of_the_root
+    with_root do |root|
+      with_server(root) do |port, built|
+        island = JSON.parse(get(port, '/island.json').body)
+        assert_equal 2, island['runs']
+        assert_equal(%w[3/1 4/1], island['places'].map { |place| place['label'] })
+        story = JSON.parse(get(port, "/story.json?run=#{B}").body)
+        assert_equal [B, 'flow-3', 0, 40], story.values_at('run', 'flow', 'fork', 'end')
+        assert_equal [[5, '3/1'], [40, '4/1']], story['trail']
+        assert_equal '404', get(port, '/story.json').code
+        assert_equal '404', get(port, '/story.json?run=nope').code
         assert_empty built
       end
     end

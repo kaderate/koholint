@@ -5,6 +5,7 @@ require 'koholint/archive'
 require 'koholint/capabilities'
 require 'koholint/dialogues'
 require 'koholint/exits'
+require 'koholint/geometry'
 require 'koholint/leads'
 require 'koholint/place_card'
 require 'koholint/place_kinds'
@@ -25,6 +26,8 @@ module Koholint
     DATA = File.expand_path('../../data', __dir__)
     FACTS = %w[addresses entities items modes place_kinds geometry exits capabilities checkpoints vocabulary].freeze
     VERIFIED_AT = 2
+    HEAT_COLS = Geometry::COLS
+    HEAT_ROWS = Geometry::ROWS
 
     module_function
 
@@ -36,10 +39,15 @@ module Koholint
     def key(place) = place.join('-')
 
     def build(roots, cache: {})
+      dirs, digests = read(roots, cache:)
+      merge(digests.compact, dirs:, roots:, unreadable: digests.count(&:nil?)).merge(facts: facts, fact_rules: { verified: VERIFIED_AT, places: Capabilities::PLACES_TO_VALIDATE, lineages: Exits::VERIFIED_AT })
+    end
+
+    # Every run directory under the roots and its digest (nil when unreadable), each cached by its trace's mtime and size.
+    def read(roots, cache: {})
       dirs = roots.flat_map { |root| Archive.runs(root) }.uniq { |dir| File.basename(dir) }
       ids = dirs.to_h { |dir| [File.basename(dir), dir] }
-      digests = dirs.map { |dir| cached(dir, ids, cache) }
-      merge(digests.compact, dirs:, roots:, unreadable: digests.count(&:nil?)).merge(facts: facts, fact_rules: { verified: VERIFIED_AT, places: Capabilities::PLACES_TO_VALIDATE, lineages: Exits::VERIFIED_AT })
+      [dirs, dirs.map { |dir| cached(dir, ids, cache) }]
     end
 
     def cached(dir, ids, cache)
@@ -128,7 +136,13 @@ module Koholint
               "last: #{entry['history'].to_a.last&.dig('reason')}" }
     end
 
-    def blank = { visits: 0, deaths: 0, texts: {}, names: [], seen: {}, signs: 0, doors: 0, tried: {}, exits: {}, opens_from: [], items: [], puzzles: [] }
+    def blank = { visits: 0, deaths: 0, texts: {}, names: [], seen: {}, signs: 0, doors: 0, tried: {}, exits: {}, opens_from: [], items: [], puzzles: [],
+                  heat: Array.new(HEAT_COLS * HEAT_ROWS, 0) }
+
+    def heat_cell(state)
+      row, col = Geometry.cell_for(state['x'], state['y'])
+      row && ((row * HEAT_COLS) + col)
+    end
 
     # Places count from `since` (the fork frame when the parent is read, else 0); cost, calls and frames always from the fork frame.
     def digest(dir, since: 0, fork: since)
@@ -147,6 +161,8 @@ module Koholint
         at.(place)[:tried][type] = tried.slice(:tries, :answered)
       end
       current = nil
+      cell = nil
+      held = []
       respawn = false
       run_frames = 0
       dollars = 0.0
@@ -157,6 +173,11 @@ module Koholint
         case event['type']
         when 'perception'
           place = Summary.perceived_place(event)
+          stood = place && heat_cell(event['state'])
+          if own && stood && [place, stood] != cell
+            cell = [place, stood]
+            at.(place)[:heat][stood] += 1
+          end
           next if place.nil? || place == current
 
           if own
@@ -195,7 +216,8 @@ module Koholint
           source = source_text(event['name'], dialogues.select { |talk| talk[:place] == event['place'] && talk[:frame].to_i <= frame })
           at.(event['place'])[:names] << { name: event['name'], run:, frame:, source: source && { text: source[:text], frame: source[:frame] } }
         when 'item_gained'
-          at.(event['place'])[:items] << { name: event['name'], run:, frame: } if own && event['place'].is_a?(Array)
+          held = Array(event['held'])
+          at.(event['place'])[:items] << { item: event['item'], name: event['name'], run:, frame: } if own && event['place'].is_a?(Array)
         when 'puzzle'
           next unless own && event['place'].is_a?(Array)
 
@@ -204,7 +226,8 @@ module Koholint
         end
         run_frames = [run_frames, frame - fork].max if frame >= fork
       end
-      { run:, flow: Summary.read_json(File.join(dir, 'manifest.json'))['flow_version'], since:, fork:, frames: run_frames, dollars:, calls:, places:, leads: leads(events, since:, run:) }
+      manifest = Summary.read_json(File.join(dir, 'manifest.json'))
+      { run:, flow: manifest['flow_version'], parent: manifest.dig('parent', 'id'), since:, fork:, frames: run_frames, dollars:, calls:, held:, places:, leads: leads(events, since:, run:) }
     end
 
     # Each lead the run holds, keyed by its quote: read here when its event is from `since` on; status and attempts from the whole run.
@@ -262,6 +285,7 @@ module Koholint
           end
           found[:exits].each { |exit, count| entry[:exits][exit] = entry[:exits].fetch(exit, 0) + count }
           entry[:opens_from] |= found[:opens_from]
+          found[:heat].each_with_index { |count, index| entry[:heat][index] += count }
           entry[:items].concat(found[:items])
           entry[:puzzles].concat(found[:puzzles])
         end

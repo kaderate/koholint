@@ -6,12 +6,13 @@ require 'koholint'
 require 'koholint/viewer/explorer'
 require 'koholint/viewer/feed'
 require 'koholint/viewer/registry'
+require 'koholint/viewer/story'
 
 module Koholint
   module Viewer
     class Server
       PAGE_PATH = File.join(__dir__, 'page.html')
-      PAGES = { runs: File.join(__dir__, 'runs.html'), compare: File.join(__dir__, 'compare.html'), atlas: File.join(__dir__, 'atlas.html') }.freeze
+      PAGES = { app: File.join(__dir__, 'app.html'), runs: File.join(__dir__, 'runs.html'), compare: File.join(__dir__, 'compare.html'), atlas: File.join(__dir__, 'atlas.html') }.freeze
       MAX_LINE = 8192
       MAX_HEADERS = 100
       MAX_BODY = 32_768
@@ -142,7 +143,10 @@ module Koholint
 
       def get(path, params)
         case path
-        when '/' then html(@page)
+        when '/' then html(@pages[:app])
+        when '/live' then html(@page)
+        when '/island.json' then json(explorer.island)
+        when '/story.json' then json(Story.for(dir_of(only(params, %w[run])['run'])))
         when '/frame.png' then ['200 OK', 'image/png', params['run'] ? explorer.frame_png(params['run']) : @follower.frame_png, NO_STORE]
         when '/state.json' then json(params['run'] ? explorer.state(params['run']) : @feed.call)
         when '/runs' then html(@pages[:runs])
@@ -195,12 +199,13 @@ module Koholint
       end
 
       def screen(place, run)
-        dir = run ? run_dir(run) : (@run_dir || raise(Explorer::NotFound, 'no live run'))
-        path = File.join(dir, 'screens', "#{place}.png")
+        path = File.join(dir_of(run), 'screens', "#{place}.png")
         raise Explorer::NotFound, 'no screenshot' unless File.file?(path) && !File.symlink?(path)
 
         ['200 OK', 'image/png', File.binread(path), SHORT_CACHE]
       end
+
+      def dir_of(run) = run ? run_dir(run) : (@run_dir || raise(Explorer::NotFound, 'no live run'))
 
       def header(run)
         return explorer.header(run) if run
