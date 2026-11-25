@@ -9,6 +9,7 @@ require 'koholint/run_compare'
 require 'koholint/summary'
 require 'koholint/trace'
 require 'koholint/viewer/insights'
+require 'koholint/viewer/island'
 require 'koholint/viewer/registry'
 require 'zlib'
 
@@ -113,6 +114,8 @@ module Koholint
       end
 
       def atlas = @atlas_lock.synchronize { Atlas.build([@root], cache: @atlas) }
+
+      def island = @atlas_lock.synchronize { Island.build([@root], cache: @atlas) }
 
       def compare(a, b) = readable("#{a} or #{b}") { RunCompare.compare(resolve(a), resolve(b)) }
 

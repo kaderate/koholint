@@ -109,7 +109,18 @@ feeds `data/addresses.json` and the `ready` of the `play` mode in `data/modes.js
 finished run or one being written; Ctrl-C stops it. It listens on 127.0.0.1 only; `--host 0.0.0.0` opens it to other
 devices on the same network (no authentication: use it on a network you trust).
 
-Every page has the same top bar (Live, Runs, Atlas, Compare once two runs are picked on `/runs`, the current run, a replay badge).
+`/` is the cockpit (French UI, keys 1 and 2 switch views, state kept in the browser). **Île** draws the overworld screens
+seen by every run under the runs root with their captures, the ways taken (thicker when crossed more), deaths summed on the
+screen an interior opens from, a star where each item was first gained and rings on the next leads; the side shows the
+screens discovered, the 16x16 locator, discoveries over time and the Prochain card (the top open lead of the lineage that
+holds the most items); a click on a screen shows its capture with where Link stood (heat), visits, runs and entities; the
+play button replays the discovery day by day. **Direct** (`#direct`, or `#direct/<id>` for a replay) shows the live frame,
+the thought and objective at the shown frame, hearts, held items, the current place, the minimap with the trail, a
+scrubber with place, item and death marks (dragging it freezes the screen on that place's capture; a replay seeks), and
+the objectives, dialogues (pieces of one text merged) and skills up to that frame. Métro is a placeholder. `/island.json`
+and `/story.json[?run=<id>]` feed it, each cached by trace mtime and size.
+
+The run page moved to `/live`. Every older page has the same top bar (Cockpit, Live, Runs, Atlas, Compare once two runs are picked on `/runs`, the current run, a replay badge).
 The live page and a replay share one layout, in equal columns on a desktop and one column on a phone: the game screen
 with the mode badge (phase and mode name from the last perception; `unknown_mode` notables and `stuck_boot` or
 `unknown_mode_stuck` stops raise a red alert), the activity banner and the grid toggle; the objective, goal and plan; the
@@ -126,7 +137,7 @@ notes box. The map, timeline and stats are derived from the trace and cached by 
 
 `watch` also explores the runs under `--runs-root DIR` (default: the watched run's parent directory when it holds other
 runs, else `runs`). Routes besides `/`, `/frame.png` and `/state.json` (each JSON route takes `?run=<id>` for a past
-run and serves the watched run without it):
+run and serves the watched run without it; `/live` is the watched run's page):
 
 | Route | What it does |
 |---|---|

@@ -6,6 +6,7 @@ class PageTest < Minitest::Test
   PAGE = File.read(File.expand_path('../lib/koholint/viewer/page.html', __dir__))
 
   VIEWER = File.expand_path('../lib/koholint/viewer', __dir__)
+  APP = File.read(File.join(VIEWER, 'app.html'))
 
   def pure_source(page = PAGE)
     page[%r{// pure:begin\n(.*?)// pure:end}m, 1] or flunk 'page has no pure section'
@@ -19,6 +20,20 @@ class PageTest < Minitest::Test
     out, status = Open3.capture2('node', '-e', "#{pure_source(page)}\nconsole.log(JSON.stringify(#{expression}));")
     assert status.success?
     JSON.parse(out)
+  end
+
+  def test_the_cockpit_labels_screens_and_dates_as_the_game_and_a_french_reader_do
+    assert_equal %w[A1 B10 P16], evaluate('[lbl(0), lbl(145), lbl(255)]', page: APP)
+    assert_equal ['23 nov.', '?', '91k', '1124·c3c7'], evaluate("[fd('2026-11-23'), fd(null), kf(91234), short('20261124-141419-c3c7')]", page: APP)
+  end
+
+  def test_the_cockpit_reads_a_story_at_the_shown_frame
+    assert_equal [5, 'C11'], evaluate("at([[1, 'C10'], [5, 'C11'], [9, 'C12']], 7)", page: APP)
+    assert_nil evaluate('at([[3, 1]], 2)', page: APP)
+    assert_equal [['walk', 2], ['talk_to', 1]], evaluate("tally([[1, 'walk'], [2, 'talk_to'], [3, 'walk'], [9, 'attack']], 5)", page: APP)
+    assert_equal [1, 0.5, 0], evaluate('hearts(12, 24)', page: APP)
+    assert_equal [[4, 'achieved', 'Go', false], [6, 'started', 'Talk', false]],
+                 evaluate("latestObjectives([[2, 'started', 'Go', false], [4, 'achieved', 'Go', false], [6, 'started', 'Talk', false]])", page: APP)
   end
 
   def test_decisions_read_as_a_sentence
@@ -393,7 +408,8 @@ class PageTest < Minitest::Test
   def test_every_page_has_the_same_top_navigation
     [PAGE, RUNS, COMPARE].each do |html|
       nav = html[%r{<nav id="nav">.*?</nav>}m] or flunk 'page has no nav'
-      assert_match(%r{<a[^>]*href="/">Live</a>}, nav)
+      assert_match(%r{<a[^>]*href="/">Cockpit</a>}, nav)
+      assert_match(%r{<a[^>]*href="/live">Live</a>}, nav)
       assert_match(%r{<a[^>]*href="/runs">Historique</a>}, nav)
       assert_match(/id="compare"|id="nav-compare"/, nav)
       assert_includes nav, 'Comparer</a>'
