@@ -8,20 +8,25 @@ module Koholint
       SPRITE_WIDTH = 8
       SPRITE_HEIGHT = 16
 
-      def initialize(cells:, static_sprites:, beliefs:, capabilities:, hole_objects: [])
+      def initialize(cells:, static_sprites:, beliefs:, capabilities:, hole_objects: [], link: nil)
         @cells = cells
         @hole_objects = hole_objects
         @beliefs = beliefs
         @capabilities = capabilities
         @sprites = {}
-        static_sprites.each do |sprite|
-          left = sprite['x'] - 8
-          top = sprite['y'] - 16
-          rows = (top.div(16)..(top + (sprite['height'] || SPRITE_HEIGHT) - 1).div(16)).select { |row| row.between?(0, ROWS - 1) }
-          cols = (left.div(16)..(left + SPRITE_WIDTH - 1).div(16)).select { |col| col.between?(0, COLS - 1) }
-          rows.product(cols).each { |cell| @sprites[cell] ||= sprite['pattern'] }
-        end
+        static_sprites.each { |sprite| (self.class.sprite_cells(sprite) - [link]).each { |cell| @sprites[cell] ||= sprite['pattern'] } }
       end
+
+      # A sprite stands on the cells holding at least half of it each way, so one that pokes a few pixels into a cell does not wall it off;
+      # a person straddling a cell edge evenly still stands on both sides.
+      def self.sprite_cells(sprite)
+        height = sprite['height'] || SPRITE_HEIGHT
+        rows = halves(sprite['y'] - 16, height).select { |row| row.between?(0, ROWS - 1) }
+        cols = halves(sprite['x'] - 8, SPRITE_WIDTH).select { |col| col.between?(0, COLS - 1) }
+        rows.product(cols)
+      end
+
+      def self.halves(start, size) = (start.div(16)..(start + size - 1).div(16)).select { |cell| ([start + size, (cell + 1) * 16].min - [start, cell * 16].max) * 2 >= size }
 
       def appearance(row, col)
         check(row, col)
