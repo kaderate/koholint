@@ -228,8 +228,9 @@ module Koholint
     end
 
     # Below full health, the nearest heart on screen outside every contact zone is walked to before any fight; goto routes around the zones.
+    # A heart counts only on known floor, since one hidden under a pot or a bush sits there with no sprite.
     # Each slot is aimed at once per visit and HEART_LIMIT bounds a visit, so a heart goto cannot reach is not chased.
-    def heart_choice(state:, entities:)
+    def heart_choice(state:, entities:, grid: nil)
       return unless @since && state.phase == :playing && state.cell && state.max_hp && state.health < state.max_hp
 
       @hearts = { place: state.place, slots: [] } unless @hearts&.dig(:place) == state.place
@@ -237,7 +238,7 @@ module Koholint
 
       danger = Entities.danger_cells(Array(entities))
       row, col = state.cell
-      heart = Array(entities).select { |entity| entity[:heals] && entity[:cell] && !danger.include?(entity[:cell]) && !@hearts[:slots].include?(entity[:slot]) }
+      heart = Array(entities).select { |entity| entity[:heals] && entity[:cell] && grid&.floor?(*entity[:cell]) && !danger.include?(entity[:cell]) && !@hearts[:slots].include?(entity[:slot]) }
                              .min_by { |entity| [(entity[:cell][0] - row).abs + (entity[:cell][1] - col).abs, entity[:slot]] } or return
       @hearts[:slots] << heart[:slot]
       DecisionPoint.harness_choice({ skill: 'goto', params: { row: heart[:cell][0], col: heart[:cell][1] } },

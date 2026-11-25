@@ -42,6 +42,9 @@ module Koholint
 
       def hole?(row, col) = holes.include?([row, col])
 
+      # Walkable floor by the background tile alone, whatever sprite stands on it.
+      def floor?(row, col) = Geometry::DIRECTIONS.any? { |direction| @beliefs.query(appearance: appearance(row, col), action: :walk, direction:, context: @capabilities) == :yes }
+
       # A hole pulls Link in from the cell beside it when his sprite overlaps its edge.
       def hole_margin
         @hole_margin ||= holes.flat_map { |row, col| [[row - 1, col], [row + 1, col], [row, col - 1], [row, col + 1]] }

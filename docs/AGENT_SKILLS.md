@@ -145,8 +145,8 @@ The skills, protocols and harness behaviours the agent works with. Versioned wit
   it is still a frontier, taken when nothing else here is reachable, before a route to another place. An explore that stops `no_frontier`
   in at most one frame is answered by the harness at the next decision, not after three, since from the same cell it would find none again.
 - flow-92: below full health (`health < max_hp`, one heart or less included) the harness walks to a heart on screen with no model call, right after
-  the disengage step and before any fight: the nearest entity whose catalogued `heals` is verified (type 45) and whose cell lies outside every
-  enemy contact zone, by a goto to its cell, which routes around the zones. Each slot is aimed at once per visit of a place, 2 at most per visit.
+  the disengage step and before any fight: the nearest entity whose catalogued `heals` is verified (type 45), on known floor (the background tile
+  of its cell walked before, since a heart hidden under a pot or a bush has no sprite) and outside every enemy contact zone, by a goto to its cell, which routes around the zones. Each slot is aimed at once per visit of a place, 2 at most per visit.
 - flow-91: no skill stands on floor that gives way past its time. The game counts the frames the cell under Link's foot point
   (`link_foot`, 4 px below him) has been crumbling floor (`crumble_timer`), starts over when that cell changes and drops the cell
   into a hole at its `give_way` value (40 for object 223). While the game is in play, every skill's step (goto, explore, touch with
