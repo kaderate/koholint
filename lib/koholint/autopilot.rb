@@ -217,7 +217,8 @@ module Koholint
                      .min_by { |entity| [distance.(entity), entity[:slot]] }
     end
 
-    # At one heart or less with an enemy within a cell of its touch, step away from every such enemy before the model decides.
+    # At one heart or less with an enemy within a cell of its touch, step away from every such enemy before the model decides: each step
+    # takes Link farther from all of them and never into or beside another hostile's contact zone.
     def disengage_choice(state:, entities:, grid: nil)
       return unless @since && state.phase == :playing && state.x && state.cell && state.health <= Perception::HP_PER_HEART && @disengaged < DISENGAGE_LIMIT
 
@@ -225,7 +226,10 @@ module Koholint
       return if near.empty?
 
       holes = grid.respond_to?(:hole_margin) ? grid.hole_margin + Geometry::ROWS.times.to_a.product(Geometry::COLS.times.to_a).select { |cell| grid.hole?(*cell) } : []
-      direction = STEP.reject { |name, (dx, dy)| Array(@walled).include?(name.to_s) || holes.include?([state.cell[0] + dy, state.cell[1] + dx]) || near.any? { |threat| ((threat[:x] - state.x) * dx) + ((threat[:y] - state.y) * dy) > 0 } }
+      zone = Navigation::Threat.zone(Navigation::Threat.of(Array(entities)) - near, margin: Entities::DANGER_MARGIN)
+      beside = zone.flat_map { |row, col| [[row, col], [row - 1, col], [row + 1, col], [row, col - 1], [row, col + 1]] }
+      farther = ->(dx, dy) { near.all? { |threat| Navigation::Threat.distance(threat, state.x + (dx * Geometry::CELL), state.y + (dy * Geometry::CELL)) > Navigation::Threat.distance(threat, state.x, state.y) } }
+      direction = STEP.reject { |name, (dx, dy)| Array(@walled).include?(name.to_s) || (holes + beside).include?([state.cell[0] + dy, state.cell[1] + dx]) || !farther.(dx, dy) }
                       .max_by { |_, (dx, dy)| near.map { |threat| Navigation::Threat.distance(threat, state.x + (dx * Geometry::CELL), state.y + (dy * Geometry::CELL)) }.min }
                       &.first or return
       @disengaged += 1

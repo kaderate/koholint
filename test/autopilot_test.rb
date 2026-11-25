@@ -461,6 +461,21 @@ class AutopilotTest < Minitest::Test
     assert_equal 'left', pilot.disengage_choice(state: state(frame: 210, hp: 4, x: 68, y: 60), entities: [threat(74, 60)])[:choice][:params][:direction]
   end
 
+  # Run f741, 172/10: up was walled, so the step went right, beside the type 155 below, and took a hit (8 -> 4 hp).
+  def test_a_disengage_step_that_takes_link_no_farther_from_the_enemy_is_not_taken
+    pilot = primed
+    link = state(frame: 200, hp: 8, x: 68, y: 60)
+    pilot.acted(skill: 'walk', outcome: { stopped_by: :blocked, params: { direction: :up, cells: 1 } })
+    assert_nil pilot.disengage_choice(state: link, entities: [threat(66, 84, type: 155)])
+  end
+
+  def test_a_disengage_step_never_lands_in_or_beside_another_hostiles_contact_zone
+    link = state(frame: 200, hp: 8, x: 68, y: 60)
+    assert_equal 'up', primed.disengage_choice(state: link, entities: [threat(68, 72)])[:choice][:params][:direction]
+    step = primed.disengage_choice(state: link, entities: [threat(68, 72), threat(68, 20).merge(slot: 4)])[:choice][:params][:direction]
+    assert_includes %w[left right], step
+  end
+
   def test_a_disengage_step_into_a_wall_is_not_tried_again_before_the_next_model_call
     pilot = primed
     link = state(frame: 200, hp: 8, x: 68, y: 60)
