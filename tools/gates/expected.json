@@ -89,6 +89,13 @@
       "lost": 8,
       "deaths": 1,
       "delivery": null
+    },
+    "no-sword-225": {
+      "calls": 16,
+      "low": 2,
+      "lost": 24,
+      "deaths": 1,
+      "delivery": null
     }
   }
 }
