@@ -773,10 +773,10 @@ class DelegatedAutopilotTest < Minitest::Test
     p = autopiloted(client)
     blobs = [blob(2, 72, 90), blob(14, 76, 92)]
     p.instance_variable_set(:@entities_reader, -> { blobs })
-    decide(p, state(frame: 97200, room_id: 66, map_id: 0, x: 84, y: 104))
+    decide(p, state(item_a: Koholint::Items::SWORD, frame: 97200, room_id: 66, map_id: 0, x: 84, y: 104))
     hit = c5_attack(:target_gone, { slot: 2, type: 27, cell: [5, 4] }, at: [6, 5])
-    p.after_action(choice: { skill: 'attack', params: hit[:params] }, outcome: hit, state: state(frame: 97280, room_id: 66, map_id: 0, x: 84, y: 104), frame: 97280)
-    now = state(frame: 97289, room_id: 66, map_id: 0, x: 84, y: 104)
+    p.after_action(choice: { skill: 'attack', params: hit[:params] }, outcome: hit, state: state(item_a: Koholint::Items::SWORD, frame: 97280, room_id: 66, map_id: 0, x: 84, y: 104), frame: 97280)
+    now = state(item_a: Koholint::Items::SWORD, frame: 97289, room_id: 66, map_id: 0, x: 84, y: 104)
     p.observe(now, frame: 97289)
     result = p.decide(p.decision_point_for(now), now, { grid: })
     assert_equal [{ skill: 'attack', params: { row: 5, col: 4 } }, 'delegated'], [result[:choice], result[:agent]]
@@ -784,11 +784,11 @@ class DelegatedAutopilotTest < Minitest::Test
     struck = c5_attack(:blocked, { slot: 2, type: 28, cell: [5, 4] }, at: [6, 5])
     p.after_action(choice: { skill: 'attack', params: struck[:params] }, outcome: struck, state: now, frame: 97300)
     blobs.replace([blob(2, 72, 90), blob(14, 76, 106)])
-    later = state(frame: 97310, room_id: 66, map_id: 0, x: 84, y: 104)
+    later = state(item_a: Koholint::Items::SWORD, frame: 97310, room_id: 66, map_id: 0, x: 84, y: 104)
     p.observe(later, frame: 97310)
     assert_match(/fight type 28 at \(6,4\)/, p.decide(p.decision_point_for(later), later, { grid: })[:justification], 'the second one is still taken for an enemy, the struck one no more')
     blobs.replace([{ slot: 14, type: 46, kind: 'creature', moves: false, x: 76, y: 106, cell: [6, 4] }])
-    reused = state(frame: 97330, room_id: 66, map_id: 0, x: 84, y: 104)
+    reused = state(item_a: Koholint::Items::SWORD, frame: 97330, room_id: 66, map_id: 0, x: 84, y: 104)
     p.observe(reused, frame: 97330)
     refute_match(/fight type 46/, p.decide(p.decision_point_for(reused), reused, { grid: })[:justification].to_s, 'gate 150d at 98029: the slot came back as a still type 46')
   end

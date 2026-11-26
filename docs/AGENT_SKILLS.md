@@ -1,6 +1,6 @@
 # Agent skills
 
-The skills, protocols and harness behaviours the agent works with. Versioned with the play flow (currently `flow-112`): update this page, not the README, when a flow changes. Layers and data flow are in [ARCHITECTURE.md](../ARCHITECTURE.md).
+The skills, protocols and harness behaviours the agent works with. Versioned with the play flow (currently `flow-113`): update this page, not the README, when a flow changes. Layers and data flow are in [ARCHITECTURE.md](../ARCHITECTURE.md).
 
 
 - Learned capabilities (`data/capabilities.json`, `bin/koholint capability list`): an `operational` entry is a composite of the skills below, offered in the skill schema and listed under "Learned skills" only while its trigger item is held (flow-49) and its object is on screen (today `sword_on_object_92 row col direction`: stand next to object 92, face it, use the sword, step into its cell). `explore` and `goto` also run it themselves when blocked facing such a cell, and the planner routes through those cells as a last resort. `learn` and `capability publish|retire` are offline commands.
@@ -154,6 +154,11 @@ The skills, protocols and harness behaviours the agent works with. Versioned wit
   context lists it as "hurt Link for N", and a model attack on it is refused at or below its hit. It replaces two rules: the
   session-only one-strike probe of flow-110 (`note_contact`, `probe_choice`, the attack's strike cap from the context) and the
   "no tries in a place that has hurt Link" of flow-107; a type that never hurt Link is tried there again.
+- flow-113: no fight without a sword. The harness fights on sight only with the sword on A or B, so explore no longer stops `enemy`
+  without one, and `attack` is offered to the model only while the sword is held (on a button or in the inventory; the skill still
+  refuses it off A and B). The autopilot's tries and touches of unknown things also wait where a strike would be refused (Link at or
+  below the measured hit, or in a place dangerous at his health). A raised shield already pushes a still enemy such as the urchin
+  (type 197) aside within 2 to 7 frames, under walk's 8-frame still limit, so pushing needs no change.
 - flow-112: one heart or less no longer holds the autopilot (the flow-68 `low health` hold is gone); the one-heart walls, walk's
   `danger` stop and the disengage walk stay, the harness neither tries nor touches an unknown thing at one heart or less, and a health
   drop still hands the next decision to the model (`hp dropped`). A decision
@@ -276,7 +281,7 @@ The skills, protocols and harness behaviours the agent works with. Versioned wit
   (the grid's `hole_objects`, never walked, with their margin); object 223 is a floor that becomes a hole when Link stands on it
   about half a second, and the room restores it on re-entry; it counts as crumbling in a place only once one of its cells there was
   seen turning into a hole (the engine traces `floor_gave_way` once per place and object), since the same object also fills cells
-  outside the walls of rooms where it never gives way. Above one heart the harness fights on sight with no model call:
+  outside the walls of rooms where it never gives way. Above one heart, with the sword on A or B, the harness fights on sight with no model call:
   the nearest `enemy` within 32 px whose `sword_hits` is 1, or 2 when verified (flow-100; explore stops `enemy`, a stop the autopilot treats as benign), up to
   8 attacks per call, never while Link's footprint (his measured row band) covers a crumbling cell, never again in the visit of a place where an
   attack stopped `damage` twice, or once at half health or below (above it only enemies with verified sword hits; flow-100; model calls in between included), and never again a slot an attack missed there (`blocked`, `no_path`, `out_of_reach`, `no_kill`, `hole`)

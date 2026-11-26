@@ -1,6 +1,7 @@
 require 'set'
 require 'koholint/decision'
 require 'koholint/entities'
+require 'koholint/items'
 require 'koholint/navigation/threat'
 require 'koholint/perception'
 
@@ -127,8 +128,8 @@ module Koholint
 
     # A thing on screen never tried is tried once with talk_to before exploring on, nearest first: the sprites the last explore offered where no catalogued enemy stands,
     # and uncatalogued entities of a type never aimed at here. Tries cost no call, so TRY_LIMIT per visit bounds them, not the chain caps.
-    def try_choice(state:, objective:, entities:, tried:)
-      return unless state.cell && state.health > Perception::HP_PER_HEART && !objective&.dig(:target) && !hold_reason(state:, objective:, caps: false)
+    def try_choice(state:, objective:, entities:, tried:, safe: true)
+      return unless safe && state.cell && state.health > Perception::HP_PER_HEART && !objective&.dig(:target) && !hold_reason(state:, objective:, caps: false)
 
       here = state.place
       visit(here)
@@ -153,8 +154,8 @@ module Koholint
 
     # A still uncatalogued entity whose try gave nothing is walked onto once per visit, nearest first: touch reads the item bytes to tell a pickup.
     # Still means it is still in the cell the try aimed at and not catalogued as moving; tries and touches share TRY_LIMIT.
-    def touch_choice(state:, objective:, entities:)
-      return unless state.cell && state.health > Perception::HP_PER_HEART && !objective&.dig(:target) && !hold_reason(state:, objective:, caps: false)
+    def touch_choice(state:, objective:, entities:, safe: true)
+      return unless safe && state.cell && state.health > Perception::HP_PER_HEART && !objective&.dig(:target) && !hold_reason(state:, objective:, caps: false)
 
       here = state.place
       visit(here)
@@ -212,7 +213,7 @@ module Koholint
 
     # Crumbling floor gives way under a Link who stands to strike, so no fight starts with his footprint on it.
     def fight_target(state:, entities:, objects: [], safe: true)
-      return unless @since && state.phase == :playing && state.cell && state.x
+      return unless @since && state.phase == :playing && state.cell && state.x && Items.button_of(state, Items::SWORD)
 
       @fight_hurt = nil if @fight_hurt && @fight_hurt[:place] != state.place
       return if state.health <= Perception::HP_PER_HEART || @fight >= FIGHT_LIMIT
