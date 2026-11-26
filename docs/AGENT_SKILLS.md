@@ -1,6 +1,6 @@
 # Agent skills
 
-The skills, protocols and harness behaviours the agent works with. Versioned with the play flow (currently `flow-110`): update this page, not the README, when a flow changes. Layers and data flow are in [ARCHITECTURE.md](../ARCHITECTURE.md).
+The skills, protocols and harness behaviours the agent works with. Versioned with the play flow (currently `flow-111`): update this page, not the README, when a flow changes. Layers and data flow are in [ARCHITECTURE.md](../ARCHITECTURE.md).
 
 
 - Learned capabilities (`data/capabilities.json`, `bin/koholint capability list`): an `operational` entry is a composite of the skills below, offered in the skill schema and listed under "Learned skills" only while its trigger item is held (flow-49) and its object is on screen (today `sword_on_object_92 row col direction`: stand next to object 92, face it, use the sword, step into its cell). `explore` and `goto` also run it themselves when blocked facing such a cell, and the planner routes through those cells as a last resort. `learn` and `capability publish|retire` are offline commands.
@@ -144,6 +144,16 @@ The skills, protocols and harness behaviours the agent works with. Versioned wit
   Within a place, explore takes a side known only as the assumed way back (flow-78) after the place's other reachable untried exits, doors and frontiers;
   it is still a frontier, taken when nothing else here is reachable, before a route to another place. An explore that stops `no_frontier`
   in at most one frame is answered by the harness at the next decision, not after three, since from the same cell it would find none again.
+- flow-111: damage teaches hostility, as typed data. A `hurts` fact on a data/entities.json entry (value = hit, `confidence`,
+  `verified_count`, `source`; written offline from the entity census and the runs' notables, never by a run) and the run's own evidence,
+  a `notable` of kind `hurt` when an action ends with an hp drop (the drop is its hit; rebuilt from the lineage trace on a resume or a
+  fork): of everything within the census window (8 px across, 16 px down or up), the nearest takes it if its type already hurt, and
+  otherwise only if Link is not within a cell of the reach of an enemy (catalogued, or a type that already hurt) and it is of kind
+  `unknown` or `creature`, not a healer and not a type Link has talked with in the lineage (a wrong blame is never retired). Both
+  make the type an enemy at its largest hit: routes and heal rules keep out of its reach, it is never a talk, try or examine target, the
+  context lists it as "hurt Link for N", and a model attack on it is refused at or below its hit. It replaces two rules: the
+  session-only one-strike probe of flow-110 (`note_contact`, `probe_choice`, the attack's strike cap from the context) and the
+  "no tries in a place that has hurt Link" of flow-107; a type that never hurt Link is tried there again.
 - flow-110: a hit that leaves an enemy's slot to another type (`target_gone`) marks the spot: creatures catalogued as moving there at the
   next look (in the struck slot, or on the cell the enemy stood on) are fought on sight as enemies until each is struck once. A creature
   not identified (kind `unknown` or `creature`) whose type was within a cell of Link when he lost health this session, standing within a

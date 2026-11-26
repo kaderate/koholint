@@ -21,7 +21,7 @@ module Koholint
       class Run < Goto::Run
         def initialize(cell:, context:, **rest)
           @entities = context[:entities]
-          @max_strikes = context[:strikes] || MAX_STRIKES
+          @max_strikes = MAX_STRIKES
           @enemy = enemy_near(cell)
           @phase = :walk
           @strikes = 0

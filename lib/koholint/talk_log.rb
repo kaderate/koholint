@@ -151,6 +151,8 @@ module Koholint
 
     def failed_sides(place, cell) = @silent.fetch([place, cell], []).dup
 
+    def talked_types = @talked.keys.filter_map { |_, (key, type)| type if key == :entity }.uniq
+
     def lines(grid, place, limit: nil, stamp: nil, entities: [])
       shown_entities = entities.select { |entity| entity[:cell] }.sort_by { |entity| [entity[:cell], entity[:slot]] }
       objects = self.class.objects(grid).reject { |cells| shown_entities.any? { |entity| cells.include?(entity[:cell]) } }

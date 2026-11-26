@@ -84,6 +84,7 @@ module Koholint
         @souvenirs = souvenirs
         @cards = memory.cards.dup
         @healers = memory.healers
+        @hurts = memory.hurts
         @retreats = memory.retreats.dup
         @reoffers = Hash.new(0).merge(memory.reoffers)
         @souvenirs_taken = memory.souvenirs_taken.dup
@@ -131,7 +132,10 @@ module Koholint
       end
 
       def prepare(context)
-        @entities_reader = context[:entities] if context[:entities]
+        if context[:entities] && context[:entities] != @overlaid
+          @entities_reader = context[:entities]
+          @overlaid = context[:entities] = method(:entities_now)
+        end
         @objects_reader = context[:objects] if context[:objects]
         @room_objects_reader = context[:room_objects] if context[:room_objects]
         offer_learned(context[:room_objects], context[:held]) if @composites.any? && context[:room_objects]
@@ -269,6 +273,7 @@ module Koholint
 
         output = decision_point.name == :choose_objective ? resolve_candidate(reply.output) : reply.output
         choice = decision_point.validate(output).slice(*decision_point.output_schema)
+        refuse_hurtful_attack(choice, state) if decision_point.name == :choose_skill
         aim_explore(choice, state, context) if decision_point.name == :choose_skill
         start_objective(choice, state, context, reply.output['because']) if decision_point.name == :choose_objective
         plan = remember_plan(reply.output)
@@ -297,6 +302,7 @@ module Koholint
       def after_action(choice:, outcome:, state:, frame:)
         return unless choice.key?(:skill)
 
+        note_hurt(outcome, state)
         @autopilot&.acted(skill: choice[:skill], outcome:) unless @revisit_acting
         @healers.moved if outcome[:moved_cells].to_i.positive?
         @objectives.abandon(frame:, reason: 'unreachable') if choice[:skill] == 'explore' && outcome[:held_back] && @objectives.current
@@ -365,6 +371,16 @@ module Koholint
         context[:grid] ||= @last_grid
       end
 
+      def refuse_hurtful_attack(choice, state)
+        return unless choice[:skill] == 'attack'
+
+        params = choice[:params].transform_keys(&:to_sym)
+        target = Entities.near(@entities, [params[:row], params[:col]]) or return
+        return unless target[:hurt] && state.health <= target[:hurt]
+
+        raise Refusal, "type #{target[:type]} hurt Link for #{target[:hurt]} and Link has #{state.health} hp: no attack on it at #{target[:hurt]} hp or less"
+      end
+
       def track
         before = @objectives.history.size
         yield
@@ -422,6 +438,7 @@ module Koholint
         stalled = @stalled | @objectives.history.filter_map { |done| done[:candidate] if done[:reason] == 'stall' }
         hops = @explore_log.hops(place)
         @candidates.reject! { |candidate| stalled.include?(candidate[:id]) && (where = candidate.dig(:target, :place)) && where != place && !hops.key?(where) }
+        @candidates.reject! { |candidate| candidate[:id].start_with?('person-', 'examine-') && @hurts.hit(candidate.dig(:target, :type)) }
         @candidates.each { |candidate| offer_puzzle(candidate[:target][:place]) if candidate[:id].start_with?('puzzle-') }
         @candidates
       end
@@ -513,7 +530,7 @@ module Koholint
       end
 
       def entities_now
-        @entities = @entities_reader ? Array(@entities_reader.call) : []
+        @entities = @hurts.overlay(@entities_reader ? Array(@entities_reader.call) : [])
       end
 
       def objects_now = @objects_reader ? Array(@objects_reader.call) : []
