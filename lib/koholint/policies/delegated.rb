@@ -239,6 +239,9 @@ module Koholint
           detour = heal_detour(decision_point, state, context)
           return detour if detour
 
+          returned = heal_return(decision_point, state, context)
+          return returned if returned
+
           broken = loop_break(decision_point, state, context)
           return broken if broken
 

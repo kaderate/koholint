@@ -667,6 +667,58 @@ class DelegatedAutopilotTest < Minitest::Test
     assert(client.calls.any? { |call| call[:system].include?('choose the next objective') })
   end
 
+  def heal_lineage_with_a_souvenir(reoffers: {})
+    log = Koholint::ExploreLog.new
+    log.absorb({ from: { room: 163, map: 16 }, exits: [{ row: 3, col: 0, direction: :left, outcome: :left, to: [164, 16] }, { row: 0, col: 5, direction: :up, outcome: :left, to: [165, 16] }],
+                 survey: { sides: { left: [{ row: 3, col: 0 }], up: [{ row: 0, col: 5 }] }, doors: [] } })
+    log.absorb({ from: { room: 164, map: 16 }, exits: [{ row: 3, col: 9, direction: :right, outcome: :left, to: [163, 16] }], survey: { sides: { right: [{ row: 3, col: 9 }] }, doors: [] } })
+    healers = Koholint::Healers.new
+    healers.saw(place: [164, 16], health: 20)
+    healers.heard([164, 16])
+    healers.saw(place: [164, 16], health: 24)
+    healers.saw(place: [164, 16], health: 20)
+    cards = { [165, 16] => { enemies: [{ type: 27, cell: [4, 5] }] }, [164, 16] => { unknown: [{ type: 132, cell: [3, 5] }] } }
+    @objectives = Koholint::Objectives.new(trace: trace)
+    @objectives.start(frame: 100, title: 'Bring the champignon', predicate: { kind: 'reach_place', place: [165, 16] }, candidate: 'souvenir-165-16-t64', target: { kind: 'person', place: [165, 16], type: 64, cell: [4, 4], try: true, item: 12 })
+    souvenirs = [{ 'place' => [165, 16], 'entity' => 64, 'cell' => [4, 4], 'text' => 'Il me faut le champignon de la forêt.', 'seen' => [{ 'run' => '20261101-000000-aaaa', 'frame' => 1, 'held' => [1, 4] }] }]
+    Koholint::Policies::Delegated.new(client: ScriptedClient.new(objective: new_place, default: explore), registry: Koholint::Skills::Registry.default, objectives: @objectives, manual: '',
+                                      memory: Koholint::Policies::Memory.new(explore_log: log, cards:, healers:, reoffers:), souvenirs:)
+  end
+
+  # Paid fork g7-2 (4e10, flow-108): the loop break had already given the delivery back twice when the heal at 101033 set it aside; after the heal
+  # at 101838 nothing gave it back, and at 102174 the model saw it 9th in its options and explored elsewhere to the end.
+  def test_the_objective_a_heal_set_aside_comes_back_when_the_heal_is_over_outside_the_re_offer_cap
+    p = heal_lineage_with_a_souvenir(reoffers: { 'souvenir-165-16-t64' => 2 })
+    low = state(frame: 101033, hp: 8, item_b: 12)
+    p.observe(low, frame: 101033)
+    assert_match(/heal in 164-16 first/, p.decide(p.decision_point_for(low), low, { grid: })[:justification])
+    @objectives.abandon(frame: 101838, reason: 'test')
+    healed = state(frame: 102174, hp: 24, room_id: 164, item_b: 12)
+    p.observe(healed, frame: 102174)
+    decision = p.decide(p.decision_point_for(healed), healed, { grid: })
+    assert_equal ['souvenir-165-16-t64', 'the heal is over: souvenir-165-16-t64, set aside for it, is taken up again'], [@objectives.current&.dig(:candidate), decision[:justification]]
+  end
+
+  # Paid fork g7-2 (4e10, flow-108): at 98830 in 82/0 with 8 hp the loop break replaced the heal started at 98678, and Link wandered at one heart
+  # until 101033; a heal holds against a loop until hp rises, and once it is over the objective it set aside comes back before the loop break.
+  def test_a_loop_break_never_replaces_a_heal_before_hp_rises_and_the_set_aside_objective_comes_back_before_it
+    p = heal_lineage_with_a_souvenir
+    low = state(frame: 98678, hp: 8, item_b: 12)
+    p.observe(low, frame: 98678)
+    assert_match(/heal in 164-16 first/, p.decide(p.decision_point_for(low), low, { grid: })[:justification])
+    [164, 163, 164, 163, 164, 163, 164, 163, 164].each_with_index do |room, i|
+      now = state(frame: 98700 + (i * 300), room_id: room, hp: 8, item_b: 12)
+      p.observe(now, frame: now.frame)
+      refute_match(/loop in/, p.decide(p.decision_point_for(now), now, { grid: })[:justification].to_s)
+    end
+    assert @objectives.current[:heal]
+    @objectives.abandon(frame: 101800, reason: 'test')
+    healed = state(frame: 101838, hp: 24, room_id: 164, item_b: 12)
+    p.observe(healed, frame: 101838)
+    assert_match(/\Athe heal is over: souvenir-165-16-t64/, p.decide(p.decision_point_for(healed), healed, { grid: })[:justification])
+    assert_equal 'souvenir-165-16-t64', @objectives.current[:candidate]
+  end
+
   def test_a_heal_objective_in_a_place_with_several_people_closes_when_hp_rises_not_on_arrival
     @objectives = Koholint::Objectives.new(trace: trace)
     @objectives.start(frame: 100, title: 'Heal in 164-16, where a talk healed Link before', predicate: { kind: 'reach_place', place: [164, 16] }, target: { kind: 'place', place: [164, 16], heal_below: 8 })
