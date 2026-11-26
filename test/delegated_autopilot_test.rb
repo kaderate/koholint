@@ -1532,4 +1532,74 @@ class DelegatedAutopilotTest < Minitest::Test
     p.note_card({ place: [172, 10], unknown: [{ type: 155, cell: [3, 4], moves: nil }] })
     assert_equal [{ type: 155, cell: [3, 4], still: true }], p.instance_variable_get(:@cards)[[172, 10]][:unknown], 'the second look in the same cell'
   end
+
+  def e6(slot, type, x, y) = { slot:, type:, kind: :unknown, moves: nil, x:, y:, cell: [(y - 8) / 16, x / 16] }
+
+  def e6_hurt(client, autopilot: nil)
+    @objectives = Koholint::Objectives.new(trace: trace)
+    p = Koholint::Policies::Delegated.new(client:, registry: Koholint::Skills::Registry.default, objectives: @objectives, manual: '', autopilot:)
+    things = [e6(1, 185, 102, 67), e6(2, 203, 72, 64)]
+    p.instance_variable_set(:@entities_reader, -> { things })
+    start = state(frame: 98300, room_id: 84, map_id: 0, x: 101, y: 58)
+    p.observe(start, frame: 98300)
+    decide(p, start)
+    hit = outcome(:damage, 0).merge(hp_delta: -8, from: { room: 84, map: 0, row: 3, col: 6 }, to: { room: 84, map: 0, row: 3, col: 6 })
+    p.after_action(choice: { skill: 'explore', params: {} }, outcome: hit, state: state(frame: 98402, room_id: 84, map_id: 0, x: 101, y: 58, hp: 16), frame: 98402)
+    p
+  end
+
+  # Paid fork g8-3 (f78e, flow-110), E6 (84/0): autopilot explore lost 8 hp at 98402 with type 185 at (3,6) 1 px right and 9 px below Link (restored),
+  # type 203 at (3,4) 29 px away; at 98418 the model struck the uncatalogued 185 (-8), and at 98506, at 8 hp, its explore up walked into (3,6) and Link died.
+  def test_the_thing_nearest_link_when_hp_drops_is_listed_as_hurting_him_and_never_attacked_at_its_hit
+    attack = ok('skill' => 'attack', 'params' => { 'row' => 3, 'col' => 6 })
+    client = ScriptedClient.new(objective: new_place, default: attack)
+    p = e6_hurt(client)
+    now = state(frame: 98418, room_id: 84, map_id: 0, x: 100, y: 39, hp: 16)
+    p.observe(now, frame: 98418)
+    result = p.decide(p.decision_point_for(now), now, { grid: })
+    assert_equal [{ kind: 'hurt', detail: { type: 185, hit: 8, place: [84, 0], cell: [3, 6] } }], Array(result[:notables]).select { |note| note[:kind] == 'hurt' }
+    assert_match(/type 203 at \(3,4\) \(not identified\), type 185 at \(3,6\) \(hurt Link for 8\)/, client.calls.last[:prompt])
+    assert_equal 'attack', result[:choice][:skill], 'above its hit the model may still strike it'
+    low = state(frame: 98506, room_id: 84, map_id: 0, x: 101, y: 38, hp: 8)
+    p.observe(low, frame: 98506)
+    refused = p.decide(p.decision_point_for(low), low, { grid: })
+    assert_equal ['wait', 'type 185 hurt Link for 8 and Link has 8 hp: no attack on it at 8 hp or less'], [refused[:choice][:skill], refused[:justification]]
+    assert_includes Koholint::Entities.danger_cells(p.send(:entities_now)), [3, 6], 'routes keep out of its reach'
+  end
+
+  # Paid fork g7-1 (b8b7, flow-108): the autopilot walked up to talk to type 203 in E6 (84/0) at 100867 and Link lost 8 hp.
+  def test_a_type_that_hurt_link_is_never_a_talk_target
+    client = ScriptedClient.new(objective: new_place, default: explore)
+    p = e6_hurt(client)
+    @objectives.abandon(frame: 98420, reason: 'test')
+    menu = state(frame: 98430, room_id: 84, map_id: 0, x: 100, y: 39, hp: 16)
+    p.observe(menu, frame: 98430)
+    p.decide(p.decision_point_for(menu), menu, { grid: })
+    labels = p.offered_candidates.map { |candidate| candidate[:label] }.join("\n")
+    refute_match(/type 185/, labels)
+    assert_match(/type 203/, labels, 'a thing that never hurt Link is still offered')
+  end
+
+  def test_the_hurt_hypotheses_come_back_from_the_lineage_trace
+    events = [{ 'type' => 'notable', 'frame' => 98418, 'kind' => 'hurt', 'detail' => { 'type' => 185, 'hit' => 8, 'place' => [84, 0], 'cell' => [3, 6] } },
+              { 'type' => 'notable', 'frame' => 101772, 'kind' => 'hurt', 'detail' => { 'type' => 185, 'hit' => 4, 'place' => [84, 0], 'cell' => [3, 6] } }]
+    fact = Koholint::Policies::Memory.from_events(events).hurts.facts[185]
+    assert_equal({ hit: 8, confidence: 'hypothesis', verified_count: 1 }, fact.slice(:hit, :confidence, :verified_count))
+    assert_match(/nearest Link in the census window/, fact[:source])
+  end
+
+  # Paid fork g8-3 (f78e, flow-110): obj-94, the autopiloted delivery souvenir-162-14-t64, failed when Link died at 98584; the menu after the
+  # respawn at 98854 offered it 14th and the model read a sign: the history already held its candidate, so the souvenir rule never took it again.
+  def test_the_delivery_under_way_when_link_died_is_taken_up_again_after_the_respawn
+    p = heal_lineage_with_a_souvenir
+    alive = state(frame: 98400, hp: 24, item_b: 12)
+    p.observe(alive, frame: 98400)
+    dead = state(frame: 98584, hp: 0, item_b: 12)
+    p.observe(dead, frame: 98584)
+    assert_equal :failed, @objectives.history.last[:outcome]
+    back = state(frame: 98854, room_id: 164, hp: 24, item_b: 12)
+    p.observe(back, frame: 98854)
+    decision = p.decide(p.decision_point_for(back), back, { grid: })
+    assert_equal ['souvenir-165-16-t64', 'after the respawn: souvenir-165-16-t64, set aside, is taken up again (1/2)'], [@objectives.current&.dig(:candidate), decision[:justification]]
+  end
 end

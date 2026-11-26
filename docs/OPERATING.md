@@ -58,6 +58,9 @@ journal or the game state.
 trace gains `screen` and `screen_changed`, `affordance` (walk evidence per tile appearance) and a `notable` of kind `grid_overlay_stuck` (over 600 frames of overlay in one
 place, so the grid went dark). The live view has a grid toggle that overlays the believed passability.
 
+**Hurt.** When an action ends with an hp drop and a thing of kind `unknown` or `creature` is nearest Link within the census window, the trace gains a
+`notable` of kind `hurt` whose `detail` holds its `type`, the `hit` (the drop), the `place` and its `cell`.
+
 **Resume and fork.** `resume` continues a run with the same `flow_version` and ROM hash and rebuilds the ledger and
 visited places from the trace; `fork` branches a run at a frame (the parent may be of an older flow; `--tag`, `--autopilot` and `--root` set the child's). Both work on an archived run, also on a fresh clone
 (see Run storage). A fork of a run without keyframes or saves replays once from boot (about half an hour to frame 57519 on the Mac), rebuilding the missing saves and leaving keyframes in the parent's local `keyframes/` (every 1800 frames, at each save and the frame before the fork); a later fork of that run, or a resume of the child, starts from them in under a second. `branch <run_dir> --at FRAME|CHECKPOINT` forks, starts `watch` on the child (`--port`, `--host`,

@@ -70,7 +70,7 @@ is the threat interface; `navigation/stones.rb` searches the pushes that open a 
 `composite` (learned capabilities). Every skill reports how it stopped (`done`, `blocked`, `no_path`, …).
 `explore_log.rb` keeps per place what explore walked, the exits and doors tried and their destinations, surveys and the exit
 graph, and cuts a way found unreachable from the landing Link entered by (dropped when Link leaves a room where a stone was pushed); `ledger.rb` counts blocked edges, `triggers.rb` forbids inputs that re-fire a scripted event, `talk_log.rb` remembers
-what each person and sign said and which items were handed over where, `healers.rb` finds the places where a talk raised Link's hp and the largest hit measured, overall and per place, `revisit.rb` drives the harness's own talks to people, signs and chests, and `dialogues.rb`
+what each person and sign said and which items were handed over where, `healers.rb` finds the places where a talk raised Link's hp and the largest hit measured, overall and per place, `hurts.rb` keeps the types nearest Link when he lost hp as hostile hypotheses with their hit, `revisit.rb` drives the harness's own talks to people, signs and chests, and `dialogues.rb`
 stitches dialogue pages into texts. Their behaviour per flow is in `docs/AGENT_SKILLS.md`.
 
 **Exit graph and puzzles** (`explore_log.rb`) — every crossing is an observation `(place, way) -> place`. A first crossing that
@@ -100,7 +100,7 @@ Every policy inherits the no-op hooks of `policies/base.rb` (`observe`, `prepare
 `note_card`, `offered_candidates`, `cancel`), so the engine calls them without probing.
 - `policies/delegated.rb` is the agent policy. Its memory is rebuilt from the trace in one object,
   `Policies::Memory.from_events` (ledger, triggers, talk log, explore log, leads, place cards, loop and zero watches, and each gained item's name words
-  read from its pickup text, `Items.pickup_names`, the item objectives started and the candidates whose objective stalled). Its
+  read from its pickup text, `Items.pickup_names`, the item objectives started, the candidates whose objective stalled and the `hurt` notables). Its
   concerns are mixed in from `policies/delegated/`: `dialogue.rb` (pages, sheets, cached readings), `waits.rb` (screens,
   locks, hemmed), `outcomes.rb` (what each result teaches the memory) and `guidance.rb` (loop breaks, zero caps, objective
   follow-up, alerts). Before asking the model it lets the harness answer: screen waits, game over, dialogue advance, lock and

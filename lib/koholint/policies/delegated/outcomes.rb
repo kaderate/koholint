@@ -18,6 +18,16 @@ module Koholint
           @last_hp = hp
         end
 
+        def note_hurt(outcome, state)
+          hit = -outcome[:hp_delta].to_i
+          return unless hit.positive? && state.x
+
+          entity = Hurts.in_contact(state, entities_now) or return
+          detail = { type: entity[:type], hit:, place: state.place, cell: entity[:cell] }
+          @hurts.add(type: entity[:type], hit:, place: state.place, frame: state.frame)
+          @notes << { kind: 'hurt', detail: }
+        end
+
         def note_talk_source(choice, outcome)
           return unless LOCK_SKILLS.include?(choice[:skill])
 

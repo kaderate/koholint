@@ -152,11 +152,14 @@ module Koholint
       private_class_method :things_block
 
       def self.creatures_line(entities)
-        shown = entities.select { |entity| entity[:cell] && Entities.creature?(entity) }.sort_by { |entity| [entity[:cell], entity[:slot].to_i] }
+        shown = entities.select { |entity| entity[:cell] && (Entities.creature?(entity) || entity[:hurt]) }.sort_by { |entity| [entity[:cell], entity[:slot].to_i] }
         return if shown.empty?
 
         listed = shown.map do |entity|
-          what = entity[:kind].to_s == 'creature' ? 'gives no dialogue' : 'not identified'
+          what = if entity[:hurt] then "hurt Link for #{entity[:hurt]}"
+                 elsif entity[:kind].to_s == 'creature' then 'gives no dialogue'
+                 else 'not identified'
+                 end
           "type #{entity[:type]} at (#{entity[:cell][0]},#{entity[:cell][1]}) (#{what})"
         end
         "Creatures on screen, not people (for information, not talk targets): #{listed.join(', ')}"
