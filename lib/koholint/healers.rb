@@ -1,8 +1,8 @@
 module Koholint
   # Places where Link's health rose after someone there spoke, before he walked a cell (so no heart he walked onto): where to heal, from observed facts only.
-  # Also the largest single hp drop seen (the measured hit), and the heal detours sent since the last heal.
+  # Also the largest single hp drop seen (the measured hit), overall and per place, and the heal detours sent since the last heal.
   class Healers
-    attr_reader :places, :hit, :detours
+    attr_reader :places, :hit, :hits, :detours
 
     def self.from_events(events)
       healers = new
@@ -27,8 +27,11 @@ module Koholint
       @spoke = nil
       @health = nil
       @hit = nil
+      @hits = {}
       @detours = 0
     end
+
+    def dangerous(health) = @hits.filter_map { |place, hit| place if hit >= health }
 
     def detoured = @detours += 1
 
@@ -45,7 +48,10 @@ module Koholint
         @spoke = nil
         @detours = 0
       end
-      @hit = [@hit.to_i, @health - health].max if @health && health < @health
+      if @health && health < @health
+        @hit = [@hit.to_i, @health - health].max
+        @hits[place] = [@hits[place].to_i, @health - health].max
+      end
       @health = health
     end
 

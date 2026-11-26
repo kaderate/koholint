@@ -180,6 +180,7 @@ module Koholint
         @asked = false
         @leads.note_held(Items.held_ids(state))
         @explore_log.in_context(Exits.context(state))
+        @explore_log.dangerous = @healers.dangerous(state.health) if state.health
         @zero_watch.in_context(Exits.context(state))
         @explore_log.use_bench(Exits.for_context(@exits, Exits.context(state))) if @exits
         @puzzles_offered = []

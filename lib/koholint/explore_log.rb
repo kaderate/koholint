@@ -31,7 +31,12 @@ module Koholint
       log
     end
 
+    # Places where one measured hit would take Link's health, set before each decision: a route to work never enters them, nor is one a fallback destination;
+    # an objective's route may still cross them.
+    attr_accessor :dangerous
+
     def initialize
+      @dangerous = []
       @exits = Hash.new(0)
       @offered = []
       @walked = Hash.new { |hash, key| hash[key] = [] }
@@ -376,8 +381,9 @@ module Koholint
 
     # skip: places not to aim at (a loop's own places), still crossed on the way.
     # lifted: the route needs a cut way, which only an explore with no aim takes.
-    def route(from, goal: nil, avoid: [], skip: [])
-      hops, lifted = lifting_path(from, goal:, avoid:, skip:)
+    # ban: keep out of the dangerous places, on by default for a route to work; a route to work picked elsewhere passes it with its goal.
+    def route(from, goal: nil, avoid: [], skip: [], ban: goal.nil?)
+      hops, lifted = lifting_path(from, goal:, avoid:, skip:, ban:)
       return nil unless hops
 
       { goal: hops.last[:to], next: hops.first[:to], via: hops.first[:via], **(lifted ? { lifted: true } : {}) }
@@ -386,13 +392,13 @@ module Koholint
     # Where a loop goes when no place has untried work: the reachable place entered least, nearest first, outside the loop.
     # A place whose landing from here was left by the side Link came in, with nothing reached from it, is no destination: Link would only come back.
     def least_visited(from, avoid: [])
-      far = hops(from).reject { |place, _| place == from || avoid.include?(place) }
+      far = hops(from).reject { |place, _| place == from || avoid.include?(place) || @dangerous.include?(place) }
       far.sort_by { |place, count| [@visits[place], count, place] }.each do |place, _|
-        hops = path(from, goal: place) or next
+        hops = path(from, goal: place, ban: true) or next
         way = hops.last[:via]
         next if way.is_a?(Symbol) && Geometry::OPPOSITE.key?(way) && pocket_side(place, @arrivals[[place, Geometry::OPPOSITE.fetch(way)]])
 
-        return route(from, goal: place)
+        return route(from, goal: place, ban: true)
       end
       nil
     end
@@ -400,14 +406,14 @@ module Koholint
     # Ways that led to one place first (a way back is assumed only across a crossing its hypothesis predicted), then ways that led to two.
     TIERS = %i[consistent contradicted].freeze
 
-    def path(from, goal: nil, avoid: [], skip: []) = lifting_path(from, goal:, avoid:, skip:)&.first
+    def path(from, goal: nil, avoid: [], skip: [], ban: goal.nil?) = lifting_path(from, goal:, avoid:, skip:, ban:)&.first
 
     # With no work reachable under the cuts, live cuts not yet tried in their episode are ignored, oldest first; a route to a goal keeps them all.
-    def lifting_path(from, goal:, avoid:, skip:)
+    def lifting_path(from, goal:, avoid:, skip:, ban: goal.nil?)
       lifted = []
       loop do
         TIERS.each do |tier|
-          found = search(from, goal:, avoid:, skip:, tier:, lifted:)
+          found = search(from, goal:, avoid:, skip:, tier:, lifted:, ban:)
           return [found, lifted.any?] if found
         end
         return nil if goal
@@ -418,7 +424,7 @@ module Koholint
     end
 
     # A place is searched once per side it is entered by, since a way cut off from one side may be reached from another.
-    def search(from, goal:, avoid:, skip:, tier:, lifted: [])
+    def search(from, goal:, avoid:, skip:, tier:, lifted: [], ban: goal.nil?)
       start = [from, @entered[from]]
       seen = { start => nil }
       queue = [start]
@@ -429,7 +435,7 @@ module Koholint
 
         ways(place).each do |key, to|
           ahead = [to, entry(place, key)]
-          next if seen.key?(ahead) || pocket?(to, key) || (place == from && avoid.include?(key)) || beyond?(tier, place, key) ||
+          next if seen.key?(ahead) || (ban && @dangerous.include?(to)) || pocket?(to, key) || (place == from && avoid.include?(key)) || beyond?(tier, place, key) ||
                   (cut?(place, came, key) && !lifted.include?([place, came, key]))
 
           seen[ahead] = [state, key]

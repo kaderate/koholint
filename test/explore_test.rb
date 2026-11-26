@@ -455,6 +455,36 @@ class ExploreTest < Minitest::Test
     assert_equal({ kind: :exit, row: 0, col: 5, direction: :up }, result[:target])
   end
 
+  # Review of #111: a work route the harness picked was re-routed by explore through a place whose measured hit would take Link's health.
+  def test_a_harness_work_route_keeps_its_hops_out_of_dangerous_places_and_an_objective_route_may_cross_them
+    rows = with(CLOSED, [7, 5], '.', [0, 5], '.')
+    log = Koholint::ExploreLog.new
+    log.absorb({ from: { room: 1, map: 0 }, exits: [{ row: 0, col: 5, direction: :up, outcome: :left, to: [3, 0] }, { row: 7, col: 5, direction: :down, outcome: :left, to: [2, 0] }] })
+    log.absorb({ from: { room: 3, map: 0 }, exits: [{ row: 0, col: 5, direction: :up, outcome: :left, to: [4, 0] }] })
+    log.absorb({ from: { room: 2, map: 0 }, exits: [{ row: 3, col: 9, direction: :right, outcome: :left, to: [5, 0] }] })
+    log.absorb({ from: { room: 5, map: 0 }, exits: [{ row: 3, col: 9, direction: :right, outcome: :left, to: [4, 0] }] })
+    log.absorb({ from: { room: 4, map: 0 }, exits: [], survey: { sides: { up: [{ row: 0, col: 5 }] }, doors: [] } })
+    log.dangerous = [[3, 0]]
+    assert_equal [3, 0], log.route([1, 0], goal: [4, 0])[:next], 'an objective route may cross it'
+    assert_equal [2, 0], log.route([1, 0], goal: [4, 0], ban: true)[:next]
+    worked, = explore(rows, exits: [[[0, 5], :up], [[7, 5], :down]], explore_log: log, aim: { place: [4, 0] }, work: true, limit: 1)
+    assert_equal({ goal: [4, 0], next: [2, 0] }, worked[:route])
+    aimed, = explore(rows, exits: [[[0, 5], :up], [[7, 5], :down]], explore_log: log, aim: { place: [4, 0] }, limit: 1)
+    assert_equal({ goal: [4, 0], next: [3, 0] }, aimed[:route])
+  end
+
+  # Review of #111: least_visited filtered its destinations but routed to them through a dangerous place (1 -> D -> X with D dangerous).
+  def test_the_least_visited_fallback_never_routes_through_a_dangerous_place
+    log = Koholint::ExploreLog.new
+    log.absorb({ from: { room: 1, map: 0 }, exits: [{ row: 0, col: 5, direction: :up, outcome: :left, to: [2, 0] }], survey: { sides: { up: [{ row: 0, col: 5 }] }, doors: [] } })
+    log.absorb({ from: { room: 2, map: 0 }, exits: [{ row: 0, col: 5, direction: :up, outcome: :left, to: [3, 0] }], survey: { sides: { up: [{ row: 0, col: 5 }] }, doors: [] } })
+    log.absorb({ from: { room: 3, map: 0 }, exits: [], survey: { sides: {}, doors: [] } })
+    assert_equal [2, 0], log.least_visited([1, 0])[:next]
+    log.dangerous = [[2, 0]]
+    assert_nil log.route([1, 0])
+    assert_nil log.least_visited([1, 0])
+  end
+
   def test_a_clearable_object_here_comes_before_an_aimed_place_and_keeps_the_place_pending
     require 'koholint/learn'
     rows = with(CLOSED, [0, 5], '.')

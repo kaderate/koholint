@@ -25,6 +25,13 @@ module Koholint
         end
 
         def route_line(state)
+          danger = @explore_log.dangerous.map { |place| "#{place.join('-')} (#{@healers.hits[place]} hp)" }
+          warned = danger.empty? ? nil : "Places where one measured hit would take Link's #{state.health} hp, which no route to work enters: #{danger.join(', ')}."
+          known = known_route(state)
+          [known, warned].compact.join("\n").then { |line| line unless line.empty? }
+        end
+
+        def known_route(state)
           goal = objective_place
           here = state.place
           return if goal.nil? || goal == here
@@ -225,7 +232,7 @@ module Koholint
           @objectives.start(frame: state.frame, **objective, target: ({ kind: 'place', place: away[:goal] } if away), autopilot: true)
           @autopilot&.adopt(@objectives.current)
           goal = (route || away)&.dig(:goal)
-          context[:aim] = { place: goal } if goal && !route&.dig(:lifted)
+          context.merge!(aim: { place: goal }, work: true) if goal && !route&.dig(:lifted)
           choice = decision_point.name == :choose_objective ? objective.dup : EXPLORE
           what = if away then "no place has untried work: explore toward #{goal.join('-')}, the reachable place entered least"
                  else "explore #{route ? "toward #{goal.join('-')}" : 'here'}, the nearest place with untried work outside the loop"
@@ -302,13 +309,22 @@ module Koholint
           route = @explore_log.route(place) if @zero_watch.explore?
           away = @explore_log.least_visited(place) if @zero_watch.explore? && !route
           goal = (route || away)&.dig(:goal)
-          context[:aim] = { place: goal } if goal && !route&.dig(:lifted)
+          context.merge!(aim: { place: goal }, work: true) if goal && !route&.dig(:lifted)
           spot = [place, state.cell]
           low = !goal && state.health <= Perception::HP_PER_HEART
           @deadlock = nil unless low && @deadlock&.dig(:spot) == spot
           zone = !goal && state.cell ? Entities.danger_cells(entities_now) : []
           pressed = ([state.cell] + Geometry::DELTAS.values.map { |dr, dc| [state.cell[0] + dr, state.cell[1] + dc] }).intersect?(zone) if zone.any?
           retreat = @retreated&.dig(:spot) != spot && (pressed || (low && @deadlock && @deadlock[:waits] >= DEADLOCK_WAITS))
+          # With the dangerous places the only ways left, or the way back leading into one, the model chooses once per spot, its context listing them;
+          # after that the bounded wait answers, and never a retreat into one.
+          if @explore_log.dangerous.any? && (retreat ? @explore_log.dangerous.include?(@explore_log.ways(place)[@explore_log.entered(place)]) : !goal)
+            unless @handed_back == spot
+              @handed_back = spot
+              return
+            end
+            retreat = false
+          end
           return guarded(state, context) if retreat && retreats(state) >= RETREAT_CAP
           @retreated = { spot:, hp: state.health } if retreat
           side = Array(@explore_log.entered(place)).flatten.join('-')
@@ -342,7 +358,7 @@ module Koholint
           @objectives.start(frame: state.frame, **AUTO_OBJECTIVE, autopilot: true)
           @autopilot&.adopt(@objectives.current)
           route = @explore_log.route(place, skip: [place])
-          context[:aim] = { place: route[:goal] } if route && !route[:lifted]
+          context.merge!(aim: { place: route[:goal] }, work: true) if route && !route[:lifted]
           DecisionPoint.harness_choice(EXPLORE, "#{place.join('-')} is guarded (#{RETREAT_CAP} retreats in #{RETREAT_WINDOW} frames): explore #{route ? "toward #{route[:goal].join('-')}" : 'elsewhere'}", autopilot: true)
         end
 

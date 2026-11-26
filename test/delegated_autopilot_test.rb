@@ -530,6 +530,32 @@ class DelegatedAutopilotTest < Minitest::Test
     refute_match(/heal/, p.decide(p.decision_point_for(low), low, { grid: })[:justification].to_s)
   end
 
+  # Stub gate 7c9c (flow-106 at f03aac0), 68/0 at 101171 with 4 hp: the zero-frame redirect explored toward 84/0, the nearest place with untried work,
+  # where hits of 8 were measured; Link was hit there at 101406 and died.
+  def test_no_harness_route_enters_a_place_whose_measured_hit_would_take_links_health
+    log = Koholint::ExploreLog.new
+    log.absorb({ from: { room: 68, map: 0 }, exits: [{ row: 4, col: 0, direction: :left, outcome: :left, to: [67, 0] }, { row: 7, col: 5, direction: :down, outcome: :left, to: [84, 0] }],
+                 survey: { sides: { left: [{ row: 4, col: 0 }], down: [{ row: 7, col: 5 }] }, doors: [] } })
+    log.absorb({ from: { room: 84, map: 0 }, exits: [], survey: { sides: { up: [{ row: 0, col: 5 }], right: [{ row: 3, col: 9 }] }, doors: [] } })
+    log.absorb({ from: { room: 67, map: 0 }, exits: [{ row: 4, col: 9, direction: :right, outcome: :left, to: [68, 0] }], survey: { sides: { right: [{ row: 4, col: 9 }] }, doors: [] } })
+    healers = Koholint::Healers.new
+    [[67, 0], [68, 0]].each { |place| healers.saw(place:, health: 24) }
+    healers.saw(place: [84, 0], health: 20)
+    healers.saw(place: [84, 0], health: 12)
+    healers.saw(place: [68, 0], health: 4)
+    assert_equal [84, 0], log.route([68, 0])&.dig(:goal), 'untried work in 84/0'
+    @objectives = Koholint::Objectives.new(trace: trace)
+    p = Koholint::Policies::Delegated.new(client: ScriptedClient.new(objective: new_place, default: explore), registry: Koholint::Skills::Registry.default, objectives: @objectives, manual: '',
+                                          memory: Koholint::Policies::Memory.new(explore_log: log, healers:))
+    low = state(frame: 101171, room_id: 68, map_id: 0, hp: 4)
+    p.observe(low, frame: 101171)
+    p.decide(p.decision_point_for(low), low, { grid: })
+    assert_nil log.route([68, 0]), 'at 4 hp no route enters 84/0'
+    refute_equal [84, 0], log.least_visited([68, 0])&.dig(:goal)
+    assert_equal [84, 0], log.route([68, 0], goal: [84, 0])&.dig(:goal), 'an objective may still lead there'
+    assert_match(/which no route to work enters: 84-0 \(8 hp\)/, p.send(:route_line, low))
+  end
+
   # Run 0e98, 84/0 at 4 hp from 101616: the objective was to talk to type 185, not a way through enemies, and Link stayed at 4 hp until the stop.
   def test_below_the_measured_hit_any_objective_gives_way_to_the_heal_at_the_skill_choice
     @objectives = Koholint::Objectives.new(trace: trace)
@@ -694,6 +720,28 @@ class DelegatedAutopilotTest < Minitest::Test
     refute_nil p.instance_variable_get(:@retreated), 'damage does not lift it'
     p.observe(state(hp: 24), frame: 430)
     assert_nil p.instance_variable_get(:@retreated), 'a heal back to the health it was sent at lifts it'
+  end
+
+  # Review of #111: with the only way out leading into a place whose measured hit would take Link's health, the zero-frame cap waited 120 frames instead of asking.
+  def test_with_only_dangerous_ways_left_the_zero_frame_cap_hands_the_choice_to_the_model_with_the_danger_listed
+    log = Koholint::ExploreLog.new
+    log.absorb({ from: { room: 163, map: 16 }, exits: [{ row: 0, col: 5, direction: :up, outcome: :left, to: [147, 16] }] })
+    healers = Koholint::Healers.new
+    healers.saw(place: [147, 16], health: 24)
+    healers.saw(place: [147, 16], health: 0)
+    client = ScriptedClient.new(objective: new_place, default: explore)
+    @objectives = Koholint::Objectives.new(trace: trace)
+    p = Koholint::Policies::Delegated.new(client:, registry: Koholint::Skills::Registry.default, objectives: @objectives, manual: '', memory: Koholint::Policies::Memory.new(explore_log: log, healers:))
+    decide(p)
+    instant = outcome(:no_frontier, 0).merge(frames: 1, moved_cells: 0, cells_walked: 0)
+    3.times { |i| p.after_action(choice: { skill: 'explore', params: {} }, outcome: instant, state:, frame: 600 + i) }
+    calls = client.calls.size
+    result = p.decide(p.decision_point_for(state), state, { grid: })
+    assert_equal ['claude', calls + 1], [result[:agent], client.calls.size]
+    assert_match(/which no route to work enters: 147-16 \(24 hp\)/, client.calls.last[:prompt])
+    p.after_action(choice: result[:choice], outcome: instant, state:, frame: 700)
+    result = p.decide(p.decision_point_for(state), state, { grid: })
+    assert_equal [{ skill: 'wait', params: { frames: 120 } }, 'delegated'], [result[:choice], result[:agent]], 'once per spot, then the bounded wait'
   end
 
   def test_repeated_zero_frame_results_in_one_place_are_answered_by_the_harness
