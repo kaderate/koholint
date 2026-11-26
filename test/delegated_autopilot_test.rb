@@ -500,6 +500,24 @@ class DelegatedAutopilotTest < Minitest::Test
     assert_empty client.calls
   end
 
+  # Stub gate 9666 (flow-105 at 1d642de): the heal set out from 84/0 at 8 hp, then the low-health hold handed every step to the model, which wandered back east and died.
+  def test_the_heal_objective_is_followed_by_the_autopilot_at_low_health
+    @objectives = Koholint::Objectives.new(trace: trace)
+    client = ScriptedClient.new(objective: new_place, default: explore)
+    autopilot = Koholint::Autopilot.new
+    p = Koholint::Policies::Delegated.new(client:, registry: Koholint::Skills::Registry.default, objectives: @objectives, manual: '', autopilot:,
+                                          memory: lineage_with_a_healer_and_an_eight_hp_hit)
+    low = state(frame: 99687, room_id: 84, map_id: 0, hp: 8)
+    autopilot.model_called(state: state(frame: 99600, room_id: 84, map_id: 0, hp: 16), objective: nil)
+    p.observe(low, frame: 99687)
+    assert_match(/heal in 83-0 first/, p.decide(p.decision_point_for(low), low, { grid: })[:justification])
+    autopilot.acted(skill: 'explore', outcome: { stopped_by: 'damage' })
+    later = state(frame: 99725, room_id: 84, map_id: 0, hp: 4)
+    p.observe(later, frame: 99725)
+    decision = p.decide(p.decision_point_for(later), later, { grid: })
+    assert_empty client.calls, decision[:justification]
+  end
+
   # Run 0e98, 84/0 at 4 hp from 101616: the objective was to talk to type 185, not a way through enemies, and Link stayed at 4 hp until the stop.
   def test_below_the_measured_hit_any_objective_gives_way_to_the_heal_at_the_skill_choice
     @objectives = Koholint::Objectives.new(trace: trace)
