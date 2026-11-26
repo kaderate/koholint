@@ -1,6 +1,6 @@
 # Cheaper and more purposeful agent loop — design
 
-Status: draft for owner approval, 2026-10-19. Follows the first live run (`docs/runs/2026-10-first-agent-run.md`). Builds on the first agent loop (`docs/superpowers/plans/2026-10-18-first-agent-loop.md`) and the architecture spec (`2026-10-16-koholint-v2-architecture-design.md`).
+Status: done except half-cell navigation (goal 7, ROADMAP item 5): `goto`, automatic dialogue reading, `new_place`, the failure ledger and doubtful cells are in code (see `docs/AGENT_SKILLS.md`). Text of 2026-10-19, a draft for owner approval. Follows the first live run (`docs/runs/2026-10-first-agent-run.md`). Builds on the first agent loop (its plan was deleted once landed) and the architecture spec (`2026-10-16-koholint-v2-architecture-design.md`).
 
 ## Intent
 

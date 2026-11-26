@@ -95,6 +95,14 @@ opens in the control is not the entity's); pins Link on it for 90 frames and com
 whether it moves; and talks to it twice and at a shifted frame to compare conversation signatures. Reports go to
 `tmp/entities/*.json` and feed `data/entities.json` (kinds, and with the runs' `hurt` notables the `hurts` facts) and `data/addresses.json`.
 
+## Door census
+
+`bin/koholint census doors <run_dir> FRAME...` replays the journal to each frame and, in throwaway copies, places Link on the cell below each object cell of the room (2 samples per object id), walks him up for 60 frames and records whether he walks into another place by himself (`link_motion_state` 3) and where he arrives. Reports go to `tmp/doors/*.json` and feed the `door` entries of `data/entities.json`.
+
+## Sword census
+
+`bin/koholint census sword <run_dir> FRAME...` replays the journal to each frame and, for every enemy on screen, in throwaway copies strikes it with the sword: the reach per facing (gaps of 8 to 40 px), the lateral tolerance, the hits to kill, the health lost per hit, the knockback, and whether a charged release (spin) or a tap hits behind Link. Reports go to `tmp/sword/*.json` and feed the `sword_reach` and `sword_hits` facts of `data/entities.json`.
+
 ## Object census
 
 `bin/koholint census objects <run_dir> FRAME... [--crawl N]` replays the journal to each frame and reads the room object

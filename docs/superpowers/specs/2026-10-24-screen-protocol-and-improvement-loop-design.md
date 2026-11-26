@@ -1,5 +1,7 @@
 # Screen protocol and improvement loop — design notes (2026-10-24)
 
+Status: done through level 1 of the improvement loop (readiness gate, explore autopilot, place cards and arrival protocol, enemy census, inventory with `use_item` and `guard`, symptom detectors in `summary.json`); the offline analyst (level 2) remains as ROADMAP item 1(d).
+
 Outcome of the owner's review of run `20261024-184627-b97e` (25,896 frames, 18 places, 19/21 objectives achieved, `because` used 18 times: the goal/leads/NPC-memory machinery works). The review found four classes of harness problems and asked for an automated improvement loop. This document records the decisions.
 
 ## Findings (with evidence)

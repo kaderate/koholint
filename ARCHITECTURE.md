@@ -39,7 +39,7 @@ observability.
 powder once its count is positive); the engine's `ItemWatch` emits `item_gained` once per id and form. The engine also watches the room
 objects every frame and emits `floor_gave_way` when a crumbling floor object turns into a hole; the skills see that object as
 crumbling only in places where this was seen. `footing.rb` reads the game's crumble timer for the cell under Link's foot point,
-and `Skills::Execution` steps every skill off that cell before it gives way. The probes under `probes/`
+and `Skills::Execution` steps every skill off that cell before it gives way. The probes under `lib/koholint/probes/`
 (`bin/koholint census …`) measure these files on throwaway copies; they are the only code that writes RAM.
 
 **Game modes** — `modes.rb` and `data/modes.json` catalogue the game's screens by their mode tuple, each with the engine
@@ -133,7 +133,7 @@ and latency.
 **Run storage** — `run.rb`: `runs/<id>/` holds `manifest.json` (flow version, ROM hash, harness sha and dirty flag, model,
 autopilot, capabilities and exits digests, souvenirs cutoff and digest), `inputs.log`, `trace.jsonl` (events validated by `trace.rb`), `keyframes/`,
 `save/`, `screens/` (one capture per place, observability only), `world.json` (`goal`, `leads`, `places`, `pickups`), `summary.json`
-(written by `summary.rb` from the trace at every stop), `activity.json`, `suggestions.md`, `star.json` and `notes.md`.
+(written by `summary.rb` from the trace at every stop), `activity.json`, `suggestions.md`, `star.json` and `notes.md`; `prompts/` (what the agent saw at each decision, local only) and `run.lock` are not part of the run's content.
 `budget.rb` enforces frames, minutes, dollars and steps. `archive.rb` keeps a light bundle per run in git. A run resumes only
 with the same `flow_version`, ROM hash, capabilities digest, exits digest and souvenirs digest.
 
@@ -156,6 +156,8 @@ writes game state; it writes only `star.json`, `summary.json`'s `starred`, `note
 **CLI** — `cli.rb`, `bin/koholint`: `run`, `resume`, `fork`, `branch`, `verify`, `summary`, `watch`, `archive`, `star`,
 `prune-heavy`, `atlas`, `souvenirs`, `census`, `ab-plan` and `ab-report` (`ab.rb`), `check-leads`, `check-pickups`, `learn`, `capability` and
 `bench exits`. `docs/OPERATING.md` documents each.
+
+**Measurement tools** (`tools/`, offline, outside `lib/`) — `tools/gates/` forks three checkpoint runs, plays each for 12000 frames with a stub in place of the model and compares five numbers (calls, calls at 8 hp or less, hp lost, deaths, first delivery) with `tools/gates/expected.json` for the current `FLOW_VERSION`; `test/gates_test.rb` fails while a flow has no numbers. `tools/scoreboard/` measures how far a run got and what it cost (progress vector, rates, harness rules fired), plays the standard run within a daily dollar cap, computes the pit index and alerts on the guardrails. Their commands and fields are in their READMEs.
 
 ## Data flow of one decision
 
@@ -187,8 +189,9 @@ writes game state; it writes only `star.json`, `summary.json`'s `starred`, `note
 |---|---|
 | Skill and harness behaviour, flow by flow | `docs/AGENT_SKILLS.md` |
 | Commands, censuses, viewer and run storage | `docs/OPERATING.md` |
+| Stub gates, scoreboard and pit index | `tools/gates/README.md`, `tools/scoreboard/README.md` |
 | Measured facts and their provenance | `data/*.json`, `koholint atlas` facts |
-| Design rationale | `docs/superpowers/specs/` |
+| Design rationale (each spec carries a status line) | `docs/superpowers/specs/` |
 | Measurements of agent runs | `docs/runs/` (`index.md` lists every archived run) |
 | What all runs observed, per place, lead and flow | `koholint atlas`, the viewer's `/atlas` |
 | What remains | `ROADMAP.md` |
