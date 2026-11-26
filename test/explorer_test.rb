@@ -186,17 +186,43 @@ class ExplorerTest < Minitest::Test
   def test_a_stored_island_is_served_at_once_and_a_first_build_reports_its_progress
     with_root do |root|
       FileUtils.mkdir_p(File.join(root, '.cache'))
-      File.write(File.join(root, '.cache', 'island.json'), JSON.generate(runs: 7, places: []))
+      File.write(File.join(root, '.cache', 'island.json'), JSON.generate(identity: Koholint::Viewer::DigestCache.identity, value: { runs: 7, places: [] }))
       explorer = Koholint::Viewer::Explorer.new(root:, registry: nil)
       assert_equal 7, explorer.island[:runs]
       sleep 0.05 until explorer.island[:runs] == 2
-      assert_equal 2, JSON.parse(File.read(File.join(root, '.cache', 'island.json')))['runs']
+      assert_equal 2, JSON.parse(File.read(File.join(root, '.cache', 'island.json')))['value']['runs']
       slow = Koholint::Viewer::Explorer.new(root:, registry: nil, cache: File.join(root, 'other'))
       original = Koholint::Viewer::Island.method(:of)
       Koholint::Viewer::Island.define_singleton_method(:of) { |*, **| sleep 3 }
       assert_equal({ building: true, done: 2, total: 2 }, slow.island)
     ensure
       Koholint::Viewer::Island.define_singleton_method(:of, original) if original
+    end
+  end
+
+  def test_an_island_stored_by_other_code_is_not_served
+    with_root do |root|
+      FileUtils.mkdir_p(File.join(root, '.cache'))
+      File.write(File.join(root, '.cache', 'island.json'), JSON.generate(identity: 'older code', value: { runs: 7, places: [] }))
+      assert_equal 2, Koholint::Viewer::Explorer.new(root:, registry: nil).island[:runs]
+    end
+  end
+
+  def test_a_failed_rebuild_keeps_the_last_island_and_is_not_retried_at_once
+    with_root do |root|
+      FileUtils.mkdir_p(File.join(root, '.cache'))
+      File.write(File.join(root, '.cache', 'island.json'), JSON.generate(identity: Koholint::Viewer::DigestCache.identity, value: { runs: 7, places: [] }))
+      explorer = Koholint::Viewer::Explorer.new(root:, registry: nil)
+      reads = 0
+      original = Koholint::Atlas.method(:read)
+      Koholint::Atlas.define_singleton_method(:read) { |*, **| (reads += 1) && raise(Koholint::Error, 'unreadable') }
+      3.times do
+        assert_equal 7, explorer.island[:runs]
+        explorer.instance_variable_get(:@refresh)&.join
+      end
+      assert_equal 1, reads
+    ensure
+      Koholint::Atlas.define_singleton_method(:read, original) if original
     end
   end
 

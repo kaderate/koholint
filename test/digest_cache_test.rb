@@ -31,4 +31,24 @@ class DigestCacheTest < Minitest::Test
       assert_equal %w[162-0 163-0], changed.first[:places].keys.map { |place| place.join('-') }.sort
     end
   end
+
+  def test_digests_written_by_other_code_are_recomputed_and_those_of_deleted_runs_are_pruned
+    Dir.mktmpdir do |root|
+      make_run(root, '20261101-100000-aaaa')
+      gone = make_run(root, '20261102-100000-bbbb')
+      cache = File.join(root, '.cache', 'digests')
+      Koholint::Atlas.read([root], cache: Koholint::Viewer::DigestCache.new(cache, identity: 'old'))
+      calls = 0
+      original = Koholint::Atlas.method(:digest)
+      Koholint::Atlas.define_singleton_method(:digest) { |*args, **kw| (calls += 1) && original.call(*args, **kw) }
+      store = Koholint::Viewer::DigestCache.new(cache, identity: 'new')
+      Koholint::Atlas.read([root], cache: store)
+      Koholint::Atlas.define_singleton_method(:digest, original)
+      assert_equal 2, calls
+      FileUtils.rm_rf(gone)
+      dirs, = Koholint::Atlas.read([root], cache: store)
+      store.prune(dirs)
+      assert_equal 1, Dir.children(cache).size
+    end
+  end
 end

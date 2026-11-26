@@ -144,8 +144,8 @@ up to the shown frame; `page.html` draws them. `app.html` is the cockpit at `/`:
 (captures, ways, deaths, heat, first gains, the open leads of the lineage holding the most items, the metro lines of the
 lineages that reached something, every lead, the texts by voice) and `Story` reads one run as
 frame-stamped thoughts, objectives, places, body, items, skills and merged dialogues; both are cached by trace mtime and size.
-`DigestCache` keeps each run's atlas digest on disk under the runs root's `.cache/digests/` (keyed by run path, trace mtime and size, and the
-source of `atlas.rb`) and the last island in `.cache/island.json`, so a restart serves the last island at once and rebuilds it in the
+`DigestCache` keeps each run's atlas digest on disk under the runs root's `.cache/digests/` (JSON, keyed by run path, trace mtime and size, and a hash of `lib/koholint/**/*.rb` and `data/*.json`) and the last
+island in `.cache/island.json` (same hash; digests of deleted runs are pruned; a failed rebuild keeps the last island and is retried after 30 s), so a restart serves the last island at once and rebuilds it in the
 background. `Machines` lists the koholint processes of the computer (ps, the `run.lock` each holds per lsof, the trace tail). It never
 writes game state; it writes only `star.json`, `summary.json`'s `starred`, `notes.md` and the runs root's `.cache/`.
 

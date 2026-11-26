@@ -171,6 +171,7 @@ module Koholint
 
       def refresh_island
         return @refresh if @refresh&.alive?
+        return nil if @island_failed_at && now - @island_failed_at < ISLAND_REFRESH
         return nil if @island&.dig(:at) && now - @island[:at] < ISLAND_REFRESH
 
         @refresh = Thread.new { build_island }
@@ -183,22 +184,27 @@ module Koholint
         value = known&.dig(:generation) == generation ? known[:value] : Island.of(dirs, digests, roots: [@root])
         @island_lock.synchronize do
           @island = { at: now, generation:, value: }
-          @island_failure = nil
+          @island_failure = @island_failed_at = nil
         end
+        @atlas.prune(dirs)
         store_island(value) unless known&.dig(:value).equal?(value)
       rescue StandardError => e
-        @island_lock.synchronize { @island_failure = "the runs cannot be read: #{e.message}" }
+        @island_lock.synchronize do
+          @island_failure = "the runs cannot be read: #{e.message}"
+          @island_failed_at = now
+        end
       end
 
       def stored_island
-        { at: nil, generation: nil, value: JSON.parse(File.read(island_path), symbolize_names: true) }
-      rescue SystemCallError, JSON::ParserError
+        stored = JSON.parse(File.read(island_path), symbolize_names: true)
+        { at: nil, generation: nil, value: stored[:value] } if stored[:identity] == DigestCache.identity
+      rescue SystemCallError, JSON::ParserError, NoMethodError, TypeError
         nil
       end
 
       def store_island(value)
         FileUtils.mkdir_p(@cache)
-        File.write("#{island_path}.#{Process.pid}.tmp", JSON.generate(value))
+        File.write("#{island_path}.#{Process.pid}.tmp", JSON.generate(identity: DigestCache.identity, value:))
         File.rename("#{island_path}.#{Process.pid}.tmp", island_path)
       rescue SystemCallError
         nil
