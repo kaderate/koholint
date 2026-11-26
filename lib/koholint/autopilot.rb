@@ -231,7 +231,7 @@ module Koholint
       distance = ->(entity) { [(entity[:x] - state.x).abs, (entity[:y] - state.y).abs].max }
       far = ->(entity) { here && @missed[:far].key?(entity[:slot]) && distance.(entity) > Geometry::CELL }
       offspring = offspring_slots(state, entities)
-      strikable = ->(entity) { entity[:kind].to_s == 'enemy' ? entity[:sword_hits] == 1 || (entity[:sword_hits] == 2 && entity[:sword_verified]) : safe && offspring.include?(entity[:slot]) }
+      strikable = ->(entity) { entity[:kind].to_s == 'enemy' ? entity[:sword_hits] == 1 || (entity[:sword_hits] == 2 && entity[:sword_verified]) : safe && entity[:moves] == true && offspring.include?(entity[:slot]) }
       Array(entities).select { |entity| strikable.(entity) && (!@fight_hurt || entity[:sword_verified]) && entity[:cell] && entity[:x] && !missed.include?(entity[:slot]) && !far.(entity) }
                      .select { |entity| distance.(entity) <= FIGHT_SIGHT }
                      .min_by { |entity| [distance.(entity), entity[:slot]] }

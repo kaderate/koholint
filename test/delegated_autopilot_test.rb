@@ -785,6 +785,10 @@ class DelegatedAutopilotTest < Minitest::Test
     later = state(frame: 97310, room_id: 66, map_id: 0, x: 84, y: 104)
     p.observe(later, frame: 97310)
     assert_match(/fight type 28 at \(6,4\)/, p.decide(p.decision_point_for(later), later, { grid: })[:justification], 'the second one is still taken for an enemy, the struck one no more')
+    blobs.replace([{ slot: 14, type: 46, kind: 'creature', moves: false, x: 76, y: 106, cell: [6, 4] }])
+    reused = state(frame: 97330, room_id: 66, map_id: 0, x: 84, y: 104)
+    p.observe(reused, frame: 97330)
+    refute_match(/fight type 46/, p.decide(p.decision_point_for(reused), reused, { grid: })[:justification].to_s, 'gate 150d at 98029: the slot came back as a still type 46')
   end
 
   # Review of #116 (KOHO-147): gate 71fb struck type 5 (uncatalogued) and type 46 (catalogued as still) beside a struck type 27; a person could be there too.
