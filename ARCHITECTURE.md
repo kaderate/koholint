@@ -106,7 +106,7 @@ Every policy inherits the no-op hooks of `policies/base.rb` (`observe`, `prepare
   follow-up, alerts). Before asking the model it lets the harness answer: screen waits, game over, dialogue advance, lock and
   settle waits, revisits, hemmed probes, loop breaks, zero caps, item objectives (a person whose recorded text names a held item, by
   those name words, is talked to with it held, then given it with `use_item`), the explore autopilot (`autopilot.rb`, which also takes a
-  visible heart below full health, fights on sight through a `fight` hook in the skill context that explore checks every frame the enemies one strike or two
+  visible heart below full health, fights on sight, only with the sword on A or B, through a `fight` hook in the skill context that explore checks every frame the enemies one strike or two
   verified strikes kill and the moving creatures a hit left in an enemy's slot; its fight memories live for the session, so a resume or a fork
   starts with none) and automatic
   objectives. An invalid answer falls back to a wait; 5 fallbacks in a row stop the run.

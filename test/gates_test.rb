@@ -30,10 +30,11 @@ class GatesTest < Minitest::Test
     assert_equal [[:calls, 69, 70], [:delivery, 100_084, nil]], Gates.mismatches(expected, { calls: 70, low: 0, lost: 12, deaths: 0, delivery: nil })
   end
 
-  def test_every_gate_has_expected_numbers_for_every_flow_listed
+  def test_every_gate_has_expected_numbers_for_the_current_flow
     gates = JSON.parse(File.read(File.expand_path('../tools/gates/gates.json', __dir__)))['gates'].keys
     JSON.parse(File.read(File.expand_path('../tools/gates/expected.json', __dir__))).each do |flow, numbers|
-      assert_equal gates.sort, numbers.keys.sort, flow
+      assert_empty numbers.keys - gates, flow
+      assert_equal gates.sort, numbers.keys.sort, flow if flow == Koholint::FLOW_VERSION
       numbers.each_value { |want| assert_equal Gates::FIELDS.map(&:to_s).sort, want.keys.sort }
     end
   end

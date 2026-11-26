@@ -3,6 +3,7 @@
   "roots": [
     "~/.capy/work/abd51/runs",
     "~/.capy/work/atlas-viewer/runs",
+    "~/.capy/work/runs/KOHO-150",
     "runs"
   ],
   "gates": {
@@ -17,6 +18,10 @@
     "sword-obtained": {
       "run": "20261111-194737-9ba1",
       "frame": 60404
+    },
+    "no-sword-225": {
+      "run": "20261126-212221-6913",
+      "frame": 35338
     }
   }
 }

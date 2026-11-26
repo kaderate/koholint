@@ -1018,13 +1018,15 @@ class DelegatedPolicyTest < Minitest::Test
     assert_equal [[163, 16], 'normal', '163-16', { row: 3, col: 3, object: 32 }, "Oh là... C'est bien trop lourd!"], lead.values_at(:place, :importance, :where, :contact, :quote)
   end
 
-  def test_attack_is_offered_only_while_the_sword_is_held
+  def test_attack_is_offered_only_while_the_sword_is_on_a_or_b
     p = policy(ScriptedClient.new(objective: objective, default: walk))
     decide_with_shot(p, state)
     floor = -> { Array.new(8) { Array.new(10, 4) } }
     p.prepare({ room_objects: floor, held: [] })
     refute_includes p.decision_point_for(state(frame: 200)).registry.names, 'attack'
-    p.prepare({ room_objects: floor, held: [Koholint::Items::SWORD] })
+    p.prepare({ room_objects: floor, held: [Koholint::Items::SWORD], armed: false })
+    refute_includes p.decision_point_for(state(frame: 200)).registry.names, 'attack', 'a sword in the inventory only'
+    p.prepare({ room_objects: floor, held: [Koholint::Items::SWORD], armed: true })
     assert_includes p.decision_point_for(state(frame: 200)).registry.names, 'attack'
   end
 

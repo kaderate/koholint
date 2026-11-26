@@ -19,7 +19,7 @@ The skills, protocols and harness behaviours the agent works with. Versioned wit
   an unknown one) (`direction` prefers that side), steps out, re-plans, and returns to the model only at an event:
   `new_place`, `known_place` (a return to a place already seen), `dialogue`, `untried_object` (once per thing never talked to within 3 cells), `blocked`, `stalled` (3
   attempts in a row walked no new cell), `no_frontier` (with the exits already tried), `locked`, `damage`, `budget` (600 frames),
-  `enemy` (an enemy to fight on sight, flow-90) or `fell` (Link starts to fall, flow-90).
+  `enemy` (an enemy to fight on sight with the sword on A or B, flow-90 and flow-113) or `fell` (Link starts to fall, flow-90).
   flow-68: at one heart or less walk, goto and explore keep out of every
   enemy contact zone grown by a cell (the extra ring only as a last resort, the contact zone never, a goal inside one still
   reached), and from inside one Link may take any step that does not head toward an enemy within a cell of its touch
@@ -155,8 +155,8 @@ The skills, protocols and harness behaviours the agent works with. Versioned wit
   session-only one-strike probe of flow-110 (`note_contact`, `probe_choice`, the attack's strike cap from the context) and the
   "no tries in a place that has hurt Link" of flow-107; a type that never hurt Link is tried there again.
 - flow-113: no fight without a sword. The harness fights on sight only with the sword on A or B, so explore no longer stops `enemy`
-  without one, and `attack` is offered to the model only while the sword is held (on a button or in the inventory; the skill still
-  refuses it off A and B). The autopilot's tries and touches of unknown things also wait where a strike would be refused (Link at or
+  without one, and `attack` is offered to the model only while the sword is on A or B,
+  the same condition, so an unequipped sword cannot loop into refusals. The autopilot's tries and touches of unknown things also wait where a strike would be refused (Link at or
   below the measured hit, or in a place dangerous at his health). A raised shield already pushes a still enemy such as the urchin
   (type 197) aside within 2 to 7 frames, under walk's 8-frame still limit, so pushing needs no change.
 - flow-112: one heart or less no longer holds the autopilot (the flow-68 `low health` hold is gone); the one-heart walls, walk's
