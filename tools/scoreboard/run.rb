@@ -36,7 +36,7 @@ module Scoreboard
       def poll(now)
         read
         return 'deaths' if @limits[:max_deaths] && @deaths >= @limits[:max_deaths]
-        return 'stall' if @limits[:stall] && !@places.empty? && @frame - @last_new >= @limits[:stall]
+        return 'stall' if @limits[:stall] && @places.size >= Measure::INTRO_PLACES && @frame - @last_new >= @limits[:stall]
 
         'wall' if now - @started > @limits[:max_seconds]
       end
