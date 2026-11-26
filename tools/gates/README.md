@@ -11,8 +11,10 @@ Run gates from the repository root, with `$KOHOLINT_ROM` set, one or two at a ti
 | respawn-171 | 20261124-191800-abbe @95758 | `caffeinate -dims ruby tools/gates/gate.rb respawn-171` |
 | post-gain-172 | 20261124-191800-abbe @94304 | `caffeinate -dims ruby tools/gates/gate.rb post-gain-172` |
 | sword-obtained | 20261111-194737-9ba1 @60404 | `caffeinate -dims ruby tools/gates/gate.rb sword-obtained` |
+| no-sword-225 | 20261126-212221-6913 @35338 | `caffeinate -dims ruby tools/gates/gate.rb no-sword-225` |
 
-- `all` plays the three in turn.
+- `all` plays them in turn.
+- no-sword-225 starts in B15 (225/0) with no sword, among enemies (flow-113: no fight and no attack offer without the sword on A or B). Gates added later have numbers only from the flow that added them.
 - `--root DIR` sets where the forks go (default `~/.capy/work/runs/gates`). Forks are kept there, about 2 MB each, and show in the viewer's `~/.capy/work/runs/*` runs glob; `--clean` deletes a fork that matched.
 - `--check RUN_DIR` checks a fork already played. It refuses a fork of another checkpoint.
 - Checkpoint runs are looked up under the `roots` of `gates.json`.
@@ -35,6 +37,10 @@ The numbers repeat only at the same code and the same data. Unlike `bin/koholint
 | flow-112 (9eeb962c) | respawn-171 | 69 | 0 | 12 | 0 | 100084 |
 | flow-112 | post-gain-172 | 65 | 0 | 4 | 0 | 99292 |
 | flow-112 | sword-obtained | 47 | 27 | 8 | 1 | — |
+| flow-113 (aca4ffb7) | respawn-171 | 69 | 0 | 12 | 0 | 100084 |
+| flow-113 | post-gain-172 | 65 | 0 | 4 | 0 | 99292 |
+| flow-113 | sword-obtained | 47 | 27 | 8 | 1 | — |
+| flow-113 | no-sword-225 | 16 | 2 | 24 | 1 | — |
 
 What each number counts, from the fork frame on:
 - **calls:** decisions the stub answered.

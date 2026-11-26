@@ -38,7 +38,7 @@ of replay); the `decision` trace event carries its `prompt_sha`. `--tag NAME` la
 
 **Autopilot.** `--autopilot on|off` (default `on`, agent runs only) is recorded in the manifest (`autopilot`); `resume`
 keeps the recorded value and refuses a different one. With it on, an `explore` that stops at a new place, a known place, at its frame
-budget, near an object never tried (`untried_object`) or for an enemy to fight on sight (`enemy`, flow-90) is followed by another `explore` with no direction that the harness issues itself (agent `delegated`, cost 0, the
+budget, near an object never tried (`untried_object`) or for an enemy to fight on sight (`enemy`, flow-90; only with the sword on A or B, flow-113) is followed by another `explore` with no direction that the harness issues itself (agent `delegated`, cost 0, the
 `decision` event carries `autopilot: true`); the model decides again on any other stop or action, after a new lead or goal,
 outside free play, after damage, when the objective changes or is not `new_place`, `leave_place` or `new_text`, and after
 6 such explores or 2400 frames since its last call. When such a chain reaches a place and achieves its objective, the harness also

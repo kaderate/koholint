@@ -10,7 +10,7 @@ class AutopilotTest < Minitest::Test
 
   def state(**over)
     Koholint::GameState.new(frame: 100, room_id: 163, map_id: 16, x: 68, y: 60, direction: :up, hp: 24, max_hp: 24,
-                            milestone: :none, game_mode: 0x0B, game_submode: 7, dialog_state: 0, **over)
+                            milestone: :none, game_mode: 0x0B, game_submode: 7, dialog_state: 0, item_a: Koholint::Items::SWORD, **over)
   end
 
   def objective(kind = 'new_place', id: 'obj-1') = { id:, predicate: { kind: } }
@@ -185,6 +185,17 @@ class AutopilotTest < Minitest::Test
       touch = fresh.touch_choice(state: state(frame: 500, hp:), objective:, entities: one)&.dig(:choice, :skill)
       skill ? assert_equal(skill, touch, "hp #{hp}") : assert_nil(touch, "hp #{hp}")
     end
+  end
+
+  def test_nothing_unknown_is_tried_or_touched_where_a_measured_hit_could_take_links_health
+    never = ->(_) { false }
+    one = [{ kind: :unknown, type: 58, cell: [3, 2], x: 40, y: 64 }]
+    assert_nil primed.try_choice(state: state(frame: 400), objective:, entities: one, tried: never, safe: false)
+    pilot = primed
+    pilot.try_choice(state: state(frame: 400), objective:, entities: one, tried: never)
+    pilot.acted(skill: 'talk_to', outcome: { stopped_by: :frame_cap, target_type: 58 })
+    assert_nil pilot.touch_choice(state: state(frame: 500), objective:, entities: one, safe: false)
+    refute_nil pilot.touch_choice(state: state(frame: 500), objective:, entities: one)
   end
 
   def test_a_return_to_a_known_place_does_not_count_in_the_chain
@@ -616,6 +627,13 @@ class AutopilotTest < Minitest::Test
     assert_equal({ skill: 'attack', params: { row: 3, col: 5 } }, result[:choice])
     assert_match(/a 2-strike kill/, result[:justification])
     assert_nil primed.fight_choice(state: state(frame: 200), entities: [sighted(16, 0, hits: 3, verified: true)])
+  end
+
+  # 6913 (flow-111) B15 (225/0) and C15 (226/0), frames 35338-40841: 53 fights on sight with no sword, each refused and handed to the model.
+  def test_nothing_is_fought_on_sight_while_the_sword_is_on_neither_button
+    enemy = [sighted(16, 0, hits: 2, verified: true)]
+    assert_nil primed.fight_choice(state: state(frame: 200, item_a: 0), entities: enemy)
+    refute_nil primed.fight_choice(state: state(frame: 200, item_a: 0, item_b: Koholint::Items::SWORD), entities: enemy)
   end
 
   def test_an_enemy_an_attack_missed_and_a_place_where_one_cost_health_are_not_fought_on_sight_again

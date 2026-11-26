@@ -217,6 +217,7 @@ module Koholint
     def context_for(grid, state)
       context = @builder ? { grid: } : {}
       context[:held] = Items.held(state)
+      context[:armed] = !Items.button_of(state, Items::SWORD).nil?
       context.merge(dialogue_shot: -> { Vision::DialogueShot.crop(@emulator) }, dialogue_rgb: -> { Vision::DialogueShot.rgb(@emulator) },
                     entities: -> { Entities.read(@emulator) }, objects: -> { observed_floors(Entities.objects(@emulator)) },
                     room_objects: -> { Entities.room_objects(@emulator) }, footing: @footing)
