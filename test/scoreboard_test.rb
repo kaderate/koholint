@@ -123,6 +123,7 @@ class ScoreboardTest < Minitest::Test
       path = File.join(dir, 'trace.jsonl')
       trace = Koholint::Trace.new(path)
       perceive(trace, 100, 1)
+      perceive(trace, 150, 2)
       watch = ->(**limits) { Scoreboard::Run::Supervisor.new(trace: path, max_seconds: 100, max_deaths: 2, stall: 4000, **limits) }
       supervisor = watch.call
       assert_nil supervisor.poll(1.0)
@@ -132,7 +133,7 @@ class ScoreboardTest < Minitest::Test
       assert_equal 'deaths', supervisor.poll(3.0)
       assert_equal [300, 2], [supervisor.frame, supervisor.deaths]
       stalled = watch.call
-      perceive(trace, 4100, 1)
+      perceive(trace, 4200, 1)
       assert_equal 'deaths', stalled.poll(0.0)
       calm = Scoreboard::Run::Supervisor.new(trace: path, max_seconds: 100, max_deaths: 9, stall: 4000)
       assert_equal 'stall', calm.poll(0.0)
@@ -226,6 +227,22 @@ class ScoreboardTest < Minitest::Test
       assert_equal 'stall', Scoreboard::Run.watcher(fork_run(root, '20261126-000005-bbbb') { |trace| perceive(trace, 9100, 1) }, defaults).poll(1.0)
       deaths = fork_run(root, '20261126-000005-cccc') { |trace| 3.times { |n| trace.emit(:notable, frame: 5040 + n, kind: 'death', detail: 'x') } }
       assert_equal 'deaths', Scoreboard::Run.watcher(deaths, defaults).poll(1.0)
+    end
+  end
+
+  def test_the_intro_of_a_boot_run_is_not_a_stall_until_its_second_place
+    Dir.mktmpdir do |root|
+      intro = make_run(root, '20261126-000006-aaaa') { |trace| [10, 4700].each { |frame| perceive(trace, frame, 1) } }
+      assert_nil Scoreboard::Run.watcher(intro, Scoreboard::Run::DEFAULTS).poll(1.0)
+      assert_equal({ count: 0, longest_frames: 0 }, Scoreboard::Measure.run(intro)[:stalls])
+      stalled = make_run(root, '20261126-000006-bbbb') do |trace|
+        [[10, 1], [4700, 1], [4800, 2], [8900, 2]].each { |frame, room| perceive(trace, frame, room) }
+      end
+      assert_equal 'stall', Scoreboard::Run.watcher(stalled, Scoreboard::Run::DEFAULTS).poll(1.0)
+      assert_equal({ count: 1, longest_frames: 4100 }, Scoreboard::Measure.run(stalled)[:stalls])
+      calm = make_run(root, '20261126-000006-cccc') { |trace| [[10, 1], [4700, 1], [4800, 2], [8700, 2]].each { |frame, room| perceive(trace, frame, room) } }
+      assert_nil Scoreboard::Run.watcher(calm, Scoreboard::Run::DEFAULTS).poll(1.0)
+      assert_equal 0, Scoreboard::Measure.run(calm)[:stalls][:count]
     end
   end
 

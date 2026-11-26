@@ -11,6 +11,7 @@ module Scoreboard
     PLAY_MODE = 11
     ONE_HEART = 8
     STALL_FRAMES = 4000
+    INTRO_PLACES = 2
     # First match wins. A 'base' family is a plain engine mechanic; a 'rule' family is a harness rule added by a flow.
     FAMILIES = [
       ['base', 'dialogue advance', '\\Aautomatic dialogue advance'], ['base', 'locked wait', '\\Alocked:'], ['base', 'boot script', '\\Aboot script'],
@@ -67,7 +68,8 @@ module Scoreboard
       usd = decisions.sum { |event| event['cost_usd'].to_f }
       deaths = own.count { |event| death?(event) }
       per = ->(count) { frames.positive? ? (1000.0 * count / frames).round(3) : nil }
-      new_frames = new_place_frames(events, start)
+      before = events.filter_map { |event| place_of(event) if event['frame'].to_i < start }.to_set
+      new_frames = new_place_frames(events, start, before)
       progress = progress(events, read_json(File.join(dir, 'summary.json')))
       {
         run: File.basename(dir), tag: manifest['tag'], flow: manifest['flow_version'], harness_sha: manifest['harness_sha'].to_s[0, 8],
@@ -76,12 +78,11 @@ module Scoreboard
         cost: { usd: usd.round(4), calls: calls.size, calls_per_1000f: per.(calls.size),
                 calls_at_one_heart: calls.count { |event| event.dig('input', 'hp').to_i <= ONE_HEART } },
         deaths:, deaths_per_1000f: per.(deaths), new_places: new_frames.size, new_places_per_usd: usd.positive? ? (new_frames.size / usd).round(3) : nil,
-        stalls: stalls(start, new_frames, start + frames), rules: rules(decisions)
+        stalls: stalls(new_frames, start + frames, start:, before: before.size), rules: rules(decisions)
       }
     end
 
-    def new_place_frames(events, start)
-      before = events.filter_map { |event| place_of(event) if event['frame'].to_i < start }.to_set
+    def new_place_frames(events, start, before)
       seen = before.dup
       events.each_with_object([]) do |event, frames|
         place = place_of(event)
@@ -110,8 +111,13 @@ module Scoreboard
       places.map(&:last).uniq.select { |map| dungeons.include?(map) }.sort.to_h { |map| [map.to_s, gained.include?(map)] }
     end
 
-    def stalls(start, new_frames, last)
-      spans = [start, *new_frames, last].each_cons(2).map { |from, to| to - from }
+    # The intro (title, name entry, opening dialogues) is not a stall: spans count from the frame the run has seen INTRO_PLACES places, or from
+    # the fork frame when its prefix already has them.
+    def stalls(new_frames, last, start:, before:)
+      from = before >= INTRO_PLACES ? start : new_frames[INTRO_PLACES - before - 1]
+      return { count: 0, longest_frames: 0 } unless from
+
+      spans = [from, *new_frames.select { |frame| frame > from }, last].each_cons(2).map { |left, right| right - left }
       { count: spans.count { |span| span >= STALL_FRAMES }, longest_frames: spans.max || 0 }
     end
 
