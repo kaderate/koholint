@@ -50,18 +50,22 @@ module Scoreboard
       {}
     end
 
+    def fork_frame(manifest) = manifest['parent'].is_a?(Hash) ? manifest['parent']['frame'].to_i : 0
+
+    def death?(event) = event['type'] == 'notable' && event['kind'] == 'death'
+
     # The progress vector counts the whole run, inherited prefix included; cost, deaths, stalls and rules count the run's own segment.
     def run(dir)
       manifest = read_json(File.join(dir, 'manifest.json'))
       parent = manifest['parent'].is_a?(Hash) ? manifest['parent'] : {}
-      start = parent['frame'].to_i
+      start = fork_frame(manifest)
       events = Koholint::Trace.read(File.join(dir, 'trace.jsonl'))
       own = events.select { |event| event['frame'].to_i >= start }
       frames = [(events.map { |event| event['frame'].to_i }.max || 0) - start, 0].max
       decisions = own.select { |event| event['type'] == 'decision' }
       calls = decisions.select { |event| event['agent'] == 'claude' }
       usd = decisions.sum { |event| event['cost_usd'].to_f }
-      deaths = own.count { |event| event['type'] == 'notable' && event['kind'] == 'death' }
+      deaths = own.count { |event| death?(event) }
       per = ->(count) { frames.positive? ? (1000.0 * count / frames).round(3) : nil }
       new_frames = new_place_frames(events, start)
       progress = progress(events, read_json(File.join(dir, 'summary.json')))

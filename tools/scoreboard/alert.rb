@@ -7,11 +7,13 @@ module Scoreboard
     DAILY_USD = 20.0
     RISE = 1.5
     GROWTH = 1.2
+    MIN_RISE = 0.5
 
     module_function
 
     # history: the scoreboard's lines, oldest first, each with the primary run's per-1000-frame rates, its progress vector and the branch count.
     def reasons(rows:, history:, day: Date.today)
+      history = history.select { |line| line['primary'] }
       paid = Runs.measured(Runs.on_day(rows, day)).select { |result| result[:cost][:usd].positive? }
       today = paid.sum { |result| result[:cost][:usd] }
       found = []
@@ -29,9 +31,10 @@ module Scoreboard
     def rose(key, before, latest)
       was = before['primary'][key]
       now = latest['primary'][key]
-      return [] unless was && now && now > was * RISE && now > was
+      return [] unless was && now && now > was * RISE && now - was >= MIN_RISE
 
-      [format('%s rose from %.2f to %.2f (+%.0f%%) between the last two scoreboard runs', key, was, now, 100.0 * (now / was - 1))]
+      change = was.positive? ? format(' (+%.0f%%)', 100.0 * (now / was - 1)) : ''
+      [format('%s rose from %.2f to %.2f%s between the last two scoreboard runs', key, was, now, change)]
     end
 
     # Branch conditions up 20% over the last two batches while no component of the progress vector moved.

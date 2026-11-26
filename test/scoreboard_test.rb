@@ -206,6 +206,113 @@ class ScoreboardTest < Minitest::Test
     end
   end
 
+  def fork_run(root, id)
+    make_run(root, id, parent: { 'id' => 'p', 'frame' => 5000 }) do |trace|
+      perceive(trace, 10, 1)
+      3.times { |n| trace.emit(:notable, frame: 100 + n, kind: 'death', detail: 'x') }
+      perceive(trace, 900, 2)
+      perceive(trace, 5000, 3)
+      perceive(trace, 5030, 1)
+      yield trace if block_given?
+    end
+  end
+
+  def test_a_fork_supervisor_ignores_the_parent_prefix_and_counts_from_the_fork_frame
+    Dir.mktmpdir do |root|
+      defaults = Scoreboard::Run::DEFAULTS
+      watch = Scoreboard::Run.watcher(fork_run(root, '20261126-000005-aaaa'), defaults)
+      assert_nil watch.poll(1.0)
+      assert_equal [0, 5030], [watch.deaths, watch.frame]
+      assert_equal 'stall', Scoreboard::Run.watcher(fork_run(root, '20261126-000005-bbbb') { |trace| perceive(trace, 9100, 1) }, defaults).poll(1.0)
+      deaths = fork_run(root, '20261126-000005-cccc') { |trace| 3.times { |n| trace.emit(:notable, frame: 5040 + n, kind: 'death', detail: 'x') } }
+      assert_equal 'deaths', Scoreboard::Run.watcher(deaths, defaults).poll(1.0)
+    end
+  end
+
+  def fake_boot(root, create: true, hang: true, wait: 0)
+    fake = File.join(root, 'fake_boot.rb')
+    File.write(fake, <<~RUBY)
+      require 'json'
+      require 'fileutils'
+      $LOAD_PATH.unshift(#{File.expand_path('../lib', __dir__).inspect})
+      require 'koholint/trace'
+      args = ARGV.dup
+      File.write(#{File.join(root, 'pid').inspect}, Process.pid.to_s)
+      File.open(#{File.join(root, 'budgets').inspect}, 'a') { |file| file.puts(args[args.index('--max-dollars') + 1]) }
+      trap('INT') { exit }
+      sleep #{wait}
+      if #{create}
+        dir = File.join(args[args.index('--root') + 1], "20261126-#{'#'}{Process.pid}")
+        FileUtils.mkdir_p(dir)
+        File.write(File.join(dir, 'manifest.json'), JSON.generate('flow_version' => 'flow-9', 'tag' => args[args.index('--tag') + 1]))
+        Koholint::Trace.new(File.join(dir, 'trace.jsonl')).emit(:stop, frame: 7, reason: 'dollars')
+      end
+      sleep 60 if #{hang}
+    RUBY
+    fake
+  end
+
+  def gone?(pid)
+    50.times do
+      return true unless Scoreboard::Run.alive?(pid)
+
+      sleep 0.1
+    end
+    false
+  end
+
+  def play(root, fake, **options)
+    Scoreboard::Run.play(froms: ['boot'], root: File.join(root, 'runs'), koholint: fake, repo: File.expand_path('..', __dir__), history: File.join(root, 'history.jsonl'), day: '20261126',
+                         roots: [File.join(root, 'runs')], out: StringIO.new, poll: 0.05, **options)
+  end
+
+  def test_the_budget_is_the_total_split_over_the_runs_and_the_daily_cap_refuses_a_start
+    Dir.mktmpdir do |root|
+      fake = fake_boot(root, hang: false)
+      line = Scoreboard::Run.play(froms: %w[boot boot], root: File.join(root, 'runs'), koholint: fake, repo: File.expand_path('..', __dir__), history: File.join(root, 'history.jsonl'),
+                                  day: '20261126', roots: [File.join(root, 'runs')], out: StringIO.new, poll: 0.05, budget: 3.0, jobs: 1)
+      assert_equal %w[1.5 1.5], File.readlines(File.join(root, 'budgets'), chomp: true)
+      assert_equal [3.0, 0.0], [line['budget'], line['overshoot']]
+      File.write(File.join(root, 'history.jsonl'), JSON.generate('date' => Time.new(2026, 11, 26, 12).utc.iso8601, 'usd' => 18.0) + "\n")
+      error = assert_raises(Scoreboard::Run::Refused) { play(root, fake, budget: 3.0) }
+      assert_match(/18.00 USD already spent today plus a budget of 3.00 is above the 20.00 USD daily cap/, error.message)
+      assert_equal 1, File.readlines(File.join(root, 'history.jsonl')).size
+      assert play(root, fake, budget: 3.0, daily_cap: 25.0)
+    end
+  end
+
+  def test_a_boot_run_that_never_creates_its_folder_is_killed
+    Dir.mktmpdir do |root|
+      line = play(root, fake_boot(root, create: false), appear: 0.5)
+      assert_match(/did not start/, line['runs'].first['error'])
+      assert gone?(File.read(File.join(root, 'pid')).to_i)
+    end
+  end
+
+  def test_a_boot_run_adopts_the_folder_created_after_its_start_not_an_earlier_one_with_the_same_tag
+    Dir.mktmpdir do |root|
+      make_run(File.join(root, 'runs'), '20261126-000001-old0', tag: 'scoreboard-boot-20261126') { |trace| trace.emit(:stop, frame: 3, reason: 'dollars') }
+      line = play(root, fake_boot(root, hang: false, wait: 0.3))
+      assert_match(/\A20261126-\d+\z/, line['runs'].first['run'])
+    end
+  end
+
+  def test_a_signal_on_the_scoreboard_stops_the_run_it_started
+    Dir.mktmpdir do |root|
+      fake = fake_boot(root)
+      board = Process.spawn(RbConfig.ruby, File.expand_path('../tools/scoreboard/scoreboard.rb', __dir__), 'run', '--koholint', fake, '--root', File.join(root, 'runs'),
+                            '--history', File.join(root, 'history.jsonl'), '--runs-root', File.join(root, 'none'), out: File::NULL, err: File::NULL)
+      100.times { break if Dir.glob(File.join(root, 'runs', '*', 'trace.jsonl')).any? || sleep(0.1).nil? }
+      pid = File.read(File.join(root, 'pid')).to_i
+      assert Scoreboard::Run.alive?(pid)
+      Process.kill('TERM', board)
+      Process.wait(board)
+      assert gone?(pid)
+    ensure
+      Process.kill('KILL', pid) if pid && Scoreboard::Run.alive?(pid)
+    end
+  end
+
   def test_the_run_never_uses_more_than_two_processes
     assert_equal 2, Scoreboard::Run::MAX_JOBS
     assert_equal ['--agent', '--root', '/r', '--tag', 't', '--max-dollars', '4.0', '--frames', '10', '--minutes', '5'], Scoreboard::Run.flags(tag: 't', root: '/r', budget: 4.0, frames: 10, minutes: 5)
@@ -229,6 +336,14 @@ class ScoreboardTest < Minitest::Test
       assert_equal 4, reasons.size
       assert_empty Scoreboard::Alert.reasons(rows: Scoreboard::Runs.rows([root]), history: [entry(100, 5), entry(100, 5, 1.4, 14.9)], day: Date.new(2026, 11, 27))
     end
+  end
+
+  def test_alert_skips_lines_without_a_primary_run_and_never_alerts_from_a_zero_base_below_the_floor
+    history = [entry(100, 5, 0.0, 10.0), { 'branches' => 100, 'primary' => nil }, entry(100, 5, 0.07, 10.0)]
+    assert_empty Scoreboard::Alert.reasons(rows: [], history:, day: Date.new(2026, 11, 26))
+    reasons = Scoreboard::Alert.reasons(rows: [], history: [entry(100, 5, 0.0), entry(100, 5, 0.7)], day: Date.new(2026, 11, 26))
+    assert_equal ['deaths_per_1000f rose from 0.00 to 0.70 between the last two scoreboard runs'], reasons
+    assert_empty Scoreboard::Alert.reasons(rows: [], history: [entry(100, 5, 1.0), entry(100, 5, 1.4)], day: Date.new(2026, 11, 26))
   end
 
   def test_alert_trips_on_branch_growth_with_no_progress_over_two_batches

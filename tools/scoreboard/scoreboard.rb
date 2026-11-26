@@ -7,7 +7,7 @@ require_relative 'run'
 require_relative 'runs'
 
 # ruby tools/scoreboard/scoreboard.rb measure RUN_DIR... [--json]
-# ruby tools/scoreboard/scoreboard.rb run [--budget USD] [--from boot|CHECKPOINT]... [--root DIR] [--history FILE]
+# ruby tools/scoreboard/scoreboard.rb run [--budget USD] [--daily-cap USD] [--from boot|CHECKPOINT]... [--root DIR] [--history FILE]
 # ruby tools/scoreboard/scoreboard.rb debt [--window N] [--last N] [--ref REF]
 # ruby tools/scoreboard/scoreboard.rb alert [--history FILE]
 module Scoreboard
@@ -22,6 +22,7 @@ module Scoreboard
     OptionParser.new do |parser|
       parser.on('--json') { options[:json] = true }
       parser.on('--budget USD', Float) { |value| options[:budget] = value }
+      parser.on('--daily-cap USD', Float) { |value| options[:daily_cap] = value }
       parser.on('--from NAME') { |value| options[:from] << value }
       parser.on('--root DIR') { |value| options[:root] = File.expand_path(value) }
       parser.on('--runs-root DIR') { |value| options[:roots] << value }
@@ -44,8 +45,12 @@ module Scoreboard
       0
     when 'run'
       from = options[:from].empty? ? ['boot'] : options[:from]
-      line = Run.play(froms: from, root: options[:root], koholint: options[:koholint], repo: options[:repo], history: options[:history], roots:, out:,
-                      **options.slice(:budget, :max_seconds, :max_deaths, :stall))
+      begin
+        line = Run.play(froms: from, root: options[:root], koholint: options[:koholint], repo: options[:repo], history: options[:history], roots:, out:,
+                        **options.slice(:budget, :daily_cap, :max_seconds, :max_deaths, :stall))
+      rescue Run::Refused => e
+        abort "scoreboard: #{e.message}"
+      end
       out.puts JSON.pretty_generate(line.slice('date', 'flow', 'harness_sha', 'usd', 'branches', 'primary'))
       line['runs'].all? { |run| run['error'].nil? } ? 0 : 1
     when 'debt'

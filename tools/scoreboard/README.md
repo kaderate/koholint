@@ -5,7 +5,7 @@ A scripted measurement of how far the agent gets and what it costs, kept in the 
 | command | what it does | spends |
 |---|---|---|
 | `ruby tools/scoreboard/scoreboard.rb measure RUN_DIR... [--json]` | the numbers below, from run folders | nothing |
-| `ruby tools/scoreboard/scoreboard.rb run [--budget USD] [--from boot\|CHECKPOINT]...` | the standard daily run, appended to the history | up to `--budget` per run (default 4.00) |
+| `ruby tools/scoreboard/scoreboard.rb run [--budget USD] [--daily-cap USD] [--from boot\|CHECKPOINT]...` | the standard daily run, appended to the history | up to `--budget` in total (default 4.00) |
 | `ruby tools/scoreboard/scoreboard.rb debt [--window N] [--last N]` | the pit index | nothing |
 | `ruby tools/scoreboard/scoreboard.rb alert` | exit 1 and the reasons when a guardrail trips | nothing |
 
@@ -23,7 +23,7 @@ Per run, from `trace.jsonl` and `manifest.json` (and `summary.json` when it reco
 
 ## run
 
-Plays `--from boot` (default) and any `--from CHECKPOINT` of `data/checkpoints.json` (repeatable; a checkpoint is forked from its run, found under the runs roots, then resumed). Every run gets `--max-dollars` of `--budget`, plays under `~/.capy/work/runs/scoreboard/` and runs with at most 2 emulator processes. A supervisor reads each trace as it grows and stops the run cleanly (SIGINT, as Ctrl-C) on 3 deaths (`--max-deaths`), on 4000 frames with no new place (`--stall`) or after 4 hours of wall time (`--max-seconds`), the rules of the held-out runs' supervisor. It appends one JSON line to `~/.capy/work/scoreboard/history.jsonl` (`--history FILE`; not the drive, not the repo): the date, flow, harness sha, decision-layer branch conditions, total dollars, the primary run's vector and rates, and every run's full measure. It spends real money: set `--budget` on purpose, and never above the day's allowance.
+Plays `--from boot` (default) and any `--from CHECKPOINT` of `data/checkpoints.json` (repeatable; a checkpoint is forked from its run, found under the runs roots, then resumed). `--budget` is the total for the invocation: each run gets `--max-dollars` of its share (`--budget` divided by the number of runs). The cap is soft: the engine stops after the call that crosses it, so a run overshoots by up to one call; the history line records the actual `usd` and the `overshoot` over the budget. It refuses to start when the history's spend of today plus `--budget` is above `--daily-cap` (default 20 USD). Runs play under `~/.capy/work/runs/scoreboard/` and runs with at most 2 emulator processes. A supervisor reads each trace as it grows and stops the run cleanly (SIGINT, as Ctrl-C) on 3 deaths (`--max-deaths`), on 4000 frames with no new place (`--stall`) or after 4 hours of wall time (`--max-seconds`), the rules of the held-out runs' supervisor; a fork's counts start at its fork frame, not at its parent's prefix. A boot run whose folder does not appear within 20 s is killed, and SIGINT or SIGTERM on the scoreboard stops the runs it started (SIGINT to each, then it exits; `caffeinate` ends with its run). It appends one JSON line to `~/.capy/work/scoreboard/history.jsonl` (`--history FILE`; not the drive, not the repo): the date, flow, harness sha, decision-layer branch conditions, total dollars, the primary run's vector and rates, and every run's full measure. It spends real money: set `--budget` on purpose.
 
 ## debt
 
@@ -35,7 +35,7 @@ Exit 1, with a line per reason, when:
 
 - the paid runs started today (run ids dated today) cost more than 20 USD;
 - a paid run of today has `harness_dirty`;
-- `deaths_per_1000f` or `calls_per_1000f` of the primary run rose more than 50% against the previous scoreboard line;
+- `deaths_per_1000f` or `calls_per_1000f` of the primary run rose by more than 50% and by at least 0.5 against the previous scoreboard line (history lines without a primary run are skipped);
 - branch conditions rose 20% over two batches while no component of the primary run's progress vector gained.
 
 A run's own cost comes from its trace: a fork's `summary.json` dollars include its parent's.
