@@ -10,6 +10,8 @@ GitHub Actions (`.github/workflows/ci.yml`) runs `rake test:ci` on every pull re
 
 **$0 stub gates.** `tools/gates/` plays three checkpoint forks with a stub in place of the model and checks calls, calls at 8 hp or less, hp lost, deaths and the first delivery against `tools/gates/expected.json` per `flow_version`: `ruby tools/gates/gate.rb respawn-171|post-gain-172|sword-obtained|all` (`--check RUN_DIR` for a fork already played). They need the checkpoint runs on the Mac, so CI does not run them; `test/gates_test.rb` covers the counting. Commands and expected numbers: `tools/gates/README.md`.
 
+**Scoreboard.** `tools/scoreboard/` measures how far the agent gets and what it costs: `ruby tools/scoreboard/scoreboard.rb measure RUN_DIR...` (progress vector, cost, deaths, stalls and harness rules fired, from run folders), `run --budget USD [--daily-cap USD] [--from boot|CHECKPOINT]` (the standard run; `--budget` is the total for the invocation, split over its runs, soft by one call per run, refused when today's history spend plus it is above the daily cap, 20 USD by default; at most 2 emulator processes, stopped on deaths, a stall or wall time, or a signal on the scoreboard, one line appended to `~/.capy/work/scoreboard/history.jsonl`), `debt` (the pit index) and `alert` (exit 1 when a guardrail trips). Only `run` spends money; `test/scoreboard_test.rb` needs no ROM. Commands and fields: `tools/scoreboard/README.md`.
+
 ### ROM in CI
 
 The ROM is never in a repository. CI downloads `zelda_dx_rev1.gbc.age`, the ROM encrypted with age to an X25519 recipient, from the direct link in the Actions secret `ROM_URL`, decrypts it with the identity in the secret `ROM_AGE_KEY` into the runner's temp dir, checks it against `ROM_SHA256` and exports `KOHOLINT_ROM` (`.github/actions/rom`). `.github/actions/rom/rom.env` holds `ROM_SHA256` (the `rom_sha256` of the committed run manifests) and `ROM_CACHE_VERSION`. Only the ciphertext is kept in the Actions cache (key `rom-age-<sha>-v<ROM_CACHE_VERSION>`): the `fetch ROM` job downloads it on a cache miss and saves it only once it has decrypted and checked it, and the shards decrypt from the cache. Pushes to `main` keep the cache warm. A missing secret, a share page instead of a file, a wrong key or a wrong file each fail with their own message.
@@ -92,6 +94,14 @@ places Link next to it on each side and presses A, with a control copy where the
 opens in the control is not the entity's); pins Link on it for 90 frames and compares health with the control; watches
 whether it moves; and talks to it twice and at a shifted frame to compare conversation signatures. Reports go to
 `tmp/entities/*.json` and feed `data/entities.json` (kinds, and with the runs' `hurt` notables the `hurts` facts) and `data/addresses.json`.
+
+## Door census
+
+`bin/koholint census doors <run_dir> FRAME...` replays the journal to each frame and, in throwaway copies, places Link on the cell below each object cell of the room (2 samples per object id), walks him up for 60 frames and records whether he walks into another place by himself (`link_motion_state` 3) and where he arrives. Reports go to `tmp/doors/*.json` and feed the `door` entries of `data/entities.json`.
+
+## Sword census
+
+`bin/koholint census sword <run_dir> FRAME...` replays the journal to each frame and, for every enemy on screen, in throwaway copies strikes it with the sword: the reach per facing (gaps of 8 to 40 px), the lateral tolerance, the hits to kill, the health lost per hit, the knockback, and whether a charged release (spin) or a tap hits behind Link. Reports go to `tmp/sword/*.json` and feed the `sword_reach` and `sword_hits` facts of `data/entities.json`.
 
 ## Object census
 

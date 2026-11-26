@@ -164,12 +164,7 @@ The skills, protocols and harness behaviours the agent works with. Versioned wit
   drop still hands the next decision to the model (`hp dropped`). A decision
   the model takes while the autopilot is on records why the autopilot did not choose (`autopilot_hold` on the `decision` event).
 - flow-110: a hit that leaves an enemy's slot to another type (`target_gone`) marks the spot: creatures catalogued as moving there at the
-  next look (in the struck slot, or on the cell the enemy stood on) are fought on sight as enemies until each is struck once. A creature
-  not identified (kind `unknown` or `creature`) whose type was within a cell of Link when he lost health this session, standing within a
-  cell of him when an explore, goto, walk or attack stops `enemy`, `blocked`, `no_path`, `no_frontier` or `out_of_reach`, gets exactly
-  one sword strike (a probe, the attack capped at one strike): once per slot per visit and 6 times per session, never at one heart, at or
-  below the lineage hit, in a place whose measured hit would take Link's health, or with a person on screen; the same safety gate holds
-  for the fights above. These are runtime rules kept for the session (a resume or a fork starts with none); no catalogue entry changes.
+  next look (in the struck slot, or on the cell the enemy stood on) are fought on sight as enemies until each is struck once. This fight memory is kept for the session (a resume or a fork starts with none).
   A sprite owned by a live entity slot (an enemy or a creature catalogued as moving), within the census window and covering the entity's
   cell, never becomes a static object, so a parked creature no longer walls its cell off; a solid one is left to the loop watch.
 - flow-109: once a heal is over, the objective it set aside is taken up again at the next objective choice, before a loop
@@ -180,8 +175,6 @@ The skills, protocols and harness behaviours the agent works with. Versioned wit
   the dangerous places with their hits. The model's own choices may still cross them. At or below the lineage hit, an aimed explore
   whose route exit is out of reach from where Link stands stops (`held_back`) instead of going after local work, and the objective
   is abandoned (`unreachable`), so the model chooses next.
-- flow-107: the autopilot starts no try of a never-tried entity or object (its `talk_to`, which a touch may follow) in a place
-  where a hit was measured on the lineage; the model may still choose to.
 - flow-106: danger is measured per place: the largest hp drop between two decisions in each place, read back from the trace. A place whose measured hit is at or above Link's health is
   never entered, as a hop or a destination, by a route to work (the harness's loop, zero-frame and guarded redirects, explore's own
   search for work, explore following such a redirect) or by the least-visited fallback, and never left into by a pocket or retreat

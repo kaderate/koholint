@@ -18,20 +18,22 @@
 
 ## Where it stands
 
+The owner's objective (2026-11-26) is to collect the 8 instruments, that is to complete the 8 dungeons. Today it stands at 0 of 8: the engine records no instrument yet and no dungeon is catalogued. Progress is measured by [`tools/scoreboard`](tools/scoreboard/README.md) (instruments, dungeons entered, key items, places seen, cost, deaths) and by the $0 stub gates of [`tools/gates`](tools/gates/README.md), not by this page. Since the independent evaluation KOHO-148 the direction is to delete before adding: no new harness rule from a single incident until a held-out validation exists, and consolidations first (see the Direction section of [`ROADMAP.md`](ROADMAP.md)).
+
 Honest numbers, from [`ROADMAP.md`](ROADMAP.md) and [`docs/runs/index.md`](docs/runs/index.md):
 
 Below, *model* means a run where Claude made the decisions and was paid for them, and *$0 stub* means a fork whose decisions came from the deterministic stub picker, with no model call.
 
-- The agent plays from the title screen, explores the overworld, talks to people and reads signs, and **obtained the shield and the sword** (model; the sword in run [`20261111-194737-9ba1`](runs/20261111-194737-9ba1/): 42 places, 62,457 frames, 4.32 USD, item gained at frame 60404 in room 242/0).
+- The agent plays from the title screen, explores the overworld, talks to people and reads signs, and **obtained the shield and the sword** (model; the sword in run [`20261111-194737-9ba1`](runs/20261111-194737-9ba1/): 42 places, 62,457 frames, 4.32 USD, item gained at frame 60404 in C16 (242/0)).
 - It strikes enemies with the sword and keeps track of leads (open, tested or refuted) found in dialogues.
-- **The mushroom (item 12)** was picked up in room 80/0 at frame 91615 by model run [`20261124-190747-626d`](runs/20261124-190747-626d/) (a fork of checkpoint `20261114-084732-45ba`, 0.33 USD of its own). Model-free stub forks of the same checkpoint picked it up too. 626d and its $0 stub fork [`20261124-191800-abbe`](runs/20261124-191800-abbe/) reached 68 places, the most of any archived run.
-- **The mushroom was delivered and became the Poudre Magique** only in two $0 stub runs, `20261125-232412-ef41` and `20261125-232411-2dd7` (flow-101, forks of abbe, not archived yet). Each healed or pushed its way to the hut 162/14 and handed the mushroom over, and the game answered « Tu as la Poudre Magique! ». No model run has done this yet. The engine names item 12 by a RAM count (0xDB4C) seen in both runs, which fork the same parent and so count as one lineage (the name stays `observed`), and emits a gain when the mushroom becomes the powder.
-- **Stone rooms:** stones slide when Link holds a direction into them (flow-82), and explore searches for the pushes that open an exit (flow-89). In the $0 stub run 2dd7, it pushed through the stones of 171/10 to go on.
+- **The mushroom (item 12)** was picked up in A6 (80/0) at frame 91615 by model run [`20261124-190747-626d`](runs/20261124-190747-626d/) (a fork of checkpoint `20261114-084732-45ba`, 0.33 USD of its own). Model-free stub forks of the same checkpoint picked it up too. 626d and its $0 stub fork [`20261124-191800-abbe`](runs/20261124-191800-abbe/) reached 68 places, the most of any archived run.
+- **The mushroom was delivered and became the Poudre Magique** in the hut 162/14, which opens from F7 (101/0). The $0 stub runs [`20261125-232412-ef41`](runs/20261125-232412-ef41/) and [`20261125-232411-2dd7`](runs/20261125-232411-2dd7/) (flow-101, forks of abbe) healed or pushed their way there and handed the mushroom over, and the game answered « Tu as la Poudre Magique! ». Model runs have done it too: the Sonnet forks d871 and 0e98 of abbe @94304 (flow-104, not archived) gained the powder at frames 100386 and 100403, and KOHO-148 counts 2 forks of 3 delivering in each of the paid batches g6 (flow-104), g7 (flow-108) and g8 (flow-110), all forked from the same point. The engine names item 12 by a RAM count (0xDB4C) seen in both runs, which fork the same parent and so count as one lineage (the name stays `observed`), and emits a gain when the mushroom becomes the powder.
+- **Stone rooms:** stones slide when Link holds a direction into them (flow-82), and explore searches for the pushes that open an exit (flow-89). In the $0 stub run 2dd7, it pushed through the stones of 171/10, a cave it reached from C7 (98/0) through 189/10 and 172/10, to go on.
 - **Souvenirs** (flow-99): when a person in another branch of the run tree (`data/souvenirs.json`) named an item Link now holds, and this lineage never heard it, that person becomes a candidate objective, quoted as a souvenir of another playthrough.
 - **The cockpit:** `bin/koholint watch` serves the cockpit at `/`: Île (the overworld screens seen across runs), Direct (one run as it plays or replays) and Métro (the lineages that reached something new). The older run page with the debugging tools stays at `/live`.
 - The one operational learned capability, `sword-on-object-92` (use the sword on a room object that blocks the way), let all three forks of a checkpointed A/B reach a place (164/17) no archived run had seen. Archived runs cost roughly 0.04 to 0.4 USD per 1000 frames.
 - [`docs/runs/index.md`](docs/runs/index.md) lists each archived run's first gains and the items it held at the end.
-- Not done yet: after the delivery, the stub gates stall on examine and talk objectives; a paid validation of the delivery is pending; the first dungeon is the next goal. See the [roadmap](ROADMAP.md) for what remains.
+- Not done yet: the first dungeon. The paid batches above share one fork point, so no held-out validation exists yet. See the [roadmap](ROADMAP.md) for what remains.
 
 ## How it works
 
@@ -81,12 +83,12 @@ Every command and option (budgets, resume, fork, branch, A/B, censuses, run stor
 ## Tests
 
 ```sh
-rake test:fast   # skips the ROM-heavy files (HEAVY in the Rakefile), about 25 s
-rake test:ci     # every file with the ROM hidden (ROM tests skip), about 25 s: what CI runs
-rake test        # full suite, about 4 min on a busy Mac (the first run builds an emulator state cache in tmp/)
+rake test:fast   # skips the ROM-heavy files (HEAVY in the Rakefile)
+rake test:ci     # every file with the ROM hidden (ROM tests skip): what CI runs
+rake test        # full suite with the ROM
 ```
 
-GitHub Actions runs `rake test:ci` and the whole suite with the ROM (4 shards) on every pull request and push to `main`, with emu-gb cloned from `kaderate/gemboy` and the ROM decrypted from an age-encrypted download (see `docs/OPERATING.md`), so the full suite need not run locally before a merge. After a boot script or perception change, `bin/generate_start_fixture` regenerates `test/fixtures/start_game.expected.json`, which `test/perception_test.rb` reads.
+Timings, the CI jobs and the ROM download are in the Tests section of [`docs/OPERATING.md`](docs/OPERATING.md); CI runs the whole suite with the ROM, so it need not run locally before a merge.
 
 ## Project layout
 
@@ -94,6 +96,7 @@ GitHub Actions runs `rake test:ci` and the whole suite with the ROM (4 shards) o
 |---|---|
 | `bin/koholint` | The command line |
 | `lib/koholint/` | Engine, perception, vision, skills, policies, viewer |
+| `tools/` | `gates/` ($0 stub gates) and `scoreboard/` (measure, run, debt, alert) |
 | `data/` | Typed game facts with provenance: addresses, items, entities, modes, capabilities |
 | `runs/` | Archived runs (light bundles: journal, trace, world map, screenshots) |
 | `docs/` | Operating guide, agent skills, run reports, specs and plans |

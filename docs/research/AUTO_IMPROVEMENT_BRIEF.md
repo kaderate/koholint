@@ -1,5 +1,7 @@
 # Koholint — brief d'évolution : boucle d'auto-amélioration modeste
 
+Status: done in part. The first slice landed (see `docs/superpowers/specs/2026-11-12-capability-learning-slice.md`); the rest is ROADMAP item 2. The brief stays in French, as received.
+
 > **Pour l'agent chargé de faire évoluer le dépôt.** Ce document est un brief de conception et d'implémentation, pas une autorisation de réécrire l'architecture. Inspecte d'abord le code actuel, puis propose et réalise la plus petite tranche verticale testable. Préserve la boucle de jeu existante.
 
 ## 1. Intention
