@@ -236,14 +236,14 @@ module Koholint
                      .min_by { |entity| [distance.(entity), entity[:slot]] }
     end
 
-    # A creature not identified that stands in touch when a walk or a strike stopped short is struck once, once per slot per visit and PROBE_LIMIT
+    # A creature not identified but catalogued as moving (an uncatalogued thing may be a person) that stands in touch when a walk or a strike stopped short is struck once, once per slot per visit and PROBE_LIMIT
     # times per run, never at one heart nor where the measured hit says no (safe); a kill makes its type one to fight on sight for the run.
     def probe_choice(state:, entities:, safe:)
       return unless safe && @since && @held && state.phase == :playing && state.cell && state.health > Perception::HP_PER_HEART && @probes < PROBE_LIMIT
 
       @probed = { place: state.place, slots: [] } unless @probed[:place] == state.place
       row, col = state.cell
-      target = Array(entities).select { |entity| Entities.creature?(entity) && entity[:moves] != false && entity[:cell] && !@probed[:slots].include?(entity[:slot]) }
+      target = Array(entities).select { |entity| Entities.creature?(entity) && entity[:moves] == true && entity[:cell] && !@probed[:slots].include?(entity[:slot]) }
                               .select { |entity| [(entity[:cell][0] - row).abs, (entity[:cell][1] - col).abs].max <= 1 }
                               .min_by { |entity| [(entity[:cell][0] - row).abs + (entity[:cell][1] - col).abs, entity[:slot]] } or return
       stop = @held

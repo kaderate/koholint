@@ -809,6 +809,20 @@ class DelegatedAutopilotTest < Minitest::Test
     assert_match(/fight type 28 at \(6,5\)/, p.decide(p.decision_point_for(later), later, { grid: })[:justification])
   end
 
+  # Stub fork 1088 (flow-110 at e7b15df, from g7-2 @97200): after the delivery the probe struck the witch, type 64 at (3,4) in 162/14, an uncatalogued thing.
+  def test_an_uncatalogued_thing_in_touch_is_never_probed
+    client = ScriptedClient.new(objective: new_place, default: explore)
+    p = autopiloted(client)
+    p.instance_variable_set(:@entities_reader, -> { [{ slot: 3, type: 64, kind: 'unknown', x: 72, y: 60, cell: [3, 4] }] })
+    start = state(frame: 99480, room_id: 162, map_id: 14, x: 72, y: 76)
+    decide(p, start)
+    stopped = outcome(:no_frontier, 0).merge(moved_cells: 0, cells_walked: 0, from: { room: 162, map: 14, row: 4, col: 4 }, to: { room: 162, map: 14, row: 4, col: 4 })
+    p.after_action(choice: { skill: 'explore', params: {} }, outcome: stopped, state: start, frame: 99506)
+    now = state(frame: 99506, room_id: 162, map_id: 14, x: 72, y: 76)
+    p.observe(now, frame: 99506)
+    refute_match(/strike the unidentified/, p.decide(p.decision_point_for(now), now, { grid: })[:justification].to_s)
+  end
+
   def test_no_probe_strike_at_one_heart_or_at_the_measured_hit
     [[8, nil], [12, 12]].each do |hp, hit|
       client = ScriptedClient.new(objective: new_place, default: explore)

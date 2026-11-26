@@ -99,8 +99,8 @@ module Koholint
 
     def creature?(entity) = NOT_PEOPLE.include?(entity[:kind].to_s)
 
-    # An enemy, or a creature not measured as still: what a sprite parked on a cell may be for a while without being part of the room.
-    def live?(entity) = (entity[:kind].to_s == 'enemy' || creature?(entity)) && entity[:moves] != false
+    # An enemy or a creature catalogued as moving: a sprite of it parked on a cell is there for a while, never part of the room.
+    def live?(entity) = (entity[:kind].to_s == 'enemy' || creature?(entity)) && entity[:moves] == true
 
     SPRITE_DX = 8
     SPRITE_DY = 16
