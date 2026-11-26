@@ -17,15 +17,15 @@ module Koholint
       hurts
     end
 
-    # The thing nearest Link in the census window takes the blame, among everything there: a type that already hurt takes its next hit; with a
-    # catalogued enemy or a type that already hurt in the window, or the nearest a person, a healer or a type Link has talked with, nobody does.
+    # The thing nearest Link in the census window takes the blame, among everything there: a type that already hurt takes its next hit; with an
+    # enemy (catalogued, or a type that already hurt) within a cell of its reach, or the nearest a person, a healer or a type Link talked with, nobody does.
     def self.in_contact(state, entities, spared: [])
       link = { x: state.x, y: state.y }
-      near = Array(entities).select { |entity| entity[:x] && Entities.sprite_of?(link, entity) }
-      nearest = near.min_by { |entity| [(entity[:x] - state.x).abs + (entity[:y] - state.y).abs, entity[:slot].to_i] } or return
-      return if near.any? { |entity| entity[:kind].to_s == 'enemy' && !entity[:hurt] }
+      nearest = Array(entities).select { |entity| entity[:x] && Entities.sprite_of?(link, entity) }
+                               .min_by { |entity| [(entity[:x] - state.x).abs + (entity[:y] - state.y).abs, entity[:slot].to_i] } or return
       return nearest if nearest[:hurt]
-      return if near.any? { |entity| entity[:hurt] } || !Entities.creature?(nearest) || nearest[:heals] || spared.include?(nearest[:type])
+      return if Navigation::Threat.within?(Navigation::Threat.of(Array(entities)), state.x, state.y, margin: Geometry::CELL)
+      return if !Entities.creature?(nearest) || nearest[:heals] || spared.include?(nearest[:type])
 
       nearest
     end

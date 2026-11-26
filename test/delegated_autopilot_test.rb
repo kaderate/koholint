@@ -1554,5 +1554,6 @@ class DelegatedAutopilotTest < Minitest::Test
     hurting = thing(185, 102, 64, hurts: 8)
     assert_equal 185, blamed([hurting, thing(125, 96, 70)])
     assert_nil blamed([thing(203, 101, 60), hurting]), 'a nearer thing beside a type that already hurt is not blamed'
+    assert_nil blamed([thing(185, 135, 125, hurts: 8), thing(125, 115, 125)], at: [120, 116]), 'gate d388 99160: 185 15 px away, 125 measured harmless'
   end
 end
