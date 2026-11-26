@@ -269,8 +269,13 @@ class AutopilotTest < Minitest::Test
       pilot.acted(skill: 'wait', outcome: { stopped_by: 'released' })
       assert_nil pilot.hold_reason(state: state, objective: person, follow:), stop
     end
-    pilot.acted(skill: 'attack', outcome: { stopped_by: 'damage' })
-    assert_equal 'last stop not an explore', pilot.hold_reason(state: state, objective: person, follow:), 'damage hands the choice back'
+    %w[damage refused no_kill no_target no_path].each do |stop|
+      pilot.acted(skill: 'attack', outcome: { stopped_by: stop })
+      assert_equal 'last stop not an explore', pilot.hold_reason(state: state, objective: person, follow:), "#{stop} hands the choice back"
+    end
+    pilot.acted(skill: 'attack', outcome: { stopped_by: 'done' })
+    goto = { skill: 'goto', params: { row: 1, col: 1 } }
+    assert_includes ['hp dropped', 'low health'], pilot.hold_reason(state: state(hp: 4), objective: person, follow: goto), 'a harmless fight keeps the health hold'
     plain = Koholint::Autopilot.new
     plain.model_called(state: state, objective: objective)
     plain.acted(skill: 'attack', outcome: { stopped_by: 'done' })
