@@ -1,6 +1,6 @@
 # Agent skills
 
-The skills, protocols and harness behaviours the agent works with. Versioned with the play flow (currently `flow-111`): update this page, not the README, when a flow changes. Layers and data flow are in [ARCHITECTURE.md](../ARCHITECTURE.md).
+The skills, protocols and harness behaviours the agent works with. Versioned with the play flow (currently `flow-112`): update this page, not the README, when a flow changes. Layers and data flow are in [ARCHITECTURE.md](../ARCHITECTURE.md).
 
 
 - Learned capabilities (`data/capabilities.json`, `bin/koholint capability list`): an `operational` entry is a composite of the skills below, offered in the skill schema and listed under "Learned skills" only while its trigger item is held (flow-49) and its object is on screen (today `sword_on_object_92 row col direction`: stand next to object 92, face it, use the sword, step into its cell). `explore` and `goto` also run it themselves when blocked facing such a cell, and the planner routes through those cells as a last resort. `learn` and `capability publish|retire` are offline commands.
@@ -20,7 +20,7 @@ The skills, protocols and harness behaviours the agent works with. Versioned wit
   `new_place`, `known_place` (a return to a place already seen), `dialogue`, `untried_object` (once per thing never talked to within 3 cells), `blocked`, `stalled` (3
   attempts in a row walked no new cell), `no_frontier` (with the exits already tried), `locked`, `damage`, `budget` (600 frames),
   `enemy` (an enemy to fight on sight, flow-90) or `fell` (Link starts to fall, flow-90).
-  flow-68: at one heart or less the autopilot hands every decision to the model; walk, goto and explore keep out of every
+  flow-68: at one heart or less walk, goto and explore keep out of every
   enemy contact zone grown by a cell (the extra ring only as a last resort, the contact zone never, a goal inside one still
   reached), and from inside one Link may take any step that does not head toward an enemy within a cell of its touch
   (flow-73: judged from where he stands, not from his cell's centre); walk stops `danger`
@@ -103,8 +103,8 @@ The skills, protocols and harness behaviours the agent works with. Versioned wit
   uncatalogued screen gets `press` and `wait` and a `notable` `unknown_mode` in the trace; 600 frames on it stop the
   run as `unknown_mode_stuck`. Options that quit to the title are refused. The game-over screen is answered by the harness, free: it
   continues with the first option that does not quit (`notable` `death`); a health drop emits a `notable` `damage` and
-  the next prompt's health line shows the hearts lost since the last model call. Low health has one rule (flow-68): at one heart or less (`health <= HP_PER_HEART`) the autopilot holds (`low health`), so the model
-  takes every decision, and walk, goto and explore grow every enemy contact zone by a cell, crossed only as a last resort (the contact zone
+  the next prompt's health line shows the hearts lost since the last model call. Low health has one rule (flow-68): at one heart or less (`health <= HP_PER_HEART`)
+  walk, goto and explore grow every enemy contact zone by a cell, crossed only as a last resort (the contact zone
   never); the disengage walk below steps away from a near enemy. Six fruitless results in one
   place without a new cell emit a `notable` `stuck` and a `STUCK` reset hint; a known place entered 4 times within 3600 frames
   with no new place emits a `notable` `stuck` (`loop: ...`) and a `LOOP` hint until a new place; the harness then explores toward
@@ -154,6 +154,10 @@ The skills, protocols and harness behaviours the agent works with. Versioned wit
   context lists it as "hurt Link for N", and a model attack on it is refused at or below its hit. It replaces two rules: the
   session-only one-strike probe of flow-110 (`note_contact`, `probe_choice`, the attack's strike cap from the context) and the
   "no tries in a place that has hurt Link" of flow-107; a type that never hurt Link is tried there again.
+- flow-112: one heart or less no longer holds the autopilot (the flow-68 `low health` hold is gone); the one-heart walls, walk's
+  `danger` stop and the disengage walk stay, the harness neither tries nor touches an unknown thing at one heart or less, and a health
+  drop still hands the next decision to the model (`hp dropped`). A decision
+  the model takes while the autopilot is on records why the autopilot did not choose (`autopilot_hold` on the `decision` event).
 - flow-110: a hit that leaves an enemy's slot to another type (`target_gone`) marks the spot: creatures catalogued as moving there at the
   next look (in the struck slot, or on the cell the enemy stood on) are fought on sight as enemies until each is struck once. A creature
   not identified (kind `unknown` or `creature`) whose type was within a cell of Link when he lost health this session, standing within a

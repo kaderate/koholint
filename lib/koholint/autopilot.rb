@@ -34,7 +34,7 @@ module Koholint
     HEART_ENDS = %w[done target_gone].freeze
     STEP = { up: [0, -1], down: [0, 1], left: [-1, 0], right: [1, 0] }.freeze
 
-    attr_reader :chain, :chain_limit, :chain_frames
+    attr_reader :chain, :chain_limit, :chain_frames, :last_hold
 
     def initialize(chain_limit: CHAIN_LIMIT, chain_frames: CHAIN_FRAMES)
       @chain_limit = chain_limit
@@ -128,7 +128,7 @@ module Koholint
     # A thing on screen never tried is tried once with talk_to before exploring on, nearest first: the sprites the last explore offered where no catalogued enemy stands,
     # and uncatalogued entities of a type never aimed at here. Tries cost no call, so TRY_LIMIT per visit bounds them, not the chain caps.
     def try_choice(state:, objective:, entities:, tried:)
-      return unless state.cell && !objective&.dig(:target) && !hold_reason(state:, objective:, caps: false)
+      return unless state.cell && state.health > Perception::HP_PER_HEART && !objective&.dig(:target) && !hold_reason(state:, objective:, caps: false)
 
       here = state.place
       visit(here)
@@ -154,7 +154,7 @@ module Koholint
     # A still uncatalogued entity whose try gave nothing is walked onto once per visit, nearest first: touch reads the item bytes to tell a pickup.
     # Still means it is still in the cell the try aimed at and not catalogued as moving; tries and touches share TRY_LIMIT.
     def touch_choice(state:, objective:, entities:)
-      return unless state.cell && !objective&.dig(:target) && !hold_reason(state:, objective:, caps: false)
+      return unless state.cell && state.health > Perception::HP_PER_HEART && !objective&.dig(:target) && !hold_reason(state:, objective:, caps: false)
 
       here = state.place
       visit(here)
@@ -175,7 +175,8 @@ module Koholint
     end
 
     def next_choice(state:, objective:, follow: nil, danger: false)
-      return if hold_reason(state:, objective:, follow:, danger:)
+      @last_hold = hold_reason(state:, objective:, follow:, danger:)
+      return if @last_hold
 
       @chain += 1 unless @stop == 'known_place'
       @stop = nil
@@ -307,7 +308,6 @@ module Koholint
       return 'explore loop' if @returns.values.max.to_i >= RETURNS
       return "phase #{state.phase}" unless state.phase == :playing
       return 'hp dropped' if health && state.health < @hp
-      return 'low health' if health && state.health <= Perception::HP_PER_HEART
 
       nil
     end

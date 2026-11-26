@@ -42,6 +42,8 @@ class DelegatedAutopilotTest < Minitest::Test
     assert_equal 6, free.size
     assert(free.all? { |r| r[:choice] == { skill: 'explore', params: {} } && r[:cost_usd].zero? && r[:agent] == 'delegated' && r[:prompt].nil? })
     assert_equal 'claude', results[8][:agent]
+    assert_equal ['no model call yet', 'chain cap'], results.values_at(0, 8).map { |r| r[:autopilot_hold] }
+    assert(free.none? { |r| r.key?(:autopilot_hold) })
     assert_equal 8, @objectives.current[:attempts].size
   end
 
@@ -102,12 +104,12 @@ class DelegatedAutopilotTest < Minitest::Test
     result
   end
 
-  def test_at_half_a_heart_every_decision_goes_to_the_model_and_no_shelter_is_offered
+  def test_at_half_a_heart_the_autopilot_keeps_choosing_and_no_shelter_is_offered
     client = ScriptedClient.new(objective: new_place, default: explore)
     p = autopiloted(client)
     p.instance_variable_get(:@explore_log).absorb({ from: { room: 1, map: 0 }, exits: [{ row: 7, col: 5, direction: :up, outcome: :left, to: [166, 16] }] })
     results = (0..3).map { |i| lap(p, state(frame: 100 + (i * 300), room_id: 1, map_id: 0, hp: 4), :known_place, to: { room: 1, map: 0, row: 3, col: 4 }) }
-    assert(results.none? { |r| r[:autopilot] })
+    assert(results.any? { |r| r[:autopilot] })
     refute_includes client.calls.map { |c| c[:prompt] }.join, 'LOW HEALTH'
   end
 
