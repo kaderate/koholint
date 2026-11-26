@@ -74,6 +74,11 @@ class DocsTest < Minitest::Test
     assert_empty stated.reject { |flow| flow == Koholint::FLOW_VERSION }
   end
 
+  def test_specs_and_research_carry_a_status_line
+    missing = Dir.chdir(ROOT) { Dir['docs/superpowers/specs/*.md', 'docs/research/*.md'] }.reject { |doc| read(doc).lines.first(6).any? { |line| line.start_with?('Status:') } }
+    assert_empty missing
+  end
+
   def test_battleship_labels_agree_with_the_room_ids_beside_them
     label = ->(room) { "#{('A'.ord + room % 16).chr}#{room / 16 + 1}" }
     wrong = DOCS.flat_map do |doc|
