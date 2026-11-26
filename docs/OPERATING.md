@@ -106,7 +106,7 @@ feeds `data/addresses.json` and the `ready` of the `play` mode in `data/modes.js
 
 ## Live view
 
-`bin/koholint watch <run_dir> [--port N] [--host H] [--from live|start] [--speed X] [--runs-root DIR]` prints
+`bin/koholint watch <run_dir> [--port N] [--host H] [--from live|start] [--speed X] [--runs-root DIR]...` prints
 `watching http://127.0.0.1:PORT` and serves the run as video, status and feed from a read-only replay. It works on a
 finished run or one being written; Ctrl-C stops it. It listens on 127.0.0.1 only; `--host 0.0.0.0` opens it to other
 devices on the same network (no authentication: use it on a network you trust).
@@ -137,7 +137,7 @@ never acts on a process. Three drawers open from the top bar:
 first then by importance, with its reading and where it was read) and **Personnes** (the texts read, by speaker or, without
 a name, by the screen they were heard on; one text read in several runs counts once). `/island.json`
 (which also carries the metro lines, leads and people) and `/story.json[?run=<id>]` feed it, each cached by trace mtime and size; the island is rebuilt at most every 30 s.
-Each run's digest is also kept on disk in the runs root's `.cache/digests/` and the last island in `.cache/island.json`: `/island.json`
+Each run's digest is also kept on disk in the first runs root's `.cache/digests/` (keyed by run path, so roots never collide) and the last island in `.cache/island.json`: `/island.json`
 answers with the last island at once and rebuilds a stale one in the background; with none yet it waits 2 s, then answers 202
 with `{ building, done, total }` and the page shows the progress and asks again; a page with no answer after 20 s offers to retry.
 Measured on the Mac with 424 runs: the first build ever takes about 30 s (the page is up at once and shows progress); a restart
@@ -161,7 +161,9 @@ notes box. The map, timeline and stats are derived from the trace and cached by 
 ### Past runs
 
 `watch` also explores the runs under `--runs-root DIR` (default: the watched run's parent directory when it holds other
-runs, else `runs`). Routes besides `/`, `/frame.png` and `/state.json` (each JSON route takes `?run=<id>` for a past
+runs, else `runs`). Repeat the option to add roots, and quote a glob to take every match, read again at each refresh so a new one
+shows up without a restart: `--runs-root ~/.capy/work/atlas-root --runs-root '~/.capy/work/runs/*'`. A run id found in several roots is
+the first root's, and the cache dir sits in the first root (the directory before the glob for a glob). Routes besides `/`, `/frame.png` and `/state.json` (each JSON route takes `?run=<id>` for a past
 run and serves the watched run without it; `/live` is the watched run's page):
 
 | Route | What it does |

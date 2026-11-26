@@ -31,13 +31,17 @@ module Koholint
       HEADER = %w[run_id tag flow_version model harness_sha highest_milestone places_seen frames dollars stop_reason].freeze
       FIELDS = %w[run_id tag flow_version frames dollars calls usd_per_1000f highest_milestone places_seen stop_reason].freeze
 
-      attr_reader :root, :registry
+      GLOB = /[*?\[{]/
 
-      def initialize(root:, registry:, cache: File.join(root, CACHE))
-        @root = root
+      attr_reader :registry
+
+      # roots: run roots, each a directory or a glob of directories (`runs/*`) expanded at every read, so a new one shows up
+      # without a restart. A run id found under several roots is the first one's. The caches sit beside the first root, never in a run.
+      def initialize(roots:, registry:, cache: nil)
+        @roots = Array(roots)
         @registry = registry
-        @cache = cache
-        @atlas = DigestCache.new(File.join(cache, 'digests'))
+        @cache = cache || File.join(File.expand_path(@roots.first).sub(%r{/[^/]*#{GLOB}.*\z}, ''), CACHE)
+        @atlas = DigestCache.new(File.join(@cache, 'digests'))
         @atlas_lock = Mutex.new
         @island_lock = Mutex.new
         @progress = [0, 0]
@@ -52,9 +56,8 @@ module Koholint
       def resolve(id)
         raise NotFound, 'no such run' unless id.is_a?(String) && id.match?(RUN_ID)
 
-        dir = File.join(@root, id)
-        raise NotFound, 'no such run' unless File.directory?(dir) && File.file?(File.join(dir, 'manifest.json'))
-        raise NotFound, 'no such run' unless File.dirname(File.realpath(dir)) == File.realpath(@root)
+        dir = run_dirs.find { |run| File.basename(run) == id }
+        raise NotFound, 'no such run' unless dir && File.dirname(File.realpath(dir)) == File.realpath(File.dirname(dir))
 
         dir
       rescue SystemCallError
@@ -117,13 +120,15 @@ module Koholint
       end
 
       def runs
-        Archive.runs(@root).filter_map { |dir| row(dir) if File.basename(dir).match?(RUN_ID) }.sort_by { |row| row['run_id'] }.reverse
+        run_dirs.filter_map { |dir| row(dir) if File.basename(dir).match?(RUN_ID) }.sort_by { |row| row['run_id'] }.reverse
       end
 
-      def atlas = @atlas_lock.synchronize { Atlas.build([@root], cache: @atlas) }
+      def atlas = @atlas_lock.synchronize { Atlas.build(roots, cache: @atlas) }
+
+      def roots = @roots.flat_map { |root| Dir.glob(File.expand_path(root)).select { |dir| File.directory?(dir) }.sort }.uniq
 
       def latest
-        dir = Archive.runs(@root).reverse.find { |run| File.basename(run).match?(RUN_ID) && File.file?(File.join(run, 'inputs.log')) }
+        dir = run_dirs.sort_by { |run| File.basename(run) }.reverse.find { |run| File.basename(run).match?(RUN_ID) && File.file?(File.join(run, 'inputs.log')) }
         dir && File.basename(dir)
       end
 
@@ -165,6 +170,8 @@ module Koholint
 
       private
 
+      def run_dirs = roots.flat_map { |root| Archive.runs(root) }.uniq { |dir| File.basename(dir) }
+
       def now = Process.clock_gettime(Process::CLOCK_MONOTONIC)
 
       def island_path = File.join(@cache, 'island.json')
@@ -178,10 +185,10 @@ module Koholint
       end
 
       def build_island
-        dirs, digests = @atlas_lock.synchronize { Atlas.read([@root], cache: @atlas, progress: ->(done, total) { @progress = [done, total] }) }
+        dirs, digests = @atlas_lock.synchronize { Atlas.read(roots, cache: @atlas, progress: ->(done, total) { @progress = [done, total] }) }
         generation = digests.map(&:object_id)
         known = @island_lock.synchronize { @island }
-        value = known&.dig(:generation) == generation ? known[:value] : Island.of(dirs, digests, roots: [@root])
+        value = known&.dig(:generation) == generation ? known[:value] : Island.of(dirs, digests, roots:)
         @island_lock.synchronize do
           @island = { at: now, generation:, value: }
           @island_failure = @island_failed_at = nil
