@@ -67,7 +67,8 @@ module Koholint
         def initialize(direction:, context:, **rest)
           super(**rest)
           @aim = context[:aim] || {}
-          @work = context[:work]
+          @ban = context[:ban]
+          @fragile = context[:fragile]
           @retreat = context[:retreat]
           @hint = direction || @aim[:direction]
           @place = @start.place
@@ -130,6 +131,7 @@ module Koholint
           held = Array(@backs) - Array(@routed_off)
           merged[:held] = held if held.any?
           merged[:dead_end] = true if @dead_end
+          merged[:held_back] = true if @held_back
           merged[:failed_push] = @failed_push if @failed_push
           merged[:too_heavy] = @too_heavy if @too_heavy
           merged[:dialogue_frontier] = @dialogue_frontier if @dialogue_frontier
@@ -414,6 +416,11 @@ module Koholint
           if @aim[:place] && @aim[:place] != @place
             aimed = routed(from, path_to)
             return order(aimed) if aimed.any?
+            # At or below the lineage hit, a route whose exit is out of reach here ends the walk rather than sending Link after local work.
+            if @fragile && @route
+              @held_back = true
+              return []
+            end
           end
           back, local = untried(from, path_to).partition { |candidate| way_back?(candidate) }
           return order(local) if local.any?
@@ -492,7 +499,7 @@ module Koholint
           avoid = []
           first = nil
           goal = @aim[:place] if @aim[:place] != @place
-          while (hop = @log&.route(@place, goal:, avoid:, ban: goal.nil? || @work))
+          while (hop = @log&.route(@place, goal:, avoid:, ban: goal.nil? || @ban))
             first ||= hop
             via = hop[:via]
             way = ->(path) { via.is_a?(Array) ? doors(path, @doors | [via]) { |door| door == via } : gather(from, path) { |cell, direction| :exit if direction == via && Geometry.step(cell, direction).nil? } }
