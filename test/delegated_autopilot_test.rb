@@ -1526,4 +1526,33 @@ class DelegatedAutopilotTest < Minitest::Test
     assert_equal [[:enemy, 8], [:npc, nil]], Koholint::Hurts.new.overlay([thing, person]).map { |entity| entity.values_at(:kind, :hurt) }
     assert_equal 8, Koholint::Entities.catalogue.dig(185, :hurts)
   end
+
+  def blamed(things, spared: [], at: [101, 58])
+    link = state(room_id: 84, map_id: 0, x: at[0], y: at[1])
+    Koholint::Hurts.in_contact(link, Koholint::Hurts.new.overlay(things), spared:)&.dig(:type)
+  end
+
+  def thing(type, x, y, kind: :unknown, **more) = { slot: type % 16, type:, kind:, x:, y:, cell: [(y - 8) / 16, x / 16], **more }
+
+  # Review of #117 (KOHO-149): a catalogued enemy (type 9) hit Link with the D6 healer (type 132, uncatalogued) nearer in the window.
+  def test_no_blame_with_a_catalogued_enemy_in_the_window
+    assert_nil blamed([thing(132, 102, 60), thing(9, 106, 70, kind: :enemy)])
+    assert_equal 132, blamed([thing(132, 102, 60)]), 'control: alone in the window it takes the blame'
+  end
+
+  def test_a_person_or_a_type_link_talked_with_is_never_blamed
+    assert_nil blamed([thing(64, 102, 60)], spared: [64]), 'the witch of 162/14 after a talk'
+    assert_nil blamed([thing(62, 102, 60, kind: :npc), thing(132, 106, 70)])
+    log = Koholint::TalkLog.new
+    log.record(place: [162, 14], row: 4, col: 4, talked: true, entity: 64)
+    log.record(place: [162, 14], row: 3, col: 5, talked: false, entity: 59)
+    assert_equal [64], log.talked_types
+  end
+
+  # Stub gate 35b7 (flow-111 at b6e1e863): 185 hit Link at 99052, and the next hit at 99160 blamed type 125 beside it.
+  def test_a_type_that_already_hurt_takes_its_next_hit_and_shields_its_neighbours
+    hurting = thing(185, 102, 64, hurts: 8)
+    assert_equal 185, blamed([hurting, thing(125, 96, 70)])
+    assert_nil blamed([thing(203, 101, 60), hurting]), 'a nearer thing beside a type that already hurt is not blamed'
+  end
 end

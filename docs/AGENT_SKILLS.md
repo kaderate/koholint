@@ -146,8 +146,10 @@ The skills, protocols and harness behaviours the agent works with. Versioned wit
   in at most one frame is answered by the harness at the next decision, not after three, since from the same cell it would find none again.
 - flow-111: damage teaches hostility, as typed data. A `hurts` fact on a data/entities.json entry (value = hit, `confidence`,
   `verified_count`, `source`; written offline from the entity census and the runs' notables, never by a run) and the run's own evidence,
-  a `notable` of kind `hurt` for the thing of kind `unknown` or `creature` nearest Link within the census window (8 px across, 16 px
-  down or up) when an action ends with an hp drop (the drop is its hit; rebuilt from the lineage trace on a resume or a fork), both make
+  a `notable` of kind `hurt` when an action ends with an hp drop (the drop is its hit; rebuilt from the lineage trace on a resume or a
+  fork): of everything within the census window (8 px across, 16 px down or up), the nearest takes it if its type already hurt, and
+  otherwise only if no catalogued enemy or type that already hurt is there and it is of kind `unknown` or `creature`, not a healer and not
+  a type Link has talked with in the lineage (a wrong blame is never retired). Both make
   the type an enemy at its largest hit: routes and heal rules keep out of its reach, it is never a talk, try or examine target, the
   context lists it as "hurt Link for N", and a model attack on it is refused at or below its hit. It replaces two rules: the
   session-only one-strike probe of flow-110 (`note_contact`, `probe_choice`, the attack's strike cap from the context) and the

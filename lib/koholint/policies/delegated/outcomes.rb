@@ -22,7 +22,7 @@ module Koholint
           hit = -outcome[:hp_delta].to_i
           return unless hit.positive? && state.x
 
-          entity = Hurts.in_contact(state, entities_now) or return
+          entity = Hurts.in_contact(state, entities_now, spared: @talk_log.talked_types) or return
           detail = { type: entity[:type], hit:, place: state.place, cell: entity[:cell] }
           @hurts.add(type: entity[:type], hit:, place: state.place, frame: state.frame)
           @notes << { kind: 'hurt', detail: }
