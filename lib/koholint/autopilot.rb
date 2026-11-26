@@ -33,6 +33,9 @@ module Koholint
     HEART_LIMIT = 2
     HEART_ENDS = %w[done target_gone].freeze
     STEP = { up: [0, -1], down: [0, 1], left: [-1, 0], right: [1, 0] }.freeze
+    PROBE_SKILLS = %w[explore goto walk attack].freeze
+    PROBE_STOPS = %w[enemy blocked no_path no_frontier out_of_reach].freeze
+    PROBE_LIMIT = 6
 
     attr_reader :chain, :chain_limit, :chain_frames
 
@@ -54,6 +57,11 @@ module Koholint
       @try_place = nil
       @trial = nil
       @touchable = []
+      @probes = 0
+      @probed = { place: nil, slots: [] }
+      @held = nil
+      @killable = Set.new
+      @offspring = { place: nil }
     end
 
     def model_called(state:, objective:, news: false)
@@ -84,6 +92,7 @@ module Koholint
       note_hurt(outcome) if skill.to_s == 'attack' && outcome.is_a?(Hash) && outcome[:stopped_by].to_s == 'damage' && outcome[:from].is_a?(Hash)
       note_missed(outcome) if skill.to_s == 'attack' && outcome.is_a?(Hash)
       note_struck(skill, outcome) if outcome.is_a?(Hash)
+      note_probe(skill, outcome) if outcome.is_a?(Hash)
       note_walled(outcome) if skill.to_s == 'walk' && outcome.is_a?(Hash) && outcome[:params].is_a?(Hash) && walled?(outcome)
       explored = skill.to_s == 'explore' && outcome.is_a?(Hash)
       @stop = stop_after(skill.to_s, outcome.is_a?(Hash) ? outcome[:stopped_by].to_s : nil) unless @heart_touch && skill.to_s == 'touch' && outcome.is_a?(Hash) && HEART_ENDS.include?(outcome[:stopped_by].to_s)
@@ -181,8 +190,8 @@ module Koholint
     end
 
     # After an attack that killed or lost its target, strike the nearest other enemy (or a type struck here before) without a call.
-    def fight_choice(state:, entities:, objects: [])
-      sighted = fight_target(state:, entities:, objects:)
+    def fight_choice(state:, entities:, objects: [], safe: true)
+      sighted = fight_target(state:, entities:, objects:, safe:)
       if sighted
         @fight += 1
         @attack_stop = nil
@@ -207,7 +216,7 @@ module Koholint
     end
 
     # Crumbling floor gives way under a Link who stands to strike, so no fight starts with his footprint on it.
-    def fight_target(state:, entities:, objects: [])
+    def fight_target(state:, entities:, objects: [], safe: true)
       return unless @since && state.phase == :playing && state.cell && state.x
 
       @fight_hurt = nil if @fight_hurt && @fight_hurt[:place] != state.place
@@ -220,9 +229,29 @@ module Koholint
       missed += [@struck[:slot]] if @struck[:place] == state.place
       distance = ->(entity) { [(entity[:x] - state.x).abs, (entity[:y] - state.y).abs].max }
       far = ->(entity) { here && @missed[:far].key?(entity[:slot]) && distance.(entity) > Geometry::CELL }
-      Array(entities).select { |entity| entity[:kind].to_s == 'enemy' && (entity[:sword_hits] == 1 || (entity[:sword_hits] == 2 && entity[:sword_verified])) && (!@fight_hurt || entity[:sword_verified]) && entity[:cell] && !missed.include?(entity[:slot]) && !far.(entity) }
+      offspring = offspring_slots(state, entities)
+      strikable = ->(entity) { entity[:kind].to_s == 'enemy' ? entity[:sword_hits] == 1 || (entity[:sword_hits] == 2 && entity[:sword_verified]) : safe && (offspring.include?(entity[:slot]) || @killable.include?(entity[:type])) }
+      Array(entities).select { |entity| strikable.(entity) && (!@fight_hurt || entity[:sword_verified]) && entity[:cell] && entity[:x] && !missed.include?(entity[:slot]) && !far.(entity) }
                      .select { |entity| distance.(entity) <= FIGHT_SIGHT }
                      .min_by { |entity| [distance.(entity), entity[:slot]] }
+    end
+
+    # A creature not identified that stands in touch when a walk or a strike stopped short is struck once, once per slot per visit and PROBE_LIMIT
+    # times per run, never at one heart nor where the measured hit says no (safe); a kill makes its type one to fight on sight for the run.
+    def probe_choice(state:, entities:, safe:)
+      return unless safe && @since && @held && state.phase == :playing && state.cell && state.health > Perception::HP_PER_HEART && @probes < PROBE_LIMIT
+
+      @probed = { place: state.place, slots: [] } unless @probed[:place] == state.place
+      row, col = state.cell
+      target = Array(entities).select { |entity| Entities.creature?(entity) && entity[:moves] != false && entity[:cell] && !@probed[:slots].include?(entity[:slot]) }
+                              .select { |entity| [(entity[:cell][0] - row).abs, (entity[:cell][1] - col).abs].max <= 1 }
+                              .min_by { |entity| [(entity[:cell][0] - row).abs + (entity[:cell][1] - col).abs, entity[:slot]] } or return
+      stop = @held
+      @held = nil
+      @probes += 1
+      @probed[:slots] << target[:slot]
+      DecisionPoint.harness_choice({ skill: 'attack', params: { row: target[:cell][0], col: target[:cell][1] } },
+                                   "autopilot: strike the unidentified type #{target[:type]} at (#{target[:cell].join(',')}), in touch after a #{stop} stop (probe #{@probes}/#{PROBE_LIMIT})", autopilot: true)
     end
 
     # At one heart or less with an enemy within a cell of its touch, step away from every such enemy before the model decides.
@@ -337,6 +366,38 @@ module Koholint
       end
       to = outcome[:to]
       @struck = { place: nil, types: [] } if to.is_a?(Hash) && @struck[:place] && [to[:room], to[:map]] != @struck[:place]
+    end
+
+    # A walk or strike that stopped short arms the probe until the next skill. A strike that killed a thing not catalogued as an enemy makes its type
+    # strikable for the run. A hit that left an enemy's slot to something else marks that spot: what appears there is fought as an enemy until struck once.
+    def note_probe(skill, outcome)
+      skill = skill.to_s
+      stop = outcome[:stopped_by].to_s
+      return if %w[wait advance_dialogue].include?(skill)
+
+      @held = PROBE_SKILLS.include?(skill) && PROBE_STOPS.include?(stop) ? stop : nil
+      from = outcome[:from]
+      to = outcome[:to]
+      target = outcome[:target]
+      @offspring = { place: nil } if to.is_a?(Hash) && [to[:room], to[:map]] != @offspring[:place]
+      return unless skill == 'attack' && target.is_a?(Hash) && from.is_a?(Hash)
+
+      enemy = Entities.catalogue.dig(target[:type], :kind).to_s == 'enemy'
+      @killable << target[:type] if stop == 'done' && !enemy
+      @offspring[:slots] -= [target[:slot]] if @offspring[:slots]
+      @offspring = { place: [from[:room], from[:map]], slot: target[:slot], type: target[:type], cell: target[:cell] } if stop == 'target_gone' && enemy
+    end
+
+    # Taken once, at the first look after the hit: the struck slot under another type, and creatures within a cell of where it stood.
+    def offspring_slots(state, entities)
+      return [] unless @offspring[:place] == state.place
+
+      unless @offspring[:slots]
+        near = ->(cell) { cell && @offspring[:cell] && [(cell[0] - @offspring[:cell][0]).abs, (cell[1] - @offspring[:cell][1]).abs].max <= 1 }
+        @offspring[:slots] = Array(entities).select { |entity| Entities.creature?(entity) && entity[:type] != @offspring[:type] && (entity[:slot] == @offspring[:slot] || near.(entity[:cell])) }
+                                            .map { |entity| entity[:slot] }
+      end
+      @offspring[:slots]
     end
 
     # A try stays benign whatever it met, through the dialogue it opened; only a talk the model chose ends as talked.

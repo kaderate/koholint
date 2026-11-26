@@ -1,6 +1,6 @@
 # Agent skills
 
-The skills, protocols and harness behaviours the agent works with. Versioned with the play flow (currently `flow-109`): update this page, not the README, when a flow changes. Layers and data flow are in [ARCHITECTURE.md](../ARCHITECTURE.md).
+The skills, protocols and harness behaviours the agent works with. Versioned with the play flow (currently `flow-110`): update this page, not the README, when a flow changes. Layers and data flow are in [ARCHITECTURE.md](../ARCHITECTURE.md).
 
 
 - Learned capabilities (`data/capabilities.json`, `bin/koholint capability list`): an `operational` entry is a composite of the skills below, offered in the skill schema and listed under "Learned skills" only while its trigger item is held (flow-49) and its object is on screen (today `sword_on_object_92 row col direction`: stand next to object 92, face it, use the sword, step into its cell). `explore` and `goto` also run it themselves when blocked facing such a cell, and the planner routes through those cells as a last resort. `learn` and `capability publish|retire` are offline commands.
@@ -144,6 +144,13 @@ The skills, protocols and harness behaviours the agent works with. Versioned wit
   Within a place, explore takes a side known only as the assumed way back (flow-78) after the place's other reachable untried exits, doors and frontiers;
   it is still a frontier, taken when nothing else here is reachable, before a route to another place. An explore that stops `no_frontier`
   in at most one frame is answered by the harness at the next decision, not after three, since from the same cell it would find none again.
+- flow-110: a creature not identified (kind `unknown` or `creature`, not measured as still) that stands within a cell of Link when an
+  explore, goto, walk or attack stops `enemy`, `blocked`, `no_path`, `no_frontier` or `out_of_reach` is struck once by the autopilot
+  (a probe): once per slot per visit, 6 times per run, never at one heart, at or below the lineage hit, or in a place whose measured hit
+  would take Link's health. A strike that kills a thing not catalogued as an enemy makes its type one to fight on sight for the run. A hit
+  that leaves an enemy's slot to another type (`target_gone`) marks the spot: creatures there at the next look (the slot, or within a cell)
+  are fought on sight as enemies until each is struck once. These are runtime rules; no catalogue entry changes. A sprite owned by a live
+  entity slot (an enemy, or a creature not measured as still) never becomes a static object, so a parked creature no longer walls its cell off.
 - flow-109: once a heal is over, the objective it set aside is taken up again at the next objective choice, before a loop
   break and outside the two re-offers (a lead still goes back to the menu), and that acts on any pending loop detection. A loop
   break never replaces a heal while Link's hp is at or below the health the heal set out at.

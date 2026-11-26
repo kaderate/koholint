@@ -109,6 +109,20 @@ class GridBuilderTest < Minitest::Test
     assert_match(/\A\h{8}\z/, sprites.first[:pattern])
   end
 
+  # Paid fork g7-2 (4e10, flow-108), C5 (66/0): type 28s parked on (6,5) and (7,5) were static sprites, so the grid read 'o' on (6,5) (prompt 97825)
+  # and closed the one-cell corridor; restored state 97825 put slot 1's sprite at (94,122) for its entity at (90,122).
+  def test_a_live_creature_parked_on_a_cell_never_becomes_a_static_sprite_but_a_still_one_does
+    { 28 => [], 46 => [{ x: 94, y: 122 }] }.each do |type, statics|
+      setup
+      address = Koholint::Entities::ADDRESSES
+      { entity_status: 1, entity_type: type, entity_x: 90, entity_y: 122 }.each { |name, value| @emulator.write(address.fetch(name) + 1, value) }
+      @emulator.sprite(0, x: 94, y: 122)
+      observe
+      observe
+      assert_equal statics, @trace.of(:screen).last[:static_sprites].map { |s| s.slice(:x, :y) }, "type #{type}"
+    end
+  end
+
   def test_a_moving_sprite_never_becomes_static
     4.times do |i|
       @emulator.sprite(0, x: 40 + i, y: 56)

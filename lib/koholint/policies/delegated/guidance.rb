@@ -170,8 +170,13 @@ module Koholint
           heart = @autopilot.heart_choice(state:, entities: entities_now, grid: context[:grid])
           return heart.merge(decision_point: @touch_point).tap { @autopilot_acting = true } if heart
 
-          fight = @autopilot.fight_choice(state:, entities: entities_now, objects: objects_now)
+          # No strike on a thing not identified at or below the measured hit, overall or of this place.
+          safe = !(@healers.hit && state.health <= @healers.hit) && !@healers.dangerous(state.health).include?(state.place)
+          fight = @autopilot.fight_choice(state:, entities: entities_now, objects: objects_now, safe:)
           return fight.tap { @autopilot_acting = true } if fight
+
+          probe = @autopilot.probe_choice(state:, entities: entities_now, safe:)
+          return probe.tap { @autopilot_acting = true } if probe
 
           door = @autopilot.door_choice(state:, doors: objects_now.select { |object| object[:kind].to_s == 'door' }.map { |object| object[:cell] })
           return door.tap { @autopilot_acting = true } if door

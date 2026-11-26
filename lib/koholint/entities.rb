@@ -99,6 +99,14 @@ module Koholint
 
     def creature?(entity) = NOT_PEOPLE.include?(entity[:kind].to_s)
 
+    # An enemy, or a creature not measured as still: what a sprite parked on a cell may be for a while without being part of the room.
+    def live?(entity) = (entity[:kind].to_s == 'enemy' || creature?(entity)) && entity[:moves] != false
+
+    SPRITE_DX = 8
+    SPRITE_DY = 16
+
+    def sprite_of?(sprite, entity) = (sprite[:x] - entity[:x]).between?(-SPRITE_DX, SPRITE_DX) && (sprite[:y] - entity[:y]).between?(-SPRITE_DY, SPRITE_DY)
+
     def near(entities, cell, within: 1)
       entities.select { |entity| entity[:cell] && (entity[:cell][0] - cell[0]).abs <= within && (entity[:cell][1] - cell[1]).abs <= within }
               .min_by { |entity| [(entity[:cell][0] - cell[0]).abs + (entity[:cell][1] - cell[1]).abs, entity[:slot]] }

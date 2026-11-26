@@ -759,6 +759,76 @@ class DelegatedAutopilotTest < Minitest::Test
     refute_equal 'souvenir-165-16-t64', @objectives.current&.dig(:candidate)
   end
 
+  def c5_attack(stop, target, at: [7, 5]) = { skill: 'attack', params: { row: target[:cell][0], col: target[:cell][1] }, stopped_by: stop, target:, moved_cells: 0, hp_delta: 0,
+                                                from: { room: 66, map: 0, row: at[0], col: at[1] }, to: { room: 66, map: 0, row: at[0], col: at[1] } }
+
+  def blob(slot, x, y) = { slot:, type: 28, kind: 'unknown', moves: true, x:, y:, cell: [(y - 8) / 16, x / 16] }
+
+  # Paid fork g7-2 (4e10, flow-108), C5 (66/0) at 97280: one hit on the type 27 at (5,4) ended target_gone, its slot became a type 28 beside a second one
+  # (restored state 97825: slots 2 and 14 at (6,5)), and the autopilot explored on into them; what appears where an enemy was just hit is fought as one.
+  def test_what_appears_where_an_enemy_was_just_hit_is_fought_as_an_enemy_until_struck
+    client = ScriptedClient.new(objective: new_place, default: explore)
+    p = autopiloted(client)
+    blobs = [blob(2, 86, 118), blob(14, 87, 118)]
+    p.instance_variable_set(:@entities_reader, -> { blobs })
+    decide(p, state(frame: 97200, room_id: 66, map_id: 0, x: 92, y: 131))
+    hit = c5_attack(:target_gone, { slot: 2, type: 27, cell: [5, 4] })
+    p.after_action(choice: { skill: 'attack', params: hit[:params] }, outcome: hit, state: state(frame: 97280, room_id: 66, map_id: 0, x: 92, y: 131), frame: 97280)
+    now = state(frame: 97289, room_id: 66, map_id: 0, x: 92, y: 131)
+    p.observe(now, frame: 97289)
+    result = p.decide(p.decision_point_for(now), now, { grid: })
+    assert_equal [{ skill: 'attack', params: { row: 6, col: 5 } }, 'delegated'], [result[:choice], result[:agent]]
+    struck = c5_attack(:blocked, { slot: 2, type: 28, cell: [6, 5] })
+    p.after_action(choice: { skill: 'attack', params: struck[:params] }, outcome: struck, state: now, frame: 97300)
+    later = state(frame: 97310, room_id: 66, map_id: 0, x: 92, y: 131)
+    p.observe(later, frame: 97310)
+    assert_equal({ row: 6, col: 5 }, p.decide(p.decision_point_for(later), later, { grid: })[:choice][:params], 'the second one is still taken for an enemy')
+  end
+
+  # Paid fork g7-2 (4e10, flow-108), C5 (66/0) at 97824: explore stopped no_frontier at (7,5) with type 28s on (7,5) and (6,5), the one-cell corridor
+  # north, and the next calls attacked the type 11 beyond them (blocked); a creature not identified in touch is struck once, and a kill makes its type fought.
+  def test_a_creature_not_identified_in_touch_after_a_stop_is_struck_once_and_a_kill_makes_its_type_fought_on_sight
+    client = ScriptedClient.new(objective: new_place, default: explore)
+    p = autopiloted(client)
+    blobs = [blob(1, 90, 122), blob(2, 86, 118)]
+    p.instance_variable_set(:@entities_reader, -> { blobs })
+    start = state(frame: 97800, room_id: 66, map_id: 0, x: 92, y: 131)
+    decide(p, start)
+    stopped = outcome(:no_frontier, 0).merge(moved_cells: 0, cells_walked: 0, from: { room: 66, map: 0, row: 7, col: 5 }, to: { room: 66, map: 0, row: 7, col: 5 })
+    p.after_action(choice: { skill: 'explore', params: {} }, outcome: stopped, state: start, frame: 97824)
+    now = state(frame: 97824, room_id: 66, map_id: 0, x: 92, y: 131)
+    p.observe(now, frame: 97824)
+    result = p.decide(p.decision_point_for(now), now, { grid: })
+    assert_equal({ skill: 'attack', params: { row: 7, col: 5 } }, result[:choice])
+    assert_match(/strike the unidentified type 28 at \(7,5\), in touch after a no_frontier stop \(probe 1/, result[:justification])
+    killed = c5_attack(:done, { slot: 1, type: 28, cell: [7, 5] })
+    p.after_action(choice: { skill: 'attack', params: killed[:params] }, outcome: killed, state: now, frame: 97840)
+    blobs.replace([blob(2, 86, 118)])
+    later = state(frame: 97850, room_id: 66, map_id: 0, x: 92, y: 131)
+    p.observe(later, frame: 97850)
+    assert_match(/fight type 28 at \(6,5\)/, p.decide(p.decision_point_for(later), later, { grid: })[:justification])
+  end
+
+  def test_no_probe_strike_at_one_heart_or_at_the_measured_hit
+    [[8, nil], [12, 12]].each do |hp, hit|
+      client = ScriptedClient.new(objective: new_place, default: explore)
+      healers = Koholint::Healers.new
+      healers.saw(place: [65, 0], health: 24)
+      healers.saw(place: [65, 0], health: 24 - hit) if hit
+      @objectives = Koholint::Objectives.new(trace: trace)
+      p = Koholint::Policies::Delegated.new(client:, registry: Koholint::Skills::Registry.default, objectives: @objectives, manual: '', autopilot: Koholint::Autopilot.new,
+                                            memory: Koholint::Policies::Memory.new(healers:))
+      p.instance_variable_set(:@entities_reader, -> { [blob(1, 90, 122)] })
+      start = state(frame: 97800, room_id: 66, map_id: 0, x: 92, y: 131, hp:)
+      decide(p, start)
+      stopped = outcome(:no_frontier, 0).merge(moved_cells: 0, cells_walked: 0, from: { room: 66, map: 0, row: 7, col: 5 }, to: { room: 66, map: 0, row: 7, col: 5 })
+      p.after_action(choice: { skill: 'explore', params: {} }, outcome: stopped, state: start, frame: 97824)
+      now = state(frame: 97824, room_id: 66, map_id: 0, x: 92, y: 131, hp:)
+      p.observe(now, frame: 97824)
+      refute_match(/strike the unidentified/, p.decide(p.decision_point_for(now), now, { grid: })[:justification].to_s, "#{hp} hp")
+    end
+  end
+
   def test_a_heal_objective_in_a_place_with_several_people_closes_when_hp_rises_not_on_arrival
     @objectives = Koholint::Objectives.new(trace: trace)
     @objectives.start(frame: 100, title: 'Heal in 164-16, where a talk healed Link before', predicate: { kind: 'reach_place', place: [164, 16] }, target: { kind: 'place', place: [164, 16], heal_below: 8 })
