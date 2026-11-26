@@ -257,6 +257,26 @@ class AutopilotTest < Minitest::Test
     assert_equal 'no way to follow the target', pilot.hold_reason(state: state, objective: person)
   end
 
+  # Paid fork 3a55: after each fight on the way to the hut (172/10, 98/0) the autopilot handed back to the model, about a call per stop.
+  def test_a_fight_that_did_not_hurt_link_leaves_the_objective_target_to_follow
+    person = objective('reach_place').merge(target: { kind: 'person', place: [162, 14] })
+    follow = { skill: 'explore', params: {} }
+    pilot = Koholint::Autopilot.new
+    pilot.model_called(state: state, objective: person)
+    pilot.acted(skill: 'explore', outcome: { stopped_by: :known_place })
+    %w[done target_gone hole out_of_reach].each do |stop|
+      pilot.acted(skill: 'attack', outcome: { stopped_by: stop })
+      pilot.acted(skill: 'wait', outcome: { stopped_by: 'released' })
+      assert_nil pilot.hold_reason(state: state, objective: person, follow:), stop
+    end
+    pilot.acted(skill: 'attack', outcome: { stopped_by: 'damage' })
+    assert_equal 'last stop not an explore', pilot.hold_reason(state: state, objective: person, follow:), 'damage hands the choice back'
+    plain = Koholint::Autopilot.new
+    plain.model_called(state: state, objective: objective)
+    plain.acted(skill: 'attack', outcome: { stopped_by: 'done' })
+    assert_equal 'last stop fought', plain.hold_reason(state: state, objective: objective), 'without a target to follow the model chooses'
+  end
+
   def test_a_goto_that_ends_below_a_door_steps_through_it_once
     pilot = primed
     below = state(x: 88, y: 92)

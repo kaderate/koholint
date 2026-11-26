@@ -907,6 +907,25 @@ class ExploreTest < Minitest::Test
     assert_equal({ kind: :frontier, row: 2, col: 5, direction: :up }, result[:target])
   end
 
+  # 66/0 in paid fork 78ef: from the left landing, the walk to the right exit opened the same dialogue on every visit, and 65/0 sent Link back each time.
+  def test_an_exit_whose_walk_opened_a_dialogue_twice_is_cut_from_that_landing
+    rows = with(CLOSED, [3, 9], '.')
+    log = Koholint::ExploreLog.new
+    enter = lambda do
+      crossing = { from: { room: 0, map: 0 }, to: { room: PLACE[0], map: PLACE[1] }, exits: [{ row: 3, col: 9, direction: :right, outcome: :left, to: PLACE }] }
+      log.note(crossing)
+      log.absorb(crossing)
+    end
+    enter.()
+    2.times do |visit|
+      result, = explore(rows, callouts: [[3, 6]], start: Koholint::Geometry.center_of(3, 1), explore_log: log)
+      assert_equal [:dialogue, { kind: :exit, row: 3, col: 9, direction: :right }, [:right]], result.values_at(:stopped_by, :target, :unreachable)
+      log.absorb(result)
+      assert_equal visit == 1, log.cut?(PLACE, :left, :right)
+      enter.()
+    end
+  end
+
   def test_a_dialogue_the_game_opens_on_an_outward_step_bars_that_edge
     rows = with(CLOSED, [3, 3], '?')
     result, = explore(rows, truth: with(CLOSED, [3, 3], '.'), rocks: [[3, 3]], start: Koholint::Geometry.center_of(3, 2))

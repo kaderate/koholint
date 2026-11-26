@@ -199,6 +199,8 @@ module Koholint
             @too_heavy = edge if unprompted?(Geometry.step(@cell, @heading))
           end
           @dialogue_frontier = target_summary if @target&.dig(:kind) == :frontier
+          way = { exit: @target&.dig(:direction), door: @target && [@target[:cell][0] - 1, @target[:cell][1]] }[@target&.dig(:kind)]
+          @unreachable = (@unreachable || []) | [way] if way
           stop_now(:dialogue)
         end
 
