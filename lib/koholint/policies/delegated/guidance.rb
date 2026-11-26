@@ -316,8 +316,15 @@ module Koholint
           zone = !goal && state.cell ? Entities.danger_cells(entities_now) : []
           pressed = ([state.cell] + Geometry::DELTAS.values.map { |dr, dc| [state.cell[0] + dr, state.cell[1] + dc] }).intersect?(zone) if zone.any?
           retreat = @retreated&.dig(:spot) != spot && (pressed || (low && @deadlock && @deadlock[:waits] >= DEADLOCK_WAITS))
-          # With the dangerous places the only ways left, or the way back leading into one, the model chooses, its context listing them.
-          return if @explore_log.dangerous.any? && (retreat ? @explore_log.dangerous.include?(@explore_log.ways(place)[@explore_log.entered(place)]) : !goal)
+          # With the dangerous places the only ways left, or the way back leading into one, the model chooses once per spot, its context listing them;
+          # after that the bounded wait answers, and never a retreat into one.
+          if @explore_log.dangerous.any? && (retreat ? @explore_log.dangerous.include?(@explore_log.ways(place)[@explore_log.entered(place)]) : !goal)
+            unless @handed_back == spot
+              @handed_back = spot
+              return
+            end
+            retreat = false
+          end
           return guarded(state, context) if retreat && retreats(state) >= RETREAT_CAP
           @retreated = { spot:, hp: state.health } if retreat
           side = Array(@explore_log.entered(place)).flatten.join('-')

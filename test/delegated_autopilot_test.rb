@@ -739,6 +739,9 @@ class DelegatedAutopilotTest < Minitest::Test
     result = p.decide(p.decision_point_for(state), state, { grid: })
     assert_equal ['claude', calls + 1], [result[:agent], client.calls.size]
     assert_match(/which no route to work enters: 147-16 \(24 hp\)/, client.calls.last[:prompt])
+    p.after_action(choice: result[:choice], outcome: instant, state:, frame: 700)
+    result = p.decide(p.decision_point_for(state), state, { grid: })
+    assert_equal [{ skill: 'wait', params: { frames: 120 } }, 'delegated'], [result[:choice], result[:agent]], 'once per spot, then the bounded wait'
   end
 
   def test_repeated_zero_frame_results_in_one_place_are_answered_by_the_harness

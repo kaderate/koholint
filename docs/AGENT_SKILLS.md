@@ -148,7 +148,8 @@ The skills, protocols and harness behaviours the agent works with. Versioned wit
   never entered, as a hop or a destination, by a route to work (the harness's loop, zero-frame and guarded redirects, explore's own
   search for work, explore following such a redirect) or by the least-visited fallback, and never left into by a pocket or retreat
   side; an objective's route may still cross it. When those places are the only ways left, or the way back leads into one, the
-  zero-frame cap hands the choice to the model instead of waiting or retreating, and its context lists those places with their hits.
+  zero-frame cap hands the choice to the model once per spot instead of waiting or retreating, its context listing those places
+  with their hits; at the same spot again it waits its bounded 120 frames, never retreating into such a place.
 - flow-105: survival comes first at every objective and skill choice, before the loop break: at or below the largest hp drop
   between two decisions measured on the lineage (read back from the trace), Link goes to the nearest place where a talk healed him
   by a known way through no place where enemies were seen, whatever the objective, with no model call, and the autopilot follows
