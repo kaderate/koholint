@@ -1,5 +1,7 @@
 # Koholint v2 retrospective (2026-11-02)
 
+Status: done. A dated snapshot, not maintained: its counts, file names and open points are those of 2026-11-02.
+
 **Verdict.** The engine/policy/skill/readiness/autopilot/viewer layering holds and the discipline is real (no `verified` address or entity below 2 checks, one `flow-16` constant, 674 commits of traceable history). But the product goal has not moved since 2026-10-20: 29 archived runs, 31.35 USD and 228,781 frames all end at milestone `shield` or `none` (`docs/runs/index.md`), while the last ~60 commits since 10-24 polish navigation/talk/explore plumbing (`policies/delegated.rb` 764 lines, `skills/explore.rb` 418, `skills/talk_to.rb` 374). Cost per 1000 frames fell 0.385 to 0.092 USD and places per run rose 1 to 28, so the loop is cheaper and wider, but nothing in the code can yet perceive or acquire the sword (no inventory in the context, no `item_gained`, no combat, no enemy census): the bottleneck is missing capability, not agent tuning.
 
 ## Health scorecard

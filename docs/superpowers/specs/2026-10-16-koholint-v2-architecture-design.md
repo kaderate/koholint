@@ -1,6 +1,6 @@
 # Koholint v2 — deterministic game engine that calls agents
 
-Status: draft for owner approval. Written from a brainstorming session on 2026-10-16.
+Status: done. Built as the v2 engine; `ARCHITECTURE.md` is the current map and wins where they differ. Text of 2026-10-16, written from a brainstorming session as a draft for owner approval.
 
 ## Intent
 

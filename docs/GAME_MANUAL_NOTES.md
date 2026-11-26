@@ -1,7 +1,7 @@
 # Game manual notes
 
 Paraphrased mechanic notes from the official *Legend of Zelda: Link's Awakening DX* instruction
-booklet (owner-provided PDF, September 11, 2026 — see `DECISIONS.md`'s D14). Original booklet
+booklet (owner-provided PDF, September 11, 2026 — see D14 of the v1 DECISIONS.md, archived under the git tag `v1-archive`). Original booklet
 text/images are copyrighted Nintendo material and are NOT reproduced verbatim or committed here or
 anywhere in this repo, consistent with `roms/` being gitignored for the same reason. This file is
 original commentary distilling which MECHANICS exist and how they generally work — never a

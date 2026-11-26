@@ -1,5 +1,7 @@
 # Capability learning: the smallest vertical slice (2026-11-12)
 
+Status: done. `koholint learn`, `capability publish|retire` and `data/capabilities.json` landed from this slice; what remains is ROADMAP item 2. The text below is the slice as designed at main 414f409 (flow-39).
+
 First step of ROADMAP item "Capability learning loop" (brief: `docs/research/AUTO_IMPROVEMENT_BRIEF.md`, improvement levels:
 `2026-10-24-screen-protocol-and-improvement-loop-design.md`). This note maps the extension points of today's code (main at
 `414f409`, flow-39), fixes the one slice the next PR builds, how it is measured and tested, and the first candidate. It adds no
