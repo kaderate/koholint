@@ -111,27 +111,37 @@ feeds `data/addresses.json` and the `ready` of the `play` mode in `data/modes.js
 finished run or one being written; Ctrl-C stops it. It listens on 127.0.0.1 only; `--host 0.0.0.0` opens it to other
 devices on the same network (no authentication: use it on a network you trust).
 
-`/` is the cockpit (French UI, keys 1 to 3 switch views, Escape closes a drawer, state kept in the browser). **Île** draws the overworld screens
+`/` is the cockpit (French UI, keys 1 to 4 switch views, Escape closes a drawer, state kept in the browser). **Île** draws the overworld screens
 seen by every run under the runs root with their captures, the ways taken (thicker when crossed more), deaths summed on the
 screen an interior opens from, a star where each item was first gained and rings on the next leads; the side shows the
 screens discovered, the 16x16 locator, discoveries over time and the Prochain card (the top open lead of the lineage that
 holds the most items); a click on a screen shows its capture with where Link stood (heat), visits, runs and entities, and
 opens the runs that last passed there; the play button replays the discovery day by day; a run's trace draws its path over
 the screens. **Direct** (`#direct`, or `#direct/<id>` for a replay) shows the live frame,
-the thought and objective at the shown frame, hearts, held items, the current place, the minimap with the trail, a
+the thought and objective at the shown frame (when no run is being written in the watched folder, that is when its
+`run.lock` is free, it says "Aucune partie en direct" and offers the latest replayable run of the runs root and the Runs drawer), hearts, held items, the current place, the minimap with the trail, a
 scrubber with place, item and death marks (dragging it freezes the screen on that place's capture; a replay seeks), and
 the objectives (consecutive attempts with one title folded into one line with ×N and the last outcome, a click unfolds
 them), dialogues (pieces of one text merged) and skills up to that frame; its header links to the run's trace on the
-island, its lineage on the metro and its debug page (`/live` or `/run/<id>`, also linked from the top bar as Debug). **Métro** draws the lineages that reached a checkpoint of `data/checkpoints.json`, a
+island, its lineage on the metro and its debug page (`/live` or `/run/<id>`; the top bar's Legacy menu opens `/atlas` and `/live`). **Métro** draws the lineages that reached a checkpoint of `data/checkpoints.json`, a
 first item gain or a new screen, against minutes of play: the furthest lineage as the main line, each fork leaving its
 parent at its fork frame, checkpoints and first gains as stations, deaths at line ends and +N for the forks that reached
 nothing new; a click on a line dims everything but its lineage and shows its card (minutes, new screens, cumulated cost,
-items, Direct, trace on the island); the play button rolls Link along the main line. Three drawers open from the top bar:
+items, Direct, trace on the island); the play button rolls Link along the main line. **Machines** lists the koholint
+processes running on the computer (`run`, `resume`, `fork`, `branch`, `watch`): type, run, flow, the last frame of its trace,
+frames per second between two refreshes, CPU, resident memory, elapsed time, a watcher's port, and Direct for a run of the
+runs root; it refreshes every 3 s while the screen is shown, reads ps, lsof (the run's `run.lock`) and the run folder, and
+never acts on a process. Three drawers open from the top bar:
 **Runs** (the runs with a `summary.json`, searched by id, flow, tag, stop or star reason, starred only; a row opens Direct,
 ✎ stars it with a reason through `POST /star` and edits its notes through `POST /notes`), **Pistes** (every lead, open
 first then by importance, with its reading and where it was read) and **Personnes** (the texts read, by speaker or, without
 a name, by the screen they were heard on; one text read in several runs counts once). `/island.json`
 (which also carries the metro lines, leads and people) and `/story.json[?run=<id>]` feed it, each cached by trace mtime and size; the island is rebuilt at most every 30 s.
+Each run's digest is also kept on disk in the runs root's `.cache/digests/` and the last island in `.cache/island.json`: `/island.json`
+answers with the last island at once and rebuilds a stale one in the background; with none yet it waits 2 s, then answers 202
+with `{ building, done, total }` and the page shows the progress and asks again; a page with no answer after 20 s offers to retry.
+Measured on the Mac with 424 runs: the first build ever takes about 30 s (the page is up at once and shows progress); a restart
+answers `/island.json` in 0.4 s (0.6 s with only the digests kept). Delete `.cache/` to force a rebuild.
 The atlas digest of each run adds `parent` (the parent run's id), `held` (the items held at its last gain) and, per place,
 `heat`: 80 counts, one per playfield cell (10 columns by 8 rows), of the times Link entered that cell there in the run's own events.
 
@@ -158,6 +168,8 @@ run and serves the watched run without it; `/live` is the watched run's page):
 |---|---|
 | `/runs`, `/runs.json` | Table of runs with a `summary.json`: sort by column; filter by minimum milestone, maximum dollars, tag, starred only; `$/call` and `free` (decisions not made by Claude); pick two runs to compare |
 | `/atlas`, `/atlas.json` | The atlas of every run under the runs root (the `atlas` command under Run storage): the 16x16 overworld map labelled A-P by 1-16, each seen screen with its screenshot and marks (a person with no talk_to try, deaths, puzzle, interior), a click shows its card (first visit, visits, deaths, entities seen, talk_to tries and answers, people and unknown types with no try, ways taken, interiors, items, puzzles, the names that a text read there carries, the texts read with run and frame); interiors below, by the screen they open from; then the leads (one per quote: status, importance, the model's reading, where and when first read, runs, objectives achieved over tried) and progress per flow (runs, frames, cost, the screens, interiors, texts, leads and items reached first from each fork frame, cost per new screen; what a fork whose parent is not read holds from before its fork frame is a separate row with no cost), then the measured facts of `data/`, one folded table per file with each entry's status (and nested confidences), checks (for a capability, derived: its success places), provenance and note; a file that does not parse shows its error |
+| `/direct.json` | Whether the watched run is being written (`live`, its `run.lock` is held), its id and the latest replayable run of the runs root |
+| `/machines.json` | The koholint processes of the computer as listed on Machines, with `open` the run id when it is under the runs root |
 | `/run/<id>` | The live page as a read-only replay of that run, from boot; `/frame.png?run=<id>` and `/state.json?run=<id>` serve it |
 | `/control?run=<id>&speed=1\|4\|16`, `&pause=0\|1` and `&seek=<frame>` | Drive a replay; `seek` restores the nearest keyframe at or before the frame (or replays from boot) and steps to it |
 | `/screens/<room>-<map>.png[?run=<id>]` | The screenshot taken the first time the run played that place (`runs/<id>/screens/`; 404 when missing; cached 30 s) |
@@ -166,7 +178,8 @@ run and serves the watched run without it; `/live` is the watched run's page):
 | `POST /star?run=<id>` (form body `why=...`) | Same as `bin/koholint star`; the `Host` header must name the viewer itself and an `Origin` header, if sent, must match |
 | `POST /notes?run=<id>` (form body `text=...`) | Writes `runs/<id>/notes.md` (at most 8 KB, no control characters but newlines and tabs; empty text deletes it), same origin check; only for runs under the runs root |
 
-At most 3 replays are kept (least recently used evicted, idle ones dropped after 5 minutes). An evicted replay answers
+At most 3 replays are kept (least recently used evicted, idle ones dropped after 5 minutes); a replay advances only while
+a page has asked for it in the last 15 s, and the watched run is replayed only while a page shows it in Direct. An evicted replay answers
 410 until its page is reloaded; a run that cannot be replayed answers 404 or 422. Run ids are plain names directly
 under the runs root (`[A-Za-z0-9_.-]`, no leading dot, no `..`); anything else is a 404.
 
@@ -176,7 +189,7 @@ Every finished run is kept in git as a light bundle under `runs/<id>/` (tens to 
 `harness_sha`, `prompts_sha`, `harness_dirty` (the SHA-256 of `git diff HEAD` when the run started on a tree with uncommitted changes, else false), `model`), `inputs.log`, `trace.jsonl.gz`, `world.json`, `suggestions.md`, `summary.json`
 (written by the engine at every stop), `star.json` when starred and `notes.md` when the owner wrote notes in the viewer, and `screens/<room>-<map>.png` (one 160x144 screenshot per place, about 3-8 KB each, taken by the engine 20 frames after the place became playable and ready). `prune-heavy` keeps `screens/`. `summary.json` (`v: 3`) also holds `cost_by_skill`
 (model calls and dollars per skill), `decisions_by_agent` (free decisions included) and `usage` (goal changes, leads
-by importance, rejected leads, objectives by kind, `because` uses, talks, talks to a known target, dialogues, `not_ready_frames` waited by the readiness gate, `not_ready_waits` longer than 5 frames, `autopilot_decisions` and `chain_max`, the longest run of consecutive autopilot decisions); `v: 4` adds `autopilot` from the manifest; `v: 5` adds `usage.left_with_unexhausted_people` (place changes away from a place whose place card listed a verified person whose last talk verdict was not `exhausted`) and the matching `symptoms` entry with its evidence (`frame`, `place`, `people`). `v: 6` adds `usage.deaths` and `usage.damage_events` (counts of those notables); `v: 7` adds `usage.stuck_events`. `prompts/`, `keyframes/`, `save/`, `video/`,
+by importance, rejected leads, objectives by kind, `because` uses, talks, talks to a known target, dialogues, `not_ready_frames` waited by the readiness gate, `not_ready_waits` longer than 5 frames, `autopilot_decisions` and `chain_max`, the longest run of consecutive autopilot decisions); `v: 4` adds `autopilot` from the manifest; `v: 5` adds `usage.left_with_unexhausted_people` (place changes away from a place whose place card listed a verified person whose last talk verdict was not `exhausted`) and the matching `symptoms` entry with its evidence (`frame`, `place`, `people`). `v: 6` adds `usage.deaths` and `usage.damage_events` (counts of those notables); `v: 7` adds `usage.stuck_events`. `v: 11` adds `milestones` (one `{name, frame}` per first gain of an item or of one of its forms, named from the current `data/items.json`) and `held` (the names of the items held at the last perceived state); `docs/runs/index.md` shows both. `prompts/`, `keyframes/`, `save/`, `video/`,
 `activity.json`, `run.lock` and the plain `trace.jsonl` are gitignored: saves and keyframes are derivable by replay.
 
 | Command | Effect |

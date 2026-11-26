@@ -115,8 +115,8 @@ module Koholint
       private_class_method :screen_lines
 
       def self.items_line(state)
-        slots = Items.slots(state).each_with_index.reject { |id, _| id.to_i.zero? }.map { |id, slot| "#{slot} #{Items.label(id)}" }
-        "Items (a ? marks a name not yet measured): A #{Items.label(state.item_a)}, B #{Items.label(state.item_b)}; " \
+        slots = Items.slots(state).each_with_index.reject { |id, _| id.to_i.zero? }.map { |id, slot| "#{slot} #{Items.label(id, state)}" }
+        "Items (a ? marks a name not yet measured): A #{Items.label(state.item_a, state)}, B #{Items.label(state.item_b, state)}; " \
           "inventory slots: #{slots.empty? ? 'all empty' : slots.join(', ')}#{"; rupees: #{state.rupees}#{' (the hundreds digit is not measured yet)' if state.rupees >= 100}" if state.rupees}"
       end
       private_class_method :items_line

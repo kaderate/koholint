@@ -1,5 +1,5 @@
 {
-  "v": 4,
+  "v": 11,
   "run_id": "20261102-075426-e333",
   "flow_version": "flow-16",
   "tag": "lotb-1",
@@ -7,6 +7,7 @@
   "prompts_sha": "a5e13b62cb6c3518855f8f5af9391f2b5cfd1e91fc1dc1116a07d53a2bfc55da",
   "model": "sonnet",
   "autopilot": true,
+  "capabilities": null,
   "frames": 10927,
   "dollars": 1.004774,
   "calls": 54,
@@ -17,13 +18,71 @@
     "p90": 12239
   },
   "highest_milestone": "shield",
+  "milestones": [
+    {
+      "name": "shield",
+      "frame": 5936
+    }
+  ],
+  "held": [
+    "shield"
+  ],
   "places_seen": 8,
   "objectives": {
     "count": 14,
     "achieved": 13
   },
   "stop_reason": "dollars",
-  "symptoms": [],
+  "symptoms": [
+    {
+      "kind": "left_with_unexhausted_people",
+      "count": 4,
+      "evidence": [
+        {
+          "frame": 6309,
+          "place": [
+            163,
+            16
+          ],
+          "people": [
+            63
+          ]
+        },
+        {
+          "frame": 7667,
+          "place": [
+            163,
+            16
+          ],
+          "people": [
+            63
+          ]
+        },
+        {
+          "frame": 8570,
+          "place": [
+            179,
+            0
+          ],
+          "people": [
+            111,
+            115
+          ]
+        },
+        {
+          "frame": 8744,
+          "place": [
+            179,
+            0
+          ],
+          "people": [
+            111,
+            115
+          ]
+        }
+      ]
+    }
+  ],
   "starred": false,
   "cost_by_skill": {
     "advance_dialogue": {
@@ -84,7 +143,18 @@
     "dialogues": 19,
     "not_ready_frames": 1004,
     "not_ready_waits": 25,
+    "deaths": 0,
+    "damage_events": 0,
+    "stuck_events": 0,
+    "chests_opened": 0,
+    "rupees": null,
     "autopilot_decisions": 21,
-    "chain_max": 6
+    "chain_max": 6,
+    "left_with_unexhausted_people": 4
+  },
+  "capability_uses": {},
+  "puzzles": {
+    "open": 0,
+    "by_place": {}
   }
 }

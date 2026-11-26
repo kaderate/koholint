@@ -36,7 +36,8 @@ module Koholint
                     room_transition: read_byte.(:room_transition), link_airborne: read_byte.(:link_airborne),
                     link_z: read_byte.(:link_z), link_knockback: read_byte.(:link_knockback),
                     link_frozen: read_byte.(:link_frozen), pending_damage: read_byte.(:pending_damage),
-                    pending_heal: read_byte.(:pending_heal), crumble_timer: read_byte.(:crumble_timer), rupees: (bcd(read_byte.(:rupees_hundreds)) * 100) + bcd(read_byte.(:rupees)))
+                    pending_heal: read_byte.(:pending_heal), crumble_timer: read_byte.(:crumble_timer),
+                    magic_powder: bcd(read_byte.(:magic_powder)), rupees: (bcd(read_byte.(:rupees_hundreds)) * 100) + bcd(read_byte.(:rupees)))
     end
   end
 end

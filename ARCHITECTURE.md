@@ -35,7 +35,8 @@ observability.
 (position, place, hp and pending damage, rupees, phase, items, readiness signals). Every address carries provenance and a
 `verified_count`. `entities.rb` reads the 16 entity slots and the room object table and gives each a kind from
 `data/entities.json` (`npc`, `enemy`, `creature`, `object`, `unknown`; objects: `sign`, `door`, `chest`, `stone`, …).
-`items.rb` and `data/items.json` name item ids; the engine's `ItemWatch` emits `item_gained`. The engine also watches the room
+`items.rb` and `data/items.json` name item ids, and the forms an id takes by a RAM field (id 12 is the mushroom, then the magic
+powder once its count is positive); the engine's `ItemWatch` emits `item_gained` once per id and form. The engine also watches the room
 objects every frame and emits `floor_gave_way` when a crumbling floor object turns into a hole; the skills see that object as
 crumbling only in places where this was seen. `footing.rb` reads the game's crumble timer for the cell under Link's foot point,
 and `Skills::Execution` steps every skill off that cell before it gives way. The probes under `probes/`
@@ -137,13 +138,17 @@ with the same `flow_version`, ROM hash, capabilities digest, exits digest and so
 the engine wrote; each fork counts from its fork frame. `Atlas.facts` lists every entry of the typed `data/` files with its status
 and provenance. `koholint atlas` writes `tmp/atlas.json`; the viewer serves `/atlas`.
 
-**Viewer** (`viewer.rb`, `viewer/`) — a small HTTP server. A `Follower` replays the watched run's journal and seeks by keyframe;
+**Viewer** (`viewer.rb`, `viewer/`) — a small HTTP server. A `Follower` replays the watched run's journal and seeks by keyframe,
+only while a page shows it (a `Registry` replay of a past run likewise only advances while asked for);
 `Feed` and `Insights` derive status, feed, reasoning, objectives, leads, dialogues, recent skill calls, the world map and the cockpit from the trace
 up to the shown frame; `page.html` draws them. `app.html` is the cockpit at `/`: `Island` merges the atlas of the runs root per screen
 (captures, ways, deaths, heat, first gains, the open leads of the lineage holding the most items, the metro lines of the
 lineages that reached something, every lead, the texts by voice) and `Story` reads one run as
-frame-stamped thoughts, objectives, places, body, items, skills and merged dialogues; both are cached by trace mtime and size. It never writes game state; it writes only `star.json`, `summary.json`'s
-`starred` and `notes.md`.
+frame-stamped thoughts, objectives, places, body, items, skills and merged dialogues; both are cached by trace mtime and size.
+`DigestCache` keeps each run's atlas digest on disk under the runs root's `.cache/digests/` (JSON, keyed by run path, trace mtime and size, and a hash of `lib/koholint/**/*.rb` and `data/*.json`) and the last
+island in `.cache/island.json` (same hash; digests of deleted runs are pruned; a failed rebuild keeps the last island and is retried after 30 s), so a restart serves the last island at once and rebuilds it in the
+background. `Machines` lists the koholint processes of the computer (ps, the `run.lock` each holds per lsof, the trace tail). It never
+writes game state; it writes only `star.json`, `summary.json`'s `starred`, `notes.md` and the runs root's `.cache/`.
 
 **CLI** — `cli.rb`, `bin/koholint`: `run`, `resume`, `fork`, `branch`, `verify`, `summary`, `watch`, `archive`, `star`,
 `prune-heavy`, `atlas`, `souvenirs`, `census`, `ab-plan` and `ab-report` (`ab.rb`), `check-leads`, `check-pickups`, `learn`, `capability` and

@@ -33,6 +33,11 @@ module Koholint
       raise Invalid, "#{entry['name']}: aliases must be a list of names" if entry.key?('aliases') && !(entry['aliases'].is_a?(Array) && entry['aliases'].all? { |name| name.is_a?(String) && !name.strip.empty? })
 
       validate_fact!(entry['pickups'], "#{entry['name']} pickups") if entry.key?('pickups')
+      Array(entry['forms']).each do |form|
+        raise Invalid, "#{entry['name']}: a form needs a name and a when" unless form.is_a?(Hash) && form['name'].is_a?(String) && form['when'].is_a?(String)
+
+        validate_fact!(form.merge('value' => form['name']), "#{entry['name']} form #{form['name']}")
+      end
     end
 
     # A fact about the item with its provenance: the pickups a gain was observed at, observed from one lineage and verified from two.
@@ -43,7 +48,15 @@ module Koholint
     end
 
     # Every name an item goes by: its catalogue name and its aliases (the game's own words, plurals, short forms).
-    def names(entry) = [entry['name'], *Array(entry['aliases'])].map(&:downcase)
+    def names(entry) = [entry, *Array(entry['forms'])].flat_map { |named| [named['name'], *Array(named['aliases'])] }.map(&:downcase)
+
+    # The form an item id takes in a state: the first whose `when` state field is positive, as the mushroom becomes the magic powder.
+    def form(id, state)
+      return nil unless state
+
+      fields = state.to_h.transform_keys(&:to_s)
+      Array(catalogue.dig(id.to_i, 'forms')).find { |form| fields[form['when']].to_i.positive? }
+    end
 
     # Item ids a state shows held: A, B, the inventory slots, and the items whose milestone it has (older traces lack the slots).
     def held_ids(state)
@@ -52,14 +65,19 @@ module Koholint
       ids | catalogue.values.select { |item| item['milestone'] && item['milestone'] == state['milestone'].to_s }.map { |item| item['id'] }
     end
 
-    def name(id)
-      entry = catalogue[id.to_i]
+    def name(id, state = nil) = named(id, form(id, state))
+
+    # The name an item_gained event stands for in the current catalogue: its form's, else its id's (event names may predate a measure).
+    def gain_name(event) = named(event['item'], Array(catalogue.dig(event['item'].to_i, 'forms')).find { |form| form['name'] == event['form'] })
+
+    def named(id, form)
+      entry = form || catalogue[id.to_i]
       return "unknown item #{id}" unless entry
 
       entry['confidence'] == 'verified' ? entry['name'] : "#{entry['name']}?"
     end
 
-    def label(id) = id.to_i.zero? ? 'empty' : "#{name(id)} (id #{id})"
+    def label(id, state = nil) = id.to_i.zero? ? 'empty' : "#{name(id, state)} (id #{id})"
 
     def milestone(id) = catalogue.dig(id.to_i, 'milestone')&.to_sym
 
@@ -124,33 +142,34 @@ module Koholint
       return Integer(query) if query.is_a?(Integer) || query.to_s.match?(/\A\d+\z/)
 
       wanted = query.to_s.downcase.delete('?').strip
-      catalogue.find { |_, entry| entry['name'] == wanted }&.first
+      catalogue.find { |_, entry| [entry, *Array(entry['forms'])].any? { |named| named['name'] == wanted } }&.first
     end
   end
 
-  # Emits each item id once per run, the first time it appears among the held items after the first play frame.
+  # Emits each item id, in each of its forms, once per run, the first time it appears among the held items after the first play frame.
   class ItemWatch
     PLAY_MODE = 0x0B
 
-    def self.from_events(events) = new(gained: events.filter_map { |event| event['item'] if event['type'] == 'item_gained' })
+    def self.from_events(events) = new(gained: events.filter_map { |event| [event['item'].to_i, event['form']] if event['type'] == 'item_gained' })
 
     def initialize(gained: [])
-      @gained = gained.map(&:to_i).to_set
+      @gained = gained.map { |id, form| [id.to_i, form] }.to_set
       @baseline = nil
     end
 
     def observe(state)
       return [] unless state.game_mode == PLAY_MODE
 
-      held = Items.held(state)
+      held = Items.held(state).uniq
+      keys = held.map { |id| [id, Items.form(id, state)&.fetch('name')] }
       unless @baseline
-        @baseline = held.to_set
+        @baseline = keys.to_set
         return []
       end
 
-      held.uniq.reject { |id| @baseline.include?(id) || @gained.include?(id) }.map do |id|
-        @gained << id
-        { item: id, name: Items.name(id), place: state.place, held: held.uniq.sort }
+      keys.reject { |key| @baseline.include?(key) || @gained.include?(key) }.map do |id, form|
+        @gained << [id, form]
+        { item: id, name: Items.name(id, state), **(form ? { form: } : {}), place: state.place, held: held.sort }
       end
     end
   end

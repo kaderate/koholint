@@ -84,7 +84,7 @@ class ArchiveTest < Minitest::Test
       summary = JSON.parse(File.read(File.join(dest, 'summary.json')))
       assert_equal ['exp', 1, 500, 'frames', 1], summary.values_at('tag', 'calls', 'frames', 'stop_reason', 'places_seen')
       index = File.read(File.join(base, 'docs', 'runs', 'index.md'))
-      assert_includes index, '| [20261020-000001-aaaa](../../runs/20261020-000001-aaaa/) | exp | flow-3 | 500 | 0.0200 | 1 | 0.0400 | none | 1 | frames |  |'
+      assert_includes index, '| [20261020-000001-aaaa](../../runs/20261020-000001-aaaa/) | exp | flow-3 | 500 | 0.0200 | 1 | 0.0400 |  |  | 1 | frames |  |'
     end
   end
 

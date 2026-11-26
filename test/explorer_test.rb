@@ -183,6 +183,70 @@ class ExplorerTest < Minitest::Test
     end
   end
 
+  def test_a_stored_island_is_served_at_once_and_a_first_build_reports_its_progress
+    with_root do |root|
+      FileUtils.mkdir_p(File.join(root, '.cache'))
+      File.write(File.join(root, '.cache', 'island.json'), JSON.generate(identity: Koholint::Viewer::DigestCache.identity, value: { runs: 7, places: [] }))
+      explorer = Koholint::Viewer::Explorer.new(root:, registry: nil)
+      assert_equal 7, explorer.island[:runs]
+      sleep 0.05 until explorer.island[:runs] == 2
+      assert_equal 2, JSON.parse(File.read(File.join(root, '.cache', 'island.json')))['value']['runs']
+      slow = Koholint::Viewer::Explorer.new(root:, registry: nil, cache: File.join(root, 'other'))
+      original = Koholint::Viewer::Island.method(:of)
+      Koholint::Viewer::Island.define_singleton_method(:of) { |*, **| sleep 3 }
+      assert_equal({ building: true, done: 2, total: 2 }, slow.island)
+    ensure
+      Koholint::Viewer::Island.define_singleton_method(:of, original) if original
+    end
+  end
+
+  def test_an_island_stored_by_other_code_is_not_served
+    with_root do |root|
+      FileUtils.mkdir_p(File.join(root, '.cache'))
+      File.write(File.join(root, '.cache', 'island.json'), JSON.generate(identity: 'older code', value: { runs: 7, places: [] }))
+      assert_equal 2, Koholint::Viewer::Explorer.new(root:, registry: nil).island[:runs]
+    end
+  end
+
+  def test_a_failed_rebuild_keeps_the_last_island_and_is_not_retried_at_once
+    with_root do |root|
+      FileUtils.mkdir_p(File.join(root, '.cache'))
+      File.write(File.join(root, '.cache', 'island.json'), JSON.generate(identity: Koholint::Viewer::DigestCache.identity, value: { runs: 7, places: [] }))
+      explorer = Koholint::Viewer::Explorer.new(root:, registry: nil)
+      reads = 0
+      original = Koholint::Atlas.method(:read)
+      Koholint::Atlas.define_singleton_method(:read) { |*, **| (reads += 1) && raise(Koholint::Error, 'unreadable') }
+      3.times do
+        assert_equal 7, explorer.island[:runs]
+        explorer.instance_variable_get(:@refresh)&.join
+      end
+      assert_equal 1, reads
+    ensure
+      Koholint::Atlas.define_singleton_method(:read, original) if original
+    end
+  end
+
+  def test_direct_says_whether_the_watched_run_is_live_and_names_the_latest_run
+    with_root do |root|
+      with_server(root) do |port, _|
+        assert_equal({ 'live' => false, 'run' => nil, 'latest' => B }, JSON.parse(get(port, '/direct.json').body))
+      end
+    end
+  end
+
+  def test_machines_lists_running_processes_with_a_link_only_for_runs_of_the_root
+    with_root do |root|
+      rows = [{ pid: 1, kind: 'fork', run: A, dir: File.join(root, A), frame: 40 }, { pid: 2, kind: 'run', run: 'x', dir: '/elsewhere/x', frame: 3 }]
+      server = Koholint::Viewer::Server.new(explorer: Koholint::Viewer::Explorer.new(root:, registry: nil), machines: Struct.new(:list).new(rows))
+      port = server.start
+      body = JSON.parse(get(port, '/machines.json').body)
+      assert_equal [[1, A, A], [2, 'x', nil]], body.map { |row| row.values_at('pid', 'run', 'open') }
+      refute(body.any? { |row| row.key?('dir') })
+    ensure
+      server&.stop
+    end
+  end
+
   def test_a_past_run_frame_and_state_come_from_its_own_replay
     with_root do |root|
       with_server(root) do |port, built|

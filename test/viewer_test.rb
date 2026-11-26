@@ -25,6 +25,16 @@ class ViewerTest < Minitest::Test
     assert_equal "koholint: replay broke\n", err.string
   end
 
+  def test_pump_leaves_the_follower_alone_while_no_page_shows_it
+    follower = Struct.new(:steps) { def step_available(max_frames:) = (self.steps += 1) && 0 }.new(0)
+    calls = 0
+    Koholint::Viewer.pump(follower, 1.0, -> { (calls += 1) > 3 }, Process.method(:clock_gettime), wanted: -> { false })
+    assert_equal 0, follower.steps
+    calls = 0
+    Koholint::Viewer.pump(follower, 1.0, -> { (calls += 1) > 3 }, Process.method(:clock_gettime), wanted: -> { true })
+    assert_operator follower.steps, :>, 0
+  end
+
   def test_announce_names_the_loopback_address_by_default
     assert_equal 'watching http://127.0.0.1:8123', Koholint::Viewer.announce('127.0.0.1', 8123)
   end

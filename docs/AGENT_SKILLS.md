@@ -1,6 +1,6 @@
 # Agent skills
 
-The skills, protocols and harness behaviours the agent works with. Versioned with the play flow (currently `flow-103`): update this page, not the README, when a flow changes. Layers and data flow are in [ARCHITECTURE.md](../ARCHITECTURE.md).
+The skills, protocols and harness behaviours the agent works with. Versioned with the play flow (currently `flow-104`): update this page, not the README, when a flow changes. Layers and data flow are in [ARCHITECTURE.md](../ARCHITECTURE.md).
 
 
 - Learned capabilities (`data/capabilities.json`, `bin/koholint capability list`): an `operational` entry is a composite of the skills below, offered in the skill schema and listed under "Learned skills" only while its trigger item is held (flow-49) and its object is on screen (today `sword_on_object_92 row col direction`: stand next to object 92, face it, use the sword, step into its cell). `explore` and `goto` also run it themselves when blocked facing such a cell, and the planner routes through those cells as a last resort. `learn` and `capability publish|retire` are offline commands.
@@ -144,11 +144,14 @@ The skills, protocols and harness behaviours the agent works with. Versioned wit
   Within a place, explore takes a side known only as the assumed way back (flow-78) after the place's other reachable untried exits, doors and frontiers;
   it is still a frontier, taken when nothing else here is reachable, before a route to another place. An explore that stops `no_frontier`
   in at most one frame is answered by the harness at the next decision, not after three, since from the same cell it would find none again.
-- flow-103: a dialogue that stops explore's walk to an exit or a door counts that way as unreachable from the landing, so a
+- flow-104: a dialogue that stops explore's walk to an exit or a door counts that way as unreachable from the landing, so a
   second such stop cuts it (as a dialogue on a frontier already did). An attack that did not hurt Link (`done`, `target_gone`,
   `hole`, `out_of_reach`) leaves an objective's target for the autopilot to follow, through the wait after it; damage still
   hands the choice back. Path skills blocked from one spot count their blocked direction toward the hemmed latch, and an explore
   that finds no frontier without walking keeps the count, so a scene that holds Link (the heal) is waited out without calls.
+- flow-103: item 12 is named by its form: the mushroom while the magic powder count (0xDB4C) is 0, the magic powder once it is
+  positive. The context's items line shows the form, and the mushroom turning into the powder emits `item_gained` (with `form`)
+  and a keyframe, though the id was gained before.
 - flow-102: a reachable souvenir naming an item Link holds by the words of its pickup text is taken up by the harness before
   the model is asked, as a lineage text naming a held item is: talk with it held, then use it. Each souvenir is taken once
   (read back from the trace on resume); a drop is offered again by the flow-101 re-offer rules.
@@ -275,7 +278,8 @@ The skills, protocols and harness behaviours the agent works with. Versioned wit
 - The context header lists the items on A and B and in the inventory slots (`data/items.json` names; a `?` marks a name
   not measured yet). `use_item item [button] [frames]` uses a held item (assigning it through the START menu to `button`,
   default B, when it is on no button); `guard frames [direction]` raises the shield (Link walks at full speed and turns
-  while guarding). A new item emits `item_gained` in the trace.
+  while guarding). A new item, or a held item that takes a new form (the mushroom becoming the magic powder), emits
+  `item_gained` in the trace, with `form` for the latter, and the context names the item by its form.
 - Scrolling dialogue pages are stitched into one text; the context remembers what each person said and whether talking
   again is worth it; `new_text` is an objective predicate; the live view lists the dialogues read.
 - People on screen come from the game's entity table in RAM (`entities.rb`): the context lists each entity with its cell,
