@@ -55,7 +55,7 @@ module Koholint
         o.on('--dollars X', Float) { |v| options[:dollars] = v }
         o.on('--flow-version V') { |v| options[:flow_version] = v }
         o.on('--root DIR') { |v| (options[:roots] ||= []) << (options[:root] = v) }
-        o.on('--runs-root DIR') { |v| options[:runs_root] = v }
+        o.on('--runs-root DIR') { |v| (options[:runs_roots] ||= []) << v }
         o.on('--tag NAME') { |v| options[:tag] = v }
         o.on('--at-frame N', Integer) { |v| options[:at_frame] = v }
         o.on('--at POINT') { |v| options[:at] = v }
@@ -115,7 +115,7 @@ module Koholint
         out.puts "run #{child.dir}"
         0
       when 'watch'
-        Viewer.watch(run_dir(args), **options.slice(:port, :host, :speed, :runs_root), **watch_from(options), out: out)
+        Viewer.watch(run_dir(args), **options.slice(:port, :host, :speed, :runs_roots), **watch_from(options), out: out)
       when 'archive'
         root = options.fetch(:root, 'runs')
         Archive.archive(root:, from: options.fetch(:from, root), **options.slice(:commit, :full), out:)

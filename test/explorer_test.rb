@@ -52,7 +52,7 @@ class ExplorerTest < Minitest::Test
       built << dir && StubFollower.new
     end
     registry = Koholint::Viewer::Registry.new(factory:, err: StringIO.new)
-    explorer = Koholint::Viewer::Explorer.new(root:, registry:)
+    explorer = Koholint::Viewer::Explorer.new(roots: [root], registry:)
     server = Koholint::Viewer::Server.new(follower: StubFollower.new, feed: -> { {} }, explorer:, host:)
     port = server.start
     yield port, built
@@ -187,11 +187,11 @@ class ExplorerTest < Minitest::Test
     with_root do |root|
       FileUtils.mkdir_p(File.join(root, '.cache'))
       File.write(File.join(root, '.cache', 'island.json'), JSON.generate(identity: Koholint::Viewer::DigestCache.identity, value: { runs: 7, places: [] }))
-      explorer = Koholint::Viewer::Explorer.new(root:, registry: nil)
+      explorer = Koholint::Viewer::Explorer.new(roots: [root], registry: nil)
       assert_equal 7, explorer.island[:runs]
       sleep 0.05 until explorer.island[:runs] == 2
       assert_equal 2, JSON.parse(File.read(File.join(root, '.cache', 'island.json')))['value']['runs']
-      slow = Koholint::Viewer::Explorer.new(root:, registry: nil, cache: File.join(root, 'other'))
+      slow = Koholint::Viewer::Explorer.new(roots: [root], registry: nil, cache: File.join(root, 'other'))
       original = Koholint::Viewer::Island.method(:of)
       Koholint::Viewer::Island.define_singleton_method(:of) { |*, **| sleep 3 }
       assert_equal({ building: true, done: 2, total: 2 }, slow.island)
@@ -204,7 +204,7 @@ class ExplorerTest < Minitest::Test
     with_root do |root|
       FileUtils.mkdir_p(File.join(root, '.cache'))
       File.write(File.join(root, '.cache', 'island.json'), JSON.generate(identity: 'older code', value: { runs: 7, places: [] }))
-      assert_equal 2, Koholint::Viewer::Explorer.new(root:, registry: nil).island[:runs]
+      assert_equal 2, Koholint::Viewer::Explorer.new(roots: [root], registry: nil).island[:runs]
     end
   end
 
@@ -212,7 +212,7 @@ class ExplorerTest < Minitest::Test
     with_root do |root|
       FileUtils.mkdir_p(File.join(root, '.cache'))
       File.write(File.join(root, '.cache', 'island.json'), JSON.generate(identity: Koholint::Viewer::DigestCache.identity, value: { runs: 7, places: [] }))
-      explorer = Koholint::Viewer::Explorer.new(root:, registry: nil)
+      explorer = Koholint::Viewer::Explorer.new(roots: [root], registry: nil)
       reads = 0
       original = Koholint::Atlas.method(:read)
       Koholint::Atlas.define_singleton_method(:read) { |*, **| (reads += 1) && raise(Koholint::Error, 'unreadable') }
@@ -237,7 +237,7 @@ class ExplorerTest < Minitest::Test
   def test_machines_lists_running_processes_with_a_link_only_for_runs_of_the_root
     with_root do |root|
       rows = [{ pid: 1, kind: 'fork', run: A, dir: File.join(root, A), frame: 40 }, { pid: 2, kind: 'run', run: 'x', dir: '/elsewhere/x', frame: 3 }]
-      server = Koholint::Viewer::Server.new(explorer: Koholint::Viewer::Explorer.new(root:, registry: nil), machines: Struct.new(:list).new(rows))
+      server = Koholint::Viewer::Server.new(explorer: Koholint::Viewer::Explorer.new(roots: [root], registry: nil), machines: Struct.new(:list).new(rows))
       port = server.start
       body = JSON.parse(get(port, '/machines.json').body)
       assert_equal [[1, A, A], [2, 'x', nil]], body.map { |row| row.values_at('pid', 'run', 'open') }
@@ -264,6 +264,34 @@ class ExplorerTest < Minitest::Test
 
   TRAVERSALS = ['..', '%2e%2e', '%2E%2E', '.hidden', '%00', "#{A}%00", '%2Fetc', '%2Fetc%2Fpasswd', 'a..b', '..%2F..%2Fetc',
                 '%C0%AE%C0%AE', 'nope', '%ZZ'].freeze
+
+  def test_several_roots_and_globs_list_resolve_and_cache_every_run_with_the_first_root_winning
+    Dir.mktmpdir do |base|
+      old = File.join(base, 'atlas')
+      make_run(old, A, summary: { 'tag' => 'old' })
+      make_run(File.join(base, 'runs', 'KOHO-1'), B, summary: { 'tag' => 'one' })
+      newest = '20261126-000000-cccc'
+      make_run(File.join(base, 'runs', 'KOHO-2'), newest, summary: { 'tag' => 'two' })
+      make_run(File.join(base, 'runs', 'KOHO-2'), A, summary: { 'tag' => 'shadowed' })
+      explorer = Koholint::Viewer::Explorer.new(roots: [old, File.join(base, 'runs', '*')], registry: nil)
+      assert_equal [newest, B, A], explorer.runs.map { |row| row['run_id'] }
+      assert_equal 'old', explorer.runs.find { |row| row['run_id'] == A }['tag']
+      assert_equal File.join(base, 'runs', 'KOHO-1', B), explorer.resolve(B)
+      assert_equal newest, explorer.latest
+      sleep 0.05 until explorer.island[:runs] == 3
+      assert_equal 3, explorer.atlas[:runs]
+      assert File.directory?(File.join(old, '.cache', 'digests'))
+      refute File.exist?(File.join(base, 'runs', 'KOHO-1', B, '.cache'))
+      make_run(File.join(base, 'runs', 'KOHO-3'), '20261127-000000-dddd', summary: {})
+      assert_equal 4, explorer.runs.size
+      assert_raises(Koholint::Viewer::Explorer::NotFound) { explorer.resolve('KOHO-1') }
+    end
+  end
+
+  def test_the_cache_of_a_glob_root_sits_in_the_directory_before_the_glob
+    explorer = Koholint::Viewer::Explorer.new(roots: ['/nonexistent/runs/*'], registry: nil)
+    assert_equal '/nonexistent/runs/.cache', explorer.instance_variable_get(:@cache)
+  end
 
   def test_run_ids_cannot_escape_the_runs_root
     with_root do |root|
