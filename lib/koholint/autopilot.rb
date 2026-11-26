@@ -197,7 +197,7 @@ module Koholint
         @attack_stop = nil
         @sighted = true
         return DecisionPoint.harness_choice({ skill: 'attack', params: { row: sighted[:cell][0], col: sighted[:cell][1] } },
-                                            "autopilot: fight type #{sighted[:type]} at (#{sighted[:cell].join(',')}), a #{sighted[:sword_hits]}-strike kill (#{@fight}/#{FIGHT_LIMIT})", autopilot: true)
+                                            "autopilot: fight type #{sighted[:type]} at (#{sighted[:cell].join(',')}), #{sighted[:sword_hits] ? "a #{sighted[:sword_hits]}-strike kill" : 'not identified, taken for an enemy'} (#{@fight}/#{FIGHT_LIMIT})", autopilot: true)
       end
       return unless @since && FIGHT_ON.include?(@attack_stop) && state.phase == :playing && state.cell
       return if state.health < FIGHT_FLOOR || state.health < @hp - FIGHT_DROP
