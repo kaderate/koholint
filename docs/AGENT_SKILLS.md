@@ -144,8 +144,8 @@ The skills, protocols and harness behaviours the agent works with. Versioned wit
   Within a place, explore takes a side known only as the assumed way back (flow-78) after the place's other reachable untried exits, doors and frontiers;
   it is still a frontier, taken when nothing else here is reachable, before a route to another place. An explore that stops `no_frontier`
   in at most one frame is answered by the harness at the next decision, not after three, since from the same cell it would find none again.
-- flow-107: the autopilot tries no never-tried entity or object (talk, then touch) in a place where a hit was measured on the
-  lineage; the model may still choose to.
+- flow-107: the autopilot starts no try of a never-tried entity or object (its `talk_to`, which a touch may follow) in a place
+  where a hit was measured on the lineage; the model may still choose to.
 - flow-106: danger is measured per place: the largest hp drop between two decisions in each place, read back from the trace. A place whose measured hit is at or above Link's health is
   never entered, as a hop or a destination, by a route to work (the harness's loop, zero-frame and guarded redirects, explore's own
   search for work, explore following such a redirect) or by the least-visited fallback, and never left into by a pocket or retreat
