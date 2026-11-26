@@ -157,6 +157,9 @@ module Koholint
         def autopilot_choice(decision_point, state, context)
           return unless @autopilot && decision_point.name == :choose_skill && !@sequence && !@reading && !hemmed?(state)
 
+          fight = heal_fight(state, context)
+          return fight.tap { @autopilot_acting = true } if fight
+
           disengage = @autopilot.disengage_choice(state:, entities: entities_now, grid: context[:grid])
           return disengage.tap { @autopilot_acting = true } if disengage
 
@@ -181,6 +184,23 @@ module Koholint
           context[:aim] = follow[:aim] if follow&.dig(:aim)
           @autopilot_acting = true
           result[:choice][:skill] == 'touch' ? result.merge(decision_point: @touch_point) : result
+        end
+
+        # On a heal walk whose route exit explore found unreachable here, the enemy standing where the grid sees an object is fought at any health while this
+        # place's measured hit stays below health; a loss that brings health to it or below ends the fight and disengage takes over.
+        def heal_fight(state, context)
+          return unless @objectives.current&.dig(:target, :heal_below) && @route_blocked == state.place && state.cell && context[:grid]
+          return unless @healers.safe?(state.place, state.health)
+
+          @heal_fights = { place: state.place, count: 0 } unless @heal_fights&.dig(:place) == state.place
+          return if @heal_fights[:count] >= Autopilot::FIGHT_LIMIT
+
+          row, col = state.cell
+          enemy = entities_now.select { |entity| entity[:kind].to_s == 'enemy' && entity[:cell] && context[:grid].static_sprite(*entity[:cell]) }
+                              .min_by { |entity| [(entity[:cell][0] - row).abs + (entity[:cell][1] - col).abs, entity[:slot].to_i] } or return
+          @heal_fights[:count] += 1
+          DecisionPoint.harness_choice({ skill: 'attack', params: { row: enemy[:cell][0], col: enemy[:cell][1] } },
+                                       "heal walk: type #{enemy[:type]} at (#{enemy[:cell].join(',')}) blocks the way out, and hits here measured at most #{@healers.hits[state.place].to_i} hp (#{@heal_fights[:count]}/#{Autopilot::FIGHT_LIMIT})", autopilot: true)
         end
 
         def follow_choice(state)
@@ -258,8 +278,8 @@ module Koholint
           DecisionPoint.harness_choice(objective.slice(:title, :predicate), "the loop is cut: #{key}, set aside, is taken up again (#{@reoffers[key]}/#{REOFFERS})", autopilot: true)
         end
 
-        # Survival before anything else, at every decision: at or below the largest hit measured on the lineage (the next one may kill), by a way through no place
-        # where enemies were seen, or at one heart on a way to the objective through such a place, Link goes to the nearest place a talk healed him; the objective
+        # Survival before anything else, at every decision: at or below the largest hit measured on the lineage (the next one may kill), by a way through places
+        # seen before where no measured hit reaches health, or at one heart on a way to the objective through such a place, Link goes to the nearest place a talk healed him; the objective
         # is taken up again afterwards.
         # A place card with one person or unknown thing names who to talk to there.
         def heal_detour(decision_point, state, context)
@@ -274,7 +294,7 @@ module Koholint
           return unless crossing || (@healers.hit && state.health <= @healers.hit)
 
           ways = @healers.places.filter_map { |at| [at, at == state.place ? [] : @explore_log.path(state.place, goal: at)] }.select(&:last)
-          ways = ways.reject { |_, path| path.any? { |hop| Array(@cards.dig(hop[:to], :enemies)).any? } } unless crossing
+          ways = ways.reject { |_, path| path.any? { |hop| !@healers.safe?(hop[:to], state.health) } } unless crossing
           place, = ways.min_by { |_, path| path.size }
           return unless place
 

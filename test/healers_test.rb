@@ -24,6 +24,14 @@ class HealersTest < Minitest::Test
     assert_equal [8, 0, [[83, 0]]], [healers.hit, healers.detours, healers.places]
   end
 
+  # Lineage abbe: 84/0 hit for 8 (d871 98204), 66/0 for 4 (87070); 68/0 was crossed unharmed; 83/0's neighbour 99/0 never seen in this trace.
+  def test_each_place_keeps_its_largest_hit_and_only_places_seen_are_safe
+    events = [decision(1, 66, 24), decision(2, 66, 20), decision(3, 68, 20), decision(4, 84, 20), decision(5, 84, 12), decision(6, 84, 24)]
+    healers = Koholint::Healers.from_events(events)
+    assert_equal({ [66, 0] => 4, [84, 0] => 8 }, healers.hits)
+    assert_equal [true, true, false, false, false], [healers.safe?([68, 0], 8), healers.safe?([66, 0], 8), healers.safe?([66, 0], 4), healers.safe?([84, 0], 8), healers.safe?([99, 0], 24)]
+  end
+
   def test_leaving_the_place_before_the_health_rises_makes_no_healer
     events = [decision(1, 83, 16, 1), decision(2, 82, 16), decision(3, 82, 24)]
     assert_empty Koholint::Healers.from_events(events).places
