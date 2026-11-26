@@ -510,6 +510,7 @@ module Koholint
           @route = { goal: first[:goal], next: first[:next] } if first
           @dead_end = true if first
           side = @log&.pocket_side(@place, from) || retreat_side or return []
+          return [] if @log.dangerous.include?(@log.ways(@place)[side])
 
           gather(from, path_to) { |cell, direction| :exit if direction == side && Geometry.step(cell, direction).nil? }
         end

@@ -180,6 +180,7 @@ module Koholint
         @asked = false
         @leads.note_held(Items.held_ids(state))
         @explore_log.in_context(Exits.context(state))
+        @explore_log.dangerous = @healers.dangerous(state.health) if state.health
         @zero_watch.in_context(Exits.context(state))
         @explore_log.use_bench(Exits.for_context(@exits, Exits.context(state))) if @exits
         @puzzles_offered = []
@@ -294,7 +295,6 @@ module Koholint
 
         @autopilot&.acted(skill: choice[:skill], outcome:) unless @revisit_acting
         @healers.moved if outcome[:moved_cells].to_i.positive?
-        @route_blocked = (Ledger.place_of(outcome[:from]) || state.place if outcome[:route] && Array(outcome[:unreachable]).any?) if choice[:skill] == 'explore'
         @zero_watch.note(place: Ledger.place_of(outcome[:from]) || state.place, skill: choice[:skill], stop: outcome[:stopped_by], frames: outcome[:frames],
                          cells: outcome[:cells_walked], to: Ledger.place_of(outcome[:to]))
         @frame = frame

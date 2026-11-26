@@ -35,6 +35,8 @@ module Koholint
     end
 
     # A place Link was seen in where no measured hit reaches health: a place never seen is unknown, so unsafe.
+    def dangerous(health) = @hits.filter_map { |place, hit| place if hit >= health }
+
     def safe?(place, health) = @seen.include?(place) && @hits.fetch(place, 0) < health
 
     def detoured = @detours += 1

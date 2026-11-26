@@ -31,7 +31,11 @@ module Koholint
       log
     end
 
+    # Places a hit measured there would bring Link's health to zero; set before each decision, no route enters them.
+    attr_accessor :dangerous
+
     def initialize
+      @dangerous = []
       @exits = Hash.new(0)
       @offered = []
       @walked = Hash.new { |hash, key| hash[key] = [] }
@@ -429,7 +433,7 @@ module Koholint
 
         ways(place).each do |key, to|
           ahead = [to, entry(place, key)]
-          next if seen.key?(ahead) || pocket?(to, key) || (place == from && avoid.include?(key)) || beyond?(tier, place, key) ||
+          next if seen.key?(ahead) || @dangerous.include?(to) || pocket?(to, key) || (place == from && avoid.include?(key)) || beyond?(tier, place, key) ||
                   (cut?(place, came, key) && !lifted.include?([place, came, key]))
 
           seen[ahead] = [state, key]

@@ -544,30 +544,29 @@ class DelegatedAutopilotTest < Minitest::Test
     refute_match(/heal/, p.decide(p.decision_point_for(low), low, { grid: })[:justification].to_s, '101/0 never seen')
   end
 
-  # Stub gate 355b, 66/0 at 100210: on the heal walk the route's down exit was unreachable from (3,8), types 27 and 11 stood at (4,6) where the grid saw
-  # an object, 66/0 had hit for at most 4, and at 8 hp Link disengaged, retreated and died back in 84/0.
-  def test_on_a_heal_walk_the_enemy_blocking_the_way_out_is_fought_while_the_place_hits_for_less_than_health
-    memory = lineage_with_a_healer_and_an_eight_hp_hit
-    memory.healers.saw(place: [66, 0], health: 12)
-    memory.healers.saw(place: [66, 0], health: 8)
+  # Stub gate 7c9c (flow-106 at f03aac0), 68/0 at 101171 with 4 hp: the zero-frame redirect explored toward 84/0, the nearest place with untried work,
+  # where hits of 8 were measured; Link was hit there at 101406 and died.
+  def test_no_harness_route_enters_a_place_whose_measured_hit_would_take_links_health
+    log = Koholint::ExploreLog.new
+    log.absorb({ from: { room: 68, map: 0 }, exits: [{ row: 4, col: 0, direction: :left, outcome: :left, to: [67, 0] }, { row: 7, col: 5, direction: :down, outcome: :left, to: [84, 0] }],
+                 survey: { sides: { left: [{ row: 4, col: 0 }], down: [{ row: 7, col: 5 }] }, doors: [] } })
+    log.absorb({ from: { room: 84, map: 0 }, exits: [], survey: { sides: { up: [{ row: 0, col: 5 }], right: [{ row: 3, col: 9 }] }, doors: [] } })
+    log.absorb({ from: { room: 67, map: 0 }, exits: [{ row: 4, col: 9, direction: :right, outcome: :left, to: [68, 0] }], survey: { sides: { right: [{ row: 4, col: 9 }] }, doors: [] } })
+    healers = Koholint::Healers.new
+    [[67, 0], [68, 0]].each { |place| healers.saw(place:, health: 24) }
+    healers.saw(place: [84, 0], health: 20)
+    healers.saw(place: [84, 0], health: 12)
+    healers.saw(place: [68, 0], health: 4)
+    assert_equal [84, 0], log.route([68, 0])&.dig(:goal), 'untried work in 84/0'
     @objectives = Koholint::Objectives.new(trace: trace)
-    @objectives.start(frame: 99687, title: 'Heal in 83-0, where a talk healed Link before', predicate: { kind: 'reach_place', place: [83, 0] },
-                      target: { kind: 'person', place: [83, 0], type: 132, cell: [3, 5], heal_below: 8 })
-    autopilot = Koholint::Autopilot.new
-    p = Koholint::Policies::Delegated.new(client: ScriptedClient.new(default: explore), registry: Koholint::Skills::Registry.default, objectives: @objectives, manual: '', autopilot:, memory:)
-    p.instance_variable_set(:@entities_reader, -> { [{ slot: 3, type: 27, kind: 'enemy', x: 104, y: 80, contact: 11, cell: [4, 6] }] })
-    blocked = Koholint::Vision::Grid.new(cells: Array.new(8) { Array.new(10) { 'floor' } }, static_sprites: [{ 'x' => 104, 'y' => 80, 'pattern' => 1 }],
-                                         beliefs: Koholint::Vision::Beliefs.new, capabilities: Koholint::Vision::Capabilities.new)
-    autopilot.model_called(state: state(frame: 99600, room_id: 84, map_id: 0, hp: 8), objective: @objectives.current)
-    here = state(frame: 100210, room_id: 66, map_id: 0, x: 132, y: 64, hp: 8)
-    p.observe(here, frame: 100210)
-    p.after_action(choice: { skill: 'explore', params: {} }, outcome: { stopped_by: 'no_frontier', from: { room: 66, map: 0, row: 3, col: 8 }, route: { goal: [83, 0], next: [82, 0] }, unreachable: ['down'] },
-                   state: here, frame: 100210)
-    fight = p.decide(p.decision_point_for(here), here, { grid: blocked })
-    assert_equal({ skill: 'attack', params: { row: 4, col: 6 } }, fight[:choice])
-    hurt = state(frame: 100300, room_id: 66, map_id: 0, x: 132, y: 64, hp: 4)
-    p.observe(hurt, frame: 100300)
-    refute_equal 'attack', p.decide(p.decision_point_for(hurt), hurt, { grid: blocked })[:choice][:skill], 'a loss down to the measured hit ends the fight'
+    p = Koholint::Policies::Delegated.new(client: ScriptedClient.new(objective: new_place, default: explore), registry: Koholint::Skills::Registry.default, objectives: @objectives, manual: '',
+                                          memory: Koholint::Policies::Memory.new(explore_log: log, healers:))
+    low = state(frame: 101171, room_id: 68, map_id: 0, hp: 4)
+    p.observe(low, frame: 101171)
+    p.decide(p.decision_point_for(low), low, { grid: })
+    assert_nil log.route([68, 0]), 'at 4 hp no route enters 84/0'
+    refute_equal [84, 0], log.least_visited([68, 0])&.dig(:goal)
+    assert_match(/which no route enters: 84-0 \(8 hp\)/, p.send(:route_line, low))
   end
 
   # Run 0e98, 84/0 at 4 hp from 101616: the objective was to talk to type 185, not a way through enemies, and Link stayed at 4 hp until the stop.
