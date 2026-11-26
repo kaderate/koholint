@@ -149,9 +149,8 @@ The skills, protocols and harness behaviours the agent works with. Versioned wit
   a `notable` of kind `hurt` when an action ends with an hp drop (the drop is its hit; rebuilt from the lineage trace on a resume or a
   fork): of everything within the census window (8 px across, 16 px down or up), the nearest takes it if its type already hurt, and
   otherwise only if Link is not within a cell of the reach of an enemy (catalogued, or a type that already hurt) and it is of kind
-  `unknown` or `creature`, not a healer and not
-  a type Link has talked with in the lineage (a wrong blame is never retired). Both make
-  the type an enemy at its largest hit: routes and heal rules keep out of its reach, it is never a talk, try or examine target, the
+  `unknown` or `creature`, not a healer and not a type Link has talked with in the lineage (a wrong blame is never retired). Both
+  make the type an enemy at its largest hit: routes and heal rules keep out of its reach, it is never a talk, try or examine target, the
   context lists it as "hurt Link for N", and a model attack on it is refused at or below its hit. It replaces two rules: the
   session-only one-strike probe of flow-110 (`note_contact`, `probe_choice`, the attack's strike cap from the context) and the
   "no tries in a place that has hurt Link" of flow-107; a type that never hurt Link is tried there again.
