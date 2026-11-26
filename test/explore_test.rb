@@ -473,6 +473,19 @@ class ExploreTest < Minitest::Test
     assert_equal({ goal: [4, 0], next: [3, 0] }, aimed[:route])
   end
 
+  # Stub fork 9f6f (0e98 @101300, flow-108 before this rule): in 66/0 at 8 hp the heal's down exit was out of reach behind enemies, explore went for the local
+  # frontier (3,6) beside them instead, and Link was hit to 4 hp at 102374.
+  def test_at_or_below_the_lineage_hit_an_aimed_explore_whose_exit_is_out_of_reach_stops_instead_of_taking_local_work
+    rows = with(CLOSED, [0, 5], '.', [1, 4], '#', [1, 5], '#', [1, 6], '#', [5, 2], '?')
+    log = Koholint::ExploreLog.new
+    log.absorb({ from: { room: 1, map: 0 }, exits: [{ row: 0, col: 5, direction: :up, outcome: :left, to: [3, 0] }] })
+    log.absorb({ from: { room: 3, map: 0 }, exits: [{ row: 7, col: 5, direction: :down, outcome: :left, to: [1, 0] }], survey: { sides: { down: [{ row: 7, col: 5 }] }, doors: [] } })
+    local, = explore(rows, exits: [[[0, 5], :up]], explore_log: log, aim: { place: [3, 0] }, limit: 1)
+    assert_equal :frontier, local[:target]&.dig(:kind)
+    held, = explore(rows, exits: [[[0, 5], :up]], explore_log: log, aim: { place: [3, 0] }, fragile: true, limit: 5)
+    assert_equal [:no_frontier, true], held.values_at(:stopped_by, :held_back)
+  end
+
   # Review of #111: least_visited filtered its destinations but routed to them through a dangerous place (1 -> D -> X with D dangerous).
   def test_the_least_visited_fallback_never_routes_through_a_dangerous_place
     log = Koholint::ExploreLog.new

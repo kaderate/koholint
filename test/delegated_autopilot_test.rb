@@ -594,7 +594,13 @@ class DelegatedAutopilotTest < Minitest::Test
     autopilot.model_called(state: state(frame: 102300, room_id: 66, map_id: 0, hp: 8), objective: @objectives.current)
     walking = state(frame: 102320, room_id: 66, map_id: 0, hp: 8)
     p.observe(walking, frame: 102320)
-    assert_equal 'delegated', p.decide(p.decision_point_for(walking), walking, { grid: })[:agent], 'at 8 hp the way hits for less'
+    context = { grid: }
+    assert_equal 'delegated', p.decide(p.decision_point_for(walking), walking, context)[:agent], 'at 8 hp the way hits for less'
+    assert context[:fragile], 'at the lineage hit'
+    p.after_action(choice: { skill: 'explore', params: {} }, outcome: { stopped_by: 'no_frontier', held_back: true, from: { room: 66, map: 0, row: 3, col: 8 } }, state: walking, frame: 102374)
+    assert_equal [nil, 'unreachable'], [@objectives.current, @objectives.history.last[:reason]]
+    @objectives.start(frame: 102380, title: 'Heal in 83-0, where a talk healed Link before', predicate: { kind: 'reach_place', place: [83, 0] },
+                      target: { kind: 'place', place: [83, 0], heal_below: 8 })
     autopilot.acted(skill: 'explore', outcome: { stopped_by: 'damage' })
     hurt = state(frame: 102390, room_id: 66, map_id: 0, hp: 4)
     p.observe(hurt, frame: 102390)
