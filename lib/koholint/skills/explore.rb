@@ -71,6 +71,7 @@ module Koholint
           @fragile = context[:fragile]
           @retreat = context[:retreat]
           @hint = direction || @aim[:direction]
+          @toward = direction
           @place = @start.place
           @ledger = context[:ledger]
           @talk_log = context[:talk_log]
@@ -93,7 +94,7 @@ module Koholint
           @doors = objects.select { |object| object[:kind].to_s == 'door' && object[:cell][0] < Geometry::ROWS - 1 }.map { |object| object[:cell] }
           @crumbling = objects.select { |object| object[:kind].to_s == 'crumbling' }.map { |object| object[:cell] }
           @survey = @known && survey
-          @route = @unreachable = @dead_end = @backs = @routed_off = nil
+          @route = @unreachable = @dead_end = @backs = @routed_off = @nearest = nil
           @entering = 0
           @cell = @start.cell
           @offered = near_objects(@cell)
@@ -139,6 +140,7 @@ module Koholint
           merged[:cause] = @fail_cause if @stopped_by == :blocked && @fail_cause
           merged[:untried_objects] = @untried.map { |row, col| { row:, col: } } if @stopped_by == :untried_object
           merged[:tried_exits] = @log ? @log.tried_exits(@place) : [] if @stopped_by == :no_frontier
+          merged[:cause] = nearest_cause if @stopped_by == :nothing_toward
           merged[:cause] = @planner ? 'no current cell' : 'no grid' if @stopped_by == :no_frontier && !(@planner && @attempt_from)
           merged
         end
@@ -146,6 +148,12 @@ module Koholint
         private
 
         def hard_cap = Float::INFINITY
+
+        def nearest_cause
+          asked, work, route = @nearest
+          way = route ? "on the way to #{route[:goal].join('-')}" : 'here'
+          "no untried work toward #{asked}; the nearest is #{way}: the #{work[:direction]} #{work[:kind]} at (#{work[:cell].join(',')})"
+        end
 
         def blocked_at_for(_state) = @blocked.last&.dup
 
@@ -288,7 +296,10 @@ module Koholint
           @attempt_from = state.cell
           target = @planner && @attempt_from && candidates(@attempt_from).first
           unless target
-            @stop = :no_frontier
+            asked, @toward = @toward, nil
+            @route = @dead_end = nil if asked
+            @nearest = asked && candidates(@attempt_from).first&.then { |c| [asked, c, @route] }
+            @stop = @nearest ? :nothing_toward : :no_frontier
             return nil
           end
 
@@ -406,6 +417,8 @@ module Koholint
           path_to = ->(cell) { paths.fetch(cell) { paths[cell] = @planner.path(from:, to: cell) } }
           safe = {}
           safe_to = ->(cell) { safe.fetch(cell) { safe[cell] = @planner.path(from:, to: cell, cross_margin: false) } }
+          return order(toward(from, path_to, safe_to)) if @toward
+
           clear = clearable(from, safe_to)
           return order(clear) if clear.any?
 
@@ -438,6 +451,12 @@ module Koholint
           return order(routed) if routed.any?
 
           order(frontier)
+        end
+
+        # Given a direction, explore takes only work on that side here, else a route to the nearest place with work that lies that way.
+        def toward(from, path_to, safe_to)
+          here = (untried(from, path_to) + gather(from, safe_to) { |cell, direction| frontier_kind(cell, direction) }).select { |c| c[:kind] != :door && c[:direction] == @toward }
+          here.any? ? here : routed(from, path_to)
         end
 
         # A side known only as the assumed way back, never crossed, still counts as untried, after every other reachable piece of work here.
@@ -499,7 +518,7 @@ module Koholint
           avoid = []
           first = nil
           goal = @aim[:place] if @aim[:place] != @place
-          while (hop = @log&.route(@place, goal:, avoid:, ban: goal.nil? || @ban))
+          while (hop = @log&.route(@place, goal:, avoid:, ban: goal.nil? || @ban, toward: @toward))
             first ||= hop
             via = hop[:via]
             way = ->(path) { via.is_a?(Array) ? doors(path, @doors | [via]) { |door| door == via } : gather(from, path) { |cell, direction| :exit if direction == via && Geometry.step(cell, direction).nil? } }
@@ -518,7 +537,7 @@ module Koholint
           end
           @route = { goal: first[:goal], next: first[:next] } if first
           @dead_end = true if first
-          side = @log&.pocket_side(@place, from) || retreat_side or return []
+          side = !@toward && (@log&.pocket_side(@place, from) || retreat_side) or return []
           return [] if @log.dangerous.include?(@log.ways(@place)[side])
 
           gather(from, path_to) { |cell, direction| :exit if direction == side && Geometry.step(cell, direction).nil? }

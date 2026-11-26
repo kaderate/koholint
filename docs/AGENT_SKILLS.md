@@ -1,6 +1,6 @@
 # Agent skills
 
-The skills, protocols and harness behaviours the agent works with. Versioned with the play flow (currently `flow-113`): update this page, not the README, when a flow changes. Layers and data flow are in [ARCHITECTURE.md](../ARCHITECTURE.md).
+The skills, protocols and harness behaviours the agent works with. Versioned with the play flow (currently `flow-114`): update this page, not the README, when a flow changes. Layers and data flow are in [ARCHITECTURE.md](../ARCHITECTURE.md).
 
 
 - Learned capabilities (`data/capabilities.json`, `bin/koholint capability list`): an `operational` entry is a composite of the skills below, offered in the skill schema and listed under "Learned skills" only while its trigger item is held (flow-49) and its object is on screen (today `sword_on_object_92 row col direction`: stand next to object 92, face it, use the sword, step into its cell). `explore` and `goto` also run it themselves when blocked facing such a cell, and the planner routes through those cells as a last resort. `learn` and `capability publish|retire` are offline commands.
@@ -16,10 +16,10 @@ The skills, protocols and harness behaviours the agent works with. Versioned wit
   even when it is no door object, and routes go through it like a door object;
   flow-55: or, if surveyed before the capability existed, a tile
   the capability has cleared elsewhere, listed with its source in the route's `clearable`; inferred from the trace when a run is forked or resumed, not during a live run's first visit), else to the nearest frontier (a known cell next to
-  an unknown one) (`direction` prefers that side), steps out, re-plans, and returns to the model only at an event:
+  an unknown one) (with `direction`, only work on that side or a route to a place with work that lies that way, flow-114), steps out, re-plans, and returns to the model only at an event:
   `new_place`, `known_place` (a return to a place already seen), `dialogue`, `untried_object` (once per thing never talked to within 3 cells), `blocked`, `stalled` (3
   attempts in a row walked no new cell), `no_frontier` (with the exits already tried), `locked`, `damage`, `budget` (600 frames),
-  `enemy` (an enemy to fight on sight with the sword on A or B, flow-90 and flow-113) or `fell` (Link starts to fall, flow-90).
+  `enemy` (an enemy to fight on sight with the sword on A or B, flow-90 and flow-113), `nothing_toward` (flow-114) or `fell` (Link starts to fall, flow-90).
   flow-68: at one heart or less walk, goto and explore keep out of every
   enemy contact zone grown by a cell (the extra ring only as a last resort, the contact zone never, a goal inside one still
   reached), and from inside one Link may take any step that does not head toward an enemy within a cell of its touch
@@ -154,6 +154,11 @@ The skills, protocols and harness behaviours the agent works with. Versioned wit
   context lists it as "hurt Link for N", and a model attack on it is refused at or below its hit. It replaces two rules: the
   session-only one-strike probe of flow-110 (`note_contact`, `probe_choice`, the attack's strike cap from the context) and the
   "no tries in a place that has hurt Link" of flow-107; a type that never hurt Link is tried there again.
+- flow-114: `explore(direction)` is truthful. It takes only untried exits and frontiers on that side of the place, else a route over
+  the known graph to the nearest place with work whose screen lies that way on the map grid (detours allowed; interiors lie nowhere; no
+  pocket or retreat fallback). With neither, it moves nowhere and stops `nothing_toward`, its `cause` naming the nearest work, e.g.
+  "no untried work toward right; the nearest is on the way to 65-0: the left exit at (4,0)". The direction was only a tie-break in
+  the first non-empty candidate class (2c93 98500 and d871 101068: asked right, went left). Explores the harness issues carry no direction.
 - flow-113: no fight without a sword. The harness fights on sight only with the sword on A or B, so explore no longer stops `enemy`
   without one, and `attack` is offered to the model only while the sword is on A or B,
   the same condition, so an unequipped sword cannot loop into refusals. The autopilot's tries and touches of unknown things also wait where a strike would be refused (Link at or

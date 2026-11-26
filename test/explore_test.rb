@@ -303,6 +303,22 @@ class ExploreTest < Minitest::Test
     assert_nil result[:knocked_edges]
   end
 
+  # 2c93 (flow-104) and its $0 stub fork 5b72 at 98500: explore right from C5 (66/0) left by the left side into B5 (65/0) three times out of three.
+  def test_a_direction_keeps_explore_to_work_that_lies_that_way
+    rows = with(CLOSED, [4, 0], '.', [4, 9], '.')
+    log = Koholint::ExploreLog.new
+    log.absorb({ from: { room: 1, map: 0 }, survey: { sides: { left: [{ row: 4, col: 0 }], right: [{ row: 4, col: 9 }] }, doors: [] },
+                 exits: [{ row: 4, col: 0, direction: :left, outcome: :left, to: [0, 0] }, { row: 4, col: 9, direction: :right, outcome: :left, to: [2, 0] }] })
+    log.absorb({ from: { room: 2, map: 0 }, survey: { sides: { left: [{ row: 4, col: 0 }] }, doors: [] }, exits: [{ row: 4, col: 0, direction: :left, outcome: :left, to: [1, 0] }] })
+    assert_equal [[0, 0], nil, [0, 0]], [nil, :right, :left].map { |side| log.route([1, 0], toward: side)&.dig(:goal) }
+    plain, = explore(rows, explore_log: log, limit: 2)
+    left, = explore(rows, explore_log: log, params: { 'direction' => 'left' }, limit: 2)
+    assert_equal [:left, :left], [plain, left].map { |result| result[:target][:direction] }
+    right, = explore(rows, explore_log: log, params: { 'direction' => 'right' }, limit: 2)
+    assert_equal [:nothing_toward, 0], right.values_at(:stopped_by, :cells_walked)
+    assert_equal 'no untried work toward right; the nearest is on the way to 0-0: the left exit at (4,0)', right[:cause]
+  end
+
   def test_untried_exits_that_cannot_be_reached_yet_send_explore_to_the_frontier_before_another_place
     rows = with(CLOSED, [0, 5], '.', [1, 5], '#', [1, 4], '#', [1, 6], '#', [2, 5], '?', [7, 5], '.')
     log = Koholint::ExploreLog.new
