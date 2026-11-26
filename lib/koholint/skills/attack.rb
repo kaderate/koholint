@@ -21,6 +21,7 @@ module Koholint
       class Run < Goto::Run
         def initialize(cell:, context:, **rest)
           @entities = context[:entities]
+          @max_strikes = context[:strikes] || MAX_STRIKES
           @enemy = enemy_near(cell)
           @phase = :walk
           @strikes = 0
@@ -122,7 +123,7 @@ module Koholint
           @enemy = @enemy.merge(now.slice(:x, :y, :cell, :health))
           return finish(:damage) if state.health < @start.health
           return swing if @swing
-          return finish(:no_kill) if @strikes >= MAX_STRIKES
+          return finish(:no_kill) if @strikes >= @max_strikes
           turn_to(all, state)
           return reapproach(state) if far?(state) && @approaches < APPROACHES
 

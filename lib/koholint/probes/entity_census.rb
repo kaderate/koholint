@@ -19,8 +19,6 @@ module Koholint
       SCENE_FRAMES = 600
       CONTACT_FRAMES = 90
       IDLE_FRAMES = 120
-      SPRITE_DX = 8
-      SPRITE_DY = 16
       ADVANCE_FRAMES = 30
       ADVANCE_PRESS = 3
       PAGE_LIMIT = 40
@@ -59,7 +57,7 @@ module Koholint
           hostile: damage.negative? && !control.negative?, conversations: (conversations(emulator, entity, talk) if talkable) }.compact
       end
 
-      def sprite_of?(sprite, entity) = (sprite[:x] - entity[:x]).between?(-SPRITE_DX, SPRITE_DX) && (sprite[:y] - entity[:y]).between?(-SPRITE_DY, SPRITE_DY)
+      def sprite_of?(sprite, entity) = Entities.sprite_of?(sprite, entity)
 
       def free_slots(emulator, sprites)
         (0...Entities::SLOTS).filter_map do |slot|

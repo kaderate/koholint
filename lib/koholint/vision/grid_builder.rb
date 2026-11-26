@@ -58,7 +58,9 @@ module Koholint
         others = snapshot.sprites.reject { |sprite| self.class.link_sprite?(sprite, state) }
         current = others.group_by { |s| [s[:x], s[:y]] }
         track(place, current)
-        statics = @statics.map { |(x, y), pattern| { x:, y:, pattern: } }.sort_by { |s| [s[:y], s[:x]] }
+        # A live creature parked on a cell is no fixed object: its sprite never walls the cell off.
+        live = Entities.read(emulator).select { |entity| Entities.live?(entity) }
+        statics = @statics.map { |(x, y), pattern| { x:, y:, pattern: } }.reject { |s| live.any? { |entity| Entities.sprite_of?(s, entity) && Grid.sprite_cells(s.transform_keys(&:to_s)).include?(entity[:cell]) } }.sort_by { |s| [s[:y], s[:x]] }
         emit(state.frame, snapshot, statics) if changed?(snapshot, statics)
         cell = self.class.link_cell(state.x, state.y)
         grid = Grid.new(cells: grid_of(snapshot), static_sprites: statics.map { |s| s.transform_keys(&:to_s) }, beliefs: @beliefs, link: cell,

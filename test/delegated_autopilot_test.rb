@@ -759,6 +759,123 @@ class DelegatedAutopilotTest < Minitest::Test
     refute_equal 'souvenir-165-16-t64', @objectives.current&.dig(:candidate)
   end
 
+  def c5_attack(stop, target, at: [7, 5]) = { skill: 'attack', params: { row: target[:cell][0], col: target[:cell][1] }, stopped_by: stop, target:, moved_cells: 0, hp_delta: 0,
+                                                from: { room: 66, map: 0, row: at[0], col: at[1] }, to: { room: 66, map: 0, row: at[0], col: at[1] } }
+
+  def blob(slot, x, y) = { slot:, type: 28, kind: 'unknown', moves: true, x:, y:, cell: [(y - 8) / 16, x / 16] }
+
+  # Paid fork g7-2 (4e10, flow-108), C5 (66/0) at 97280: from (6,5), one hit on the type 27 at (5,4) ended target_gone; its slot became a type 28 beside a
+  # second one where it stood, and the autopilot explored on into them. What appears in the struck slot or on its cell is fought as an enemy until struck once.
+  def test_what_appears_where_an_enemy_was_just_hit_is_fought_as_an_enemy_until_struck
+    client = ScriptedClient.new(objective: new_place, default: explore)
+    p = autopiloted(client)
+    blobs = [blob(2, 72, 90), blob(14, 76, 92)]
+    p.instance_variable_set(:@entities_reader, -> { blobs })
+    decide(p, state(frame: 97200, room_id: 66, map_id: 0, x: 84, y: 104))
+    hit = c5_attack(:target_gone, { slot: 2, type: 27, cell: [5, 4] }, at: [6, 5])
+    p.after_action(choice: { skill: 'attack', params: hit[:params] }, outcome: hit, state: state(frame: 97280, room_id: 66, map_id: 0, x: 84, y: 104), frame: 97280)
+    now = state(frame: 97289, room_id: 66, map_id: 0, x: 84, y: 104)
+    p.observe(now, frame: 97289)
+    result = p.decide(p.decision_point_for(now), now, { grid: })
+    assert_equal [{ skill: 'attack', params: { row: 5, col: 4 } }, 'delegated'], [result[:choice], result[:agent]]
+    assert_match(/fight type 28 at \(5,4\), not identified, taken for an enemy/, result[:justification])
+    struck = c5_attack(:blocked, { slot: 2, type: 28, cell: [5, 4] }, at: [6, 5])
+    p.after_action(choice: { skill: 'attack', params: struck[:params] }, outcome: struck, state: now, frame: 97300)
+    blobs.replace([blob(2, 72, 90), blob(14, 76, 106)])
+    later = state(frame: 97310, room_id: 66, map_id: 0, x: 84, y: 104)
+    p.observe(later, frame: 97310)
+    assert_match(/fight type 28 at \(6,4\)/, p.decide(p.decision_point_for(later), later, { grid: })[:justification], 'the second one is still taken for an enemy, the struck one no more')
+    blobs.replace([{ slot: 14, type: 46, kind: 'creature', moves: false, x: 76, y: 106, cell: [6, 4] }])
+    reused = state(frame: 97330, room_id: 66, map_id: 0, x: 84, y: 104)
+    p.observe(reused, frame: 97330)
+    refute_match(/fight type 46/, p.decide(p.decision_point_for(reused), reused, { grid: })[:justification].to_s, 'gate 150d at 98029: the slot came back as a still type 46')
+  end
+
+  # Review of #116 (KOHO-147): gate 71fb struck type 5 (uncatalogued) and type 46 (catalogued as still) beside a struck type 27; a person could be there too.
+  def test_an_uncatalogued_or_still_thing_where_an_enemy_was_just_hit_is_not_fought
+    client = ScriptedClient.new(objective: new_place, default: explore)
+    p = autopiloted(client)
+    p.instance_variable_set(:@entities_reader, -> { [{ slot: 2, type: 5, kind: 'unknown', x: 72, y: 90, cell: [5, 4] }, { slot: 13, type: 46, kind: 'creature', moves: false, x: 76, y: 92, cell: [5, 4] }] })
+    decide(p, state(frame: 97200, room_id: 66, map_id: 0, x: 84, y: 104))
+    hit = c5_attack(:target_gone, { slot: 2, type: 27, cell: [5, 4] }, at: [6, 5])
+    p.after_action(choice: { skill: 'attack', params: hit[:params] }, outcome: hit, state: state(frame: 97280, room_id: 66, map_id: 0, x: 84, y: 104), frame: 97280)
+    now = state(frame: 97289, room_id: 66, map_id: 0, x: 84, y: 104)
+    p.observe(now, frame: 97289)
+    refute_match(/fight type/, p.decide(p.decision_point_for(now), now, { grid: })[:justification].to_s)
+  end
+
+  def c5_probe(entities, hurt: true)
+    client = ScriptedClient.new(objective: new_place, default: explore)
+    p = autopiloted(client)
+    p.instance_variable_set(:@entities_reader, -> { entities })
+    start = state(frame: 98300, room_id: 66, map_id: 0, x: 92, y: 131)
+    decide(p, start)
+    p.observe(start, frame: 98300)
+    first = p.decide(p.decision_point_for(start), start, { grid: })
+    p.after_action(choice: first[:choice], outcome: outcome(:budget, 0).merge(from: { room: 66, map: 0, row: 7, col: 5 }, to: { room: 66, map: 0, row: 7, col: 5 }), state: start, frame: 98375)
+    hurt_at = state(frame: 98391, room_id: 66, map_id: 0, x: 92, y: 131, hp: hurt ? 20 : 24)
+    p.observe(hurt_at, frame: 98391)
+    decision = p.decide(p.decision_point_for(hurt_at), hurt_at, { grid: })
+    stopped = outcome(:no_frontier, 0).merge(moved_cells: 0, cells_walked: 0, from: { room: 66, map: 0, row: 7, col: 5 }, to: { room: 66, map: 0, row: 7, col: 5 })
+    p.after_action(choice: decision[:choice], outcome: stopped, state: hurt_at, frame: 98400)
+    now = state(frame: 98410, room_id: 66, map_id: 0, x: 92, y: 131, hp: hurt ? 20 : 24)
+    p.observe(now, frame: 98410)
+    context = { grid: }
+    [p.decide(p.decision_point_for(now), now, context), context]
+  end
+
+  # Paid fork g7-2 (4e10, flow-108), C5 (66/0): Link lost 4 hp at 98375 with type 28s on (7,5) and (6,5) in touch (restored 97825/prompt 98391), then
+  # stops at (7,5) followed; a type that hurt Link with it in touch, in touch after a stop, gets exactly one strike.
+  def test_a_creature_whose_type_hurt_link_in_touch_gets_one_strike_after_a_stop
+    result, context = c5_probe([blob(1, 90, 122), blob(2, 86, 118)])
+    assert_equal({ skill: 'attack', params: { row: 7, col: 5 } }, result[:choice])
+    assert_match(/strike the unidentified type 28 at \(7,5\) once, in touch after a no_frontier stop \(probe 1/, result[:justification])
+    assert_equal 1, context[:strikes]
+    refute_match(/strike the unidentified/, c5_probe([blob(1, 90, 122)], hurt: false).first[:justification].to_s, 'no evidence of hostility')
+  end
+
+  # Review of #116 (KOHO-147): types 108, 109, 110 and 61 move, give no dialogue and do no contact damage, in the village rooms.
+  def test_no_probe_of_a_moving_creature_that_never_hurt_link_or_with_a_person_on_screen
+    villager = { slot: 4, type: 108, kind: 'creature', moves: true, x: 90, y: 122, cell: [7, 5] }
+    refute_match(/strike the unidentified/, c5_probe([villager], hurt: false).first[:justification].to_s)
+    person = { slot: 5, type: 62, kind: 'npc', moves: true, x: 40, y: 60, cell: [3, 2] }
+    refute_match(/strike the unidentified/, c5_probe([blob(1, 90, 122), person]).first[:justification].to_s)
+  end
+
+  # Stub fork 1088 (flow-110 at e7b15df, from g7-2 @97200): after the delivery the probe struck the witch, type 64 at (3,4) in 162/14, an uncatalogued thing.
+  def test_an_uncatalogued_thing_in_touch_is_never_probed
+    client = ScriptedClient.new(objective: new_place, default: explore)
+    p = autopiloted(client)
+    p.instance_variable_set(:@entities_reader, -> { [{ slot: 3, type: 64, kind: 'unknown', x: 72, y: 60, cell: [3, 4] }] })
+    start = state(frame: 99480, room_id: 162, map_id: 14, x: 72, y: 76)
+    decide(p, start)
+    stopped = outcome(:no_frontier, 0).merge(moved_cells: 0, cells_walked: 0, from: { room: 162, map: 14, row: 4, col: 4 }, to: { room: 162, map: 14, row: 4, col: 4 })
+    p.after_action(choice: { skill: 'explore', params: {} }, outcome: stopped, state: start, frame: 99506)
+    now = state(frame: 99506, room_id: 162, map_id: 14, x: 72, y: 76)
+    p.observe(now, frame: 99506)
+    refute_match(/strike the unidentified/, p.decide(p.decision_point_for(now), now, { grid: })[:justification].to_s)
+  end
+
+  def test_no_probe_strike_at_one_heart_or_at_the_measured_hit
+    [[8, nil], [12, 12]].each do |hp, hit|
+      client = ScriptedClient.new(objective: new_place, default: explore)
+      healers = Koholint::Healers.new
+      healers.saw(place: [65, 0], health: 24)
+      healers.saw(place: [65, 0], health: 24 - hit) if hit
+      @objectives = Koholint::Objectives.new(trace: trace)
+      p = Koholint::Policies::Delegated.new(client:, registry: Koholint::Skills::Registry.default, objectives: @objectives, manual: '', autopilot: Koholint::Autopilot.new,
+                                            memory: Koholint::Policies::Memory.new(healers:))
+      p.instance_variable_set(:@entities_reader, -> { [blob(1, 90, 122)] })
+      start = state(frame: 97800, room_id: 66, map_id: 0, x: 92, y: 131, hp:)
+      decide(p, start)
+      stopped = outcome(:no_frontier, 0).merge(moved_cells: 0, cells_walked: 0, from: { room: 66, map: 0, row: 7, col: 5 }, to: { room: 66, map: 0, row: 7, col: 5 })
+      p.after_action(choice: { skill: 'explore', params: {} }, outcome: stopped, state: start, frame: 97824)
+      now = state(frame: 97824, room_id: 66, map_id: 0, x: 92, y: 131, hp:)
+      p.observe(now, frame: 97824)
+      refute_match(/strike the unidentified/, p.decide(p.decision_point_for(now), now, { grid: })[:justification].to_s, "#{hp} hp")
+    end
+  end
+
   def test_a_heal_objective_in_a_place_with_several_people_closes_when_hp_rises_not_on_arrival
     @objectives = Koholint::Objectives.new(trace: trace)
     @objectives.start(frame: 100, title: 'Heal in 164-16, where a talk healed Link before', predicate: { kind: 'reach_place', place: [164, 16] }, target: { kind: 'place', place: [164, 16], heal_below: 8 })
