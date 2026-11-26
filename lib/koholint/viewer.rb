@@ -14,7 +14,7 @@ module Koholint
 
     module_function
 
-    def watch(run_dir, port: 0, host: '127.0.0.1', from: :live, speed: 1.0, runs_root: nil, out: $stdout, err: $stderr,
+    def watch(run_dir, port: 0, host: '127.0.0.1', from: :live, speed: 1.0, runs_roots: [], out: $stdout, err: $stderr,
               clock: Process.method(:clock_gettime))
       stopping = false
       previous = %w[INT TERM].to_h { |sig| [sig, Signal.trap(sig) { stopping = true }] }
@@ -25,7 +25,7 @@ module Koholint
       server.feed = -> { Feed.for(run_dir, follower) }
       server.run_dir = run_dir
       registry = Registry.new(err:).start
-      explorer = Explorer.new(root: runs_root || Explorer.default_root(run_dir), registry:)
+      explorer = Explorer.new(roots: runs_roots.empty? ? [Explorer.default_root(run_dir)] : runs_roots, registry:)
       server.explorer = explorer
       explorer.warm
       out.puts announce(host, server.start)
