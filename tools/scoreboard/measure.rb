@@ -91,8 +91,19 @@ module Scoreboard
       dungeons = Koholint::PlaceKinds.catalogue.select { |_, entry| entry['kind'] == 'dungeon' }.keys
       { instruments: summary['instruments'],
         dungeons: dungeons.empty? ? nil : places.map(&:last).uniq.count { |map| dungeons.include?(map) },
+        dungeon_keys: dungeon_keys(events, places, dungeons),
         key_items: state ? Koholint::Items.held_ids(state).sort.map { |id| { id:, name: Koholint::Items.name(id, state) } } : [],
         places_seen: places.size, highest_milestone: Koholint::Summary.highest_milestone(events) }
+    end
+
+    # Per dungeon entered, whether a key item (a data/items.json entry named like a key) was gained while there. Optional: nil while no dungeon
+    # map is catalogued, and a dungeon without a key reads false, never required.
+    def dungeon_keys(events, places, dungeons)
+      return nil if dungeons.empty?
+
+      keys = Koholint::Items.catalogue.select { |_, item| Koholint::Items.names(item).any? { |name| name.match?(/\b(key|clé|cle)\b/) } }.keys
+      gained = events.select { |event| event['type'] == 'item_gained' && keys.include?(event['item'].to_i) && event['place'].is_a?(Array) }.map { |event| event['place'].last }
+      places.map(&:last).uniq.select { |map| dungeons.include?(map) }.sort.to_h { |map| [map.to_s, gained.include?(map)] }
     end
 
     def stalls(start, new_frames, last)

@@ -15,7 +15,7 @@ A scripted measurement of how far the agent gets and what it costs, kept in the 
 
 Per run, from `trace.jsonl` and `manifest.json` (and `summary.json` when it records instruments):
 
-- **progress vector** (the whole run, inherited prefix included): `instruments` 0-8 (null: the engine records none yet), `dungeons` entered (null: `data/place_kinds.json` lists no dungeon map yet), `key_items` held at the end (id and name from `data/items.json`; a `?` marks a name not verified), `places_seen`, `highest_milestone`.
+- **progress vector** (the whole run, inherited prefix included): `instruments` 0-8 (null: the engine records none yet), `dungeons` entered (null: `data/place_kinds.json` lists no dungeon map yet), `dungeon_keys` (per dungeon entered, whether a key item was gained there: an optional milestone, null while no dungeon is catalogued, `false` for a dungeon with no key, and only from `item_gained` events of items that `data/items.json` names like a key), `key_items` held at the end (id and name from `data/items.json`; a `?` marks a name not verified), `places_seen`, `highest_milestone`.
 - **cost** (the run's own segment, frames from its fork frame on): `usd`, model `calls`, `calls_per_1000f`, `calls_at_one_heart` (8 hp or less).
 - `deaths_per_1000f`, `new_places` (new to the run's own prefix) and `new_places_per_usd`.
 - `stalls`: spans of 4000 frames or more with no new place, and the longest span.

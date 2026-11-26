@@ -4,6 +4,7 @@ require 'tmpdir'
 require 'fileutils'
 require 'stringio'
 require 'koholint'
+require 'koholint/checkpoints'
 require 'koholint/trace'
 require_relative '../tools/scoreboard/alert'
 require_relative '../tools/scoreboard/debt'
@@ -60,6 +61,36 @@ class ScoreboardTest < Minitest::Test
       assert_equal({ 'fight on sight (90/100)' => 1 }, result[:rules])
       assert_equal ['shield'], result[:items_gained]
       assert_equal false, result[:harness_dirty]
+    end
+  end
+
+  def with_catalogues(places, items)
+    place_kinds = Koholint::PlaceKinds.method(:catalogue)
+    item_catalogue = Koholint::Items.method(:catalogue)
+    Koholint::PlaceKinds.define_singleton_method(:catalogue) { places }
+    Koholint::Items.define_singleton_method(:catalogue) { items }
+    yield
+  ensure
+    Koholint::PlaceKinds.define_singleton_method(:catalogue, place_kinds)
+    Koholint::Items.define_singleton_method(:catalogue, item_catalogue)
+  end
+
+  def test_dungeons_entered_and_their_optional_key_come_only_from_catalogued_data_and_gain_events
+    items = { 50 => { 'id' => 50, 'name' => 'small key', 'confidence' => 'observed' } }
+    Dir.mktmpdir do |root|
+      dir = make_run(root, '20261126-000003-cccc') do |trace|
+        perceive(trace, 10, 1)
+        trace.emit(:perception, frame: 20, state: STATE.merge('room_id' => 9, 'map_id' => 7), state_hash: 'h')
+        trace.emit(:perception, frame: 30, state: STATE.merge('room_id' => 4, 'map_id' => 8), state_hash: 'h')
+        trace.emit(:item_gained, frame: 40, item: 50, name: 'small key', place: [4, 8], held: [50])
+        trace.emit(:stop, frame: 50, reason: 'frames')
+      end
+      with_catalogues({ 7 => { 'kind' => 'dungeon' }, 8 => { 'kind' => 'dungeon' } }, items) do
+        progress = Scoreboard::Measure.run(dir)[:progress]
+        assert_equal 2, progress[:dungeons]
+        assert_equal({ '7' => false, '8' => true }, progress[:dungeon_keys])
+      end
+      with_catalogues({}, items) { assert_nil Scoreboard::Measure.run(dir)[:progress][:dungeon_keys] }
     end
   end
 
@@ -140,6 +171,38 @@ class ScoreboardTest < Minitest::Test
       assert_equal 1, line['runs'].size
       assert_equal 'scoreboard-boot-20261126', line['runs'].first['tag']
       assert_operator line['branches'], :>, 0
+    end
+  end
+
+  def test_a_checkpoint_run_forks_the_checkpoint_run_then_resumes_the_fork
+    Dir.mktmpdir do |root|
+      point = Koholint::Checkpoints.catalogue.fetch('post-gain-172')
+      make_run(File.join(root, 'old'), point['run'])
+      fake = File.join(root, 'fake.rb')
+      File.write(fake, <<~RUBY)
+        require 'json'
+        require 'fileutils'
+        $LOAD_PATH.unshift(#{File.expand_path('../lib', __dir__).inspect})
+        require 'koholint/trace'
+        args = ARGV.dup
+        command = args.shift
+        if command == 'fork'
+          abort 'wrong parent' unless File.basename(args[0]) == #{point['run'].inspect} && args[args.index('--at-frame') + 1] == #{point['frame'].to_s.inspect}
+          dir = File.join(args[args.index('--root') + 1], '20261126-020202-dddd')
+          FileUtils.mkdir_p(dir)
+          File.write(File.join(dir, 'manifest.json'), JSON.generate('flow_version' => 'flow-9', 'tag' => args[args.index('--tag') + 1], 'parent' => { 'id' => #{point['run'].inspect}, 'frame' => #{point['frame']} }))
+          puts "run \#{dir}"
+        else
+          abort 'wrong command' unless command == 'resume'
+          trace = Koholint::Trace.new(File.join(args[0], 'trace.jsonl'))
+          trace.emit(:decision, frame: #{point['frame'] + 5}, decision_point: 'x', input: { 'hp' => 24 }, options: [], choice: {}, justification: 'x', confidence: 1.0, agent: 'claude', latency_ms: 0, cost_usd: 0.5)
+        end
+      RUBY
+      history = File.join(root, 'history.jsonl')
+      line = Scoreboard::Run.play(froms: ['post-gain-172'], root: File.join(root, 'runs'), koholint: fake, repo: File.expand_path('..', __dir__), history:, day: '20261126',
+                                  roots: [File.join(root, 'old')], out: StringIO.new, poll: 0.05)
+      assert_equal [0.5, 'post-gain-172'], [line['usd'], line['primary']['from']]
+      assert_equal [point['run'], point['frame']], line['runs'].first['parent'].values
     end
   end
 
