@@ -13,12 +13,14 @@ Run gates from the repository root, with `$KOHOLINT_ROM` set, one or two at a ti
 | sword-obtained | 20261111-194737-9ba1 @60404 | `caffeinate -dims ruby tools/gates/gate.rb sword-obtained` |
 
 - `all` plays the three in turn.
-- `--root DIR` sets where the forks go (default `~/.capy/work/runs/gates`).
+- `--root DIR` sets where the forks go (default `~/.capy/work/runs/gates`). Forks are kept there, about 2 MB each, and show in the viewer's `~/.capy/work/runs/*` runs glob; `--clean` deletes a fork that matched.
 - `--check RUN_DIR` checks a fork already played. It refuses a fork of another checkpoint.
 - Checkpoint runs are looked up under the `roots` of `gates.json`.
 - The exit status is 0 when every number matches. It is 1 on a mismatch, or when the flow has no expected numbers yet.
 
-A change to the play flow either keeps every number or states the change in its pull request and adds the new numbers to `expected.json` under its `flow_version`.
+The numbers repeat only at the same code and the same data. Unlike `bin/koholint fork`, the stub loads no exit bench (`data/exits.json`). It does load the current `data/capabilities.json`, `data/souvenirs.json` and `data/entities.json`, whose changes alter play without a flow bump. A data change that moves a number is stated like a flow change.
+
+`test/gates_test.rb` fails while the current `FLOW_VERSION` has no numbers here, so a flow bump lands with its gates played. A change to the play flow either keeps every number or states the change in its pull request and adds the new numbers to `expected.json` under its `flow_version`.
 
 ## Expected numbers
 

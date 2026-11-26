@@ -1,6 +1,7 @@
 require 'minitest/autorun'
 require 'json'
 require 'tmpdir'
+require 'koholint'
 require_relative '../tools/gates/metrics'
 
 class GatesTest < Minitest::Test
@@ -35,5 +36,10 @@ class GatesTest < Minitest::Test
       assert_equal gates.sort, numbers.keys.sort, flow
       numbers.each_value { |want| assert_equal Gates::FIELDS.map(&:to_s).sort, want.keys.sort }
     end
+  end
+
+  def test_a_flow_bump_records_its_gate_numbers
+    expected = JSON.parse(File.read(File.expand_path('../tools/gates/expected.json', __dir__)))
+    assert expected.key?(Koholint::FLOW_VERSION), "play the gates at #{Koholint::FLOW_VERSION} and add their numbers to tools/gates/expected.json"
   end
 end

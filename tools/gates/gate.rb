@@ -1,13 +1,15 @@
 $LOAD_PATH.unshift(File.expand_path('../../lib', __dir__))
+require 'fileutils'
 require 'optparse'
 require_relative 'metrics'
 
-# ruby tools/gates/gate.rb GATE|all [--root DIR]   plays each gate with the stub and checks it against expected.json for FLOW_VERSION
+# ruby tools/gates/gate.rb GATE|all [--root DIR] [--clean]   plays each gate with the stub and checks it against expected.json for FLOW_VERSION
 # ruby tools/gates/gate.rb GATE --check RUN_DIR    checks a run already played
 options = { root: File.expand_path('~/.capy/work/runs/gates') }
 OptionParser.new do |parser|
   parser.on('--root DIR') { |dir| options[:root] = File.expand_path(dir) }
   parser.on('--check DIR') { |dir| options[:check] = File.expand_path(dir) }
+  parser.on('--clean') { options[:clean] = true }
 end.parse!
 
 config = JSON.parse(File.read(File.join(__dir__, 'gates.json')))
@@ -39,6 +41,7 @@ failed = names.count do |name|
 
   wrong = Gates.mismatches(want, measured)
   wrong.each { |field, was, now| puts "#{name}: #{field} expected #{was.inspect}, measured #{now.inspect}" }
+  FileUtils.rm_rf(dir) if options[:clean] && !options[:check] && wrong.empty?
   wrong.any?
 end
 exit(failed.zero? ? 0 : 1)
