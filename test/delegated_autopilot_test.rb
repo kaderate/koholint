@@ -518,6 +518,18 @@ class DelegatedAutopilotTest < Minitest::Test
     assert_empty client.calls, decision[:justification]
   end
 
+  # Stub gate 355b (flow-105 at 9bbd554): from 84/0 at 8 hp the only known way to 83/0 went through 66/0's type 27; Link was hemmed there, wandered back and died.
+  def test_below_the_measured_hit_no_heal_is_sent_by_a_way_through_enemies
+    memory = lineage_with_a_healer_and_an_eight_hp_hit
+    memory.cards[[100, 0]] = { enemies: [{ type: 27, cell: [4, 5] }] }
+    @objectives = Koholint::Objectives.new(trace: trace)
+    client = ScriptedClient.new(objective: new_place, default: explore)
+    p = Koholint::Policies::Delegated.new(client:, registry: Koholint::Skills::Registry.default, objectives: @objectives, manual: '', memory:)
+    low = state(frame: 99915, room_id: 162, map_id: 14, hp: 8)
+    p.observe(low, frame: 99915)
+    refute_match(/heal/, p.decide(p.decision_point_for(low), low, { grid: })[:justification].to_s)
+  end
+
   # Run 0e98, 84/0 at 4 hp from 101616: the objective was to talk to type 185, not a way through enemies, and Link stayed at 4 hp until the stop.
   def test_below_the_measured_hit_any_objective_gives_way_to_the_heal_at_the_skill_choice
     @objectives = Koholint::Objectives.new(trace: trace)

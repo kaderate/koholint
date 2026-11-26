@@ -145,8 +145,9 @@ The skills, protocols and harness behaviours the agent works with. Versioned wit
   it is still a frontier, taken when nothing else here is reachable, before a route to another place. An explore that stops `no_frontier`
   in at most one frame is answered by the harness at the next decision, not after three, since from the same cell it would find none again.
 - flow-105: survival comes first at every objective and skill choice, before the loop break: at or below the largest hp drop
-  between two decisions measured on the lineage (read back from the trace), Link goes to the nearest place where a talk healed him,
-  whatever the objective, with no model call; the flow-101 rule (one heart or less on a way through enemies) still applies. The two
+  between two decisions measured on the lineage (read back from the trace), Link goes to the nearest place where a talk healed him
+  by a known way through no place where enemies were seen, whatever the objective, with no model call, and the autopilot follows
+  that heal whatever stops it or hurts Link; the flow-101 rule (one heart or less on a way through enemies) still applies. The two
   detours count again after each heal by a talk. A lead set aside by a heal goes back to the menu, never to a harness-alone take.
 - flow-104: a dialogue that stops explore's walk to an exit or a door counts that way as unreachable from the landing, so a
   second such stop cuts it (as a dialogue on a frontier already did). An attack that did not hurt Link (`done`, `target_gone`,
