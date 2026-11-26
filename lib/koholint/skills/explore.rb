@@ -67,7 +67,7 @@ module Koholint
         def initialize(direction:, context:, **rest)
           super(**rest)
           @aim = context[:aim] || {}
-          @work = context[:work]
+          @ban = context[:ban]
           @retreat = context[:retreat]
           @hint = direction || @aim[:direction]
           @place = @start.place
@@ -492,7 +492,7 @@ module Koholint
           avoid = []
           first = nil
           goal = @aim[:place] if @aim[:place] != @place
-          while (hop = @log&.route(@place, goal:, avoid:, ban: goal.nil? || @work))
+          while (hop = @log&.route(@place, goal:, avoid:, ban: goal.nil? || @ban))
             first ||= hop
             via = hop[:via]
             way = ->(path) { via.is_a?(Array) ? doors(path, @doors | [via]) { |door| door == via } : gather(from, path) { |cell, direction| :exit if direction == via && Geometry.step(cell, direction).nil? } }

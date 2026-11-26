@@ -480,13 +480,15 @@ class DelegatedAutopilotTest < Minitest::Test
     healers.saw(place: [83, 0], health: 4)
     healers.heard([83, 0])
     healers.saw(place: [83, 0], health: 24)
-    healers.saw(place: [84, 0], health: 16)
-    healers.saw(place: [84, 0], health: 8)
+    healers.saw(place: [84, 0], health: 20)
+    healers.saw(place: [99, 0], health: 16)
+    healers.saw(place: [99, 0], health: 8)
     cards = { [83, 0] => { unknown: [{ type: 132, cell: [3, 5] }] } }
     Koholint::Policies::Memory.new(explore_log: log, cards:, healers:, leads:)
   end
 
-  # Run d871: 84/0 hit for 8 at 98204, 83/0 healed at 96398; at 99915 in 162/14 with 8 hp the model chose the next objective and died later from 8 hp.
+  # Run d871: an 8 hp hit measured, 83/0 healed at 96398; at 99915 in 162/14 with 8 hp the model chose the next objective and died later from 8 hp.
+  # Here the places on the way hit for at most 4.
   def test_at_or_below_the_largest_measured_hit_the_next_objective_is_to_heal_where_a_talk_healed_link_without_asking_the_model
     @objectives = Koholint::Objectives.new(trace: trace)
     client = ScriptedClient.new(objective: new_place, default: explore)
@@ -553,7 +555,51 @@ class DelegatedAutopilotTest < Minitest::Test
     assert_nil log.route([68, 0]), 'at 4 hp no route enters 84/0'
     refute_equal [84, 0], log.least_visited([68, 0])&.dig(:goal)
     assert_equal [84, 0], log.route([68, 0], goal: [84, 0])&.dig(:goal), 'an objective may still lead there'
-    assert_match(/which no route to work enters: 84-0 \(8 hp\)/, p.send(:route_line, low))
+    assert_match(/which the harness never walks into: 84-0 \(8 hp\)/, p.send(:route_line, low))
+  end
+
+  # Run d871 at 99915: the way out of 162/14 to 83/0 crosses 84/0, which hit for 8 at 98204, so at 8 hp no heal is sent that way.
+  def test_no_heal_is_sent_by_a_way_through_a_place_whose_measured_hit_would_take_links_health
+    memory = lineage_with_a_healer_and_an_eight_hp_hit
+    memory.healers.saw(place: [84, 0], health: 20)
+    memory.healers.saw(place: [84, 0], health: 12)
+    @objectives = Koholint::Objectives.new(trace: trace)
+    p = Koholint::Policies::Delegated.new(client: ScriptedClient.new(objective: new_place, default: explore), registry: Koholint::Skills::Registry.default, objectives: @objectives, manual: '', memory:)
+    low = state(frame: 99915, room_id: 162, map_id: 14, hp: 8)
+    p.observe(low, frame: 99915)
+    refute_match(/heal/, p.decide(p.decision_point_for(low), low, { grid: })[:justification].to_s)
+  end
+
+  # Stub fork 5b45 (0e98 @101300, flow-107): the heal set out at 8 hp in 66/0; at 4 hp the autopilot kept walking it through 66/0 toward 82/0,
+  # both measured at 4 hp hits, and Link died at 102771.
+  def test_an_objective_way_through_a_place_whose_measured_hit_would_take_links_health_is_left_to_the_model
+    log = Koholint::ExploreLog.new
+    log.absorb({ from: { room: 66, map: 0 }, exits: [{ row: 7, col: 5, direction: :down, outcome: :left, to: [82, 0] }], survey: { sides: { down: [{ row: 7, col: 5 }] }, doors: [] } })
+    log.absorb({ from: { room: 82, map: 0 }, exits: [{ row: 3, col: 9, direction: :right, outcome: :left, to: [83, 0] }], survey: { sides: { right: [{ row: 3, col: 9 }] }, doors: [] } })
+    healers = Koholint::Healers.new
+    healers.saw(place: [83, 0], health: 4)
+    healers.heard([83, 0])
+    healers.saw(place: [83, 0], health: 24)
+    healers.saw(place: [82, 0], health: 24)
+    healers.saw(place: [82, 0], health: 20)
+    healers.saw(place: [66, 0], health: 12)
+    healers.saw(place: [66, 0], health: 8)
+    @objectives = Koholint::Objectives.new(trace: trace)
+    @objectives.start(frame: 102310, title: 'Heal in 83-0, where a talk healed Link before', predicate: { kind: 'reach_place', place: [83, 0] },
+                      target: { kind: 'place', place: [83, 0], heal_below: 8 })
+    client = ScriptedClient.new(default: explore)
+    autopilot = Koholint::Autopilot.new
+    p = Koholint::Policies::Delegated.new(client:, registry: Koholint::Skills::Registry.default, objectives: @objectives, manual: '', autopilot:,
+                                          memory: Koholint::Policies::Memory.new(explore_log: log, healers:))
+    autopilot.model_called(state: state(frame: 102300, room_id: 66, map_id: 0, hp: 8), objective: @objectives.current)
+    walking = state(frame: 102320, room_id: 66, map_id: 0, hp: 8)
+    p.observe(walking, frame: 102320)
+    assert_equal 'delegated', p.decide(p.decision_point_for(walking), walking, { grid: })[:agent], 'at 8 hp the way hits for less'
+    autopilot.acted(skill: 'explore', outcome: { stopped_by: 'damage' })
+    hurt = state(frame: 102390, room_id: 66, map_id: 0, hp: 4)
+    p.observe(hurt, frame: 102390)
+    assert_equal 'claude', p.decide(p.decision_point_for(hurt), hurt, { grid: })[:agent]
+    assert_match(/which the harness never walks into: .*82-0 \(4 hp\)/, client.calls.last[:prompt])
   end
 
   # Run 0e98, 84/0 at 4 hp from 101616: the objective was to talk to type 185, not a way through enemies, and Link stayed at 4 hp until the stop.
@@ -738,7 +784,7 @@ class DelegatedAutopilotTest < Minitest::Test
     calls = client.calls.size
     result = p.decide(p.decision_point_for(state), state, { grid: })
     assert_equal ['claude', calls + 1], [result[:agent], client.calls.size]
-    assert_match(/which no route to work enters: 147-16 \(24 hp\)/, client.calls.last[:prompt])
+    assert_match(/which the harness never walks into: 147-16 \(24 hp\)/, client.calls.last[:prompt])
     p.after_action(choice: result[:choice], outcome: instant, state:, frame: 700)
     result = p.decide(p.decision_point_for(state), state, { grid: })
     assert_equal [{ skill: 'wait', params: { frames: 120 } }, 'delegated'], [result[:choice], result[:agent]], 'once per spot, then the bounded wait'

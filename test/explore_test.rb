@@ -467,7 +467,7 @@ class ExploreTest < Minitest::Test
     log.dangerous = [[3, 0]]
     assert_equal [3, 0], log.route([1, 0], goal: [4, 0])[:next], 'an objective route may cross it'
     assert_equal [2, 0], log.route([1, 0], goal: [4, 0], ban: true)[:next]
-    worked, = explore(rows, exits: [[[0, 5], :up], [[7, 5], :down]], explore_log: log, aim: { place: [4, 0] }, work: true, limit: 1)
+    worked, = explore(rows, exits: [[[0, 5], :up], [[7, 5], :down]], explore_log: log, aim: { place: [4, 0] }, ban: true, limit: 1)
     assert_equal({ goal: [4, 0], next: [2, 0] }, worked[:route])
     aimed, = explore(rows, exits: [[[0, 5], :up], [[7, 5], :down]], explore_log: log, aim: { place: [4, 0] }, limit: 1)
     assert_equal({ goal: [4, 0], next: [3, 0] }, aimed[:route])
