@@ -35,6 +35,9 @@ The numbers repeat only at the same code and the same data. Unlike `bin/koholint
 | flow-112 (9eeb962c) | respawn-171 | 69 | 0 | 12 | 0 | 100084 |
 | flow-112 | post-gain-172 | 65 | 0 | 4 | 0 | 99292 |
 | flow-112 | sword-obtained | 47 | 27 | 8 | 1 | — |
+| flow-113 (aca4ffb7) | respawn-171 | 69 | 0 | 12 | 0 | 100084 |
+| flow-113 | post-gain-172 | 65 | 0 | 4 | 0 | 99292 |
+| flow-113 | sword-obtained | 47 | 27 | 8 | 1 | — |
 
 What each number counts, from the fork frame on:
 - **calls:** decisions the stub answered.
