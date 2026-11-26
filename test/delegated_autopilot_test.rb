@@ -722,6 +722,25 @@ class DelegatedAutopilotTest < Minitest::Test
     assert_nil p.instance_variable_get(:@retreated), 'a heal back to the health it was sent at lifts it'
   end
 
+  # Review of #111: with the only way out leading into a place whose measured hit would take Link's health, the zero-frame cap waited 120 frames instead of asking.
+  def test_with_only_dangerous_ways_left_the_zero_frame_cap_hands_the_choice_to_the_model_with_the_danger_listed
+    log = Koholint::ExploreLog.new
+    log.absorb({ from: { room: 163, map: 16 }, exits: [{ row: 0, col: 5, direction: :up, outcome: :left, to: [147, 16] }] })
+    healers = Koholint::Healers.new
+    healers.saw(place: [147, 16], health: 24)
+    healers.saw(place: [147, 16], health: 0)
+    client = ScriptedClient.new(objective: new_place, default: explore)
+    @objectives = Koholint::Objectives.new(trace: trace)
+    p = Koholint::Policies::Delegated.new(client:, registry: Koholint::Skills::Registry.default, objectives: @objectives, manual: '', memory: Koholint::Policies::Memory.new(explore_log: log, healers:))
+    decide(p)
+    instant = outcome(:no_frontier, 0).merge(frames: 1, moved_cells: 0, cells_walked: 0)
+    3.times { |i| p.after_action(choice: { skill: 'explore', params: {} }, outcome: instant, state:, frame: 600 + i) }
+    calls = client.calls.size
+    result = p.decide(p.decision_point_for(state), state, { grid: })
+    assert_equal ['claude', calls + 1], [result[:agent], client.calls.size]
+    assert_match(/which no route to work enters: 147-16 \(24 hp\)/, client.calls.last[:prompt])
+  end
+
   def test_repeated_zero_frame_results_in_one_place_are_answered_by_the_harness
     client = ScriptedClient.new(objective: new_place, default: explore)
     p = autopiloted(client, autopilot: nil)

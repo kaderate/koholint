@@ -145,9 +145,10 @@ The skills, protocols and harness behaviours the agent works with. Versioned wit
   it is still a frontier, taken when nothing else here is reachable, before a route to another place. An explore that stops `no_frontier`
   in at most one frame is answered by the harness at the next decision, not after three, since from the same cell it would find none again.
 - flow-106: danger is measured per place: the largest hp drop between two decisions in each place, read back from the trace. A place whose measured hit is at or above Link's health is
-  never entered by a route to work (the harness's redirects and explore's own), never a least-visited fallback, and never left
-  into by a pocket or retreat side; a route to a given place (an objective's) may still cross it. With no safe way the choice
-  goes to the model, whose context lists those places with their hits.
+  never entered, as a hop or a destination, by a route to work (the harness's loop, zero-frame and guarded redirects, explore's own
+  search for work, explore following such a redirect) or by the least-visited fallback, and never left into by a pocket or retreat
+  side; an objective's route may still cross it. When those places are the only ways left, or the way back leads into one, the
+  zero-frame cap hands the choice to the model instead of waiting or retreating, and its context lists those places with their hits.
 - flow-105: survival comes first at every objective and skill choice, before the loop break: at or below the largest hp drop
   between two decisions measured on the lineage (read back from the trace), Link goes to the nearest place where a talk healed him
   by a known way through no place where enemies were seen, whatever the objective, with no model call, and the autopilot follows
