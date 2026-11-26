@@ -301,7 +301,7 @@ module Koholint
           @objectives.start(frame: state.frame, title: "Heal in #{place.join('-')}, where a talk healed Link before", predicate: { kind: 'reach_place', place: }, target:, autopilot: true)
           @objectives.current[:heal] = true
           @autopilot&.adopt(@objectives.current)
-          context[:aim] = { place: } unless place == state.place
+          context.merge!(aim: { place: }, ban: true) unless place == state.place
           why = crossing ? "the way to #{goal.join('-')} crosses enemies" : "the largest hit measured is #{@healers.hit} hp"
           choice = decision_point.name == :choose_objective ? @objectives.current.slice(:title, :predicate) : EXPLORE
           DecisionPoint.harness_choice(choice, "#{state.health} hp and #{why}: heal in #{place.join('-')} first (#{@healers.detours}/#{HEAL_DETOURS})", autopilot: true)

@@ -570,6 +570,30 @@ class DelegatedAutopilotTest < Minitest::Test
     refute_match(/heal/, p.decide(p.decision_point_for(low), low, { grid: })[:justification].to_s)
   end
 
+  # Review of #113 (diamond): the heal picked its place by the safe way but explore routed unbanned, so its first hop could enter the shorter dangerous way.
+  def test_the_heal_walk_keeps_to_the_safe_way_it_was_picked_by
+    log = Koholint::ExploreLog.new
+    log.absorb({ from: { room: 1, map: 0 }, exits: [{ row: 0, col: 5, direction: :up, outcome: :left, to: [2, 0] }, { row: 7, col: 5, direction: :down, outcome: :left, to: [3, 0] }] })
+    log.absorb({ from: { room: 2, map: 0 }, exits: [{ row: 0, col: 5, direction: :up, outcome: :left, to: [83, 0] }] })
+    log.absorb({ from: { room: 3, map: 0 }, exits: [{ row: 3, col: 9, direction: :right, outcome: :left, to: [4, 0] }] })
+    log.absorb({ from: { room: 4, map: 0 }, exits: [{ row: 0, col: 5, direction: :up, outcome: :left, to: [83, 0] }] })
+    healers = Koholint::Healers.new
+    healers.saw(place: [83, 0], health: 4)
+    healers.heard([83, 0])
+    healers.saw(place: [83, 0], health: 24)
+    [[3, 0], [4, 0]].each { |place| healers.saw(place:, health: 24) }
+    healers.saw(place: [2, 0], health: 16)
+    healers.saw(place: [2, 0], health: 8)
+    @objectives = Koholint::Objectives.new(trace: trace)
+    p = Koholint::Policies::Delegated.new(client: ScriptedClient.new(objective: new_place, default: explore), registry: Koholint::Skills::Registry.default, objectives: @objectives, manual: '',
+                                          memory: Koholint::Policies::Memory.new(explore_log: log, healers:))
+    low = state(frame: 100, room_id: 1, map_id: 0, hp: 8)
+    p.observe(low, frame: 100)
+    context = { grid: }
+    assert_match(/heal in 83-0 first/, p.decide(p.decision_point_for(low), low, context)[:justification])
+    assert_equal [3, 0], log.route([1, 0], goal: context.dig(:aim, :place), ban: context[:ban])[:next]
+  end
+
   # Stub fork 5b45 (0e98 @101300, flow-107): the heal set out at 8 hp in 66/0; at 4 hp the autopilot kept walking it through 66/0 toward 82/0,
   # both measured at 4 hp hits, and Link died at 102771.
   def test_an_objective_way_through_a_place_whose_measured_hit_would_take_links_health_is_left_to_the_model
