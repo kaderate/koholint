@@ -60,7 +60,7 @@ module Koholint
         track(place, current)
         # A live creature parked on a cell is no fixed object: its sprite never walls the cell off.
         live = Entities.read(emulator).select { |entity| Entities.live?(entity) }
-        statics = @statics.map { |(x, y), pattern| { x:, y:, pattern: } }.reject { |s| live.any? { |entity| Entities.sprite_of?(s, entity) } }.sort_by { |s| [s[:y], s[:x]] }
+        statics = @statics.map { |(x, y), pattern| { x:, y:, pattern: } }.reject { |s| live.any? { |entity| Entities.sprite_of?(s, entity) && Grid.sprite_cells(s.transform_keys(&:to_s)).include?(entity[:cell]) } }.sort_by { |s| [s[:y], s[:x]] }
         emit(state.frame, snapshot, statics) if changed?(snapshot, statics)
         cell = self.class.link_cell(state.x, state.y)
         grid = Grid.new(cells: grid_of(snapshot), static_sprites: statics.map { |s| s.transform_keys(&:to_s) }, beliefs: @beliefs, link: cell,

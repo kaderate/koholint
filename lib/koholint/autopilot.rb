@@ -60,7 +60,8 @@ module Koholint
       @probes = 0
       @probed = { place: nil, slots: [] }
       @held = nil
-      @killable = Set.new
+      @hostile = Set.new
+      @seen_health = nil
       @offspring = { place: nil }
     end
 
@@ -230,20 +231,33 @@ module Koholint
       distance = ->(entity) { [(entity[:x] - state.x).abs, (entity[:y] - state.y).abs].max }
       far = ->(entity) { here && @missed[:far].key?(entity[:slot]) && distance.(entity) > Geometry::CELL }
       offspring = offspring_slots(state, entities)
-      strikable = ->(entity) { entity[:kind].to_s == 'enemy' ? entity[:sword_hits] == 1 || (entity[:sword_hits] == 2 && entity[:sword_verified]) : safe && (offspring.include?(entity[:slot]) || @killable.include?(entity[:type])) }
+      strikable = ->(entity) { entity[:kind].to_s == 'enemy' ? entity[:sword_hits] == 1 || (entity[:sword_hits] == 2 && entity[:sword_verified]) : safe && offspring.include?(entity[:slot]) }
       Array(entities).select { |entity| strikable.(entity) && (!@fight_hurt || entity[:sword_verified]) && entity[:cell] && entity[:x] && !missed.include?(entity[:slot]) && !far.(entity) }
                      .select { |entity| distance.(entity) <= FIGHT_SIGHT }
                      .min_by { |entity| [distance.(entity), entity[:slot]] }
     end
 
-    # A creature not identified but catalogued as moving (an uncatalogued thing may be a person) that stands in touch when a walk or a strike stopped short is struck once, once per slot per visit and PROBE_LIMIT
-    # times per run, never at one heart nor where the measured hit says no (safe); a kill makes its type one to fight on sight for the run.
+    # Health lost with a creature catalogued as moving within a cell of Link is the evidence that its type may hurt, for the session.
+    def note_contact(state:, entities:)
+      lost = @seen_health && state.health && state.health < @seen_health
+      @seen_health = state.health
+      return unless lost && state.cell
+
+      row, col = state.cell
+      @hostile |= Array(entities).select { |entity| Entities.creature?(entity) && entity[:moves] == true && entity[:cell] }
+                                 .select { |entity| [(entity[:cell][0] - row).abs, (entity[:cell][1] - col).abs].max <= 1 }.map { |entity| entity[:type] }
+    end
+
+    # A creature not identified whose type hurt Link with it in touch, standing in touch when a walk or a strike stopped short, gets one sword strike
+    # (the attack's strikes capped at 1 through the context): once per slot per visit and PROBE_LIMIT times per session, never at one heart, where the
+    # measured hit says no (safe) or with a person on screen.
     def probe_choice(state:, entities:, safe:)
       return unless safe && @since && @held && state.phase == :playing && state.cell && state.health > Perception::HP_PER_HEART && @probes < PROBE_LIMIT
+      return if Array(entities).any? { |entity| entity[:kind].to_s == 'npc' }
 
       @probed = { place: state.place, slots: [] } unless @probed[:place] == state.place
       row, col = state.cell
-      target = Array(entities).select { |entity| Entities.creature?(entity) && entity[:moves] == true && entity[:cell] && !@probed[:slots].include?(entity[:slot]) }
+      target = Array(entities).select { |entity| Entities.creature?(entity) && @hostile.include?(entity[:type]) && entity[:cell] && !@probed[:slots].include?(entity[:slot]) }
                               .select { |entity| [(entity[:cell][0] - row).abs, (entity[:cell][1] - col).abs].max <= 1 }
                               .min_by { |entity| [(entity[:cell][0] - row).abs + (entity[:cell][1] - col).abs, entity[:slot]] } or return
       stop = @held
@@ -251,7 +265,7 @@ module Koholint
       @probes += 1
       @probed[:slots] << target[:slot]
       DecisionPoint.harness_choice({ skill: 'attack', params: { row: target[:cell][0], col: target[:cell][1] } },
-                                   "autopilot: strike the unidentified type #{target[:type]} at (#{target[:cell].join(',')}), in touch after a #{stop} stop (probe #{@probes}/#{PROBE_LIMIT})", autopilot: true)
+                                   "autopilot: strike the unidentified type #{target[:type]} at (#{target[:cell].join(',')}) once, in touch after a #{stop} stop (probe #{@probes}/#{PROBE_LIMIT})", autopilot: true).merge(strikes: 1)
     end
 
     # At one heart or less with an enemy within a cell of its touch, step away from every such enemy before the model decides.
@@ -368,8 +382,8 @@ module Koholint
       @struck = { place: nil, types: [] } if to.is_a?(Hash) && @struck[:place] && [to[:room], to[:map]] != @struck[:place]
     end
 
-    # A walk or strike that stopped short arms the probe until the next skill. A strike that killed a thing not catalogued as an enemy makes its type
-    # strikable for the run. A hit that left an enemy's slot to something else marks that spot: what appears there is fought as an enemy until struck once.
+    # A walk or strike that stopped short arms the probe until the next skill. A hit that left an enemy's slot to something else marks that spot:
+    # what appears there is fought as an enemy until struck once.
     def note_probe(skill, outcome)
       skill = skill.to_s
       stop = outcome[:stopped_by].to_s
@@ -383,18 +397,16 @@ module Koholint
       return unless skill == 'attack' && target.is_a?(Hash) && from.is_a?(Hash)
 
       enemy = Entities.catalogue.dig(target[:type], :kind).to_s == 'enemy'
-      @killable << target[:type] if stop == 'done' && !enemy
       @offspring[:slots] -= [target[:slot]] if @offspring[:slots]
       @offspring = { place: [from[:room], from[:map]], slot: target[:slot], type: target[:type], cell: target[:cell] } if stop == 'target_gone' && enemy
     end
 
-    # Taken once, at the first look after the hit: the struck slot under another type, and creatures within a cell of where it stood.
+    # Taken once, at the first look after the hit: creatures catalogued as moving in the struck slot under another type or on the cell where it stood.
     def offspring_slots(state, entities)
       return [] unless @offspring[:place] == state.place
 
       unless @offspring[:slots]
-        near = ->(cell) { cell && @offspring[:cell] && [(cell[0] - @offspring[:cell][0]).abs, (cell[1] - @offspring[:cell][1]).abs].max <= 1 }
-        @offspring[:slots] = Array(entities).select { |entity| Entities.creature?(entity) && entity[:type] != @offspring[:type] && (entity[:slot] == @offspring[:slot] || near.(entity[:cell])) }
+        @offspring[:slots] = Array(entities).select { |entity| Entities.creature?(entity) && entity[:moves] == true && entity[:type] != @offspring[:type] && (entity[:slot] == @offspring[:slot] || entity[:cell] == @offspring[:cell]) }
                                             .map { |entity| entity[:slot] }
       end
       @offspring[:slots]

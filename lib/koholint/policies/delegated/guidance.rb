@@ -164,6 +164,7 @@ module Koholint
         def autopilot_choice(decision_point, state, context)
           return unless @autopilot && decision_point.name == :choose_skill && !@sequence && !@reading && !hemmed?(state)
 
+          @autopilot.note_contact(state:, entities: entities_now)
           disengage = @autopilot.disengage_choice(state:, entities: entities_now, grid: context[:grid])
           return disengage.tap { @autopilot_acting = true } if disengage
 
@@ -176,7 +177,11 @@ module Koholint
           return fight.tap { @autopilot_acting = true } if fight
 
           probe = @autopilot.probe_choice(state:, entities: entities_now, safe:)
-          return probe.tap { @autopilot_acting = true } if probe
+          if probe
+            context[:strikes] = probe.delete(:strikes)
+            @autopilot_acting = true
+            return probe
+          end
 
           door = @autopilot.door_choice(state:, doors: objects_now.select { |object| object[:kind].to_s == 'door' }.map { |object| object[:cell] })
           return door.tap { @autopilot_acting = true } if door
