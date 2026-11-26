@@ -448,8 +448,9 @@ module Koholint
 
     def beyond?(tier, place, key) = tier == :consistent && contradicted?(place, key)
 
-    # Whether a screen lies farther toward a side than another on the same map grid; interiors lie nowhere.
+    # Whether a screen lies farther toward a side than another on the same map grid; an interior lies where the screen it opens from lies.
     def lies?(from, place, side)
+      from, place = [from, place].map { |at| PlaceKinds.grid?(at) ? at : @edges.find { |screen, ways| PlaceKinds.grid?(screen) && ways.value?(at) }&.first || at }
       return false unless from[1] == place[1] && PlaceKinds.grid?(from) && PlaceKinds.grid?(place)
 
       (fc, fr), (pc, pr) = PlaceKinds.cell(from), PlaceKinds.cell(place)

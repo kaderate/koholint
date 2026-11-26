@@ -317,6 +317,8 @@ class ExploreTest < Minitest::Test
     right, = explore(rows, explore_log: log, params: { 'direction' => 'right' }, limit: 2)
     assert_equal [:nothing_toward, 0], right.values_at(:stopped_by, :cells_walked)
     assert_equal 'no untried work toward right; the nearest is on the way to 0-0: the left exit at (4,0)', right[:cause]
+    log.absorb({ from: { room: 2, map: 0 }, exits: [{ row: 2, col: 4, direction: :up, outcome: :left, to: [162, 14], kind: :door }] })
+    assert_equal [162, 14], log.route([1, 0], toward: :right)&.dig(:goal), 'an interior lies where the screen it opens from lies'
   end
 
   def test_untried_exits_that_cannot_be_reached_yet_send_explore_to_the_frontier_before_another_place
