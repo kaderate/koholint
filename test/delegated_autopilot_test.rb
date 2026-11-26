@@ -719,6 +719,46 @@ class DelegatedAutopilotTest < Minitest::Test
     assert_equal 'souvenir-165-16-t64', @objectives.current[:candidate]
   end
 
+  # Review of #115 (KOHO-146): a lead the guard sets aside goes back to the menu, never to a harness-alone take, as with a heal.
+  def test_a_lead_the_guard_sets_aside_is_never_taken_up_again_by_the_harness_alone
+    leads = Koholint::Leads.from_events([{ 'type' => 'lead', 'id' => 'lead-27', 'place' => [162, 14], 'where' => '164-16', 'quote' => "Tu m'apportes le Champignon",
+                                           'claim' => 'The witch wants the mushroom', 'importance' => 'high' }])
+    @objectives = Koholint::Objectives.new(trace: trace)
+    client = ScriptedClient.new(objective: new_place, default: explore)
+    p = Koholint::Policies::Delegated.new(client:, registry: Koholint::Skills::Registry.default, objectives: @objectives, manual: '', memory: Koholint::Policies::Memory.new(leads:))
+    p.instance_variable_set(:@entities_reader, -> { [{ slot: 2, type: 27, kind: 'enemy', x: 84, y: 60, contact: 11, cell: [3, 5] }] })
+    decide(p)
+    @objectives.abandon(frame: 200, reason: 'test') if @objectives.current
+    @objectives.start(frame: 250, title: 'Go to 164-16', predicate: { kind: 'reach_place', place: [164, 16] }, candidate: 'lead-27', target: { kind: 'lead', place: [164, 16], lead: 'lead-27' })
+    [300, 800, 1300].each do |frame|
+      here = state(frame:, hp: 24)
+      p.instance_variable_set(:@retreated, nil)
+      result = p.decide(p.decision_point_for(here), here, { grid: })
+      p.after_action(choice: result[:choice], outcome: outcome(:no_frontier, 0).merge(frames: 1, moved_cells: 0, cells_walked: 0), state: here, frame:)
+      result = p.decide(p.decision_point_for(here), here, { grid: })
+      p.after_action(choice: result[:choice], outcome: outcome(:known_place, 0).merge(frames: 40, moved_cells: 2, cells_walked: 2), state: here, frame: frame + 1)
+    end
+    assert_equal ['lead-27', 'guarded'], @objectives.history.last.values_at(:candidate, :reason)
+    @objectives.abandon(frame: 1400, reason: 'test')
+    later = state(frame: 1500, room_id: 165, hp: 24)
+    p.observe(later, frame: 1500)
+    refute_match(/lead-27/, p.decide(p.decision_point_for(later), later, { grid: })[:justification].to_s)
+    refute_equal 'lead-27', @objectives.current&.dig(:candidate)
+  end
+
+  # Review of #115 (KOHO-146): a delivery the menu no longer offers is not taken up again when the heal is over.
+  def test_the_objective_a_heal_set_aside_is_not_taken_up_again_once_the_menu_no_longer_offers_it
+    p = heal_lineage_with_a_souvenir
+    low = state(frame: 98678, hp: 8, item_b: 12)
+    p.observe(low, frame: 98678)
+    assert_match(/heal in 164-16 first/, p.decide(p.decision_point_for(low), low, { grid: })[:justification])
+    @objectives.abandon(frame: 101800, reason: 'test')
+    healed = state(frame: 101838, hp: 24, room_id: 164)
+    p.observe(healed, frame: 101838)
+    refute_match(/heal is over/, p.decide(p.decision_point_for(healed), healed, { grid: })[:justification].to_s)
+    refute_equal 'souvenir-165-16-t64', @objectives.current&.dig(:candidate)
+  end
+
   def test_a_heal_objective_in_a_place_with_several_people_closes_when_hp_rises_not_on_arrival
     @objectives = Koholint::Objectives.new(trace: trace)
     @objectives.start(frame: 100, title: 'Heal in 164-16, where a talk healed Link before', predicate: { kind: 'reach_place', place: [164, 16] }, target: { kind: 'place', place: [164, 16], heal_below: 8 })

@@ -250,8 +250,10 @@ module Koholint
         end
 
         # A delivery the loop break dropped is a lead the loop says nothing about, so it is taken up again once the loop is cut, REOFFERS times at most.
+        # A lead's claim is model-written, so a lead set aside goes back to the menu, never to a harness-alone take.
         def note_dropped(objective, any: false, heal: false)
           return unless objective && (any || DROPPED.any? { |prefix| objective[:candidate].to_s.start_with?(prefix) })
+          return if objective[:candidate].to_s.start_with?('lead-')
 
           @dropped = objective.slice(:title, :predicate, :candidate, :target)
           @dropped_for_heal = heal
@@ -264,8 +266,6 @@ module Koholint
           objective = @dropped
           @dropped = nil
           @dropped_for_heal = false
-          # A lead's claim is model-written, so a lead dropped by a heal goes back to the menu, never to a harness-alone take.
-          return if objective[:candidate].to_s.start_with?('lead-')
           return if objective[:candidate] && build_candidates(state, context).none? { |candidate| candidate[:id] == objective[:candidate] }
 
           @loop_watch.act!
