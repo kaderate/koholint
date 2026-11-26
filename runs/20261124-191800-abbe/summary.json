@@ -28,14 +28,14 @@
       "frame": 60404
     },
     {
-      "name": "mushroom",
+      "name": "mushroom?",
       "frame": 91615
     }
   ],
   "held": [
     "sword",
     "shield",
-    "mushroom"
+    "mushroom?"
   ],
   "places_seen": 68,
   "objectives": {

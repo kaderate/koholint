@@ -167,11 +167,11 @@ class SummaryTest < Minitest::Test
               { 'type' => 'item_gained', 'frame' => 100_134, 'item' => 12, 'name' => 'magic powder', 'form' => 'magic powder' },
               { 'type' => 'item_gained', 'frame' => 100_200, 'item' => 4, 'name' => 'shield' },
               { 'type' => 'perception', 'frame' => 100_300, 'state' => PLAYING.merge('item_a' => 1, 'item_b' => 12, 'inventory' => [4] + Array.new(9, 0), 'magic_powder' => 20) }]
-    assert_equal [{ name: 'shield', frame: 3906 }, { name: 'mushroom', frame: 91_615 }, { name: 'magic powder', frame: 100_134 }], Koholint::Summary.milestones(events)
-    assert_equal ['sword', 'shield', 'magic powder'], Koholint::Summary.held(events)
+    assert_equal [{ name: 'shield', frame: 3906 }, { name: 'mushroom?', frame: 91_615 }, { name: 'magic powder?', frame: 100_134 }], Koholint::Summary.milestones(events)
+    assert_equal ['sword', 'shield', 'magic powder?'], Koholint::Summary.held(events)
     assert_empty Koholint::Summary.held([])
     sword = { 'type' => 'perception', 'frame' => 60_404, 'state' => PLAYING.merge('milestone' => 'sword') }
-    assert_equal %w[shield sword mushroom magic\ powder], Koholint::Summary.milestones(events.insert(1, sword)).map { |milestone| milestone[:name] }
+    assert_equal %w[shield sword mushroom? magic\ powder?], Koholint::Summary.milestones(events.insert(1, sword)).map { |milestone| milestone[:name] }
     assert_equal [{ name: 'shield', frame: 10 }], Koholint::Summary.milestones([{ 'type' => 'perception', 'frame' => 10, 'state' => PLAYING.merge('milestone' => 'shield') }])
   end
 

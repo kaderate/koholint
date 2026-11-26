@@ -12,12 +12,12 @@ require 'koholint/zero_watch'
 module Koholint
   module Policies
     Memory = Data.define(:ledger, :triggers, :talk_log, :explore_log, :leads, :cards, :loop_watch, :zero_watch, :item_names, :item_tries, :stalled, :healers,
-                         :heal_detours, :retreats, :reoffers) do
+                         :heal_detours, :retreats, :reoffers, :souvenirs_taken) do
       def initialize(ledger: nil, triggers: nil, talk_log: nil, explore_log: nil, leads: nil, cards: {}, loop_watch: nil, zero_watch: nil, item_names: {},
-                     item_tries: {}, stalled: [], healers: nil, heal_detours: 0, retreats: [], reoffers: {})
+                     item_tries: {}, stalled: [], healers: nil, heal_detours: 0, retreats: [], reoffers: {}, souvenirs_taken: [])
         super(ledger: ledger || Ledger.new, triggers: triggers || Triggers.new, talk_log: talk_log || TalkLog.new, explore_log: explore_log || ExploreLog.new,
               leads: leads || Leads.new, cards:, loop_watch: loop_watch || LoopWatch.new, zero_watch: zero_watch || ZeroWatch.new, item_names:, item_tries:, stalled:,
-              healers: healers || Healers.new, heal_detours:, retreats:, reoffers:)
+              healers: healers || Healers.new, heal_detours:, retreats:, reoffers:, souvenirs_taken:)
       end
 
       def self.from_events(events)
@@ -25,7 +25,7 @@ module Koholint
             explore_log: ExploreLog.from_events(events), leads: Leads.from_events(events), cards: PlaceCard.latest(events),
             loop_watch: LoopWatch.from_events(events), zero_watch: ZeroWatch.from_events(events), item_names: Items.pickup_names(events), item_tries: item_tries(events), stalled: stalled(events),
             healers: Healers.from_events(events), heal_detours: events.count { |event| event['type'] == 'objective' && event['status'] == 'abandoned' && event['reason'] == 'heal' },
-            retreats: retreats(events), reoffers: reoffers(events))
+            retreats: retreats(events), reoffers: reoffers(events), souvenirs_taken: souvenirs_taken(events))
       end
 
       RETREAT = /\(retreat by the (\S*) side\)/
@@ -37,6 +37,10 @@ module Koholint
           side = event['type'] == 'decision' && event['justification'].to_s[RETREAT, 1]
           [[event.dig('input', 'room_id'), event.dig('input', 'map_id')], side, event['frame']] if side
         end
+      end
+
+      def self.souvenirs_taken(events)
+        events.filter_map { |event| event['candidate'] if event['type'] == 'objective' && event['status'] == 'started' && event['candidate'].to_s.start_with?('souvenir-') }.uniq
       end
 
       def self.reoffers(events)

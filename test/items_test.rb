@@ -118,10 +118,10 @@ class ItemsTest < Minitest::Test
   end
 
   def test_item_12_is_the_mushroom_until_the_powder_count_names_it_the_magic_powder
-    assert_equal 'mushroom', Items.name(12)
-    assert_equal 'mushroom', Items.name(12, state(item_b: 12, magic_powder: 0))
-    assert_equal 'magic powder', Items.name(12, state(item_b: 12, magic_powder: 20))
-    assert_equal 'magic powder', Items.name(12, { 'magic_powder' => 20 })
+    assert_equal 'mushroom?', Items.name(12)
+    assert_equal 'mushroom?', Items.name(12, state(item_b: 12, magic_powder: 0))
+    assert_equal 'magic powder?', Items.name(12, state(item_b: 12, magic_powder: 20))
+    assert_equal 'magic powder?', Items.name(12, { 'magic_powder' => 20 })
     assert_equal 12, Items.find('magic powder')
     assert_includes Items.names(Items.catalogue[12]), 'poudre magique'
   end
@@ -129,10 +129,10 @@ class ItemsTest < Minitest::Test
   def test_watch_emits_the_magic_powder_when_the_held_mushroom_becomes_it
     watch = Koholint::ItemWatch.new
     watch.observe(state(item_a: 1))
-    assert_equal [{ item: 12, name: 'mushroom', place: [163, 16], held: [1, 12] }], watch.observe(state(item_a: 1, item_b: 12))
+    assert_equal [{ item: 12, name: 'mushroom?', place: [163, 16], held: [1, 12] }], watch.observe(state(item_a: 1, item_b: 12))
     assert_empty watch.observe(state(item_a: 1))
     gained = watch.observe(state(item_a: 1, item_b: 12, magic_powder: 20))
-    assert_equal [{ item: 12, name: 'magic powder', form: 'magic powder', place: [163, 16], held: [1, 12] }], gained
+    assert_equal [{ item: 12, name: 'magic powder?', form: 'magic powder', place: [163, 16], held: [1, 12] }], gained
     assert_empty watch.observe(state(item_a: 1, item_b: 12, magic_powder: 19))
   end
 
@@ -168,6 +168,6 @@ class ItemsTest < Minitest::Test
     assert_equal 'Items (a ? marks a name not yet measured): A empty, B shield (id 4); inventory slots: 2 bombs? (id 2)', text
     assert_includes Koholint::Agents::Context.send(:items_line, state), 'inventory slots: all empty'
     powder = Koholint::Agents::Context.send(:items_line, state(item_b: 12, magic_powder: 20))
-    assert_includes powder, 'B magic powder (id 12)'
+    assert_includes powder, 'B magic powder? (id 12)'
   end
 end
