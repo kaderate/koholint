@@ -813,6 +813,21 @@ class DelegatedAutopilotTest < Minitest::Test
     assert_equal 2, client.calls.size
   end
 
+  # Runs d871, 0e98 and 2c93 (g6): 84/0 had hit Link for 8 hp (d871 98187); the harness then tried types 185 and 203 there with talk_to and took 8 hp
+  # each time (d871 102332, 0e98 101616, 2c93 101833 and 102369).
+  def test_the_harness_tries_nothing_in_a_place_that_has_hurt_link
+    client = ScriptedClient.new(objective: new_place, default: explore)
+    p = autopiloted(client)
+    ctx = { grid:, entities: -> { [{ kind: :unknown, type: 185, cell: [2, 2], slot: 3, x: 40, y: 48 }] } }
+    p.prepare(ctx)
+    p.note_card({ place: [163, 16], unknown: [{ type: 185, cell: [2, 2] }] })
+    p.observe(state(frame: 50, hp: 24), frame: 50)
+    p.observe(state(frame: 60, hp: 16), frame: 60)
+    tours(p, 2)
+    result = p.decide(p.decision_point_for(state(frame: 800)), state(frame: 800), ctx)
+    refute_equal 'talk_to', result[:choice][:skill], result[:justification]
+  end
+
   def test_a_still_entity_whose_try_gave_nothing_is_touched_through_a_point_the_model_never_sees
     client = ScriptedClient.new(objective: new_place, default: explore)
     p = autopiloted(client)

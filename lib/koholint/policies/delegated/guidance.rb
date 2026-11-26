@@ -180,7 +180,8 @@ module Koholint
           return touch.merge(decision_point: @touch_point).tap { @autopilot_acting = true } if touch
 
           place = state.place
-          trial = @autopilot.try_choice(state:, objective: @objectives.current, entities: entities_now, tried: ->(type) { @explore_log.met?(place, type) })
+          # A place that has hurt Link is no place to try unknown things: the model may still choose to.
+          trial = @autopilot.try_choice(state:, objective: @objectives.current, entities: entities_now, tried: ->(type) { @explore_log.met?(place, type) }) unless @healers.hits.key?(place)
           return trial.tap { @autopilot_acting = true } if trial
 
           follow = follow_choice(state)
