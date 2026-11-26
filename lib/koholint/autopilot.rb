@@ -33,9 +33,6 @@ module Koholint
     HEART_LIMIT = 2
     HEART_ENDS = %w[done target_gone].freeze
     STEP = { up: [0, -1], down: [0, 1], left: [-1, 0], right: [1, 0] }.freeze
-    PROBE_SKILLS = %w[explore goto walk attack].freeze
-    PROBE_STOPS = %w[enemy blocked no_path no_frontier out_of_reach].freeze
-    PROBE_LIMIT = 6
 
     attr_reader :chain, :chain_limit, :chain_frames
 
@@ -57,10 +54,6 @@ module Koholint
       @try_place = nil
       @trial = nil
       @touchable = []
-      @probes = 0
-      @probed = { place: nil, slots: [] }
-      @held = nil
-      @hostile = Set.new
       @seen_health = nil
       @offspring = { place: nil }
     end
@@ -93,7 +86,7 @@ module Koholint
       note_hurt(outcome) if skill.to_s == 'attack' && outcome.is_a?(Hash) && outcome[:stopped_by].to_s == 'damage' && outcome[:from].is_a?(Hash)
       note_missed(outcome) if skill.to_s == 'attack' && outcome.is_a?(Hash)
       note_struck(skill, outcome) if outcome.is_a?(Hash)
-      note_probe(skill, outcome) if outcome.is_a?(Hash)
+      note_offspring(skill, outcome) if outcome.is_a?(Hash)
       note_walled(outcome) if skill.to_s == 'walk' && outcome.is_a?(Hash) && outcome[:params].is_a?(Hash) && walled?(outcome)
       explored = skill.to_s == 'explore' && outcome.is_a?(Hash)
       @stop = stop_after(skill.to_s, outcome.is_a?(Hash) ? outcome[:stopped_by].to_s : nil) unless @heart_touch && skill.to_s == 'touch' && outcome.is_a?(Hash) && HEART_ENDS.include?(outcome[:stopped_by].to_s)
@@ -237,37 +230,6 @@ module Koholint
                      .min_by { |entity| [distance.(entity), entity[:slot]] }
     end
 
-    # Health lost with a creature catalogued as moving within a cell of Link is the evidence that its type may hurt, for the session.
-    def note_contact(state:, entities:)
-      lost = @seen_health && state.health && state.health < @seen_health
-      @seen_health = state.health
-      return unless lost && state.cell
-
-      row, col = state.cell
-      @hostile |= Array(entities).select { |entity| Entities.creature?(entity) && entity[:moves] == true && entity[:cell] }
-                                 .select { |entity| [(entity[:cell][0] - row).abs, (entity[:cell][1] - col).abs].max <= 1 }.map { |entity| entity[:type] }
-    end
-
-    # A creature not identified whose type hurt Link with it in touch, standing in touch when a walk or a strike stopped short, gets one sword strike
-    # (the attack's strikes capped at 1 through the context): once per slot per visit and PROBE_LIMIT times per session, never at one heart, where the
-    # measured hit says no (safe) or with a person on screen.
-    def probe_choice(state:, entities:, safe:)
-      return unless safe && @since && @held && state.phase == :playing && state.cell && state.health > Perception::HP_PER_HEART && @probes < PROBE_LIMIT
-      return if Array(entities).any? { |entity| entity[:kind].to_s == 'npc' }
-
-      @probed = { place: state.place, slots: [] } unless @probed[:place] == state.place
-      row, col = state.cell
-      target = Array(entities).select { |entity| Entities.creature?(entity) && @hostile.include?(entity[:type]) && entity[:cell] && !@probed[:slots].include?(entity[:slot]) }
-                              .select { |entity| [(entity[:cell][0] - row).abs, (entity[:cell][1] - col).abs].max <= 1 }
-                              .min_by { |entity| [(entity[:cell][0] - row).abs + (entity[:cell][1] - col).abs, entity[:slot]] } or return
-      stop = @held
-      @held = nil
-      @probes += 1
-      @probed[:slots] << target[:slot]
-      DecisionPoint.harness_choice({ skill: 'attack', params: { row: target[:cell][0], col: target[:cell][1] } },
-                                   "autopilot: strike the unidentified type #{target[:type]} at (#{target[:cell].join(',')}) once, in touch after a #{stop} stop (probe #{@probes}/#{PROBE_LIMIT})", autopilot: true).merge(strikes: 1)
-    end
-
     # At one heart or less with an enemy within a cell of its touch, step away from every such enemy before the model decides.
     def disengage_choice(state:, entities:, grid: nil)
       return unless @since && state.phase == :playing && state.x && state.cell && state.health <= Perception::HP_PER_HEART && @disengaged < DISENGAGE_LIMIT
@@ -382,14 +344,12 @@ module Koholint
       @struck = { place: nil, types: [] } if to.is_a?(Hash) && @struck[:place] && [to[:room], to[:map]] != @struck[:place]
     end
 
-    # A walk or strike that stopped short arms the probe until the next skill. A hit that left an enemy's slot to something else marks that spot:
-    # what appears there is fought as an enemy until struck once.
-    def note_probe(skill, outcome)
+    # A hit that left an enemy's slot to something else marks that spot: what appears there is fought as an enemy until struck once.
+    def note_offspring(skill, outcome)
       skill = skill.to_s
       stop = outcome[:stopped_by].to_s
       return if %w[wait advance_dialogue].include?(skill)
 
-      @held = PROBE_SKILLS.include?(skill) && PROBE_STOPS.include?(stop) ? stop : nil
       from = outcome[:from]
       to = outcome[:to]
       target = outcome[:target]

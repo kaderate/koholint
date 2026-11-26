@@ -88,7 +88,7 @@ entity table, records its position, type and matching sprites, then in throwaway
 places Link next to it on each side and presses A, with a control copy where the slot is cleared (a dialogue that also
 opens in the control is not the entity's); pins Link on it for 90 frames and compares health with the control; watches
 whether it moves; and talks to it twice and at a shifted frame to compare conversation signatures. Reports go to
-`tmp/entities/*.json` and feed `data/entities.json` (kinds) and `data/addresses.json`.
+`tmp/entities/*.json` and feed `data/entities.json` (kinds, and with the runs' `hurt` notables the `hurts` facts) and `data/addresses.json`.
 
 ## Object census
 

@@ -70,7 +70,7 @@ is the threat interface; `navigation/stones.rb` searches the pushes that open a 
 `composite` (learned capabilities). Every skill reports how it stopped (`done`, `blocked`, `no_path`, …).
 `explore_log.rb` keeps per place what explore walked, the exits and doors tried and their destinations, surveys and the exit
 graph, and cuts a way found unreachable from the landing Link entered by (dropped when Link leaves a room where a stone was pushed); `ledger.rb` counts blocked edges, `triggers.rb` forbids inputs that re-fire a scripted event, `talk_log.rb` remembers
-what each person and sign said and which items were handed over where, `healers.rb` finds the places where a talk raised Link's hp and the largest hit measured, overall and per place, `hurts.rb` keeps the types nearest Link when he lost hp as hostile hypotheses with their hit, `revisit.rb` drives the harness's own talks to people, signs and chests, and `dialogues.rb`
+what each person and sign said and which items were handed over where, `healers.rb` finds the places where a talk raised Link's hp and the largest hit measured, overall and per place, `hurts.rb` makes a type an enemy at its hit from the `hurts` facts of data/entities.json and the `hurt` notables of the lineage (the thing nearest Link when he lost hp), `revisit.rb` drives the harness's own talks to people, signs and chests, and `dialogues.rb`
 stitches dialogue pages into texts. Their behaviour per flow is in `docs/AGENT_SKILLS.md`.
 
 **Exit graph and puzzles** (`explore_log.rb`) — every crossing is an observation `(place, way) -> place`. A first crossing that
@@ -107,8 +107,8 @@ Every policy inherits the no-op hooks of `policies/base.rb` (`observe`, `prepare
   settle waits, revisits, hemmed probes, loop breaks, zero caps, item objectives (a person whose recorded text names a held item, by
   those name words, is talked to with it held, then given it with `use_item`), the explore autopilot (`autopilot.rb`, which also takes a
   visible heart below full health, fights on sight through a `fight` hook in the skill context that explore checks every frame the enemies one strike or two
-  verified strikes kill and the moving creatures a hit left in an enemy's slot, and gives one strike to a creature not identified whose type hurt Link
-  with it in touch; its fight, probe and hostility memories live for the session, so a resume or a fork starts with none) and automatic
+  verified strikes kill and the moving creatures a hit left in an enemy's slot; its fight memories live for the session, so a resume or a fork
+  starts with none) and automatic
   objectives. An invalid answer falls back to a wait; 5 fallbacks in a row stop the run.
 - `policies/start_game.rb` runs the intro and wraps the policy of every CLI run, forwarding the hooks to it.
 - `policies/walk_and_talk.rb` is the deterministic baseline.

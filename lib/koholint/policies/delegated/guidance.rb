@@ -164,7 +164,6 @@ module Koholint
         def autopilot_choice(decision_point, state, context)
           return unless @autopilot && decision_point.name == :choose_skill && !@sequence && !@reading && !hemmed?(state)
 
-          @autopilot.note_contact(state:, entities: entities_now)
           disengage = @autopilot.disengage_choice(state:, entities: entities_now, grid: context[:grid])
           return disengage.tap { @autopilot_acting = true } if disengage
 
@@ -176,13 +175,6 @@ module Koholint
           fight = @autopilot.fight_choice(state:, entities: entities_now, objects: objects_now, safe:)
           return fight.tap { @autopilot_acting = true } if fight
 
-          probe = @autopilot.probe_choice(state:, entities: entities_now, safe:)
-          if probe
-            context[:strikes] = probe.delete(:strikes)
-            @autopilot_acting = true
-            return probe
-          end
-
           door = @autopilot.door_choice(state:, doors: objects_now.select { |object| object[:kind].to_s == 'door' }.map { |object| object[:cell] })
           return door.tap { @autopilot_acting = true } if door
 
@@ -190,8 +182,7 @@ module Koholint
           return touch.merge(decision_point: @touch_point).tap { @autopilot_acting = true } if touch
 
           place = state.place
-          # A place that has hurt Link is no place to try unknown things: the model may still choose to.
-          trial = @autopilot.try_choice(state:, objective: @objectives.current, entities: entities_now, tried: ->(type) { @explore_log.met?(place, type) }) unless @healers.hits.key?(place)
+          trial = @autopilot.try_choice(state:, objective: @objectives.current, entities: entities_now, tried: ->(type) { @explore_log.met?(place, type) })
           return trial.tap { @autopilot_acting = true } if trial
 
           follow = follow_choice(state)
@@ -261,13 +252,12 @@ module Koholint
 
         # A delivery the loop break dropped is a lead the loop says nothing about, so it is taken up again once the loop is cut, REOFFERS times at most.
         # A lead's claim is model-written, so a lead set aside goes back to the menu, never to a harness-alone take.
-        def note_dropped(objective, any: false, heal: false, why: 'the loop is cut')
+        def note_dropped(objective, any: false, heal: false)
           return unless objective && (any || DROPPED.any? { |prefix| objective[:candidate].to_s.start_with?(prefix) })
           return if objective[:candidate].to_s.start_with?('lead-')
 
           @dropped = objective.slice(:title, :predicate, :candidate, :target)
           @dropped_for_heal = heal
-          @dropped_why = why
         end
 
         # Once the heal is over, the objective it set aside comes back first, before a loop break and outside the re-offer cap.
@@ -298,7 +288,7 @@ module Koholint
           @reoffers[key] += 1
           @objectives.start(frame: state.frame, **objective, autopilot: true)
           @autopilot&.adopt(@objectives.current)
-          DecisionPoint.harness_choice(objective.slice(:title, :predicate), "#{@dropped_why}: #{key}, set aside, is taken up again (#{@reoffers[key]}/#{REOFFERS})", autopilot: true)
+          DecisionPoint.harness_choice(objective.slice(:title, :predicate), "the loop is cut: #{key}, set aside, is taken up again (#{@reoffers[key]}/#{REOFFERS})", autopilot: true)
         end
 
         # Survival before anything else, at every decision: at or below the largest hit measured on the lineage (the next one may kill), by a way through no place

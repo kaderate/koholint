@@ -804,78 +804,6 @@ class DelegatedAutopilotTest < Minitest::Test
     refute_match(/fight type/, p.decide(p.decision_point_for(now), now, { grid: })[:justification].to_s)
   end
 
-  def c5_probe(entities, hurt: true)
-    client = ScriptedClient.new(objective: new_place, default: explore)
-    p = autopiloted(client)
-    p.instance_variable_set(:@entities_reader, -> { entities })
-    start = state(frame: 98300, room_id: 66, map_id: 0, x: 92, y: 131)
-    decide(p, start)
-    p.observe(start, frame: 98300)
-    first = p.decide(p.decision_point_for(start), start, { grid: })
-    p.after_action(choice: first[:choice], outcome: outcome(:budget, 0).merge(from: { room: 66, map: 0, row: 7, col: 5 }, to: { room: 66, map: 0, row: 7, col: 5 }), state: start, frame: 98375)
-    hurt_at = state(frame: 98391, room_id: 66, map_id: 0, x: 92, y: 131, hp: hurt ? 20 : 24)
-    p.observe(hurt_at, frame: 98391)
-    decision = p.decide(p.decision_point_for(hurt_at), hurt_at, { grid: })
-    stopped = outcome(:no_frontier, 0).merge(moved_cells: 0, cells_walked: 0, from: { room: 66, map: 0, row: 7, col: 5 }, to: { room: 66, map: 0, row: 7, col: 5 })
-    p.after_action(choice: decision[:choice], outcome: stopped, state: hurt_at, frame: 98400)
-    now = state(frame: 98410, room_id: 66, map_id: 0, x: 92, y: 131, hp: hurt ? 20 : 24)
-    p.observe(now, frame: 98410)
-    context = { grid: }
-    [p.decide(p.decision_point_for(now), now, context), context]
-  end
-
-  # Paid fork g7-2 (4e10, flow-108), C5 (66/0): Link lost 4 hp at 98375 with type 28s on (7,5) and (6,5) in touch (restored 97825/prompt 98391), then
-  # stops at (7,5) followed; a type that hurt Link with it in touch, in touch after a stop, gets exactly one strike.
-  def test_a_creature_whose_type_hurt_link_in_touch_gets_one_strike_after_a_stop
-    result, context = c5_probe([blob(1, 90, 122), blob(2, 86, 118)])
-    assert_equal({ skill: 'attack', params: { row: 7, col: 5 } }, result[:choice])
-    assert_match(/strike the unidentified type 28 at \(7,5\) once, in touch after a no_frontier stop \(probe 1/, result[:justification])
-    assert_equal 1, context[:strikes]
-    refute_match(/strike the unidentified/, c5_probe([blob(1, 90, 122)], hurt: false).first[:justification].to_s, 'no evidence of hostility')
-  end
-
-  # Review of #116 (KOHO-147): types 108, 109, 110 and 61 move, give no dialogue and do no contact damage, in the village rooms.
-  def test_no_probe_of_a_moving_creature_that_never_hurt_link_or_with_a_person_on_screen
-    villager = { slot: 4, type: 108, kind: 'creature', moves: true, x: 90, y: 122, cell: [7, 5] }
-    refute_match(/strike the unidentified/, c5_probe([villager], hurt: false).first[:justification].to_s)
-    person = { slot: 5, type: 62, kind: 'npc', moves: true, x: 40, y: 60, cell: [3, 2] }
-    refute_match(/strike the unidentified/, c5_probe([blob(1, 90, 122), person]).first[:justification].to_s)
-  end
-
-  # Stub fork 1088 (flow-110 at e7b15df, from g7-2 @97200): after the delivery the probe struck the witch, type 64 at (3,4) in 162/14, an uncatalogued thing.
-  def test_an_uncatalogued_thing_in_touch_is_never_probed
-    client = ScriptedClient.new(objective: new_place, default: explore)
-    p = autopiloted(client)
-    p.instance_variable_set(:@entities_reader, -> { [{ slot: 3, type: 64, kind: 'unknown', x: 72, y: 60, cell: [3, 4] }] })
-    start = state(frame: 99480, room_id: 162, map_id: 14, x: 72, y: 76)
-    decide(p, start)
-    stopped = outcome(:no_frontier, 0).merge(moved_cells: 0, cells_walked: 0, from: { room: 162, map: 14, row: 4, col: 4 }, to: { room: 162, map: 14, row: 4, col: 4 })
-    p.after_action(choice: { skill: 'explore', params: {} }, outcome: stopped, state: start, frame: 99506)
-    now = state(frame: 99506, room_id: 162, map_id: 14, x: 72, y: 76)
-    p.observe(now, frame: 99506)
-    refute_match(/strike the unidentified/, p.decide(p.decision_point_for(now), now, { grid: })[:justification].to_s)
-  end
-
-  def test_no_probe_strike_at_one_heart_or_at_the_measured_hit
-    [[8, nil], [12, 12]].each do |hp, hit|
-      client = ScriptedClient.new(objective: new_place, default: explore)
-      healers = Koholint::Healers.new
-      healers.saw(place: [65, 0], health: 24)
-      healers.saw(place: [65, 0], health: 24 - hit) if hit
-      @objectives = Koholint::Objectives.new(trace: trace)
-      p = Koholint::Policies::Delegated.new(client:, registry: Koholint::Skills::Registry.default, objectives: @objectives, manual: '', autopilot: Koholint::Autopilot.new,
-                                            memory: Koholint::Policies::Memory.new(healers:))
-      p.instance_variable_set(:@entities_reader, -> { [blob(1, 90, 122)] })
-      start = state(frame: 97800, room_id: 66, map_id: 0, x: 92, y: 131, hp:)
-      decide(p, start)
-      stopped = outcome(:no_frontier, 0).merge(moved_cells: 0, cells_walked: 0, from: { room: 66, map: 0, row: 7, col: 5 }, to: { room: 66, map: 0, row: 7, col: 5 })
-      p.after_action(choice: { skill: 'explore', params: {} }, outcome: stopped, state: start, frame: 97824)
-      now = state(frame: 97824, room_id: 66, map_id: 0, x: 92, y: 131, hp:)
-      p.observe(now, frame: 97824)
-      refute_match(/strike the unidentified/, p.decide(p.decision_point_for(now), now, { grid: })[:justification].to_s, "#{hp} hp")
-    end
-  end
-
   def test_a_heal_objective_in_a_place_with_several_people_closes_when_hp_rises_not_on_arrival
     @objectives = Koholint::Objectives.new(trace: trace)
     @objectives.start(frame: 100, title: 'Heal in 164-16, where a talk healed Link before', predicate: { kind: 'reach_place', place: [164, 16] }, target: { kind: 'place', place: [164, 16], heal_below: 8 })
@@ -1099,18 +1027,22 @@ class DelegatedAutopilotTest < Minitest::Test
   end
 
   # Runs d871, 0e98 and 2c93 (g6): 84/0 had hit Link for 8 hp (d871 98187); the harness then tried types 185 and 203 there with talk_to and took 8 hp
-  # each time (d871 102332, 0e98 101616, 2c93 101833 and 102369).
-  def test_the_harness_tries_nothing_in_a_place_that_has_hurt_link
-    client = ScriptedClient.new(objective: new_place, default: explore)
-    p = autopiloted(client)
-    ctx = { grid:, entities: -> { [{ kind: :unknown, type: 185, cell: [2, 2], slot: 3, x: 40, y: 48 }] } }
-    p.prepare(ctx)
-    p.note_card({ place: [163, 16], unknown: [{ type: 185, cell: [2, 2] }] })
-    p.observe(state(frame: 50, hp: 24), frame: 50)
-    p.observe(state(frame: 60, hp: 16), frame: 60)
-    tours(p, 2)
-    result = p.decide(p.decision_point_for(state(frame: 800)), state(frame: 800), ctx)
-    refute_equal 'talk_to', result[:choice][:skill], result[:justification]
+  # each time (d871 102332, 0e98 101616, 2c93 101833 and 102369). The entity census (b8b7 @100867, cleared control) measures 185 hostile, 203 not.
+  def test_the_harness_never_tries_a_type_that_hurt_link
+    tried = lambda do |hurt|
+      client = ScriptedClient.new(objective: new_place, default: explore)
+      p = autopiloted(client)
+      ctx = { grid:, entities: -> { [{ kind: :unknown, type: 185, cell: [2, 2], slot: 3, x: 40, y: 48 }] } }
+      p.prepare(ctx)
+      p.note_card({ place: [163, 16], unknown: [{ type: 185, cell: [2, 2] }] })
+      p.observe(state(frame: 50, hp: 24), frame: 50)
+      hit = outcome(:damage, 0).merge(hp_delta: hurt ? -8 : 0)
+      p.after_action(choice: { skill: 'explore', params: {} }, outcome: hit, state: state(frame: 60, x: 44, y: 52, hp: hurt ? 16 : 24), frame: 60)
+      tours(p, 2)
+      p.decide(p.decision_point_for(state(frame: 800)), state(frame: 800), ctx)[:choice][:skill]
+    end
+    assert_equal 'talk_to', tried.(false), 'control: a type that never hurt Link is tried'
+    refute_equal 'talk_to', tried.(true)
   end
 
   def test_a_still_entity_whose_try_gave_nothing_is_touched_through_a_point_the_model_never_sees
@@ -1588,18 +1520,10 @@ class DelegatedAutopilotTest < Minitest::Test
     assert_match(/nearest Link in the census window/, fact[:source])
   end
 
-  # Paid fork g8-3 (f78e, flow-110): obj-94, the autopiloted delivery souvenir-162-14-t64, failed when Link died at 98584; the menu after the
-  # respawn at 98854 offered it 14th and the model read a sign: the history already held its candidate, so the souvenir rule never took it again.
-  def test_the_delivery_under_way_when_link_died_is_taken_up_again_after_the_respawn
-    p = heal_lineage_with_a_souvenir
-    alive = state(frame: 98400, hp: 24, item_b: 12)
-    p.observe(alive, frame: 98400)
-    dead = state(frame: 98584, hp: 0, item_b: 12)
-    p.observe(dead, frame: 98584)
-    assert_equal :failed, @objectives.history.last[:outcome]
-    back = state(frame: 98854, room_id: 164, hp: 24, item_b: 12)
-    p.observe(back, frame: 98854)
-    decision = p.decide(p.decision_point_for(back), back, { grid: })
-    assert_equal ['souvenir-165-16-t64', 'after the respawn: souvenir-165-16-t64, set aside, is taken up again (1/2)'], [@objectives.current&.dig(:candidate), decision[:justification]]
+  def test_a_hurts_fact_in_the_catalogue_makes_its_type_an_enemy_from_the_first_look
+    thing = { slot: 1, type: 185, kind: :unknown, moves: true, hurts: 8, x: 102, y: 67, cell: [3, 6] }
+    person = { slot: 2, type: 62, kind: :npc, hurts: 8, x: 40, y: 60, cell: [3, 2] }
+    assert_equal [[:enemy, 8], [:npc, nil]], Koholint::Hurts.new.overlay([thing, person]).map { |entity| entity.values_at(:kind, :hurt) }
+    assert_equal 8, Koholint::Entities.catalogue.dig(185, :hurts)
   end
 end

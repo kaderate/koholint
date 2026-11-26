@@ -73,7 +73,6 @@ module Koholint
       DEADLOCK_WAITS = 3
       DROPPED = %w[need- souvenir-].freeze
       REOFFERS = 2
-      RESPAWN = 'after the respawn'
       HEAL_DETOURS = 2
       RETREAT_CAP = 2
       RETREAT_WINDOW = 3000
@@ -175,7 +174,7 @@ module Koholint
         note_loop(state, frame)
         @revisit.observe(state)
         note_open_chest(state)
-        update_objective(state, frame)
+        track { @objectives.update(state, frame:) }
         note_puzzle_entry(state)
       end
 
@@ -318,7 +317,7 @@ module Koholint
         @flushes = 0 if state.phase == :playing
         if @auto || @locked_wait
           @auto = @locked_wait = false
-          return update_objective(state, frame)
+          return track { @objectives.update(state, frame:) }
         end
         revisiting = @revisit_acting && choice[:skill] == 'talk_to'
         @revisit.talked(outcome) if revisiting
@@ -343,7 +342,7 @@ module Koholint
           @objectives.record_attempt(skill: choice[:skill], params: choice[:params], result_summary: "#{'(autopilot) ' if autopiloted}#{summary(outcome, opened)}")
         end
         @waiting = false
-        update_objective(state, frame)
+        track { @objectives.update(state, frame:) }
       end
 
       def offered_candidates = Candidates.offered(@candidates, @candidate)
@@ -370,12 +369,6 @@ module Koholint
         @last_place = place
         @last_grid = context[:grid] if context[:grid]
         context[:grid] ||= @last_grid
-      end
-
-      # A delivery under way when Link died is set aside like a loop drop, so the menu after the respawn takes it up again.
-      def update_objective(state, frame)
-        current = @objectives.current
-        track { note_dropped(current, why: RESPAWN) if @objectives.update(state, frame:) == :failed }
       end
 
       def refuse_hurtful_attack(choice, state)

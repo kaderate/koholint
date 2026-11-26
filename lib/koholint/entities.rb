@@ -29,7 +29,7 @@ module Koholint
         type = at.(:entity_type)
         known = kinds[type]
         { slot:, type:, x:, y:, status:, state: at.(:entity_state), health: at.(:entity_health), cell: Geometry.cell_for(x, y), kind: known ? known[:kind] : :unknown,
-          verified: known ? known[:verified] : false, moves: known&.dig(:moves), **(known || {}).slice(:contact, :sword_hits, :sword_verified, :heals) }
+          verified: known ? known[:verified] : false, moves: known&.dig(:moves), **(known || {}).slice(:contact, :sword_hits, :sword_verified, :heals, :hurts) }
       end
     end
 
@@ -66,7 +66,7 @@ module Koholint
         validate!(entry)
         [Integer(entry.fetch('type')), { kind: entry.fetch('kind').to_sym, verified: entry['confidence'] == 'verified', moves: entry['moves'], contact: entry['contact_px'],
                                          sword_hits: entry.dig('sword_hits', 'value'), sword_verified: (entry['sword_hits']['confidence'] == 'verified' if entry.key?('sword_hits')),
-                                         heals: (entry.dig('heals', 'value') if entry.dig('heals', 'confidence') == 'verified') }.compact]
+                                         heals: (entry.dig('heals', 'value') if entry.dig('heals', 'confidence') == 'verified'), hurts: entry.dig('hurts', 'value') }.compact]
       end
     end
 
@@ -84,6 +84,7 @@ module Koholint
       validate_fact!(entry['push'], "object #{entry['object']} push") if entry.key?('push')
       validate_fact!(entry['give_way'], "object #{entry['object']} give_way") if entry.key?('give_way')
       validate_fact!(entry['heals'], "entity #{entry['type']} heals") if entry.key?('heals')
+      validate_fact!(entry['hurts'], "entity #{entry['type']} hurts") if entry.key?('hurts')
     end
 
     def validate_fact!(fact, label)

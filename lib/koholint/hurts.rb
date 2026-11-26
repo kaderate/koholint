@@ -1,8 +1,9 @@
 require 'koholint/entities'
 
 module Koholint
-  # An hp drop with a thing not catalogued as an enemy or a person nearest Link in the census window is the hypothesis that its type hurts, with the
-  # largest hit measured; a run never verifies it (that needs 2 independent lineages with a control, offline).
+  # Hostility learned from damage. The typed fact is the `hurts` entry of data/entities.json (hit, confidence, verified_count, source), written
+  # offline from the census; a run adds the `hurt` notables of its own lineage: an hp drop with a thing not catalogued as an enemy or a person
+  # nearest Link in the census window, its hit the drop. Either makes the type an enemy.
   class Hurts
     SOURCE = 'hp drop with it nearest Link in the census window'
 
@@ -38,7 +39,10 @@ module Koholint
 
     # A type that hurt Link counts as an enemy: routes keep out of its reach, and it is no talk target.
     def overlay(entities)
-      entities.map { |entity| (hit = hit(entity[:type])) && Entities.creature?(entity) ? entity.merge(kind: :enemy, moves: true, hurt: hit) : entity }
+      entities.map do |entity|
+        hit = [hit(entity[:type]), entity[:hurts]].compact.max
+        hit && Entities.creature?(entity) ? entity.merge(kind: :enemy, moves: true, hurt: hit) : entity
+      end
     end
   end
 end

@@ -30,7 +30,7 @@ module Koholint
       end
 
       RETREAT = /\(retreat by the (\S*) side\)/
-      REOFFER = /\A(?:the loop is cut|after the respawn): (.+), set aside, is taken up again \(/
+      REOFFER = /\Athe loop is cut: (.+), set aside, is taken up again \(/
 
       # Each retreat the harness sent: [place, side Link had come in by, frame], read back from its justification.
       def self.retreats(events)
