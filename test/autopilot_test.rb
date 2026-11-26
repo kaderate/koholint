@@ -275,7 +275,7 @@ class AutopilotTest < Minitest::Test
     end
     pilot.acted(skill: 'attack', outcome: { stopped_by: 'done' })
     goto = { skill: 'goto', params: { row: 1, col: 1 } }
-    assert_includes ['hp dropped', 'low health'], pilot.hold_reason(state: state(hp: 4), objective: person, follow: goto), 'a harmless fight keeps the health hold'
+    assert_equal 'hp dropped', pilot.hold_reason(state: state(hp: 4), objective: person, follow: goto), 'a harmless fight keeps the health hold'
     plain = Koholint::Autopilot.new
     plain.model_called(state: state, objective: objective)
     plain.acted(skill: 'attack', outcome: { stopped_by: 'done' })
@@ -315,13 +315,13 @@ class AutopilotTest < Minitest::Test
     %w[new_place leave_place new_text].each { |kind| assert_nil primed.hold_reason(state: state, objective: objective(kind)), kind }
   end
 
-  def test_one_heart_or_less_holds_the_autopilot_and_a_creature_near_does_not
-    [[8, 'low health'], [4, 'low health'], [9, nil]].each do |hp, reason|
+  def test_one_heart_or_less_does_not_hold_the_autopilot_nor_does_a_creature_near
+    [8, 4, 9].each do |hp|
       low = primed(stop: :known_place)
       low.model_called(state: state(hp:), objective: objective)
       low.acted(skill: 'explore', outcome: { stopped_by: :known_place })
-      hold = low.hold_reason(state: state(hp:), objective: objective)
-      reason ? assert_equal(reason, hold, "hp #{hp}") : assert_nil(hold, "hp #{hp}")
+      assert_nil low.hold_reason(state: state(hp:), objective: objective), "hp #{hp}"
+      refute_nil low.next_choice(state: state(hp:), objective: objective), "hp #{hp}"
     end
     assert_nil primed.hold_reason(state: state, objective: objective, danger: true)
   end

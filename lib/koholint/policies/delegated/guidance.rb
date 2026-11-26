@@ -193,7 +193,10 @@ module Koholint
 
             context[:ban] = true
           end
-          result = @autopilot.next_choice(state:, objective: @objectives.current, follow: follow&.dig(:choice)) or return
+          result = @autopilot.next_choice(state:, objective: @objectives.current, follow: follow&.dig(:choice))
+          @hold = @autopilot.last_hold
+          return unless result
+
           context[:aim] = follow[:aim] if follow&.dig(:aim)
           @autopilot_acting = true
           result[:choice][:skill] == 'touch' ? result.merge(decision_point: @touch_point) : result
@@ -433,7 +436,7 @@ module Koholint
 
         def auto_objective(decision_point, state)
           return unless @autopilot && decision_point.name == :choose_objective && !@puzzle_ask
-          return if @autopilot.objective_hold(state:, last: @objectives.history.last)
+          return if (@hold = @autopilot.objective_hold(state:, last: @objectives.history.last))
 
           place = state.place
           return unless @explore_log.work?(place) || @explore_log.route(place)

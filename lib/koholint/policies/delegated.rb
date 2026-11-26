@@ -182,6 +182,7 @@ module Koholint
 
       def decide(decision_point, state, context)
         @asked = false
+        @hold = nil
         @leads.note_held(Items.held_ids(state))
         @explore_log.in_context(Exits.context(state))
         @explore_log.dangerous = @healers.dangerous(state.health) if state.health
@@ -194,6 +195,7 @@ module Koholint
         @puzzle_ask = nil if entry
         result = result.merge(puzzles_offered: @puzzles_offered) unless @puzzles_offered.empty?
         result = result.merge(puzzle_entry: entry) if entry
+        result = result.merge(autopilot_hold: @hold) if @asked && @hold
         news = !Array(result[:leads]).empty? || !result[:goal].nil?
         @autopilot&.model_called(state:, objective: @objectives.current, news:) if @asked
         @zero_watch.news! if news

@@ -34,7 +34,7 @@ module Koholint
     HEART_ENDS = %w[done target_gone].freeze
     STEP = { up: [0, -1], down: [0, 1], left: [-1, 0], right: [1, 0] }.freeze
 
-    attr_reader :chain, :chain_limit, :chain_frames
+    attr_reader :chain, :chain_limit, :chain_frames, :last_hold
 
     def initialize(chain_limit: CHAIN_LIMIT, chain_frames: CHAIN_FRAMES)
       @chain_limit = chain_limit
@@ -175,7 +175,8 @@ module Koholint
     end
 
     def next_choice(state:, objective:, follow: nil, danger: false)
-      return if hold_reason(state:, objective:, follow:, danger:)
+      @last_hold = hold_reason(state:, objective:, follow:, danger:)
+      return if @last_hold
 
       @chain += 1 unless @stop == 'known_place'
       @stop = nil
@@ -307,7 +308,6 @@ module Koholint
       return 'explore loop' if @returns.values.max.to_i >= RETURNS
       return "phase #{state.phase}" unless state.phase == :playing
       return 'hp dropped' if health && state.health < @hp
-      return 'low health' if health && state.health <= Perception::HP_PER_HEART
 
       nil
     end
