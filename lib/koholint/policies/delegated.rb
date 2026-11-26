@@ -84,7 +84,6 @@ module Koholint
         @souvenirs = souvenirs
         @cards = memory.cards.dup
         @healers = memory.healers
-        @heal_detours = memory.heal_detours
         @retreats = memory.retreats.dup
         @reoffers = Hash.new(0).merge(memory.reoffers)
         @souvenirs_taken = memory.souvenirs_taken.dup
@@ -235,11 +234,11 @@ module Koholint
             @locks.clear
           end
 
-          broken = loop_break(decision_point, state, context)
-          return broken if broken
-
           detour = heal_detour(decision_point, state, context)
           return detour if detour
+
+          broken = loop_break(decision_point, state, context)
+          return broken if broken
 
           capped = zero_cap(decision_point, state, context)
           return capped if capped

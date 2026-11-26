@@ -248,6 +248,8 @@ module Koholint
           @dropped = nil
           key = objective[:candidate] || objective[:title]
           return if @reoffers[key] >= REOFFERS
+          # A lead's claim is model-written, so a lead dropped by a heal goes back to the menu, never to a harness-alone take.
+          return if objective[:candidate].to_s.start_with?('lead-')
           return if objective[:candidate] && build_candidates(state, context).none? { |candidate| candidate[:id] == objective[:candidate] }
 
           @reoffers[key] += 1
@@ -256,31 +258,38 @@ module Koholint
           DecisionPoint.harness_choice(objective.slice(:title, :predicate), "the loop is cut: #{key}, set aside, is taken up again (#{@reoffers[key]}/#{REOFFERS})", autopilot: true)
         end
 
-        # At one heart or less, a route to the objective through a place where enemies were seen first goes to the nearest place a talk healed Link;
-        # the objective is taken up again afterwards. A place card with one person or unknown thing names who to talk to there.
+        # Survival before anything else, at every decision: at or below the largest hit measured on the lineage (the next one may kill), by a way through no place
+        # where enemies were seen, or at one heart on a way to the objective through such a place, Link goes to the nearest place a talk healed him; the objective
+        # is taken up again afterwards.
+        # A place card with one person or unknown thing names who to talk to there.
         def heal_detour(decision_point, state, context)
-          return unless decision_point.name == :choose_skill && !@sequence && state.health <= Perception::HP_PER_HEART && state.max_hp.to_i > state.health
+          return unless %i[choose_skill choose_objective].include?(decision_point.name) && !@sequence && state.max_hp.to_i > state.health
 
-          current = @objectives.current or return
-          return if current[:heal] || @heal_detours >= HEAL_DETOURS
+          current = @objectives.current
+          return if current&.dig(:heal) || @healers.detours >= HEAL_DETOURS
 
-          goal = current.dig(:predicate, :place) or return
-          hops = @explore_log.path(state.place, goal:) or return
-          return unless hops.any? { |hop| Array(@cards.dig(hop[:to], :enemies)).any? }
+          goal = current&.dig(:predicate, :place)
+          hops = goal && @explore_log.path(state.place, goal:)
+          crossing = state.health <= Perception::HP_PER_HEART && hops&.any? { |hop| Array(@cards.dig(hop[:to], :enemies)).any? }
+          return unless crossing || (@healers.hit && state.health <= @healers.hit)
 
-          place, = (@healers.places - [state.place]).filter_map { |at| [at, @explore_log.path(state.place, goal: at)] }.select(&:last).min_by { |_, path| path.size }
+          ways = @healers.places.filter_map { |at| [at, at == state.place ? [] : @explore_log.path(state.place, goal: at)] }.select(&:last)
+          ways = ways.reject { |_, path| path.any? { |hop| Array(@cards.dig(hop[:to], :enemies)).any? } } unless crossing
+          place, = ways.min_by { |_, path| path.size }
           return unless place
 
-          @heal_detours += 1
+          @healers.detoured
           note_dropped(current, any: true)
-          @objectives.abandon(frame: state.frame, reason: 'heal')
+          @objectives.abandon(frame: state.frame, reason: 'heal') if current
           who = Array(@cards.dig(place, :people)) + Array(@cards.dig(place, :unknown))
           target = (who.size == 1 ? { kind: 'person', place:, type: who.first[:type], cell: who.first[:cell] } : { kind: 'place', place: }).merge(heal_below: state.health)
           @objectives.start(frame: state.frame, title: "Heal in #{place.join('-')}, where a talk healed Link before", predicate: { kind: 'reach_place', place: }, target:, autopilot: true)
           @objectives.current[:heal] = true
           @autopilot&.adopt(@objectives.current)
-          context[:aim] = { place: }
-          DecisionPoint.harness_choice(EXPLORE, "#{state.health} hp and the way to #{goal.join('-')} crosses enemies: heal in #{place.join('-')} first (#{@heal_detours}/#{HEAL_DETOURS})", autopilot: true)
+          context[:aim] = { place: } unless place == state.place
+          why = crossing ? "the way to #{goal.join('-')} crosses enemies" : "the largest hit measured is #{@healers.hit} hp"
+          choice = decision_point.name == :choose_objective ? @objectives.current.slice(:title, :predicate) : EXPLORE
+          DecisionPoint.harness_choice(choice, "#{state.health} hp and #{why}: heal in #{place.join('-')} first (#{@healers.detours}/#{HEAL_DETOURS})", autopilot: true)
         end
 
         def zero_cap(decision_point, state, context)

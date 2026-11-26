@@ -104,12 +104,14 @@ module Koholint
       return 'no model call yet' unless @since
 
       target = objective&.dig(:target)
+      # A heal objective is survival first: no stop and no hp loss hands it back to the model.
+      heal = target&.dig(:heal_below)
       fresh = follow && follow[:skill] != 'explore' && follow[:skill] != @last_skill
       first = follow && target && (!@acted || fresh)
-      return "last stop #{@stop || 'not an explore'}" unless first || BENIGN.include?(@stop) || @stop == TALKED || (@stop == FOUGHT && target)
+      return "last stop #{@stop || 'not an explore'}" unless heal || first || BENIGN.include?(@stop) || @stop == TALKED || (@stop == FOUGHT && target)
       return 'target followed' if target && @acted && follow && follow[:skill] != 'explore' && !fresh
 
-      common = common_hold(state, news: !target || @stop == TALKED, health: !fresh || @stop == FOUGHT)
+      common = common_hold(state, news: !target || @stop == TALKED, health: !heal && (!fresh || @stop == FOUGHT))
       return common if common
       return 'objective changed' unless objective && objective[:id] == @objective
 

@@ -471,6 +471,100 @@ class DelegatedAutopilotTest < Minitest::Test
     assert_equal 'souvenir-165-16-t64', @objectives.current[:candidate]
   end
 
+  def lineage_with_a_healer_and_an_eight_hp_hit(leads: nil)
+    log = Koholint::ExploreLog.new
+    log.absorb({ from: { room: 162, map: 14 }, exits: [{ row: 7, col: 4, direction: :down, outcome: :left, to: [100, 0] }], survey: { sides: { down: [{ row: 7, col: 4 }] }, doors: [] } })
+    log.absorb({ from: { room: 100, map: 0 }, exits: [{ row: 0, col: 5, direction: :up, outcome: :left, to: [84, 0] }], survey: { sides: { up: [{ row: 0, col: 5 }] }, doors: [] } })
+    log.absorb({ from: { room: 84, map: 0 }, exits: [{ row: 3, col: 0, direction: :left, outcome: :left, to: [83, 0] }], survey: { sides: { left: [{ row: 3, col: 0 }] }, doors: [] } })
+    healers = Koholint::Healers.new
+    healers.saw(place: [83, 0], health: 4)
+    healers.heard([83, 0])
+    healers.saw(place: [83, 0], health: 24)
+    healers.saw(place: [84, 0], health: 16)
+    healers.saw(place: [84, 0], health: 8)
+    cards = { [83, 0] => { unknown: [{ type: 132, cell: [3, 5] }] } }
+    Koholint::Policies::Memory.new(explore_log: log, cards:, healers:, leads:)
+  end
+
+  # Run d871: 84/0 hit for 8 at 98204, 83/0 healed at 96398; at 99915 in 162/14 with 8 hp the model chose the next objective and died later from 8 hp.
+  def test_at_or_below_the_largest_measured_hit_the_next_objective_is_to_heal_where_a_talk_healed_link_without_asking_the_model
+    @objectives = Koholint::Objectives.new(trace: trace)
+    client = ScriptedClient.new(objective: new_place, default: explore)
+    p = Koholint::Policies::Delegated.new(client:, registry: Koholint::Skills::Registry.default, objectives: @objectives, manual: '', memory: lineage_with_a_healer_and_an_eight_hp_hit)
+    low = state(frame: 99915, room_id: 162, map_id: 14, hp: 8)
+    p.observe(low, frame: 99915)
+    context = { grid: }
+    decision = p.decide(p.decision_point_for(low), low, context)
+    assert_match(/8 hp and the largest hit measured is 8 hp: heal in 83-0 first/, decision[:justification])
+    assert_equal [[83, 0], { kind: 'person', place: [83, 0], type: 132, cell: [3, 5], heal_below: 8 }], [@objectives.current.dig(:predicate, :place), @objectives.current[:target]]
+    assert_empty client.calls
+  end
+
+  # Stub gate 9666 (flow-105 at 1d642de): the heal set out from 84/0 at 8 hp, then the low-health hold handed every step to the model, which wandered back east and died.
+  def test_the_heal_objective_is_followed_by_the_autopilot_at_low_health
+    @objectives = Koholint::Objectives.new(trace: trace)
+    client = ScriptedClient.new(objective: new_place, default: explore)
+    autopilot = Koholint::Autopilot.new
+    p = Koholint::Policies::Delegated.new(client:, registry: Koholint::Skills::Registry.default, objectives: @objectives, manual: '', autopilot:,
+                                          memory: lineage_with_a_healer_and_an_eight_hp_hit)
+    low = state(frame: 99687, room_id: 84, map_id: 0, hp: 8)
+    autopilot.model_called(state: state(frame: 99600, room_id: 84, map_id: 0, hp: 16), objective: nil)
+    p.observe(low, frame: 99687)
+    assert_match(/heal in 83-0 first/, p.decide(p.decision_point_for(low), low, { grid: })[:justification])
+    autopilot.acted(skill: 'explore', outcome: { stopped_by: 'damage' })
+    later = state(frame: 99725, room_id: 84, map_id: 0, hp: 4)
+    p.observe(later, frame: 99725)
+    decision = p.decide(p.decision_point_for(later), later, { grid: })
+    assert_empty client.calls, decision[:justification]
+  end
+
+  # Stub gate 355b (flow-105 at 9bbd554): from 84/0 at 8 hp the only known way to 83/0 went through 66/0's type 27; Link was hemmed there, wandered back and died.
+  def test_below_the_measured_hit_no_heal_is_sent_by_a_way_through_enemies
+    memory = lineage_with_a_healer_and_an_eight_hp_hit
+    memory.cards[[100, 0]] = { enemies: [{ type: 27, cell: [4, 5] }] }
+    @objectives = Koholint::Objectives.new(trace: trace)
+    client = ScriptedClient.new(objective: new_place, default: explore)
+    p = Koholint::Policies::Delegated.new(client:, registry: Koholint::Skills::Registry.default, objectives: @objectives, manual: '', memory:)
+    low = state(frame: 99915, room_id: 162, map_id: 14, hp: 8)
+    p.observe(low, frame: 99915)
+    refute_match(/heal/, p.decide(p.decision_point_for(low), low, { grid: })[:justification].to_s)
+  end
+
+  # Run 0e98, 84/0 at 4 hp from 101616: the objective was to talk to type 185, not a way through enemies, and Link stayed at 4 hp until the stop.
+  def test_below_the_measured_hit_any_objective_gives_way_to_the_heal_at_the_skill_choice
+    @objectives = Koholint::Objectives.new(trace: trace)
+    @objectives.start(frame: 101600, title: 'Try type 185', predicate: { kind: 'new_text' }, target: { kind: 'person', place: [84, 0], type: 185, cell: [2, 2] })
+    client = ScriptedClient.new(default: explore)
+    p = Koholint::Policies::Delegated.new(client:, registry: Koholint::Skills::Registry.default, objectives: @objectives, manual: '', memory: lineage_with_a_healer_and_an_eight_hp_hit)
+    full = state(frame: 101500, room_id: 84, map_id: 0, hp: 12)
+    p.observe(full, frame: 101500)
+    refute_match(/heal/, p.decide(p.decision_point_for(full), full, { grid: })[:justification].to_s, 'above the measured hit')
+    low = state(frame: 101616, room_id: 84, map_id: 0, hp: 4)
+    p.observe(low, frame: 101616)
+    decision = p.decide(p.decision_point_for(low), low, { grid: })
+    assert_match(/heal in 83-0 first/, decision[:justification])
+    assert_equal 'heal', @objectives.history.last[:reason]
+  end
+
+  # Run 0e98, lead-27 at 100422: the model's claim named the person beyond the quoted text, so a lead set aside for a heal goes back to the menu.
+  def test_a_lead_set_aside_by_a_heal_is_never_taken_up_again_by_the_harness_alone
+    leads = Koholint::Leads.from_events([{ 'type' => 'lead', 'id' => 'lead-27', 'place' => [162, 14], 'where' => '84-0', 'quote' => "Tu m'apportes le Champignon",
+                                           'claim' => 'The witch wants the mushroom', 'importance' => 'high' }])
+    @objectives = Koholint::Objectives.new(trace: trace)
+    @objectives.start(frame: 100422, title: 'Go to 84-0', predicate: { kind: 'reach_place', place: [84, 0] }, candidate: 'lead-27', target: { kind: 'lead', place: [84, 0], lead: 'lead-27' })
+    client = ScriptedClient.new(objective: new_place, default: explore)
+    p = Koholint::Policies::Delegated.new(client:, registry: Koholint::Skills::Registry.default, objectives: @objectives, manual: '', memory: lineage_with_a_healer_and_an_eight_hp_hit(leads:))
+    low = state(frame: 100500, room_id: 100, map_id: 0, hp: 8)
+    p.observe(low, frame: 100500)
+    assert_match(/heal in 83-0 first/, p.decide(p.decision_point_for(low), low, { grid: })[:justification])
+    @objectives.abandon(frame: 100600, reason: 'test')
+    healed = state(frame: 100700, room_id: 83, map_id: 0, hp: 24)
+    p.observe(healed, frame: 100700)
+    p.decide(p.decision_point_for(healed), healed, { grid: })
+    refute_equal 'lead-27', @objectives.current&.dig(:candidate)
+    assert(client.calls.any? { |call| call[:system].include?('choose the next objective') })
+  end
+
   def test_a_heal_objective_in_a_place_with_several_people_closes_when_hp_rises_not_on_arrival
     @objectives = Koholint::Objectives.new(trace: trace)
     @objectives.start(frame: 100, title: 'Heal in 164-16, where a talk healed Link before', predicate: { kind: 'reach_place', place: [164, 16] }, target: { kind: 'place', place: [164, 16], heal_below: 8 })
@@ -564,10 +658,10 @@ class DelegatedAutopilotTest < Minitest::Test
   end
 
   def test_a_resume_reads_back_the_heal_detours_and_the_re_offers
-    events = [{ 'type' => 'objective', 'frame' => 10, 'id' => 'obj-1', 'status' => 'abandoned', 'reason' => 'heal' },
+    events = [{ 'type' => 'objective', 'frame' => 10, 'id' => 'obj-1', 'status' => 'started', 'target' => { 'kind' => 'place', 'place' => [83, 0], 'heal_below' => 8 } },
               { 'type' => 'decision', 'frame' => 20, 'input' => {}, 'justification' => 'the loop is cut: souvenir-162-14-t64, set aside, is taken up again (1/2)' }]
     memory = Koholint::Policies::Memory.from_events(events)
-    assert_equal [1, { 'souvenir-162-14-t64' => 1 }], [memory.heal_detours, memory.reoffers]
+    assert_equal [1, { 'souvenir-162-14-t64' => 1 }], [memory.healers.detours, memory.reoffers]
   end
 
   # Run 5e81, 172/10 at 4 hp: the type 155 walked up to Link during the first 120-frame wait and killed him.
