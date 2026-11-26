@@ -177,6 +177,28 @@ class DelegatedPolicyTest < Minitest::Test
     assert_equal 4, @objectives.current[:attempts].size
   end
 
+  # Paid fork 3a55, 83/0 after the heal: explore and talk_to stopped blocked from (5,4) on three sides, an explore found no frontier,
+  # then walks; each was a model call while the heal scene held Link for about 350 frames.
+  def test_path_skills_blocked_from_one_spot_and_an_idle_no_frontier_latch_the_hemmed_wait
+    client = ScriptedClient.new(objective: objective(kind: 'reach_place', place: [1, 2]), skill: walk)
+    p = policy(client)
+    decide(p)
+    path = lambda do |skill, stop, direction|
+      outcome = { skill:, params: {}, frames: 30, moved_cells: 0, room_changed: false, hp_delta: 0, stopped_by: stop }
+      outcome[:blocked_at] = { row: 3, col: 4, direction: } if direction
+      p.after_action(choice: { skill:, params: {} }, outcome:, state:, frame: 101)
+    end
+    path.('explore', 'blocked', :right)
+    path.('talk_to', 'blocked', :left)
+    path.('explore', 'blocked', :down)
+    path.('explore', 'no_frontier', nil)
+    blocked_walk(p, 'up')
+    calls = client.calls.size
+    point, result = decide(p)
+    assert_equal [:choose_skill, { skill: 'wait', params: { frames: 120 } }], [point.name, result[:choice]]
+    assert_equal calls, client.calls.size
+  end
+
   def test_hemmed_in_waits_are_capped_to_one_stall_window_then_the_agent_is_called
     client = ScriptedClient.new(objective: objective(kind: 'reach_place', place: [1, 2]), skill: walk)
     p = policy(client)

@@ -11,6 +11,8 @@ module Koholint
     BENIGN = %w[new_place known_place budget untried_object tried pushed enemy].freeze
     ARRIVED = %w[new_place known_place].freeze
     TALKED = 'talked'.freeze
+    FOUGHT = 'fought'.freeze
+    HARMLESS = %w[done target_gone hole out_of_reach].freeze
     TALK_ENDS = %w[done no_response].freeze
     DOOR_STEP = { skill: 'walk', params: { direction: 'up', cells: 2 } }.freeze
     RETURNS = 3
@@ -104,10 +106,10 @@ module Koholint
       target = objective&.dig(:target)
       fresh = follow && follow[:skill] != 'explore' && follow[:skill] != @last_skill
       first = follow && target && (!@acted || fresh)
-      return "last stop #{@stop || 'not an explore'}" unless first || BENIGN.include?(@stop) || @stop == TALKED
+      return "last stop #{@stop || 'not an explore'}" unless first || BENIGN.include?(@stop) || @stop == TALKED || (@stop == FOUGHT && target)
       return 'target followed' if target && @acted && follow && follow[:skill] != 'explore' && !fresh
 
-      common = common_hold(state, news: !target || @stop == TALKED, health: !fresh)
+      common = common_hold(state, news: !target || @stop == TALKED, health: !fresh || @stop == FOUGHT)
       return common if common
       return 'objective changed' unless objective && objective[:id] == @objective
 
@@ -340,6 +342,8 @@ module Koholint
       return stop if skill == 'explore'
       return 'tried' if @trying || (%w[advance_dialogue wait].include?(skill) && @stop == 'tried')
       return TALKED if (skill == 'talk_to' && TALK_ENDS.include?(stop)) || (%w[advance_dialogue wait].include?(skill) && @stop == TALKED)
+      # A fight that did not hurt Link leaves an objective's target to follow; only damage hands the choice back.
+      return FOUGHT if (skill == 'attack' && HARMLESS.include?(stop)) || (%w[advance_dialogue wait].include?(skill) && @stop == FOUGHT)
 
       nil
     end
