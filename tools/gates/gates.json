@@ -1,0 +1,22 @@
+{
+  "frames": 12000,
+  "roots": [
+    "~/.capy/work/abd51/runs",
+    "~/.capy/work/atlas-viewer/runs",
+    "runs"
+  ],
+  "gates": {
+    "respawn-171": {
+      "run": "20261124-191800-abbe",
+      "frame": 95758
+    },
+    "post-gain-172": {
+      "run": "20261124-191800-abbe",
+      "frame": 94304
+    },
+    "sword-obtained": {
+      "run": "20261111-194737-9ba1",
+      "frame": 60404
+    }
+  }
+}
