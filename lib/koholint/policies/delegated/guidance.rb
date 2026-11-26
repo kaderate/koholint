@@ -26,7 +26,7 @@ module Koholint
 
         def route_line(state)
           danger = @explore_log.dangerous.map { |place| "#{place.join('-')} (#{@healers.hits[place]} hp)" }
-          warned = danger.empty? ? nil : "Places where one measured hit would take Link's #{state.health} hp, which no route enters: #{danger.join(', ')}."
+          warned = danger.empty? ? nil : "Places where one measured hit would take Link's #{state.health} hp, which no route to work enters: #{danger.join(', ')}."
           known = known_route(state)
           [known, warned].compact.join("\n").then { |line| line unless line.empty? }
         end

@@ -146,9 +146,10 @@ The skills, protocols and harness behaviours the agent works with. Versioned wit
   in at most one frame is answered by the harness at the next decision, not after three, since from the same cell it would find none again.
 - flow-106: danger is measured per place: the largest hp drop between two decisions in each place, read back from the trace. The
   measured-hit heal takes a known way only through places Link was seen in whose measured hit stays below his health (a place never
-  seen is unsafe); places where enemies were listed no longer matter. No route of the harness or of explore (routes to work or to
-  an aimed place, the least-visited fallback, a pocket or retreat side) enters a place whose measured hit is at or above Link's
-  health; with no safe way the choice goes to the model, whose context lists those places with their hits.
+  seen is unsafe); places where enemies were listed no longer matter. A place whose measured hit is at or above Link's health is
+  never entered by a route to work (the harness's redirects and explore's own), never a least-visited fallback, and never left
+  into by a pocket or retreat side; a route to a given place (an objective's) may still cross it. With no safe way the choice
+  goes to the model, whose context lists those places with their hits.
 - flow-105: survival comes first at every objective and skill choice, before the loop break: at or below the largest hp drop
   between two decisions measured on the lineage (read back from the trace), Link goes to the nearest place where a talk healed him
   by a known way through no place where enemies were seen, whatever the objective, with no model call, and the autopilot follows

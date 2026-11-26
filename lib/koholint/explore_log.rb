@@ -31,7 +31,8 @@ module Koholint
       log
     end
 
-    # Places a hit measured there would bring Link's health to zero; set before each decision, no route enters them.
+    # Places where one measured hit would take Link's health, set before each decision: a route to work never enters them, nor is one a fallback destination;
+    # a route to a given place may still cross them.
     attr_accessor :dangerous
 
     def initialize
@@ -390,7 +391,7 @@ module Koholint
     # Where a loop goes when no place has untried work: the reachable place entered least, nearest first, outside the loop.
     # A place whose landing from here was left by the side Link came in, with nothing reached from it, is no destination: Link would only come back.
     def least_visited(from, avoid: [])
-      far = hops(from).reject { |place, _| place == from || avoid.include?(place) }
+      far = hops(from).reject { |place, _| place == from || avoid.include?(place) || @dangerous.include?(place) }
       far.sort_by { |place, count| [@visits[place], count, place] }.each do |place, _|
         hops = path(from, goal: place) or next
         way = hops.last[:via]
@@ -433,7 +434,7 @@ module Koholint
 
         ways(place).each do |key, to|
           ahead = [to, entry(place, key)]
-          next if seen.key?(ahead) || @dangerous.include?(to) || pocket?(to, key) || (place == from && avoid.include?(key)) || beyond?(tier, place, key) ||
+          next if seen.key?(ahead) || (goal.nil? && @dangerous.include?(to)) || pocket?(to, key) || (place == from && avoid.include?(key)) || beyond?(tier, place, key) ||
                   (cut?(place, came, key) && !lifted.include?([place, came, key]))
 
           seen[ahead] = [state, key]

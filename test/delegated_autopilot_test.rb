@@ -566,7 +566,8 @@ class DelegatedAutopilotTest < Minitest::Test
     p.decide(p.decision_point_for(low), low, { grid: })
     assert_nil log.route([68, 0]), 'at 4 hp no route enters 84/0'
     refute_equal [84, 0], log.least_visited([68, 0])&.dig(:goal)
-    assert_match(/which no route enters: 84-0 \(8 hp\)/, p.send(:route_line, low))
+    assert_equal [84, 0], log.route([68, 0], goal: [84, 0])&.dig(:goal), 'an objective may still lead there'
+    assert_match(/which no route to work enters: 84-0 \(8 hp\)/, p.send(:route_line, low))
   end
 
   # Run 0e98, 84/0 at 4 hp from 101616: the objective was to talk to type 185, not a way through enemies, and Link stayed at 4 hp until the stop.
