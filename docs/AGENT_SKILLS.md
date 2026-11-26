@@ -144,9 +144,7 @@ The skills, protocols and harness behaviours the agent works with. Versioned wit
   Within a place, explore takes a side known only as the assumed way back (flow-78) after the place's other reachable untried exits, doors and frontiers;
   it is still a frontier, taken when nothing else here is reachable, before a route to another place. An explore that stops `no_frontier`
   in at most one frame is answered by the harness at the next decision, not after three, since from the same cell it would find none again.
-- flow-106: danger is measured per place: the largest hp drop between two decisions in each place, read back from the trace. The
-  measured-hit heal takes a known way only through places Link was seen in whose measured hit stays below his health (a place never
-  seen is unsafe); places where enemies were listed no longer matter. A place whose measured hit is at or above Link's health is
+- flow-106: danger is measured per place: the largest hp drop between two decisions in each place, read back from the trace. A place whose measured hit is at or above Link's health is
   never entered by a route to work (the harness's redirects and explore's own), never a least-visited fallback, and never left
   into by a pocket or retreat side; a route to a given place (an objective's) may still cross it. With no safe way the choice
   goes to the model, whose context lists those places with their hits.

@@ -265,8 +265,8 @@ module Koholint
           DecisionPoint.harness_choice(objective.slice(:title, :predicate), "the loop is cut: #{key}, set aside, is taken up again (#{@reoffers[key]}/#{REOFFERS})", autopilot: true)
         end
 
-        # Survival before anything else, at every decision: at or below the largest hit measured on the lineage (the next one may kill), by a way through places
-        # seen before where no measured hit reaches health, or at one heart on a way to the objective through such a place, Link goes to the nearest place a talk healed him; the objective
+        # Survival before anything else, at every decision: at or below the largest hit measured on the lineage (the next one may kill), by a way through no place
+        # where enemies were seen, or at one heart on a way to the objective through such a place, Link goes to the nearest place a talk healed him; the objective
         # is taken up again afterwards.
         # A place card with one person or unknown thing names who to talk to there.
         def heal_detour(decision_point, state, context)
@@ -281,7 +281,7 @@ module Koholint
           return unless crossing || (@healers.hit && state.health <= @healers.hit)
 
           ways = @healers.places.filter_map { |at| [at, at == state.place ? [] : @explore_log.path(state.place, goal: at)] }.select(&:last)
-          ways = ways.reject { |_, path| path.any? { |hop| !@healers.safe?(hop[:to], state.health) } } unless crossing
+          ways = ways.reject { |_, path| path.any? { |hop| Array(@cards.dig(hop[:to], :enemies)).any? } } unless crossing
           place, = ways.min_by { |_, path| path.size }
           return unless place
 
