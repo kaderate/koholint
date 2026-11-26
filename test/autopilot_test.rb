@@ -168,6 +168,25 @@ class AutopilotTest < Minitest::Test
     assert_nil primed(stop: :blocked).try_choice(state: state(frame: 400), objective:, entities:, tried:)
   end
 
+  def test_at_one_heart_or_less_nothing_unknown_is_tried_or_touched
+    never = ->(_) { false }
+    one = [{ kind: :unknown, type: 58, cell: [3, 2], x: 40, y: 64 }]
+    { 8 => nil, 4 => nil, 9 => 'touch' }.each do |hp, skill|
+      pilot = primed
+      pilot.model_called(state: state(hp:), objective:)
+      pilot.acted(skill: 'explore', outcome: { stopped_by: :known_place })
+      try = pilot.try_choice(state: state(frame: 400, hp:), objective:, entities: one, tried: never)
+      skill ? refute_nil(try, "hp #{hp}") : assert_nil(try, "hp #{hp}")
+      fresh = primed
+      fresh.try_choice(state: state(frame: 400), objective:, entities: one, tried: never)
+      fresh.acted(skill: 'talk_to', outcome: { stopped_by: :frame_cap, target_type: 58 })
+      fresh.model_called(state: state(frame: 450, hp:), objective:)
+      fresh.acted(skill: 'explore', outcome: { stopped_by: :known_place })
+      touch = fresh.touch_choice(state: state(frame: 500, hp:), objective:, entities: one)&.dig(:choice, :skill)
+      skill ? assert_equal(skill, touch, "hp #{hp}") : assert_nil(touch, "hp #{hp}")
+    end
+  end
+
   def test_a_return_to_a_known_place_does_not_count_in_the_chain
     pilot = primed(stop: :known_place)
     pilot.next_choice(state: state(frame: 400), objective: objective)

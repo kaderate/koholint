@@ -128,7 +128,7 @@ module Koholint
     # A thing on screen never tried is tried once with talk_to before exploring on, nearest first: the sprites the last explore offered where no catalogued enemy stands,
     # and uncatalogued entities of a type never aimed at here. Tries cost no call, so TRY_LIMIT per visit bounds them, not the chain caps.
     def try_choice(state:, objective:, entities:, tried:)
-      return unless state.cell && !objective&.dig(:target) && !hold_reason(state:, objective:, caps: false)
+      return unless state.cell && state.health > Perception::HP_PER_HEART && !objective&.dig(:target) && !hold_reason(state:, objective:, caps: false)
 
       here = state.place
       visit(here)
@@ -154,7 +154,7 @@ module Koholint
     # A still uncatalogued entity whose try gave nothing is walked onto once per visit, nearest first: touch reads the item bytes to tell a pickup.
     # Still means it is still in the cell the try aimed at and not catalogued as moving; tries and touches share TRY_LIMIT.
     def touch_choice(state:, objective:, entities:)
-      return unless state.cell && !objective&.dig(:target) && !hold_reason(state:, objective:, caps: false)
+      return unless state.cell && state.health > Perception::HP_PER_HEART && !objective&.dig(:target) && !hold_reason(state:, objective:, caps: false)
 
       here = state.place
       visit(here)

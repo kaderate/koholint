@@ -155,7 +155,8 @@ The skills, protocols and harness behaviours the agent works with. Versioned wit
   session-only one-strike probe of flow-110 (`note_contact`, `probe_choice`, the attack's strike cap from the context) and the
   "no tries in a place that has hurt Link" of flow-107; a type that never hurt Link is tried there again.
 - flow-112: one heart or less no longer holds the autopilot (the flow-68 `low health` hold is gone); the one-heart walls, walk's
-  `danger` stop and the disengage walk stay, and a health drop still hands the next decision to the model (`hp dropped`). A decision
+  `danger` stop and the disengage walk stay, the harness neither tries nor touches an unknown thing at one heart or less, and a health
+  drop still hands the next decision to the model (`hp dropped`). A decision
   the model takes while the autopilot is on records why the autopilot did not choose (`autopilot_hold` on the `decision` event).
 - flow-110: a hit that leaves an enemy's slot to another type (`target_gone`) marks the spot: creatures catalogued as moving there at the
   next look (in the struck slot, or on the cell the enemy stood on) are fought on sight as enemies until each is struck once. A creature
