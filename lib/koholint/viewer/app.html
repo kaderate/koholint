@@ -231,7 +231,7 @@
   // pure:begin
   const COLS = 'ABCDEFGHIJKLMNOP';
   const MOIS = ['janv.', 'févr.', 'mars', 'avr.', 'mai', 'juin', 'juil.', 'août', 'sept.', 'oct.', 'nov.', 'déc.'];
-  const FR = { sword: 'épée', bombs: 'bombes', 'power bracelet': 'bracelet', shield: 'bouclier', bow: 'arc', hookshot: 'grappin', 'magic rod': 'baguette', 'pegasus boots': 'bottes', ocarina: 'ocarina', "roc's feather": 'plume', shovel: 'pelle', mushroom: 'champignon', boomerang: 'boomerang' };
+  const FR = { sword: 'épée', bombs: 'bombes', 'power bracelet': 'bracelet', shield: 'bouclier', bow: 'arc', hookshot: 'grappin', 'magic rod': 'baguette', 'pegasus boots': 'bottes', ocarina: 'ocarina', "roc's feather": 'plume', shovel: 'pelle', mushroom: 'champignon', 'magic powder': 'poudre magique', boomerang: 'boomerang' };
   function esc(t) { return String(t == null ? '' : t).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
   function fd(d) { return d ? +d.slice(8) + ' ' + MOIS[+d.slice(5, 7) - 1] : '?'; }
   function kf(n) { return n >= 1000 ? Math.round(n / 1000) + 'k' : String(n); }

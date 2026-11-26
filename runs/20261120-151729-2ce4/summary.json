@@ -1,5 +1,5 @@
 {
-  "v": 9,
+  "v": 11,
   "run_id": "20261120-151729-2ce4",
   "flow_version": "flow-78",
   "tag": "val78-1",
@@ -18,6 +18,20 @@
     "p90": 6249
   },
   "highest_milestone": "sword",
+  "milestones": [
+    {
+      "name": "shield",
+      "frame": 3906
+    },
+    {
+      "name": "sword",
+      "frame": 60404
+    }
+  ],
+  "held": [
+    "sword",
+    "shield"
+  ],
   "places_seen": 67,
   "objectives": {
     "count": 97,
@@ -230,6 +244,8 @@
     "deaths": 4,
     "damage_events": 40,
     "stuck_events": 8,
+    "chests_opened": 0,
+    "rupees": null,
     "autopilot_decisions": 398,
     "chain_max": 19,
     "left_with_unexhausted_people": 11
