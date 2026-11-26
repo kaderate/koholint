@@ -6,6 +6,7 @@ module Koholint
     WINDOW_FRAMES = 3600
 
     BREAK = 'loop in'
+    HEAL_OVER = 'the heal is over:'
 
     attr_reader :hint, :notes
 
@@ -14,7 +15,7 @@ module Koholint
       events.each do |event|
         state = event['state'] if event['type'] == 'perception'
         watch.observe(place: [state['room_id'], state['map_id']], frame: event['frame']) if state && state['game_mode'] == Koholint::PLAY_MODE
-        watch.act! if event['type'] == 'decision' && event['justification'].to_s.start_with?(BREAK)
+        watch.act! if event['type'] == 'decision' && event['justification'].to_s.start_with?(BREAK, HEAL_OVER)
       end
       watch.notes.clear
       watch
@@ -29,7 +30,7 @@ module Koholint
       @notes = []
     end
 
-    # The policy acts once per detection, also across a resume.
+    # The policy acts once per detection (a loop break, or the objective a heal set aside taken up again), also across a resume.
     def act! = @acted = true
 
     def pending_hint = (@hint unless @acted)

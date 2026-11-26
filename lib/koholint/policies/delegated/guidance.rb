@@ -221,10 +221,11 @@ module Koholint
         end
 
         # A detected loop drops the current objective, once per detection, and explores toward the nearest place with untried work outside the loop,
-        # or, when no place has any, goes to the reachable place entered least outside the loop.
+        # or, when no place has any, goes to the reachable place entered least outside the loop. A heal is never replaced before hp rises above what it set out at.
         def loop_break(decision_point, state, context)
           hint = @loop_watch.pending_hint
           return if hint.nil? || @sequence || !%i[choose_skill choose_objective].include?(decision_point.name) || @puzzle_ask || model_hold?(state)
+          return if @objectives.current&.dig(:heal) && state.health <= @objectives.current.dig(:target, :heal_below).to_i
 
           place = state.place
           looped = hint[:places].map { |at| at.split('-').map(&:to_i) }
@@ -249,10 +250,28 @@ module Koholint
         end
 
         # A delivery the loop break dropped is a lead the loop says nothing about, so it is taken up again once the loop is cut, REOFFERS times at most.
-        def note_dropped(objective, any: false)
+        # A lead's claim is model-written, so a lead set aside goes back to the menu, never to a harness-alone take.
+        def note_dropped(objective, any: false, heal: false)
           return unless objective && (any || DROPPED.any? { |prefix| objective[:candidate].to_s.start_with?(prefix) })
+          return if objective[:candidate].to_s.start_with?('lead-')
 
           @dropped = objective.slice(:title, :predicate, :candidate, :target)
+          @dropped_for_heal = heal
+        end
+
+        # Once the heal is over, the objective it set aside comes back first, before a loop break and outside the re-offer cap.
+        def heal_return(decision_point, state, context)
+          return unless @dropped_for_heal && @dropped && decision_point.name == :choose_objective && !@objectives.current&.dig(:heal)
+
+          objective = @dropped
+          @dropped = nil
+          @dropped_for_heal = false
+          return if objective[:candidate] && build_candidates(state, context).none? { |candidate| candidate[:id] == objective[:candidate] }
+
+          @loop_watch.act!
+          @objectives.start(frame: state.frame, **objective, autopilot: true)
+          @autopilot&.adopt(@objectives.current)
+          DecisionPoint.harness_choice(objective.slice(:title, :predicate), "#{LoopWatch::HEAL_OVER} #{objective[:candidate] || objective[:title]}, set aside for it, is taken up again", autopilot: true)
         end
 
         # Taken up once per drop, and only while the menu still offers it: a delivery that fired retires its candidate.
@@ -263,8 +282,6 @@ module Koholint
           @dropped = nil
           key = objective[:candidate] || objective[:title]
           return if @reoffers[key] >= REOFFERS
-          # A lead's claim is model-written, so a lead dropped by a heal goes back to the menu, never to a harness-alone take.
-          return if objective[:candidate].to_s.start_with?('lead-')
           return if objective[:candidate] && build_candidates(state, context).none? { |candidate| candidate[:id] == objective[:candidate] }
 
           @reoffers[key] += 1
@@ -294,7 +311,7 @@ module Koholint
           return unless place
 
           @healers.detoured
-          note_dropped(current, any: true)
+          note_dropped(current, any: true, heal: true)
           @objectives.abandon(frame: state.frame, reason: 'heal') if current
           who = Array(@cards.dig(place, :people)) + Array(@cards.dig(place, :unknown))
           target = (who.size == 1 ? { kind: 'person', place:, type: who.first[:type], cell: who.first[:cell] } : { kind: 'place', place: }).merge(heal_below: state.health)

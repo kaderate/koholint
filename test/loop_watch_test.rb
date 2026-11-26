@@ -60,4 +60,12 @@ class LoopWatchTest < Minitest::Test
     enter(watch, [[90, 2], [100, 3], [110, 1], [120, 3], [130, 1], [140, 3], [150, 1], [160, 3], [170, 1]])
     assert_equal [1, 0], watch.pending_hint[:place], 'a new detection is acted on again'
   end
+
+  def test_an_objective_a_heal_set_aside_taken_up_again_acts_on_the_detection_after_a_resume
+    events = [[0, 1], [10, 2], [20, 1], [30, 2], [40, 1], [50, 2], [60, 1], [70, 2], [80, 1]].map do |frame, room|
+      { 'type' => 'perception', 'frame' => frame, 'state' => { 'room_id' => room, 'map_id' => 0, 'game_mode' => 0x0B } }
+    end
+    events << { 'type' => 'decision', 'frame' => 80, 'justification' => 'the heal is over: souvenir-162-14-t64, set aside for it, is taken up again' }
+    assert_nil Koholint::LoopWatch.from_events(events).pending_hint
+  end
 end
