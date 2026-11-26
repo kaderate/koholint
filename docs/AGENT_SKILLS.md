@@ -149,8 +149,8 @@ The skills, protocols and harness behaviours the agent works with. Versioned wit
   the dangerous places with their hits. The model's own choices may still cross them. At or below the lineage hit, an aimed explore
   whose route exit is out of reach from where Link stands stops (`held_back`) instead of going after local work, and the objective
   is abandoned (`unreachable`), so the model chooses next.
-- flow-107: the autopilot tries no never-tried entity or object (talk, then touch) in a place where a hit was measured on the
-  lineage; the model may still choose to.
+- flow-107: the autopilot starts no try of a never-tried entity or object (its `talk_to`, which a touch may follow) in a place
+  where a hit was measured on the lineage; the model may still choose to.
 - flow-106: danger is measured per place: the largest hp drop between two decisions in each place, read back from the trace. A place whose measured hit is at or above Link's health is
   never entered, as a hop or a destination, by a route to work (the harness's loop, zero-frame and guarded redirects, explore's own
   search for work, explore following such a redirect) or by the least-visited fallback, and never left into by a pocket or retreat
