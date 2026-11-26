@@ -138,13 +138,17 @@ with the same `flow_version`, ROM hash, capabilities digest, exits digest and so
 the engine wrote; each fork counts from its fork frame. `Atlas.facts` lists every entry of the typed `data/` files with its status
 and provenance. `koholint atlas` writes `tmp/atlas.json`; the viewer serves `/atlas`.
 
-**Viewer** (`viewer.rb`, `viewer/`) — a small HTTP server. A `Follower` replays the watched run's journal and seeks by keyframe;
+**Viewer** (`viewer.rb`, `viewer/`) — a small HTTP server. A `Follower` replays the watched run's journal and seeks by keyframe,
+only while a page shows it (a `Registry` replay of a past run likewise only advances while asked for);
 `Feed` and `Insights` derive status, feed, reasoning, objectives, leads, dialogues, recent skill calls, the world map and the cockpit from the trace
 up to the shown frame; `page.html` draws them. `app.html` is the cockpit at `/`: `Island` merges the atlas of the runs root per screen
 (captures, ways, deaths, heat, first gains, the open leads of the lineage holding the most items, the metro lines of the
 lineages that reached something, every lead, the texts by voice) and `Story` reads one run as
-frame-stamped thoughts, objectives, places, body, items, skills and merged dialogues; both are cached by trace mtime and size. It never writes game state; it writes only `star.json`, `summary.json`'s
-`starred` and `notes.md`.
+frame-stamped thoughts, objectives, places, body, items, skills and merged dialogues; both are cached by trace mtime and size.
+`DigestCache` keeps each run's atlas digest on disk under the runs root's `.cache/digests/` (JSON, keyed by run path, trace mtime and size, and a hash of `lib/koholint/**/*.rb` and `data/*.json`) and the last
+island in `.cache/island.json` (same hash; digests of deleted runs are pruned; a failed rebuild keeps the last island and is retried after 30 s), so a restart serves the last island at once and rebuilds it in the
+background. `Machines` lists the koholint processes of the computer (ps, the `run.lock` each holds per lsof, the trace tail). It never
+writes game state; it writes only `star.json`, `summary.json`'s `starred`, `notes.md` and the runs root's `.cache/`.
 
 **CLI** — `cli.rb`, `bin/koholint`: `run`, `resume`, `fork`, `branch`, `verify`, `summary`, `watch`, `archive`, `star`,
 `prune-heavy`, `atlas`, `souvenirs`, `census`, `ab-plan` and `ab-report` (`ab.rb`), `check-leads`, `check-pickups`, `learn`, `capability` and

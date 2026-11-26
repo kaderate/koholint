@@ -44,10 +44,10 @@ module Koholint
     end
 
     # Every run directory under the roots and its digest (nil when unreadable), each cached by its trace's mtime and size.
-    def read(roots, cache: {})
+    def read(roots, cache: {}, progress: nil)
       dirs = roots.flat_map { |root| Archive.runs(root) }.uniq { |dir| File.basename(dir) }
       ids = dirs.to_h { |dir| [File.basename(dir), dir] }
-      [dirs, dirs.map { |dir| cached(dir, ids, cache) }]
+      [dirs, dirs.each_with_index.map { |dir, index| cached(dir, ids, cache).tap { progress&.call(index + 1, dirs.size) } }]
     end
 
     def cached(dir, ids, cache)

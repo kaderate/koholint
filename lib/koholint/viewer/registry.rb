@@ -11,6 +11,7 @@ module Koholint
       STEP_CHUNK = 60
       SLICE = 0.02
       MAX_EXPIRED = 100
+      UNWATCHED = 15
 
       class Expired < Error; end
 
@@ -125,7 +126,7 @@ module Koholint
       def owe(entry, now)
         elapsed = now - entry.ticked_at
         entry.ticked_at = now
-        entry.owed = entry.paused ? 0.0 : [entry.owed + (elapsed * FPS * entry.speed), FPS * entry.speed].min
+        entry.owed = entry.paused || now - entry.used_at > UNWATCHED ? 0.0 : [entry.owed + (elapsed * FPS * entry.speed), FPS * entry.speed].min
       end
 
       def advance(entry)

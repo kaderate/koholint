@@ -178,6 +178,20 @@
   .sprite-big { width: 48px; height: 48px; animation: bob .5s steps(2) infinite; }
   a.tool, a.xbtn { text-decoration: none; color: inherit; }
   button.tag.live { border: 0; cursor: pointer; }
+  .legacy { position: relative; }
+  .legacy summary { list-style: none; color: var(--mut); }
+  .legacy summary::-webkit-details-marker { display: none; }
+  .legacy .menu { position: absolute; right: 0; top: 38px; display: flex; flex-direction: column; min-width: 120px; padding: 4px; border-radius: 10px; background: var(--panel); border: 1px solid var(--line); box-shadow: 0 10px 30px -10px rgba(0,0,0,.4); }
+  .legacy .menu a { padding: 7px 10px; border-radius: 7px; text-decoration: none; color: inherit; font-weight: 600; font-size: 13px; }
+  .legacy .menu a:hover { background: var(--soft); }
+  .empty .btns { justify-content: center; }
+  .bar.progress { width: 220px; display: block; height: 8px; border-radius: 4px; background: var(--soft); }
+  #machines { flex-direction: column; padding: 18px 24px; gap: 14px; overflow: auto; }
+  .mtable { width: 100%; border-collapse: collapse; font-size: 13.5px; font-variant-numeric: tabular-nums; }
+  .mtable th { text-align: left; font-size: 12px; color: var(--mut); font-weight: 600; padding: 6px 10px; border-bottom: 1px solid var(--line); }
+  .mtable td { padding: 9px 10px; border-bottom: 1px solid var(--line); }
+  .mtable td.r, .mtable th.r { text-align: right; }
+  .mtable a { color: var(--blue); text-decoration: none; }
 </style>
 </head>
 <body>
@@ -210,19 +224,20 @@
     <button type="button" data-go="ile"><svg class="ico" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M2 11c2-1 3-4 6-4s4 3 6 4M3 13h10"></path><circle cx="11" cy="4" r="1.5"></circle></svg>Île</button>
     <button type="button" data-go="direct"><svg class="ico" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="2" y="3" width="12" height="10" rx="2"></rect><path d="M7 6l3 2-3 2z" fill="currentColor"></path></svg>Direct</button>
     <button type="button" data-go="metro"><svg class="ico" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M2 8h12M6 8l3-4h5"></path><circle cx="6" cy="8" r="1.6" fill="currentColor"></circle><circle cx="11" cy="8" r="1.6" fill="currentColor"></circle></svg>Métro</button>
+    <button type="button" data-go="machines"><svg class="ico" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="2" y="3" width="12" height="8" rx="1.5"></rect><path d="M5 14h6M8 11v3"></path></svg>Machines</button>
   </nav>
   <div class="chips" id="chips"></div>
   <button type="button" class="tool" data-drawer="runs" title="Runs" aria-pressed="false"><svg class="ico" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M3 4h10M3 8h10M3 12h6"></path></svg></button>
   <button type="button" class="tool" data-drawer="leads" title="Pistes" aria-pressed="false"><svg class="ico" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M4 2h8v12l-4-3-4 3z"></path></svg></button>
   <button type="button" class="tool" data-drawer="people" title="Personnes" aria-pressed="false"><svg class="ico" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="8" cy="5.5" r="2.5"></circle><path d="M3 14c.5-3 2.5-4.5 5-4.5s4.5 1.5 5 4.5"></path></svg></button>
-  <a class="tool" href="/live" title="Debug"><svg class="ico" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M5 5l-3 3 3 3M11 5l3 3-3 3M9 3l-2 10"></path></svg></a>
-  <a class="tool" href="/atlas" title="Atlas"><svg class="ico" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="2" y="2" width="12" height="12" rx="1"></rect><path d="M2 6h12M2 10h12M6 2v12M10 2v12"></path></svg></a>
+  <details class="legacy" id="legacy"><summary class="xbtn">Legacy</summary><div class="menu"><a href="/atlas">Atlas</a><a href="/live">Live</a></div></details>
   <button type="button" class="tool" id="sound" title="Son"></button>
 </header>
 <main>
   <section class="place" id="ile"></section>
   <section class="place" id="direct"></section>
   <section class="place" id="metro"></section>
+  <section class="place" id="machines"></section>
 </main>
 <div class="scrim" id="scrim"></div>
 <aside id="drawer" aria-label="tiroir"></aside>
@@ -241,6 +256,7 @@
   function upto(rows, frame) { return rows.filter(function (row) { return row[0] <= frame; }); }
   function tally(skills, frame) { const out = {}; upto(skills, frame).forEach(function (row) { out[row[1]] = (out[row[1]] || 0) + 1; }); return Object.entries(out).sort(function (a, b) { return b[1] - a[1]; }); }
   function hearts(hp, max) { const out = []; for (let k = 0; k < Math.ceil((max || 0) / 8); k++) out.push(Math.max(0, Math.min(1, (hp - k * 8) / 8))); return out; }
+  function cap(t) { return t ? t.charAt(0).toUpperCase() + t.slice(1) : t; }
   function placeName(label, place) { return !place || place.grid ? label : place.opens_from[0] ? 'intérieur, porte en ' + place.opens_from[0] : 'intérieur ' + label; }
   function groupAttempts(rows) { const out = []; rows.forEach(function (o) { const g = out[out.length - 1]; if (g && g[0][2] === o[2]) g.push(o); else out.push([o]); }); return out; }
   function latestObjectives(objectives) { const last = {}; objectives.forEach(function (o) { last[o[4]] = o; }); return Object.values(last).sort(function (a, b) { return a[0] - b[0]; }); }
@@ -248,7 +264,7 @@
 
   const $ = function (id) { return document.getElementById(id); };
   const SVGNS = $('sprites').namespaceURI;
-  const ORDER = ['ile', 'direct', 'metro'];
+  const ORDER = ['ile', 'direct', 'metro', 'machines'];
   const KEY = 'koholint-app';
   const state = { view: 'ile', sel: null, day: null, sound: false, run: null, frame: null, scrub: null, drawer: null, q: '', starOnly: false, runsAt: null, more: null, msel: null, trail: null };
   try { Object.assign(state, JSON.parse(localStorage.getItem(KEY) || '{}')); } catch (e) { }
@@ -290,7 +306,14 @@
       h('span', { class: 'chip', text: '$' + Math.round(island.dollars) })]);
   }
 
-  function loading(where) { fill(where, h('div', { class: 'empty' }, h('div', { class: 'sprite-big' }, sprite()), h('div', { text: 'Lecture des runs…' }))); }
+  let building = null, islandError = null;
+  function loading(where) {
+    const atlasView = where === 'ile' || where === 'metro';
+    if (atlasView && islandError) return fill(where, h('div', { class: 'empty' }, h('div', { text: 'Atlas indisponible' }), h('div', { class: 'mut', text: islandError }), h('div', { class: 'btns' }, h('button', { type: 'button', class: 'xbtn', id: 'retryIsland', text: 'Réessayer' }))));
+    const part = atlasView && building && building.total ? building : null;
+    fill(where, h('div', { class: 'empty' }, h('div', { class: 'sprite-big' }, sprite()), h('div', { text: where === 'machines' ? 'Lecture des processus…' : 'Lecture des runs…' + (part ? ' ' + part.done + '/' + part.total : '') }),
+      part && h('div', { class: 'bar progress' }, h('i', { style: 'width:' + (100 * part.done / part.total).toFixed(1) + '%' }))));
+  }
 
   /* ---------- Île ---------- */
   function ile() {
@@ -334,13 +357,13 @@
         h('div', { class: 'shot' }, p.screen && h('img', { class: 'px', alt: '', src: shotUrl(p.label) }), dots),
         h('div', { class: 'facts' }, h('b', { text: p.label }), h('span', { class: 'mut', text: p.room + '/' + p.map }), h('span', { text: fd(p.first.date) }), h('span', { text: p.visits + '×' }), p.deaths ? h('span', null, skull(14), ' ' + p.deaths) : null),
         h('div', { class: 'cap', text: p.runs + ' runs' + (seen ? ' · ' + seen : '') }),
-        h('div', { class: 'btns' }, p.recent.length ? h('button', { type: 'button', class: 'xbtn', 'data-runs-at': p.label, text: p.recent.length + ' runs récentes ici' }) : null, h('button', { type: 'button', class: 'xbtn', id: 'unsel', text: '✕ fermer' })));
+        h('div', { class: 'btns' }, p.recent.length ? h('button', { type: 'button', class: 'xbtn', 'data-runs-at': p.label, text: p.recent.length + ' runs récentes ici' }) : null, h('button', { type: 'button', class: 'xbtn', id: 'unsel', text: '✕ Fermer' })));
     } else {
       const n = island.next[0];
-      side = [h('div', null, h('div', { class: 'hero' }, count, h('small', { text: ' / 256' })), h('div', { class: 'cap', text: 'écrans découverts' })),
+      side = [h('div', null, h('div', { class: 'hero' }, count, h('small', { text: ' / 256' })), h('div', { class: 'cap', text: 'Écrans découverts' })),
         h('div', { style: 'display:flex;gap:14px;align-items:center' }, h('div', { class: 'loc' }, loc),
-          h('div', { class: 'legend', style: 'flex-direction:column;gap:6px' }, h('span', null, skull(14), ' ' + deaths + ' morts'), h('span', null, star(14), ' objets'),
-            h('span', null, s('svg', { width: 14, height: 14 }, s('circle', { cx: 7, cy: 7, r: 5, fill: 'none', style: 'stroke:var(--warn)', 'stroke-width': 2 })), ' cap'))),
+          h('div', { class: 'legend', style: 'flex-direction:column;gap:6px' }, h('span', null, skull(14), ' ' + deaths + ' morts'), h('span', null, star(14), ' Objets'),
+            h('span', null, s('svg', { width: 14, height: 14 }, s('circle', { cx: 7, cy: 7, r: 5, fill: 'none', style: 'stroke:var(--warn)', 'stroke-width': 2 })), ' Cap'))),
         s('svg', { class: 'spark', viewBox: '0 0 320 54', preserveAspectRatio: 'none' }, s('path', { class: 'area', d: line + 'L320,54L0,54Z' }), s('path', { d: line }), s('circle', { cx: sx(di), cy: sy(series[di]), r: 4, style: 'fill:var(--warn)' })),
         n && h('div', { class: 'card next' }, h('div', { class: 'lbl' }, h('span', { text: 'PROCHAIN' }), h('span', { class: 'mut', text: island.next.length + ' pistes' })), h('q', { text: n.quote }),
           h('div', { class: 'where' }, P[n.screen] && P[n.screen].screen && h('img', { class: 'px', alt: '', src: shotUrl(n.screen) }), h('span', { class: 'linkish', 'data-sel': n.screen, text: placeName(n.place, P[n.place]) }), h('span', { text: 'lu le ' + fd(n.date) })))];
@@ -348,7 +371,7 @@
     fill('ile', [h('div', { class: 'mapbox' },
       h('div', { class: 'island', style: 'grid-template-columns:repeat(' + nc + ',' + W + 'px);grid-auto-rows:' + H + 'px' }, cells,
         s('svg', { viewBox: '0 0 ' + nc * W + ' ' + nr * H }, trails, marks, runTrail(c)),
-        state.trail && h('div', { class: 'banner' }, 'trace de ' + short(state.trail), h('button', { type: 'button', id: 'untrail', 'aria-label': 'retirer la trace', text: '✕' })),
+        state.trail && h('div', { class: 'banner' }, 'Trace de ' + short(state.trail), h('button', { type: 'button', id: 'untrail', 'aria-label': 'retirer la trace', text: '✕' })),
         h('div', { class: 'sprite', id: 'sprite', style: 'display:' + (replay && spritePos ? 'block' : 'none') + ';transform:translate(' + (spritePos ? spritePos[0] - 13 : 0) + 'px,' + (spritePos ? spritePos[1] - 13 : 0) + 'px)' }, sprite())),
       h('div', { class: 'scrub' }, h('button', { type: 'button', class: 'round', id: 'playA', 'aria-label': 'rejouer la découverte' }, playIco(!!replay)),
         h('input', { type: 'range', id: 'dayA', min: 0, max: days.length - 1, value: di, 'aria-label': 'jour' }), h('b', { style: 'width:70px;text-align:right', text: fd(day) }))),
@@ -371,7 +394,17 @@
   let built = null;
   const shown = {};
   function put(id, key, build) { const k = JSON.stringify(key); if (shown[id] === k) return; shown[id] = k; fill(id, build()); }
+  let liveInfo = null;
+  function noLive() {
+    const key = 'nolive|' + liveInfo.latest; if (built === key) return; built = key;
+    fill('direct', h('div', { class: 'empty' }, h('div', { class: 'sprite-big' }, sprite()), h('div', { text: 'Aucune partie en direct' }),
+      h('div', { class: 'mut', text: 'Aucune run n\'avance en ce moment sous ce viewer' }),
+      h('div', { class: 'btns' }, liveInfo.latest && h('button', { type: 'button', class: 'xbtn', 'data-direct': liveInfo.latest }, playIco(false), ' Revoir la dernière run (' + short(liveInfo.latest) + ')'),
+        h('button', { type: 'button', class: 'xbtn', 'data-drawer': 'runs', text: 'Choisir une run' }))));
+  }
   function direct() {
+    if (!state.run && !liveInfo) { built = null; return loading('direct'); }
+    if (!state.run && !liveInfo.live) return noLive();
     if (!story) { built = null; return loading('direct'); }
     const st = story, f0 = st.fork, f1 = Math.max(st.end, f0 + 1);
     if (built !== st.run + '|' + f1) {
@@ -383,9 +416,9 @@
         h('div', { class: 'trow' }, h('button', { type: 'button', class: 'round', id: 'playD', 'aria-label': 'lecture' }),
           h('div', { class: 'tline', style: 'flex:1' }, h('div', { class: 'track' }), h('div', { class: 'fill', id: 'dfill' }), h('div', { id: 'dmarks' }), h('span', { class: 'knob', id: 'dknob' }), h('input', { type: 'range', id: 'frameD', min: f0, max: f1, 'aria-label': 'frame' })),
           h('span', { class: 'mut num', style: 'width:90px;text-align:right', text: kf(f0) + '→' + kf(f1) })),
-        h('div', { class: 'cols' }, h('div', { class: 'card' }, h('h3', null, star(13), ' objectifs'), h('div', { class: 'list', id: 'dobj' })),
-          h('div', { class: 'card' }, h('h3', { text: 'dialogues' }), h('div', { class: 'list', id: 'ddl' })),
-          h('div', { class: 'card' }, h('h3', { text: 'compétences' }), h('div', { class: 'list', id: 'dsk' })))]);
+        h('div', { class: 'cols' }, h('div', { class: 'card' }, h('h3', null, star(13), ' Objectifs'), h('div', { class: 'list', id: 'dobj' })),
+          h('div', { class: 'card' }, h('h3', { text: 'Dialogues' }), h('div', { class: 'list', id: 'ddl' })),
+          h('div', { class: 'card' }, h('h3', { text: 'Compétences' }), h('div', { class: 'list', id: 'dsk' })))]);
       refreshScreen(true);
     }
     const f = Math.max(f0, Math.min(f1, shownFrame()));
@@ -403,20 +436,20 @@
     const dl = st.dialogues.filter(function (d) { return d.frame <= f; }).slice(-30).reverse();
     const playing = !isLive && controls && !controls.paused && !frozen;
     put('dhead', [st.run, st.flow, isLive, frozen, inMetro(st.run)], function () {
-      return [h('h2', { text: short(st.run) }), isLive && !frozen ? h('span', { class: 'tag live', text: '● direct' }) : frozen && isLive ? h('button', { type: 'button', class: 'tag live', id: 'backLive', text: '● revenir au direct' }) : h('span', { class: 'tag', text: 'replay' }),
+      return [h('h2', { text: short(st.run) }), isLive && !frozen ? h('span', { class: 'tag live', text: '● Direct' }) : frozen && isLive ? h('button', { type: 'button', class: 'tag live', id: 'backLive', text: '● Revenir au direct' }) : h('span', { class: 'tag', text: 'Replay' }),
         h('span', { class: 'tag', text: st.flow }), h('span', { class: 'mut', text: fd(st.run.slice(0, 4) + '-' + st.run.slice(4, 6) + '-' + st.run.slice(6, 8)) }), h('span', { style: 'flex:1' }),
-        h('button', { type: 'button', class: 'xbtn', 'data-trail': st.run, text: 'sa trace sur l\'île' }), inMetro(st.run) && h('button', { type: 'button', class: 'xbtn', 'data-lineage': st.run, text: 'sa lignée' }),
+        h('button', { type: 'button', class: 'xbtn', 'data-trail': st.run, text: 'Sa trace sur l\'île' }), inMetro(st.run) && h('button', { type: 'button', class: 'xbtn', 'data-lineage': st.run, text: 'Sa lignée' }),
         h('a', { class: 'xbtn', href: state.run ? '/run/' + encodeURIComponent(st.run) : '/live', text: 'Debug' }),
-        h('button', { type: 'button', class: 'xbtn', 'data-drawer': 'runs', text: 'runs' })];
+        h('button', { type: 'button', class: 'xbtn', 'data-drawer': 'runs', text: 'Runs' })];
     });
     put('dhud', [body, held, kf(f), !!island], function () {
       return [h('span', { class: 'hearts' }, body && hearts(body[1], body[2]).map(function (fr) { return s('svg', { viewBox: '0 0 16 16' }, s('path', { d: HEART, fill: fr >= 1 ? '#ef6f6f' : fr > 0 ? '#f0b54a' : 'none', stroke: '#ef6f6f', 'stroke-width': 1.2 })); })),
-        h('span', { class: 'held' }, held.map(function (id) { return itemIco(id, 24); })), h('span', { style: 'flex:1' }), h('span', { class: 'mut', text: 'frame ' + kf(f) })];
+        h('span', { class: 'held' }, held.map(function (id) { return itemIco(id, 24); })), h('span', { style: 'flex:1' }), h('span', { class: 'mut', text: 'Frame ' + kf(f) })];
     });
-    put('dbubble', t, function () { return [h('span', { class: 'sk', text: t ? t[1] || 'pense' : 'pense' }), h('p', { text: t ? t[2] : 'aucune pensée enregistrée' })]; });
+    put('dbubble', t, function () { return [h('span', { class: 'sk', text: t ? t[1] || 'pense' : 'pense' }), h('p', { text: t ? t[2] : 'Aucune pensée enregistrée' })]; });
     put('dgoal', obj && obj[2], function () { return obj && h('div', { class: 'goal' }, star(16), h('span', { text: obj[2] })); });
     put('dplace', [placeL, place && place.visits], function () {
-      return [h('span', { class: 'big', text: placeName(placeL, place) || '?' }), h('span', { class: 'ents' }, place && [['people', 'personnes'], ['enemies', 'ennemis'], ['creatures', 'créatures']].map(function (k) { return place.seen[k[0]] ? h('span', { text: place.seen[k[0]] + ' ' + k[1] }) : null; }), place && h('span', { text: place.visits + '×' }))];
+      return [h('span', { class: 'big', text: cap(placeName(placeL, place)) || '?' }), h('span', { class: 'ents' }, place && [['people', 'personnes'], ['enemies', 'ennemis'], ['creatures', 'créatures']].map(function (k) { return place.seen[k[0]] ? h('span', { text: place.seen[k[0]] + ' ' + k[1] }) : null; }), place && h('span', { text: place.visits + '×' }))];
     });
     put('dmini', [here, trail.size, grid.length], function () { const mini = []; for (let room = 0; room < 256; room++) { const l = lbl(room); mini.push(h('i', { class: l === here ? 'here' : trail.has(l) ? 't' : P[l] ? 's' : '' })); } return mini; });
     put('playD', !!playing, function () { return playIco(playing); });
@@ -429,10 +462,10 @@
       return groupAttempts(latest).reverse().slice(0, 40).map(function (g) {
         const last = g[g.length - 1], key = String(g[0][4]), now = obj && g.some(function (o) { return o[4] === obj[4]; });
         const line = h('div', { class: 'ob' + (g.length > 1 ? ' grp' : '') + (now ? ' now' : ''), 'data-group': g.length > 1 ? key : null }, obIco(last[1]), h('span', null, last[2], g.length > 1 && h('span', { class: 'n', text: '×' + g.length })), h('span', { class: 'mut num', text: kf(last[0]) }));
-        return [line, expanded.has(key) && g.slice().reverse().map(function (o) { return h('div', { class: 'ob sub' }, obIco(o[1]), h('span', { text: ({ started: 'en cours', achieved: 'atteint', failed: 'échoué', abandoned: 'abandonné' })[o[1]] || o[1] }), h('span', { class: 'mut num', text: kf(o[0]) })); })];
+        return [line, expanded.has(key) && g.slice().reverse().map(function (o) { return h('div', { class: 'ob sub' }, obIco(o[1]), h('span', { text: ({ started: 'En cours', achieved: 'Atteint', failed: 'Échoué', abandoned: 'Abandonné' })[o[1]] || o[1] }), h('span', { class: 'mut num', text: kf(o[0]) })); })];
       });
     });
-    put('ddl', [dl.length, dl.length && dl[0].frame, dl.length && dl[0].text], function () { return dl.length ? dl.map(function (d) { return h('div', { class: 'dl' }, h('small', { text: (d.speaker || placeName(d.place, P[d.place])) + ' · ' + kf(d.frame) }), d.text); }) : h('span', { class: 'mut', text: 'aucun texte lu' }); });
+    put('ddl', [dl.length, dl.length && dl[0].frame, dl.length && dl[0].text], function () { return dl.length ? dl.map(function (d) { return h('div', { class: 'dl' }, h('small', { text: cap(d.speaker || placeName(d.place, P[d.place])) + ' · ' + kf(d.frame) }), d.text); }) : h('span', { class: 'mut', text: 'Aucun texte lu' }); });
     put('dsk', sk, function () { return sk.map(function (e) { return h('div', { class: 'bar' }, h('span', { text: e[0] }), h('i', { style: 'width:' + (100 * e[1] / skMax) + '%' }), h('span', { class: 'mut num', text: e[1] })); }); });
   }
 
@@ -446,16 +479,59 @@
 
   function json(url) { return fetch(url, { cache: 'no-store' }).then(function (r) { if (!r.ok) throw new Error(r.status); return r.json(); }); }
   let islandText = null;
+  function fetchIsland(signal) {
+    return fetch('/island.json', { cache: 'no-store', signal: signal }).then(function (r) {
+      if (r.status === 202) return r.json().then(function (p) { building = p; islandError = null; if (!island) render(); islandRetry = setTimeout(loadIsland, 1000); });
+      if (!r.ok) return r.json().catch(function () { return {}; }).then(function (b) { throw new Error(b.error || 'erreur ' + r.status); });
+      return r.text().then(islandArrived);
+    });
+  }
+  function islandArrived(text) {
+    building = null; islandError = null;
+    if (text === islandText) return;
+    islandText = text; const data = JSON.parse(text);
+    island = data; islandGen++; P = {}; data.places.forEach(function (p) { P[p.label] = p; });
+    grid = data.places.filter(function (p) { return p.grid; });
+    days = Array.from(new Set(data.places.map(function (p) { return p.first.date; }))).sort();
+    if (!replay) state.day = null;
+    render();
+  }
+  let islandRetry = null;
   function loadIsland() {
-    return fetch('/island.json', { cache: 'no-store' }).then(function (r) { if (!r.ok) throw new Error(r.status); return r.text(); }).then(function (text) {
-      if (text === islandText) return;
-      islandText = text; const data = JSON.parse(text);
-      island = data; islandGen++; P = {}; data.places.forEach(function (p) { P[p.label] = p; });
-      grid = data.places.filter(function (p) { return p.grid; });
-      days = Array.from(new Set(data.places.map(function (p) { return p.first.date; }))).sort();
-      if (!replay) state.day = null;
-      render();
-    }).catch(function () { if (!island) fill('ile', empty('Atlas indisponible', 'Le serveur n\'a pas de dossier de runs')); });
+    clearTimeout(islandRetry);
+    const ctl = new AbortController(), timer = setTimeout(function () { ctl.abort(); }, 20000);
+    return fetchIsland(ctl.signal).catch(function (e) { if (island) return; islandError = e.name === 'AbortError' ? 'Le serveur ne répond pas après 20 s' : String(e.message); render(); })
+      .finally(function () { clearTimeout(timer); });
+  }
+  function loadLive() {
+    return json('/direct.json').then(function (d) { liveInfo = d; if (state.view === 'direct') direct(); }).catch(function () { if (!liveInfo) { liveInfo = { live: true }; if (state.view === 'direct') direct(); } });
+  }
+  let machinesList = null, machinesError = null, machinesBusy = false;
+  const KIND = { run: 'Partie', resume: 'Reprise', fork: 'Fork', branch: 'Branche', watch: 'Viewer' };
+  function loadMachines() {
+    if (machinesBusy) return; machinesBusy = true;
+    json('/machines.json').then(function (rows) { machinesList = rows; machinesError = null; }).catch(function (e) { machinesError = String(e.message); })
+      .finally(function () { machinesBusy = false; if (state.view === 'machines') machines(); });
+  }
+  function duration(sec) { const hh = Math.floor(sec / 3600), mm = Math.floor(sec % 3600 / 60); return hh ? hh + ' h ' + String(mm).padStart(2, '0') : mm + ' min ' + String(sec % 60).padStart(2, '0'); }
+  function hostPort(port) { const host = location.hostname.indexOf(':') >= 0 ? '[' + location.hostname + ']' : location.hostname; return '//' + host + ':' + port + '/'; }
+
+  /* ---------- Machines ---------- */
+  function machines() {
+    if (!machinesList) return machinesError ? fill('machines', empty('Machines indisponibles', machinesError)) : loading('machines');
+    const head = h('div', { class: 'runhead' }, h('h2', { text: 'Machines' }), h('span', { class: 'mut', text: machinesList.length + ' processus koholint sur ce Mac' }), h('span', { style: 'flex:1' }),
+      h('span', { class: 'mut', text: machinesError ? 'Rafraîchissement en échec : ' + machinesError : 'Rafraîchi toutes les 3 s' }));
+    if (!machinesList.length) return fill('machines', [head, empty('Aucun émulateur en marche', 'Ni partie, ni fork, ni viewer koholint en cours')]);
+    const cols = ['Type', 'Run', 'Flow', 'Frame', 'Frames/s', 'CPU', 'Mémoire', 'Durée', 'Port', ''];
+    fill('machines', [head, h('table', { class: 'mtable' },
+      h('thead', null, h('tr', null, cols.map(function (t, k) { return h('th', { class: k >= 3 && k <= 7 ? 'r' : null, text: t }); }))),
+      h('tbody', null, machinesList.map(function (m) {
+        return h('tr', null, h('td', { text: KIND[m.kind] || m.kind }), h('td', { title: m.run || '', text: m.run ? short(m.run) : '?' }), h('td', { text: m.flow || '' }),
+          h('td', { class: 'r', text: m.frame != null ? m.frame.toLocaleString('fr-FR') : '' }), h('td', { class: 'r', text: m.fps != null ? m.fps.toLocaleString('fr-FR') : '—' }),
+          h('td', { class: 'r', text: Math.round(m.cpu) + ' %' }), h('td', { class: 'r', text: Math.round(m.rss / 1048576) + ' Mo' }), h('td', { class: 'r', text: duration(m.elapsed) }),
+          h('td', null, m.port ? h('a', { href: hostPort(m.port), text: ':' + m.port }) : ''),
+          h('td', null, m.open ? h('button', { type: 'button', class: 'xbtn', 'data-direct': m.open }, playIco(false), ' Direct') : ''));
+      })))]);
   }
   function loadStory() {
     return json('/story.json' + (state.run ? '?run=' + encodeURIComponent(state.run) : '')).then(function (data) { story = data; if (state.view === 'direct') direct(); })
@@ -463,7 +539,7 @@
   }
   let polling = false;
   function poll() {
-    if (polling || document.hidden || state.view !== 'direct') return;
+    if (polling || document.hidden || state.view !== 'direct' || (!state.run && (!liveInfo || !liveInfo.live))) return;
     polling = true;
     const url = state.run ? '/state.json?run=' + encodeURIComponent(state.run) : '/state.json';
     json(url).then(function (st) {
@@ -533,11 +609,11 @@
       h('div', { style: 'display:flex;gap:10px;align-items:baseline' }, h('b', { style: 'font-size:18px', text: short(r.run) }), h('span', { class: 'tag', text: r.flow }), h('span', { class: 'mut', text: fd(r.date) })),
       h('div', { class: 'facts' }, h('span', null, h('b', { text: mins(r.fork) + '→' + mins(r.end) }), ' min'), h('span', null, h('b', { text: '+' + r.screens }), ' écrans'), h('span', null, h('b', { text: '$' + Math.round(r.cum) }), ' cumulés')),
       h('div', { class: 'held' }, r.held.map(function (id) { return itemIco(id, 22); })),
-      h('div', { class: 'btns' }, h('button', { type: 'button', class: 'xbtn', 'data-direct': r.run }, playIco(false), ' Direct'), h('button', { type: 'button', class: 'xbtn', 'data-trail': r.run, text: 'sa trace sur l\'île' }), h('button', { type: 'button', class: 'xbtn', id: 'unmsel', 'aria-label': 'fermer', text: '✕' })));
+      h('div', { class: 'btns' }, h('button', { type: 'button', class: 'xbtn', 'data-direct': r.run }, playIco(false), ' Direct'), h('button', { type: 'button', class: 'xbtn', 'data-trail': r.run, text: 'Sa trace sur l\'île' }), h('button', { type: 'button', class: 'xbtn', id: 'unmsel', 'aria-label': 'fermer', text: '✕' })));
     fill('metro', [h('div', { class: 'mhead' },
-      h('div', null, h('div', { class: 'hero' }, mins(end.end), h('small', { text: ' min de jeu' })), h('div', { class: 'cap', text: 'de l\'allumage à la run la plus avancée · ' + mains.length + ' runs bout à bout' })),
-      h('div', { class: 'legend', style: 'margin-bottom:8px' }, h('span', null, s('svg', { width: 20, height: 20 }, s('circle', { cx: 10, cy: 10, r: 7, fill: 'none', stroke: 'currentColor', 'stroke-width': 3 })), 'checkpoint'),
-        h('span', null, s('svg', { width: 24, height: 24 }, s('circle', { cx: 12, cy: 12, r: 10, fill: 'none', stroke: 'currentColor', 'stroke-width': 3 })), 'premier objet'), h('span', null, skull(13), ' mort'), h('span', null, h('b', { text: '+N' }), ' forks repliés')),
+      h('div', null, h('div', { class: 'hero' }, mins(end.end), h('small', { text: ' min de jeu' })), h('div', { class: 'cap', text: 'De l\'allumage à la run la plus avancée · ' + mains.length + ' runs bout à bout' })),
+      h('div', { class: 'legend', style: 'margin-bottom:8px' }, h('span', null, s('svg', { width: 20, height: 20 }, s('circle', { cx: 10, cy: 10, r: 7, fill: 'none', stroke: 'currentColor', 'stroke-width': 3 })), 'Checkpoint'),
+        h('span', null, s('svg', { width: 24, height: 24 }, s('circle', { cx: 12, cy: 12, r: 10, fill: 'none', stroke: 'currentColor', 'stroke-width': 3 })), 'Premier objet'), h('span', null, skull(13), ' Mort'), h('span', null, h('b', { text: '+N' }), ' forks repliés')),
       h('span', { style: 'flex:1' }), h('button', { type: 'button', class: 'round', id: 'playM', 'aria-label': 'faire rouler' }, playIco(!!trainTimer))),
       s('svg', { id: 'msvg', viewBox: '0 0 ' + W + ' ' + HH, preserveAspectRatio: 'xMidYMid meet' }, s('g', { class: 'axis' }, axis), lines, st, labels, trainNodes), sel]);
   }
@@ -566,12 +642,12 @@
     drawn = key; drawnKind = d;
   }
   function runsDrawer(kept) {
-    if (!kept) fill('drawer', [h('div', { class: 'h' }, h('input', { class: 'search', id: 'q', placeholder: 'run, flow, tag, arrêt, étoile…', value: state.q, 'aria-label': 'chercher une run' }), h('button', { type: 'button', class: 'tool', id: 'starOnly', title: 'étoilées seulement', text: '★' })), h('div', { class: 'body', id: 'dbody' })]);
+    if (!kept) fill('drawer', [h('div', { class: 'h' }, h('input', { class: 'search', id: 'q', placeholder: 'run, flow, tag, arrêt, étoile…', value: state.q, 'aria-label': 'chercher une run' }), h('button', { type: 'button', class: 'tool', id: 'starOnly', title: 'Étoilées seulement', text: '★' })), h('div', { class: 'body', id: 'dbody' })]);
     $('starOnly').setAttribute('aria-pressed', String(state.starOnly)); $('starOnly').style.color = state.starOnly ? 'var(--warn)' : '';
     if (!runs) return fill('dbody', h('p', { class: 'mut', style: 'padding:12px', text: 'Lecture des runs…' }));
     const q = state.q.toLowerCase(), at = state.runsAt && P[state.runsAt] ? new Set(P[state.runsAt].recent) : null;
     const rows = runs.filter(function (r) { return (!state.starOnly || r.starred) && (!at || at.has(r.run_id)) && (!q || [r.run_id, r.flow_version, r.tag, r.stop_reason, r.why].join(' ').toLowerCase().indexOf(q) >= 0); });
-    fill('dbody', [at && h('div', { class: 'banner', style: 'position:static;transform:none;margin:4px 6px 8px;width:max-content' }, 'récentes à ' + placeName(state.runsAt, P[state.runsAt]), h('button', { type: 'button', id: 'unat', 'aria-label': 'toutes les runs', text: '✕' })),
+    fill('dbody', [at && h('div', { class: 'banner', style: 'position:static;transform:none;margin:4px 6px 8px;width:max-content' }, 'Récentes à ' + placeName(state.runsAt, P[state.runsAt]), h('button', { type: 'button', id: 'unat', 'aria-label': 'toutes les runs', text: '✕' })),
       rows.length ? rows.slice(0, 200).map(runRow) : h('p', { class: 'mut', style: 'padding:12px', text: 'Aucune run ne correspond' }),
       rows.length > 200 && h('p', { class: 'mut', style: 'padding:8px', text: '+' + (rows.length - 200) + ' de plus' })]);
   }
@@ -581,17 +657,17 @@
       h('span', { class: 'stb' + (r.starred ? ' on' : ''), title: r.why || '', text: '★' }), h('span', { text: short(id) }),
       h('span', { class: 'mut', text: [r.flow_version, fd(day(id)), r.stop_reason && 'arrêt ' + r.stop_reason].filter(Boolean).join(' · ') }),
       h('span', { text: typeof r.dollars === 'number' ? '$' + r.dollars.toFixed(2) : '' }),
-      h('button', { type: 'button', class: 'tool', 'data-more': id, title: 'étoile et notes', text: '✎' })),
+      h('button', { type: 'button', class: 'tool', 'data-more': id, title: 'Étoile et notes', text: '✎' })),
       state.more === id && moreBox(r)];
   }
   function moreBox(r) {
     const id = r.run_id, draft = drafts[id] || {};
     if (notesOf[id] == null) { notesOf[id] = ''; json('/header.json?run=' + encodeURIComponent(id)).then(function (hd) { notesOf[id] = hd.notes || ''; const ta = $('notesT'); if (ta && state.more === id && draft.notes == null && !ta.value) ta.value = notesOf[id]; }).catch(function () { }); }
     return h('div', { class: 'runmore' },
-      h('label', null, 'étoile : pourquoi', h('input', { id: 'whyI', maxlength: 500, value: draft.why != null ? draft.why : r.why || '', placeholder: 'ce que cette run montre' })),
-      h('div', { class: 'btns' }, h('button', { type: 'button', class: 'xbtn', id: 'starGo', 'data-run': id, text: r.starred ? '★ mettre à jour' : '★ étoiler' })),
-      h('label', null, 'notes', h('textarea', { id: 'notesT', maxlength: 8192 }, draft.notes != null ? draft.notes : notesOf[id])),
-      h('div', { class: 'btns' }, h('button', { type: 'button', class: 'xbtn', id: 'notesGo', 'data-run': id, text: 'enregistrer les notes' }), h('span', { class: 'mut', id: 'moreMsg' })));
+      h('label', null, 'Étoile : pourquoi', h('input', { id: 'whyI', maxlength: 500, value: draft.why != null ? draft.why : r.why || '', placeholder: 'ce que cette run montre' })),
+      h('div', { class: 'btns' }, h('button', { type: 'button', class: 'xbtn', id: 'starGo', 'data-run': id, text: r.starred ? '★ Mettre à jour' : '★ Étoiler' })),
+      h('label', null, 'Notes', h('textarea', { id: 'notesT', maxlength: 8192 }, draft.notes != null ? draft.notes : notesOf[id])),
+      h('div', { class: 'btns' }, h('button', { type: 'button', class: 'xbtn', id: 'notesGo', 'data-run': id, text: 'Enregistrer les notes' }), h('span', { class: 'mut', id: 'moreMsg' })));
   }
   function leadsDrawer() {
     const ls = island ? island.leads.slice().sort(function (a, b) { return (a.status === 'open' ? 0 : 1) - (b.status === 'open' ? 0 : 1) || (RANK[a.importance] == null ? 4 : RANK[a.importance]) - (RANK[b.importance] == null ? 4 : RANK[b.importance]); }) : [];
@@ -606,12 +682,12 @@
     fill('drawer', [h('div', { class: 'h' }, h('b', { text: 'Personnes' }), h('span', { class: 'mut', text: ps.length + ' voix' })),
       h('div', { class: 'body' }, ps.length ? ps.map(function (p) { const sc = P[p.screen], go = sc && sc.grid;
         return h('div', { class: 'person' }, h('b', null, sc && sc.screen && h('img', { class: 'px', alt: '', style: 'width:36px;border-radius:4px', src: shotUrl(p.screen) }),
-          p.name || [h('span', { class: 'mut', text: 'sans nom, à' }), ' ', h('span', { class: go ? 'linkish' : null, 'data-sel': go ? p.screen : null, text: placeName(p.screen, sc) })], h('span', { class: 'mut', text: String(p.count) })),
+          p.name || [h('span', { class: 'mut', text: 'Sans nom, à' }), ' ', h('span', { class: go ? 'linkish' : null, 'data-sel': go ? p.screen : null, text: placeName(p.screen, sc) })], h('span', { class: 'mut', text: String(p.count) })),
           p.texts.map(function (t) { return h('div', { class: 'dl', text: t.text }); }), p.count > p.texts.length && h('span', { class: 'mut', style: 'font-size:12px', text: '+' + (p.count - p.texts.length) })); }) : h('p', { class: 'mut', style: 'padding:12px', text: 'Aucun texte lu' }))]);
   }
 
   function go(view) {
-    if (view !== state.view) beep(view === 'ile' ? 523 : view === 'direct' ? 659 : 784, .09);
+    if (view !== state.view) beep({ ile: 523, direct: 659, metro: 784, machines: 880 }[view], .09);
     if (view !== 'metro') stopTrain();
     const to = ORDER.indexOf(view);
     ORDER.forEach(function (v, k) { const el = $(v); el.classList.toggle('on', v === view); el.classList.toggle('left', k < to); });
@@ -622,9 +698,10 @@
     const hash = view === 'direct' && state.run ? '#direct/' + state.run : '#' + view;
     if (location.hash !== hash) history.replaceState(null, '', hash);
     render();
-    if (view === 'direct') { if (!story || (story.run !== state.run && state.run)) loadStory(); poll(); }
+    if (view === 'direct') { if (!state.run) loadLive(); if (!story || (story.run !== state.run && state.run)) loadStory(); poll(); }
+    if (view === 'machines') loadMachines();
   }
-  function render() { chips(); ({ ile: ile, direct: direct, metro: metro })[state.view](); drawer(); }
+  function render() { chips(); ({ ile: ile, direct: direct, metro: metro, machines: machines })[state.view](); drawer(); }
   function stopReplay() { clearInterval(replay); replay = null; spritePos = null; }
   function control(query) { return json('/control?run=' + encodeURIComponent(state.run) + '&' + query).then(function (c) { controls = c; direct(); }); }
   function openDrawer(d) { state.drawer = d; if (d === 'runs') loadRuns(); drawer(); }
@@ -636,7 +713,9 @@
 
   document.addEventListener('click', function (e) {
     const t = e.target;
+    if (!t.closest('#legacy')) $('legacy').removeAttribute('open');
     const g = t.closest('[data-go]'); if (g) { stopReplay(); return go(g.dataset.go); }
+    if (t.closest('#retryIsland')) { islandError = null; render(); return loadIsland(); }
     if (t.closest('#sound')) { state.sound = !state.sound; save(); beep(880, .1); return chips(); }
     const dr = t.closest('[data-drawer]'); if (dr) { return state.drawer === dr.dataset.drawer ? (state.drawer = null, drawer()) : openDrawer(dr.dataset.drawer); }
     if (t.closest('#scrim')) { state.drawer = null; return drawer(); }
@@ -646,7 +725,7 @@
     const sg = t.closest('#starGo'); if (sg) { const id = sg.dataset.run, why = $('whyI').value;
       return post('/star', id, { why: why }).then(function (b) { const r = runs.find(function (x) { return x.run_id === id; }); if (r) { r.starred = true; r.why = b.why; } if (drafts[id]) delete drafts[id].why; runsGen++; drawer(); }).catch(function (err) { const m = $('moreMsg'); if (m) m.textContent = err.message; }); }
     const ng = t.closest('#notesGo'); if (ng) { const id = ng.dataset.run, text = $('notesT').value;
-      return post('/notes', id, { text: text }).then(function () { notesOf[id] = text; if (drafts[id]) delete drafts[id].notes; const m = $('moreMsg'); if (m) m.textContent = 'enregistré'; }).catch(function (err) { const m = $('moreMsg'); if (m) m.textContent = err.message; }); }
+      return post('/notes', id, { text: text }).then(function () { notesOf[id] = text; if (drafts[id]) delete drafts[id].notes; const m = $('moreMsg'); if (m) m.textContent = 'Enregistré'; }).catch(function (err) { const m = $('moreMsg'); if (m) m.textContent = err.message; }); }
     const ra = t.closest('[data-runs-at]'); if (ra) { state.runsAt = ra.dataset.runsAt; state.q = ''; return openDrawer('runs'); }
     const dg = t.closest('[data-direct]'); if (dg && !t.closest('input, textarea')) { stopReplay(); state.drawer = null; drawer(); location.hash = '#direct/' + encodeURIComponent(dg.dataset.direct); return; }
     const tg = t.closest('[data-trail]'); if (tg) return showTrail(tg.dataset.trail);
@@ -696,7 +775,7 @@
     if (e.key === 'Escape') { if (state.drawer) { state.drawer = null; return drawer(); } state.sel = null; state.msel = null; return render(); }
     if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
     if (e.key === 'Enter' && e.target.dataset && e.target.dataset.direct) return e.target.click();
-    const k = { '1': 'ile', '2': 'direct', '3': 'metro' }[e.key]; if (k) { stopReplay(); go(k); }
+    const k = { '1': 'ile', '2': 'direct', '3': 'metro', '4': 'machines' }[e.key]; if (k) { stopReplay(); go(k); }
   });
   addEventListener('resize', render);
   addEventListener('hashchange', function () { route(); });
@@ -709,6 +788,8 @@
   loadIsland();
   setInterval(function () { if (!document.hidden) loadIsland(); }, 60000);
   setInterval(poll, 1000);
+  setInterval(function () { if (!document.hidden && state.view === 'direct' && !state.run) loadLive(); }, 5000);
+  setInterval(function () { if (!document.hidden && state.view === 'machines') loadMachines(); }, 3000);
   setInterval(function () { if (!document.hidden && state.view === 'direct' && story && !state.run && state.scrub == null && liveFrame > story.end) loadStory(); }, 5000);
   setInterval(refreshScreen, 120);
 })();
