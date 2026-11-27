@@ -1,242 +1,173 @@
 # Self-improvement loop: find the blocker, judge honestly, delete, then learn (2026-11-27)
 
-Status: proposed. Nothing in this document has landed. It replaces the ten-phase draft of the same day (git keeps it), after a review of that draft found it built the loop before knowing what blocks the game.
+Status: proposed. Step 1 is done below as a blocker report from existing runs; steps 2 and 3 are to build; step 4 and section 7 are parked. The owner paused new flows on 2026-11-27 pending this spec.
 
-This is a handoff document. An agent that has read `AGENTS.md`, `ARCHITECTURE.md` and this file should be able to build steps 1 to 4, one pull request per step, without asking what was meant. Where the text says "confirm in code", the fact was not checked when this was written (main at `eed4f525`, flow-113).
+This is a handoff document. An agent that has read `AGENTS.md`, `ARCHITECTURE.md` and this file should be able to build steps 2 and 3, one pull request each, without asking what was meant. Where the text says "confirm in code", the fact was not checked when this was written (main at `5e0a7ded`, flow-116). Every figure comes from a run or a pull request; runs are named by their id suffix and live under `~/.capy/work/runs/` on the owner's Mac.
+
+## Where this stands
+
+| What | State | Evidence |
+|---|---|---|
+| flow-112 (#119) | deletes the one-heart autopilot hold | motivated by 5 held-out forks at one heart: 3.58 USD, 0 new places (KOHO-150). Not validated as a fix: in 27ab (flow-115) the beach stall still made 441 calls in 25,845 frames, 411 at one heart |
+| flow-113 (#122) | no fight on sight and no `attack` offer without a sword | shield push on urchins measured on a stub copy of 6913 @40280. Not validated: 27ab reached the same urchin screens and did not pass (pushes moved 0 to 4 px, KOHO-167) |
+| flow-114 (#124) | `explore(direction)` takes only work on that side, else stops `nothing_toward` | paid: used in 944a, 3d74 and 391b, `nothing_toward` 3, 3 and 6 times; every case read was true (KOHO-163) |
+| flow-115 (#125) | objectives expire after 3600 frames without measured progress; lib net -43 | paid: fired in none of 944a, 3d74, 391b; in 27ab 2 objectives expired while `guarded` abandoned 547 |
+| flow-116 (#128) | a model's own place objective hands over to the harness's exit taking after 1800 frames | no paid run yet |
+| Tools | `tools/gates` (#118: 3 checkpoints, 2 on one run `abbe`, one stub play each); `tools/scoreboard` (#120, #123: measure, run, debt, alert) | merged |
+| Paid evidence, flows 110 to 115 | 6 runs off the C7..F7 stretch: 6913, b32c, 944a, 3d74, 391b, 27ab; 143,489 frames, 24.01 USD, 0 deaths, shield only, no new key item | `scoreboard measure` on the six runs |
+| Learning path | 1 hypothesis shape in `lib/koholint/learn.rb`; `data/capabilities.json` 1 `operational` entry of 11; `suggestions.md` written by nothing | main |
+| What the owner decides next | step 2 at 0 USD; then a budget for the paid 3-vs-3 confirmations of step 3 | section 10 |
+
+From now on no flow merges without a from-zero run or an off-stretch gate that improves, and every task runs in a fresh thread.
 
 ## 1. Goal, and why this order
 
-"It improves itself" should mean: **the system gains game progress from changes it found, tested and proposed by itself, and those changes are data, not Ruby.** The number that says so, later printed by the scoreboard:
+"It improves itself" should mean: **the system gains game progress from changes it found, tested and proposed by itself, and those changes are data, not Ruby.** The number that would say so:
 
 > **autonomous gains** = first gains of the progress vector that appear between two scoreboard lines whose only difference is a data-only commit produced by the loop.
 
-It is 0 today, and it will stay 0 for a while: gains are rare events. So this spec does not start with the loop. The project stands at 0 dungeons of 8, and nothing shows that missing learned facts are what blocks it. The first draft would have spent ten phases of tooling on a guess, which is the v1 mistake `docs/RETROSPECTIVE.md` describes. The order here is:
+It is 0 and steers nothing yet; it stays described here, and nothing is built for it before section 7 is unparked. The project stands at 0 dungeons of 8, and the evidence below shows learned facts are not what blocks it. The order:
 
-1. **Diagnose.** Give the model the general knowledge it is allowed to have, play from boot at a frozen flow, and write down what actually stops the runs.
-2. **Build a judge that can be trusted**, small, and measure how long it takes before promising any speed.
-3. **Use the judge to delete** harness rules, which is the roadmap's direction and gives decisions back to the model.
-4. **Choose the first learner** from the diagnosis, not from what is small to build.
-
-Everything after that (anomaly events, a generic experiment bench, an offline analyst, tuned parameters, a nightly cycle) is an outline in section 7, to be specified only when steps 1 to 4 show it is needed.
-
-Where the loop stands on main:
-
-| What | State | Where |
-|---|---|---|
-| Hypothesis shapes the learner knows | 1: "use the newly held item facing an uncatalogued solid object" | `lib/koholint/learn.rb` |
-| Learned capabilities | 11 entries: 1 `operational` (`sword-on-object-92`), 9 `inconclusive`, 1 `rejected` | `data/capabilities.json` |
-| Trigger and publication | a person runs `koholint learn` and `koholint capability publish` | `lib/koholint/cli.rb` |
-| `suggestions.md` | created empty by `Run.create`; nothing in `lib/` writes into it | `lib/koholint/run.rb` |
-| Real learning path | 113 flow versions, each a hand-written harness rule | `policies/delegated.rb`, `policies/delegated/guidance.rb`, `autopilot.rb` |
-| Judge | 4 stub gates on 3 checkpoints, 2 of them forks of the same run (`abbe`), one play each | `tools/gates/gates.json` |
-| Who decides in play | the $0 stub gains the mushroom and the powder as the paid runs do, so the model weighs little | `README.md` |
+1. **Diagnose** (done, from existing runs).
+2. **A minimal judge**: measure its speed, then paired replicates with an A/A check.
+3. **Delete or bound harness rules** with that judge as a filter and paid pairs as the verdict.
+4. **A learner**, only if a later diagnosis points to one. The current one does not.
 
 ## 2. Non-goals
 
+- No new flow or rule written from this document now (owner, 2026-11-27).
 - No agent that edits Ruby, prompts or its own skill code. Code changes stay reviewed pull requests with a `flow_version` bump.
 - No learning during a run: "a run only emits `suggestions.md`; `learn` and `capability` are offline commands" (`AGENTS.md`).
-- No new harness rule. The freeze of `ROADMAP.md` holds; step 3 removes rules.
 - No walkthrough knowledge from any source (section 6).
-- No tooling ahead of a measured need: section 7 is not to be built from this document.
+- No tooling ahead of a measured need: section 7 is not built from this document.
 
 ## 3. Principles
 
 1. **Diagnose before building.** A step states the question it answers and the observation that would make the next step pointless.
-2. **Deterministic is not reliable.** A play repeats exactly, but the game is chaotic: one changed decision shifts everything after it. One trajectory against one trajectory measures that accident. A verdict needs several paired plays.
-3. **Reward progress before safety.** A score that looks at deaths first teaches the system to stand still, and paralysis at one heart is already a documented failure (`ROADMAP.md`).
-4. **The stub filters, the model confirms.** The stub is not the agent; nothing is called a gain on stub numbers alone.
-5. **Measure the time, then set the budget.** No speed figure in this spec is a promise until step 2 has measured it.
-6. **What is learned is data with provenance**, `verified` at 2 root lineages, with its trials, negative ones included; and everything that steers play is in a manifest digest.
+2. **Deterministic is not reliable.** One changed decision shifts everything after it: 3d74 and 391b fork b32c at the same frame and found 14 and 3 new places for 0.70 USD each, mainly by the model's first objective (KOHO-163). A verdict needs several paired plays.
+3. **Reward progress before safety.** A score that looks at deaths first teaches standing still; 27ab spent 90% of its dollars at one heart with 0 deaths.
+4. **The stub measures the harness, not the agent.** The $0 stub picks up the mushroom and turns it into the powder as model runs do (`README.md`), so a stub number says what the rules do, not what the model would do with the freedom a deleted rule gives back; that is the limit KOHO-148 and KOHO-150 found. Every deletion and every published fact is confirmed by a paid pair or an A/B.
+5. **Measure the time, then set the budget.** No speed figure is a promise until step 2 has measured it.
+6. **What is learned is data with provenance**, `verified` at 2 root lineages, with its trials, negative ones included; everything that steers play is in a manifest digest.
 
 ## Step 1. Allowed knowledge, then the diagnosis
 
 ### 1.1 What may be written down for good
 
-The line is the one of `AGENTS.md`: how to play is public; where to go and what to do next is not. A test for any sentence: *would it still be true in another game of the series?* If yes it is a mechanic; if it is only true on this island it is a walkthrough.
+The line is the one of `AGENTS.md`: how to play is public; where to go and what to do next is not. A test for any sentence: *would it still be true in another game of the series?* If yes it is a mechanic; if only on this island, a walkthrough.
 
 | Allowed (the manual and genre knowledge) | Not allowed |
 |---|---|
 | The goal: 8 dungeons, a boss in each, 8 instruments | Which dungeon comes first, or any order |
 | Controls, screens, save, game over, hearts and heart pieces (already in `docs/AGENT_MANUAL.md`) | Where anything is: a key, an item, a dungeon entrance, a person |
-| A dungeon needs its own key to be entered | Which key opens which dungeon and where it is found |
+| Nothing about what opens a dungeon: whether one has a key is observed per dungeon and recorded as an optional milestone (the scoreboard's `dungeon_keys`), never as a required step | Which dungeon has a key, which key opens which dungeon, where it is found |
 | Inside a dungeon: small keys open locked doors and are spent; one special key opens the boss door; a map and a compass may be found; some doors open when a room's enemies are defeated or a switch is pressed; blocks can be pushed; stairs link floors | The solution of any room, the path through any dungeon |
 | A dungeon usually holds an item, and such an item often opens ways that were closed before, inside and outside | Which item opens which obstacle |
 | Some tasks are required and some are optional; people may ask for a thing and give another in return | The chain of exchanges, who wants what |
 | Texts are the source of direction: signs, people, the map's marks | Any paraphrase of a hint the playthrough has not read |
 
-- Extend `docs/AGENT_MANUAL.md` with a "Dungeons" section and the two notions of the last rows above, in its plain style, paraphrased (no booklet text is reproduced).
-- `test/agent_manual_test.rb` gains a check that the manual names no place of the island and no person, against a small allow list of the mechanics' own words.
-- The manual is joined to every play message, so this is a flow bump with its gate numbers.
-- Anything with a number or a testable effect enters data as `hypothesis` with its source, verified by a probe. The manual stays prose about mechanics.
+When flows resume, this goes into `docs/AGENT_MANUAL.md` as a "Dungeons" section in its plain style, paraphrased, with a check in `test/agent_manual_test.rb` that the manual names no place or person of the island. The manual is joined to every play message, so that is a flow bump with its gate numbers. Anything with a number enters data as `hypothesis` with its source and is verified by a probe.
 
-### 1.2 The diagnosis runs
+### 1.2 Blocker report
 
-Two paid runs from boot at the flow of 1.1, frozen: `ruby tools/scoreboard/scoreboard.rb run --from boot`, twice, on different days or with different tags so they are two root lineages. The owner approved the budget (decision 1). No code change between them, whatever they show.
+The two planned diagnosis runs are replaced by the paid runs already on file: 6913 (flow-110, from boot, KOHO-150), b32c (flow-112, from boot, capability review b32c), 944a (flow-115, from boot) and the forks 3d74 and 391b of b32c @13322 (KOHO-163), and 27ab (flow-115, from boot, 20 USD cap, KOHO-167). Spans are the scoreboard's `stalls` (4000 frames or more with no new place, counted from the second place or the fork frame), re-cut with its own code; frames, dollars, calls and rule counts are the trace's. 3d74 and 391b have none (longest 1,872 and 3,268). "What was missing" is stated only from what the run had read or seen (section 6).
 
-They serve three purposes at once: the diagnosis below, the held-out lineages of step 2, and the from-boot proof of the frontier (section 5).
+| Run (flow) | Frames | Screens | USD, calls | Class | What was missing, from the run's own knowledge | Addressed by |
+|---|---|---|---|---|---|---|
+| 6913 (110) | 16,107-24,051 (7,944) | C11 (162/0), D11 (163/0), D12 (179/0), C12 (178/0) | 0.60, 23 | `direction` | a lead "the beach to the south" and no way south; the model reasoned from room numbers while exits north and west stayed untried; a loop break found a house at 24,051 | 114, 116 in part; no paid check of 116 |
+| 6913 (110) | 36,156-40,841 (4,685) | B15 (225/0), C15 (226/0), D15 (227/0) | 1.48, 51 | `skill` | no sword; urchins block the way; refused attacks, zero cap (16) and retreat (4) sent Link back; the shield push was blocked | 113; 27ab at flow-115 still did not pass |
+| b32c (112) | 15,520-19,686 (4,166) | C11, C12, D11, D12 | 0.43, 17 | `direction` | its own objective "reach D12 column 9" never closed and held the autopilot; 2,093 frames re-talking to people already read | 115 (expiry, revisit), 116 |
+| 944a (115) | 8,211-12,666 (4,455) | D12, C12 | 0.36, 13 | `direction` | probed D12's south edge, a tree line the grid shows as unknown cells; the exits up and right of B12 (177/0) untried | 116 (its case); `perception` second |
+| 27ab (115) | 10,269-14,429 (4,160) | D12, C12, B12 (177/0), B11 (161/0) | 0.36, 11 | `direction` | row 7 blocked; the way out was found on the left edge | 116 in part |
+| 27ab (115) | 26,369-52,214 (25,845) | B15, C15, D15 | 14.91, 441 (411 at one heart) | `override` | at one heart from about 27,300 and nothing restores hearts: `guarded place (101)` answered 547 decisions and abandoned 547 objectives, `zero cap` 189, `heart pickup / disengage (94)` 106; the run had read the tip "if your hearts get too low, enter a house or a cave"; the model's own way out (stand by an enemy, die, continue, 51,701) was undone by autopilot walks | nothing |
 
-### 1.3 The blocker report
-
-One document, `docs/runs/2026-11-blockers.md`, written from the two runs and from the last paid forks of the frontier. It is evidence, not a backlog of rules. For each span where a run stopped gaining (the scoreboard's `stalls`, the deaths, the last 10000 frames), one row:
-
-| Field | Content |
-|---|---|
-| run, frames, place | where and when |
-| what was needed to progress | stated only from what the run had read or seen; "unknown from the run's own knowledge" is a valid answer |
-| class | one of the six below |
-| who decided | the share of decisions in the span answered by the model, by each rule family (`Scoreboard::Measure::FAMILIES`) and by the autopilot |
-| evidence | frames, the decision's justification, the text read |
-
-Classes, each with the work it points to:
+Classes and what each points to:
 
 | Class | Meaning | Points to |
 |---|---|---|
-| `direction` | the run had no idea where to go: no lead, or leads never turned into objectives | story objectives from texts, the map's marks (ROADMAP 1(e), 3) |
+| `direction` | no idea where to go: no lead, or leads never turned into objectives | story objectives from texts, the map's marks (ROADMAP 1(e), 3) |
 | `override` | the model chose something sensible and a rule replaced or pre-empted it, or the model was never asked | step 3 |
 | `model` | the model was asked, had what it needed, and chose badly | the prompt and the context, an A/B on the model |
 | `fact` | a wrong or missing fact about a thing: hostile, solid, pushable, where an exit leads | a learner (step 4) |
-| `skill` | the right intention, and no skill able to carry it out: a fight, a jump, an item use | a skill or a learned capability |
+| `skill` | the right intention and no skill able to carry it out | a skill or a learned capability |
 | `perception` | the engine did not see what was on screen or read a text wrongly | perception (ROADMAP 4) |
 
-**Done when.** The report exists, every stall of the two runs has a row, and its last section counts frames lost per class. That count decides step 4 and may decide that step 3 comes first or not at all. If more than half of the lost frames are `direction` or `model`, say so plainly at the top: the loop of section 7 would not help, and the work is on objectives and context.
+**Frames lost per class** (51,255 frames and 18.14 USD over the six stalls): `override` 25,845 (50%, 14.91 USD); `direction` 20,725 over four runs (40%, 1.75 USD); `skill` 4,685 (9%, 1.48 USD); `model`, `fact` and `perception` 0 as the first class.
 
-## Step 2. A judge that can be trusted
+What this decides, by the tests this spec set itself:
 
-### 2.1 Gates, lineages and splits
+- `direction` and `model` are 40%, under half, so the work is not only objectives and context. But `direction` recurs in every from-boot run at the same village screens, through flows 110 to 115; flows 114 to 116 address it and only 114 was seen in a paid run.
+- `fact` and `skill` are 9%, under a fifth: step 4 builds no learner.
+- `override` is half the frames and 82% of the dollars: step 3 comes first.
+- Two kinds of evidence the first draft did not foresee. **Protective refusals are unbounded**: no window or count ended the 547 refusals of one place. **A run can burn most of its budget with 0 deaths**: 27ab spent 90% of 16.61 USD in one absorbing state, and its guard stopped on deaths only (stall guard off, KOHO-167).
 
-Each gate of `tools/gates/gates.json` gains `lineage` (computed by `Bench.lineage_root`, checked by a test), `zone` and `split` (`tune` or `held_out`). The 4 gates of today are `tune`: the rules of flows 84 to 113 were written while watching them. Cut 4 to 6 `held_out` gates from the two runs of step 1 (early overworld without the sword, after the sword, after a death, in a place with an open puzzle). `test/gates_test.rb` fails unless at least 3 held-out gates exist over at least 2 root lineages, none sharing its checkpoint run with a tune gate.
+## Step 2. A minimal judge
 
-### 2.2 Replicates
+Two parts, both at 0 USD.
 
-A gate is played `R` times, not once: replicate `k` forks the checkpoint `k * 37` frames later (the parent is replayed that far, so every replicate is a real state of the same run; confirm that `Run#fork` at any frame is exact, as `fork --at-frame` suggests). A candidate and the baseline are compared replicate by replicate: same gate, same offset. Default `R = 5`.
+**(a) Speed, measured first.** Before any judge code: frames per second of one stub gate play, the fixed cost of one fork, and both again with plays in parallel on the Mac's cores, recorded in `tools/gates/README.md`. The figures on file disagree (the v2 design measured 96 frames per second per process; the exit bench 8 forks and 9909 frames in 251 s), so the size of (b) is set from this measure, not before.
 
-### 2.3 Score and verdict
+**(b) Paired replicates at a few forks, and the A/A check.**
 
-Per play, from `Scoreboard::Measure` on the fork's own segment, compared in this order:
+- Gates: the 3 of today plus 2 or 3 cut from the runs of step 1, at full health and off the C7..F7 stretch (a checkpoint at one heart tests the one-heart behaviour, not the rules: KOHO-150). `lineage` is recorded per gate (`Bench.lineage_root`) so a test can tell the stretch the rules came from from the others.
+- Replicate `k` forks the checkpoint `k * 37` frames later (confirm that `Run#fork` at any frame is exact). A candidate and the baseline are compared replicate by replicate: same gate, same offset.
+- Score per play, from `Scoreboard::Measure` on the fork's own segment, in this order: `gains` (key items, first deliveries, dungeons, instruments), `new_places`, `deaths`, then `stall_frames` and `calls`. `hp_lost` is reported, never compared.
+- Each pair is a win, loss or tie: `better` when wins are at least twice the losses and at least 3 more, `worse` the other way, `equal` otherwise.
+- **A/A:** the baseline against itself at offsets `k * 37 + 11` must say `equal`; if not, raise the replicate count or the thresholds until it holds 3 times in a row, and record them.
+- The pin numbers of `tools/gates/metrics.rb` stay a regression check of replicate 0, not the judge.
 
-1. `gains`: key items gained, first deliveries, dungeons entered, instruments (higher is better);
-2. `new_places`: places new to the parent's prefix (higher);
-3. `deaths` (lower);
-4. `stall_frames`, then `calls` (lower).
+It filters candidates; it never decides one (principle 4).
 
-Progress comes before safety on purpose (principle 3). `hp_lost` is reported and never compared: losing health while advancing is not a fault.
+**Done when.** The timings are recorded, the A/A check passes 3 times with the recorded settings, and the paired comparison is tested ROM-free on tables of numbers.
 
-Each paired replicate is a win, a loss or a tie for the candidate. Over a set of gates: `better` when wins are at least twice the losses and at least 3 more; `worse` the same way round; `equal` otherwise. These two thresholds are hypotheses; 2.4 calibrates them.
+## Step 3. First use of the judge: delete or bound
 
-The five pin numbers of `tools/gates/metrics.rb` stay what they are, a regression check of replicate 0 at the same code. They are not the judge.
+**Candidates, from evidence, not from a switch per family.** The ROADMAP's criterion is "a rule that fired in no held-out run". The scoreboard's `rules` table over the six runs of step 1 (143,489 frames off the stretch) names the families that fired in none: heal give-back (109), heal detour (101/105), loop re-offer (101), souvenir (102), offspring fight (110), danger / held back (106/108) and harness override of the model. Those that fired at all did so on the C7..F7 stretch they were written from (g6 to g8, KOHO-148 and KOHO-150). Before relying on a zero, confirm in code that the family's pattern in `Measure::FAMILIES` still matches the justification its rule writes today; a stale pattern reads as a rule that never fires.
 
-### 2.4 Calibration: the judge is tested before it is used
+**Bounded refusals.** The second target comes from the `override` row: every protective refusal is bounded, by a window or a count, and yields to the model's choice, as objective expiry (flow-115) and the model objective hand-over (flow-116) already do. Measured candidates: guarded place (101) 547 in 27ab, zero cap 189 in 27ab and 16 in 6913, heart pickup / disengage (94) 106, hostile no standing (100) 16, retreat (100) 4 in each of 6913 and 27ab, and the one-heart walls. This is a target for deletion or tightening, not a new rule to write now.
 
-Three checks, all at 0 USD, are the judge's own acceptance test:
+**Process.** A candidate is a branch that deletes or bounds one family. It goes through the judge of step 2 on every gate; not `worse`, it is confirmed by a paid 3-vs-3 (`ab-plan`, `ab-report`) from one stretch checkpoint and one off-stretch checkpoint, and by the merge rule of "Where this stands". Not worse there: delete the code and its tests in one pull request with a flow bump and the new gate numbers. Worse: the rule stays, with its measured reason in `tools/gates/README.md`.
 
-- **A/A.** The baseline against itself with another set of offsets (`k * 37 + 11`) must say `equal`. If it says anything else, the thresholds or `R` are too low; raise them until it holds 3 times in a row and record the values.
-- **Known bad.** A change that must hurt (for example the operational capability retired, or `attack` never offered) must say `worse` on the gates where it matters.
-- **Known neutral.** A change that cannot matter (a note edited in a data file, a threshold of a rule that fires in no gate) must say `equal`.
+**Done when.** Every candidate above has a verdict, and `scoreboard debt` shows fewer branch conditions than at the start.
 
-Record the three results in `tools/gates/README.md` with the chosen `R` and thresholds.
+## Step 4. A learner: not indicated by the evidence so far
 
-### 2.5 `tools/gates/judge.rb`
-
-```
-ruby tools/gates/judge.rb [--overlay DIR] [--without FAMILY]... [--split tune|held_out|all] [--replicates N] [--jobs N] [--root DIR] [--json]
-```
-
-- `--overlay DIR` holds candidate copies of data files; files absent from it come from `data/`. Pass paths to the loaders (they take a `path`); never write into `data/`.
-- `--without FAMILY` is the switch of step 3.
-- It prints, per gate and in total, wins, losses, ties, the summed score of both arms and the verdict; exit 0 on `better` or `equal`, 1 on `worse`.
-- **Held-out use is counted.** Every call with `--split held_out` or `all` appends a line to `tools/gates/held_out_log.jsonl` (date, harness sha, what was judged, verdict). The split leaks a little at each look; the log makes the leak visible. After 30 looks, or at each new paid from-boot run, the oldest held-out gates move to `tune` and new ones are cut from the new run.
-
-### 2.6 Speed: measured first
-
-The owner's requirement is a loop that runs fast and stays reliable. Reliability is 2.2 to 2.4 and costs plays: 4 tune gates and 5 held-out gates at 5 replicates and 2 arms is 90 plays. The figures on file disagree: the v2 design measured 96 frames per second per process with YJIT; the exit bench measured 8 forks and 9909 frames in 251 s, about 30 s per fork. So:
-
-1. **Measure**, before anything else in this step, and record in `docs/OPERATING.md`: frames per second of one stub gate play, the fixed cost of one fork, and both again with 12 plays in parallel on the 14 cores.
-2. **Then apply, in this order, only what the measure justifies:**
-   - one process per play, `--jobs` up to cores minus 2, longest first (the queue of the `Rakefile`);
-   - a baseline cache keyed by (gate, replicate, harness sha, data digests), so a cycle of candidates pays for the baseline once;
-   - `frames` per gate: 3000 to 4000 for most gates, 12000 kept for the two whose behaviour needs the length (confirm from the timelines which);
-   - a keyframe at each replicate's fork frame kept in the parent's `keyframes/` cache, so the fork's fixed cost is paid once;
-   - whatever a stub never reads turned off in the judge's forks (place screenshots, viewer feed), if the measure shows perception costs more than the emulator.
-3. **Then set the budgets** from the measure and write them in `tools/gates/README.md`. The target to confirm or correct is: the tune split in under 3 minutes of wall time, everything in under 10. `judge.rb` prints its wall time and how many plays the cache avoided, and a run over the recorded budget says so.
-
-Not in this step: skipping a gate because the candidate "cannot affect it". That needs every data read to be instrumented, and one missed read gives a silent wrong `equal`.
-
-**Tests.** ROM-free: split and lineage validation, the paired comparison on tables of numbers, overlay path resolution, the held-out log. ROM: one short gate, replicate 0, empty overlay, equals the pins.
-
-**Done when.** The three calibration checks of 2.4 pass and are recorded, the measured timings and the budgets are written down, and `gates_test.rb` enforces the split rules.
-
-## Step 3. First use of the judge: delete
-
-The scoreboard already attributes every harness answer to a rule family (`Scoreboard::Measure::FAMILIES`: heal give-back, heal detour, loop break, loop re-offer, retreat, guarded place, hostile no standing, zero cap, fight on sight, probe strike, danger and held back, harness override of the model, and others). Step 3 asks of each: what happens without it?
-
-**3.1 The switch.** `Policies::Delegated` takes `without:`, a set of family names; a rule of a disabled family does not answer, and the decision goes on to the next rule or to the model. Most harness answers are built by `DecisionPoint.harness_choice` (`policies/delegated/guidance.rb`, `waits.rb`) and the autopilot's by `autopilot.rb`: give each call site its family name once, in code, and have the scoreboard read that name from the decision instead of matching the justification by regular expression (confirm the call sites; the regular expressions go away with this). The `base` families (dialogue advance, locked wait, boot script, game over) are engine mechanics and cannot be disabled. The switch is recorded in the manifest (`without`) and refused on a paid run unless `--tag` starts with `ablation`, so no ordinary run plays with a rule missing by accident. It is a flow bump with identical gate numbers.
-
-**3.2 The ablation table.** For each rule family, `judge.rb --without FAMILY --split tune`, then `held_out` for those not `worse`. The table goes in `tools/gates/README.md`: family, decisions it answered in the baseline plays, verdict on each split.
-
-**3.3 What each verdict means.**
-
-- **`equal` or `better` on both splits:** a deletion candidate. But the stub cannot use the freedom a deleted rule gives back, so confirm with the model: 3 paid forks with the family disabled against 3 without, from one tune and one held-out checkpoint (`ab-plan`, `ab-report`). Not worse there: delete the rule's code and its tests in one pull request, with a flow bump and the new gate numbers.
-- **`worse`:** the rule stays, and now has a measured reason, recorded beside it in the table. This is the held-out validation the rule freeze asked for.
-- **A family that answered no decision in any play:** it cannot be judged here. Look for it in the diagnosis runs of step 1; if it fired in none, it is a deletion candidate on the roadmap's own terms ("a rule that fired in no held-out run").
-
-**3.4 Order.** Start with the families the blocker report charged under `override`, then by decisions answered, most first.
-
-**Done when.** Every non-base family has a row in the table, each deletion candidate was confirmed or refused by a model A/B, and `scoreboard debt` shows the branch conditions lower than at the start of the step.
-
-## Step 4. Choose the first learner from the diagnosis
-
-No learner is specified here on purpose. The blocker report's `fact` and `skill` rows say which facts, had the run known them, would have saved the most frames; the learner to build is the one that would have produced the top row.
-
-- If it is hostility: an offline step that turns `hurt` notables into `hurts` facts of `data/entities.json` by census with a control, verified at 2 lineages (the ROADMAP incident "Hurt hypotheses are never verified").
-- If it is solidity or pushing: object facts from a push trial on a fork (the "too heavy" rock of C7 (98/0)).
-- If it is item use: more hypothesis shapes for `koholint learn` (an item on a person, on a door cell), reusing `Learn::Trial`.
-- If `fact` and `skill` together are under a fifth of the lost frames: build none, and say so in `ROADMAP.md`.
-
-Whichever it is, it comes with these, specified in its own short plan under `docs/superpowers/plans/`:
-
-- **A digest first.** `data/entities.json` steers play (`kind`, `moves`, `contact_px`, `sword_hits`, `hurts`, `heals`, `push`, `faces`) and is in no manifest digest (`tools/gates/README.md` says so). Before a learner writes to it: `Entities.digest` over the play-steering fields, recorded by `Run.create`, checked at resume like `check_exits!`, and required equal by `ab-report`. Update `AGENTS.md`, `ARCHITECTURE.md` and `docs/OPERATING.md` in the same commit.
-- **A control arm** in every trial, and the trials kept in the entry, negative ones included.
-- **No RAM write in a validation** (a census may place Link; a trial that validates a capability reaches its state through skills, as the 2026-11-12 slice explains).
-- **Publication through the judge:** the fact goes in an overlay; it is committed only when held-out is not `worse` and one split is `better`. A fact with no effect anywhere stays in its file as `validated` and unpublished.
-- **Speed:** one trial is a fork of a few hundred frames; its measured wall time is reported like the judge's.
-
-**Done when.** One fact that no person wrote is in `data/`, published through the judge, and the paid confirmation run does not regress. That is the first real evidence for or against section 7.
+`fact` and `skill` together are 9% of the lost frames, so none is built. If a later blocker report puts them above a fifth, the learner is the one that would have produced its top row, in its own plan under `docs/superpowers/plans/`, with: a digest of the play-steering fields of `data/entities.json` checked at resume before anything writes there; a control arm in every trial; no RAM write in a validation; publication through the judge and a paid pair.
 
 ## 5. Progress across runs: frontier checkpoints
 
-No run is "the save". Progress carries through data, which every later run loads, and through checkpoints, which a later run may fork from.
+No run is "the save". Progress carries through data and through checkpoints a later run may fork from.
 
-- `data/checkpoints.json` entries gain `lineage` (computed), `vector` (the scoreboard progress vector at that frame) and `role`: `frontier`, `held_out` or `regression`.
-- **Promotion.** A new `frontier` is proposed when a run's progress vector is above every existing checkpoint's on the first component that differs (instruments, dungeons, key items, then places), at the first ready keyframe after the gain. Committing it is a data change.
-- **Advance from the frontier.** Paid runs that aim at new progress fork from the highest frontier, so no run pays again for the intro.
-- **Prove from boot.** A frontier reached by one root lineage is `observed`. It is `verified` when a from-boot run of another lineage, at a flow frozen for that run, reaches the same vector component. The scoreboard shows the highest frontier and the highest verified frontier side by side; the gap is the progress that rests on one lineage. The runs of step 1 are the first such proof.
-- **Old frontiers become gates.** A passed frontier stays as a `regression` gate in the tune split.
+- `data/checkpoints.json` entries gain `lineage`, `vector` (the progress vector at that frame) and `role`: `frontier`, `held_out` or `regression`.
+- A new `frontier` is proposed when a run's vector is above every checkpoint's on the first component that differs (instruments, dungeons, key items, places), at the first ready keyframe after the gain. Paid runs that aim at new progress fork from the highest one.
+- A frontier reached by one root lineage is `observed`; it is `verified` when a from-boot run of another lineage, at a frozen flow, reaches the same component. A passed frontier stays as a `regression` gate.
 
-Build this with step 2 (it is the same metadata as the gates). `test/checkpoints_test.rb` checks the computed fields and that a `verified` frontier names 2 lineages.
+Build it with the gate metadata of step 2; `test/checkpoints_test.rb` checks the computed fields.
 
 ## 6. The walkthrough rule in this work
 
-- The blocker report states what was needed **only from what the run had read or seen**. Writing "it should have gone to X" from knowledge of the game puts the walkthrough into the repo by the back door; "unknown from the run's own knowledge" is the honest entry, and it is itself the finding (class `direction`).
-- A rule is never written from the report (the freeze). The report selects among general mechanisms.
-- For a model used offline (section 7), restricting what it may name does not stop it from choosing the right experiment because it knows the game. That leak cannot be checked mechanically; it is a reason to prefer deterministic templates and to keep such a model for last.
+- The blocker report states what was needed only from what the run had read or seen. "It should have gone to X" from knowledge of the game is the walkthrough by the back door; "unknown from the run's own knowledge" is the honest entry and itself the finding (`direction`).
+- No rule is written from the report; it selects among general mechanisms.
+- A model used offline (section 7) may choose the right experiment because it knows the game; that leak cannot be checked mechanically, which is a reason to prefer deterministic templates and keep such a model for last.
 
-## 7. Later, only if steps 1 to 4 call for it
+## 7. Parked: later, only if steps 2 and 3 call for it
 
-An outline, not a specification. Each item names what would justify it and the trap the first draft fell into.
+An outline, not a specification. Nothing here is indicated by the evidence so far.
 
 | Piece | What it is | Build it when | Known trap |
 |---|---|---|---|
-| `anomaly` trace events | every action carries the outcome the world model expects; a mismatch is traced and counted, and fills `suggestions.md` | the report's `fact` rows were found by a person reading traces and a second learner is wanted | emitting must change no decision: a flow bump with identical gate numbers |
-| Generic experiment bench | `learn.rb` and `bench.rb` are one machine (fork a keyframe, play a scripted sequence, read an effect from a closed list of oracles, record a trial); unify them, with `data/experiments.json` for hypotheses | a third hypothesis shape is needed | generality before a third user is a guess |
-| Offline analyst | a strong model reads an anomaly and proposes experiments in the bench's format; data only, never a status | templates leave anomalies unexplained | the leak of section 6; measure its validated share against the templates' and drop it if lower |
-| Parameters as data | the unmeasured thresholds of `docs/loose-ends.md` in `data/params.json` | step 3 left rules whose threshold visibly matters | searching 30 parameters on a few gates is overfitting by construction: one parameter at a time, each change confirmed on held-out and by a paid run |
-| The nightly cycle | one command: collect, propose, experiment, judge, record in `data/improvements.json`, open a data-only pull request | step 4 published facts by hand at least 3 times | see "automatic merge" below |
-| Scoreboard `autonomy` | autonomous gains, published facts and their verdicts, data commits against flow bumps | the cycle exists | a number that stays 0 steers nothing: show published facts and deleted rules beside it |
-| Dungeon perception | place kind `dungeon`, small keys, boss key, instruments, as typed data verified at pickups | a run stands in a first dungeon | nothing can be verified before; cataloguing dungeon maps in advance would say where they are. RAM address hypotheses with their public source may be entered earlier |
+| Judge, full version | known-bad and known-neutral calibration, a held-out split with a log of every look (`held_out_log.jsonl`) and rotation after 30 looks or each paid from-boot run, a baseline cache keyed by gate, replicate, harness sha and data digests, frames per gate tuned from the timelines (3000 to 4000 for most, 12000 where the length matters), a keyframe per replicate, a budget table (4 tune and 5 held-out gates at 5 replicates and 2 arms is 90 plays) | the minimal judge is too slow or too coarse for the candidates of step 3 | skipping a gate a candidate "cannot affect" needs every data read instrumented; one missed read gives a silent wrong `equal` |
+| `anomaly` trace events | every action carries the outcome the world model expects; a mismatch is traced, counted and fills `suggestions.md` | a learner is indicated and its facts were found by a person reading traces | emitting must change no decision |
+| Generic experiment bench | `learn.rb` and `bench.rb` as one machine, with `data/experiments.json` | a third hypothesis shape is needed | generality before a third user is a guess |
+| Offline analyst | a strong model turns an anomaly into experiments in the bench's format; data only | templates leave anomalies unexplained | the leak of section 6; drop it if its validated share is below the templates' |
+| Parameters as data | the unmeasured thresholds of `docs/loose-ends.md` in `data/params.json` | step 3 left rules whose threshold visibly matters | one parameter at a time, each confirmed by a paid run |
+| The nightly cycle | collect, propose, experiment, judge, record in `data/improvements.json`, open a data-only pull request | facts were published by hand at least 3 times | see "automatic merge" below |
+| Scoreboard `autonomy` | autonomous gains (section 1), published facts, deleted rules, data commits against flow bumps | the cycle exists | a number that stays 0 steers nothing |
+| Dungeon perception | place kind `dungeon`, small keys, boss key, instruments, as typed data verified at pickups | a run stands in a first dungeon | cataloguing dungeon maps in advance would say where they are |
 
-**Automatic merge of data-only pull requests** (owner's decision 2). It takes effect with the nightly cycle, by a standing grant added to the root `AGENTS.md` in a pull request the owner merges by hand, limited to pull requests that touch only `data/` and `tools/gates/expected.json` with every check passed, and backed by a test that fails on anything else. One consequence to design for then: a published fact changes a digest, so a run recorded before it cannot resume. Publish in batches, at most once a day, and never while a paid run is in progress.
+**Automatic merge of data-only pull requests** (owner's decision 2). It takes effect with the nightly cycle, by a standing grant added to the root `AGENTS.md` in a pull request the owner merges by hand, limited to pull requests that touch only `data/` and `tools/gates/expected.json` with every check passed, and backed by a test that fails on anything else. A published fact changes a digest, so a run recorded before it cannot resume: publish in batches, at most once a day, never while a paid run is in progress.
 
-**The analyst's system prompt**, kept from the first draft so it is not rewritten from nothing. It would live outside `Agents::Prompts`: `Prompts.digest` hashes every string constant of that module, so adding it there would break the resume of every run. Its picture input would be a filmstrip, not one image: the window around the anomaly replayed from the nearest keyframe, 8 frames, each labelled with its frame number, Link's cell and hp and what changed in the entity table since the previous one (`agents/claude_cli.rb` already sends several images in one call).
+**The analyst's system prompt**, kept so it is not rewritten from nothing. It would live outside `Agents::Prompts` (`Prompts.digest` hashes every string constant of that module, so adding it there would break the resume of every run). Its picture input would be a filmstrip: 8 frames around the anomaly, each labelled with its frame, Link's cell and hp, and what changed in the entity table.
 
 ```text
 You are the offline analyst of a harness that plays a Game Boy action-adventure game. You do not play. A deterministic engine played, something happened that its world model did not predict, and you propose experiments that would explain it.
@@ -255,24 +186,21 @@ Rules.
 
 ## 8. Invariants every step keeps
 
-- Time is the frame; no sleep or wall clock in game logic. Offline tools may use wall time, as the scoreboard supervisor does.
-- Only the engine writes a run's `trace.jsonl` and `save/`; judge and trial forks live under `tmp/` or `--root`; a fork may add keyframes to its parent's `keyframes/`.
-- `verified` never below 2 independent checks; trials of one lineage stay `observed` or `hypothesis`.
-- English everywhere, one-line imperative commits, almost no comments, short hash syntax.
-- Docs in the same commit: `ARCHITECTURE.md` for a layer, data flow or run artifact; `docs/OPERATING.md` for commands and fields; `docs/AGENT_SKILLS.md` for a flow change; `ROADMAP.md` loses what lands. `test/docs_test.rb` checks the commands, flags and paths docs name.
-- Tests: `rake test:fast` and targeted files locally; CI runs the ROM shards. A flow bump lands with its gate numbers (`test/gates_test.rb`).
+- Time is the frame; no sleep or wall clock in game logic. Offline tools may use wall time.
+- Only the engine writes a run's `trace.jsonl` and `save/`; judge forks live under `tmp/` or `--root`; a fork may add keyframes to its parent's `keyframes/`.
+- `verified` never below 2 independent checks.
+- Docs in the same commit (`ARCHITECTURE.md`, `docs/OPERATING.md`, `docs/AGENT_SKILLS.md`, `ROADMAP.md` loses what lands); a flow bump lands with its gate numbers.
 - When this spec is done or superseded, change its status line.
 
 ## 9. Risks
 
 | Risk | Guard |
 |---|---|
-| Meta-work feels like progress while the game stalls | step 1 before any tooling; step 4 may conclude "build none"; section 7 is not built from this document |
-| The judge rewards standing still | score order of 2.3; the known-bad check of 2.4 includes a change that only makes play timid, once one is at hand |
+| Meta-work feels like progress while the game stalls | the blocker report decides; step 4 and section 7 are parked |
+| The judge rewards standing still | progress before safety in the score order |
 | A verdict is a chaotic accident | replicates, paired comparison, the A/A check |
-| The stub is not the model | every deletion and every published fact is confirmed by a model A/B or a paid run |
-| The held-out split wears out | the log and the rotation of 2.5 |
-| The judge is too slow to be used | 2.6: measured, then budgeted; the budget is printed and checked |
+| The stub is not the model | every deletion and published fact is confirmed by a paid pair or an A/B |
+| A protective rule makes a state absorbing | step 3's bounded refusals; a stall guard on every paid run |
 | The diagnosis smuggles the walkthrough in | section 6 |
 
 ## 10. Owner's decisions (2026-11-27)
@@ -281,4 +209,5 @@ Rules.
 2. Data-only pull requests merge automatically once the nightly cycle exists, under the grant described in section 7.
 3. Stop and measure before the pieces of section 7; in this version that pause is the structure itself.
 4. A model used offline runs through the Claude CLI on the owner's Claude plan; a dollar cap stays as a guard.
-5. The loop must run fast and stay reliable: section 2.6.
+5. The loop must run fast and stay reliable: step 2 (a).
+6. The owner paused new flows on 2026-11-27 pending this spec.
