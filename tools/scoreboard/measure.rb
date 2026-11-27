@@ -18,11 +18,10 @@ module Scoreboard
       ['base', 'game over continue', '\\Agame over: save and continue'], ['base', 'revisit npc', '\\Arevisit npc'], ['base', 'engage sign', '\\Aengage sign'],
       ['rule', 'heal give-back (109)', '\\Athe heal is over'], ['rule', 'heal detour (101/105)', 'crosses enemies: heal in|largest hit measured|heal in \\d+-\\d+ first'],
       ['rule', 'loop break (100/101)', '\\Aloop in'], ['rule', 'loop re-offer (101)', '\\Athe loop is cut'], ['rule', 'souvenir (102)', 'souvenir-'],
-      ['rule', 'offspring fight (110)', 'not identified, taken for an enemy'], ['rule', 'probe strike (110)', 'strike the unidentified'],
+      ['rule', 'offspring fight (110)', 'not identified, taken for an enemy'],
       ['rule', 'retreat (100)', '\\(retreat by the'], ['rule', 'guarded place (101)', 'is guarded \\('], ['rule', 'hostile no standing (100)', 'no standing next to a hostile'],
       ['rule', 'zero cap (zero_watch)', 'in at most one frame|walking no cell'], ['rule', 'heart pickup / disengage (94)', 'pick up the heart|disengage at'],
       ['rule', 'fight on sight (90/100)', 'autopilot: fight type|keep fighting'], ['rule', 'try never-tried / still entity', 'never-tried (entity|object)|walk onto the still entity'],
-      ['rule', 'danger / held back (106/108)', 'dangerous|would take|held back|held_back'],
       ['base', 'autopilot explore chain', '\\Aautopilot: (explore again|follow the objective target|the last explore chain|step up through)'],
       ['rule', 'harness override of model', "replaces the model's"]
     ].map { |kind, name, pattern| [kind, name, Regexp.new(pattern)] }.freeze
@@ -45,32 +44,32 @@ module Scoreboard
       [state['room_id'], state['map_id']] if event['type'] == 'perception' && state.is_a?(Hash) && state['game_mode'] == PLAY_MODE
     end
 
-    def read_json(path)
-      JSON.parse(File.read(path))
-    rescue SystemCallError, JSON::ParserError
-      {}
-    end
-
     def fork_frame(manifest) = manifest['parent'].is_a?(Hash) ? manifest['parent']['frame'].to_i : 0
 
     def death?(event) = event['type'] == 'notable' && event['kind'] == 'death'
 
     # The progress vector counts the whole run, inherited prefix included; cost, deaths, stalls and rules count the run's own segment.
-    def run(dir)
-      manifest = read_json(File.join(dir, 'manifest.json'))
-      parent = manifest['parent'].is_a?(Hash) ? manifest['parent'] : {}
-      start = fork_frame(manifest)
+    # A run measured from `start` (its fork frame unless given) to `upto` (its end unless given): places seen before `start` are not new.
+    def segment(dir, start: nil, upto: nil)
+      manifest = Koholint::Summary.read_json(File.join(dir, 'manifest.json'))
+      start ||= fork_frame(manifest)
       events = Koholint::Trace.read(File.join(dir, 'trace.jsonl'))
+      events = events.select { |event| event['frame'].to_i <= upto } if upto
+      before = events.filter_map { |event| place_of(event) if event['frame'].to_i < start }.to_set
+      { manifest:, start:, events:, before:, new_frames: new_place_frames(events, start, before), last: events.map { |event| event['frame'].to_i }.max || 0 }
+    end
+
+    def run(dir, start: nil, upto: nil)
+      manifest, start, events, before, new_frames, last = segment(dir, start:, upto:).values_at(:manifest, :start, :events, :before, :new_frames, :last)
+      parent = manifest['parent'].is_a?(Hash) ? manifest['parent'] : {}
       own = events.select { |event| event['frame'].to_i >= start }
-      frames = [(events.map { |event| event['frame'].to_i }.max || 0) - start, 0].max
+      frames = [last - start, 0].max
       decisions = own.select { |event| event['type'] == 'decision' }
       calls = decisions.select { |event| event['agent'] == 'claude' }
       usd = decisions.sum { |event| event['cost_usd'].to_f }
       deaths = own.count { |event| death?(event) }
       per = ->(count) { frames.positive? ? (1000.0 * count / frames).round(3) : nil }
-      before = events.filter_map { |event| place_of(event) if event['frame'].to_i < start }.to_set
-      new_frames = new_place_frames(events, start, before)
-      progress = progress(events, read_json(File.join(dir, 'summary.json')))
+      progress = progress(events, Koholint::Summary.read_json(File.join(dir, 'summary.json')))
       {
         run: File.basename(dir), tag: manifest['tag'], flow: manifest['flow_version'], harness_sha: manifest['harness_sha'].to_s[0, 8],
         harness_dirty: manifest['harness_dirty'] || false, parent: parent.slice('id', 'frame'), frames:, progress:,
@@ -113,12 +112,14 @@ module Scoreboard
 
     # The intro (title, name entry, opening dialogues) is not a stall: spans count from the frame the run has seen INTRO_PLACES places, or from
     # the fork frame when its prefix already has them.
-    def stalls(new_frames, last, start:, before:)
+    def spans(new_frames, last, start:, before:)
       from = before >= INTRO_PLACES ? start : new_frames[INTRO_PLACES - before - 1]
-      return { count: 0, longest_frames: 0 } unless from
+      from ? [from, *new_frames.select { |frame| frame > from }, last].each_cons(2).to_a : []
+    end
 
-      spans = [from, *new_frames.select { |frame| frame > from }, last].each_cons(2).map { |left, right| right - left }
-      { count: spans.count { |span| span >= STALL_FRAMES }, longest_frames: spans.max || 0 }
+    def stalls(new_frames, last, start:, before:)
+      lengths = spans(new_frames, last, start:, before:).map { |left, right| right - left }
+      { count: lengths.count { |span| span >= STALL_FRAMES }, longest_frames: lengths.max || 0 }
     end
 
     def rules(decisions)

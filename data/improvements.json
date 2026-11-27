@@ -1,0 +1,17 @@
+[
+  {
+    "id": "27ab-bound-guarded-place",
+    "kind": "rule",
+    "stall": {
+      "run": "20261127-134720-27ab",
+      "from": 26369,
+      "to": 52214,
+      "class": "override"
+    },
+    "status": "proposed",
+    "change": "Bound the guarded place rule (101): after a count of guarded verdicts on the same place within a window, it stops abandoning the objective and the model's choice stands.",
+    "trials": [],
+    "verdict": null,
+    "evidence": "scoreboard diagnose on 27ab: top stall by dollars, 25845 frames, 14.91 USD, 441 calls (411 at one heart) on D15 C15 B15; 'guarded place (101)' answered 547 decisions against 425 model decisions and abandoned 547 objectives (reason guarded); zero cap 189, heart pickup / disengage 106. Testing it needs game code (a bound in lib/koholint/policies/delegated/guidance.rb#guarded) and a flow bump."
+  }
+]

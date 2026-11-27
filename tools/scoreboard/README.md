@@ -6,6 +6,8 @@ A scripted measurement of how far the agent gets and what it costs, kept in the 
 |---|---|---|
 | `ruby tools/scoreboard/scoreboard.rb measure RUN_DIR... [--json]` | the numbers below, from run folders | nothing |
 | `ruby tools/scoreboard/scoreboard.rb run [--budget USD] [--daily-cap USD] [--from boot\|CHECKPOINT]...` | the standard daily run, appended to the history | up to `--budget` in total (default 4.00) |
+| `ruby tools/scoreboard/scoreboard.rb diagnose RUN_DIR... [--json]` | each stall with its cost and class, ranked by dollars | nothing |
+| `ruby tools/scoreboard/scoreboard.rb pair RUN_DIR --at-frame N --max-dollars USD [--forks N] [--variant REF]` | the candidate forked at a stall's start against a baseline | up to `--max-dollars` per fork |
 | `ruby tools/scoreboard/scoreboard.rb debt [--window N] [--last N]` | the pit index | nothing |
 | `ruby tools/scoreboard/scoreboard.rb alert` | exit 1 and the reasons when a guardrail trips | nothing |
 
@@ -20,6 +22,26 @@ Per run, from `trace.jsonl` and `manifest.json` (and `summary.json` when it reco
 - `deaths_per_1000f`, `new_places` (new to the run's own prefix) and `new_places_per_usd`.
 - `stalls`: spans of 4000 frames or more with no new place, and the longest span, counted from the run's second place (the intro before it is not a stall) or from the fork frame.
 - `rules`: how many decisions each harness rule family answered, by the decision's justification (`Measure::FAMILIES`; plain engine mechanics and the model's own choices are not counted).
+
+## diagnose
+
+One row per stall of `measure` (a span of 4000 frames or more with no new place, from the second place or the fork frame), ranked by dollars: its frames, the dollars and model calls of its decisions (both ends included), the screens it stayed on (battleship labels, interiors as `room/map`), the rule families that answered, and a class. The class comes from `Diagnose::TEMPLATES`, tried in order:
+
+| class | template |
+|---|---|
+| `override` | one harness rule family answered more decisions than the model |
+| `skill` | a skill was refused 3 times or more (an action stopped `refused`) |
+| `direction` | the model chose and an objective aimed at a place or a cell was open during the stall |
+
+`direction` is the residual class, a template and not a diagnosis: almost every stall of a model run has a place objective open, so it is what remains once no rule dominated and nothing was refused (362 of 376 stalls over the 604 run folders under the default runs roots on 2026-11-27). A stall no template fits is `unclassified`, with its evidence. `model`, `fact` and `perception` have no template yet; a person may still write them into the registry. A table of frames, share and dollars per class follows. No model is called. On the six runs of the self-improvement spec (6913, b32c, 944a, 3d74, 391b, 27ab) it gives `override` 25,845 frames and 14.91 USD, `direction` 20,725 and 1.75, `skill` 4,685 and 1.47 (the spec rounded the last to 1.48).
+
+## pair
+
+Forks `RUN_DIR` at `--at-frame` (a stall's start from `diagnose`) `--forks` times (default 2) and resumes each with `--max-dollars` under the supervisor of `run`, at most 2 at a time, under `--root`. The candidate is this checkout; the baseline is the parent's own recorded segment from the same frame, cut at the same dollar horizon (at the parent's decision that brought its spend from that frame to `--max-dollars`, as the soft cap would stop a fork). With `--variant REF`, the candidate is that git ref, checked out in a throwaway worktree under `tmp/pair/` (removed at the end, `.env` copied in), and this checkout plays as many baseline forks. It prints the cap (forks x arms x `--max-dollars`) before spending; like `run`'s, the cap is soft: each fork stops after the call that crosses it, so it can overshoot by one call. It refuses without `--max-dollars` or over the daily cap, then prints a row per arm and run (`from`, `frames`, `usd`, `calls`, `new_places`, `longest_stall`, the trial numbers of the registry; a fork that failed shows its error and the others go on). The tags `pair-<run>-<frame>-<arm>-<k>` also suit `koholint ab-report`, but it counts places differently: a place the parent reached after the fork frame is known to it when the parent is under the same root, new to `pair`. It appends a line of `kind` `pair` with the forks' `usd` to the history, also when a fork fails, so the next daily cap counts it (`alert` and `debt` skip such lines: no primary run, no runs). It judges nothing.
+
+## The candidate registry
+
+`data/improvements.json` lists the loop's candidates; `Improvements.load` validates it and `test/improvement_loop_test.rb` loads it. Each entry has exactly: `id` (lowercase words joined by dashes), `kind` (`fact`, `rule` or `skill`), `stall` (`run` id, `from` and `to` frames, `class` of diagnose), `status` (`proposed`, `testing`, `published`, `failed`), `change` (what the candidate does, one sentence), `trials` (each `run`, `arm` `baseline` or `candidate`, `from`, `frames`, `usd`, `calls`, `new_places`, `longest_stall`, as `pair` prints them), `verdict` (null until `published` or `failed`, then required) and `evidence`. `published` needs 2 candidate trials and a baseline trial. The atlas lists it with the other facts of `data/` (status, evidence, kind and change); no run reads it.
 
 ## run
 
