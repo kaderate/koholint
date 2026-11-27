@@ -1,6 +1,6 @@
 # Self-improvement loop: find the blocker, judge honestly, delete, then learn (2026-11-27)
 
-Status: proposed. Step 1 is done below as a blocker report from existing runs; steps 2 and 3 are to build; step 4 and section 7 are parked. The owner paused new flows on 2026-11-27 pending this spec.
+Status: proposed. Step 1 is done below as a blocker report from existing runs; steps 2 and 3 are to build; step 4 and sections 5 and 7 are parked. The owner paused new flows on 2026-11-27 pending this spec.
 
 This is a handoff document. An agent that has read `AGENTS.md`, `ARCHITECTURE.md` and this file should be able to build steps 2 and 3, one pull request each, without asking what was meant. Where the text says "confirm in code", the fact was not checked when this was written (main at `5e0a7ded`, flow-116). Every figure comes from a run or a pull request; runs are named by their id suffix and live under `~/.capy/work/runs/` on the owner's Mac.
 
@@ -11,7 +11,7 @@ This is a handoff document. An agent that has read `AGENTS.md`, `ARCHITECTURE.md
 | flow-112 (#119) | deletes the one-heart autopilot hold | motivated by 5 held-out forks at one heart: 3.58 USD, 0 new places (KOHO-150). Not validated as a fix: in 27ab (flow-115) the beach stall still made 441 calls in 25,845 frames, 411 at one heart |
 | flow-113 (#122) | no fight on sight and no `attack` offer without a sword | shield push on urchins measured on a stub copy of 6913 @40280. Not validated: 27ab reached the same urchin screens and did not pass (pushes moved 0 to 4 px, KOHO-167) |
 | flow-114 (#124) | `explore(direction)` takes only work on that side, else stops `nothing_toward` | paid: used in 944a, 3d74 and 391b, `nothing_toward` 3, 3 and 6 times; every case read was true (KOHO-163) |
-| flow-115 (#125) | objectives expire after 3600 frames without measured progress; lib net -43 | paid: fired in none of 944a, 3d74, 391b; in 27ab 2 objectives expired while `guarded` abandoned 547 |
+| flow-115 (#125) | objectives expire after 3600 frames without measured progress; lib net -31 | paid: fired in none of 944a, 3d74, 391b; in 27ab 2 objectives expired while `guarded` abandoned 547 |
 | flow-116 (#128) | a model's own place objective hands over to the harness's exit taking after 1800 frames | no paid run yet |
 | Tools | `tools/gates` (#118: 3 checkpoints, 2 on one run `abbe`, one stub play each); `tools/scoreboard` (#120, #123: measure, run, debt, alert) | merged |
 | Paid evidence, flows 110 to 115 | 6 runs off the C7..F7 stretch: 6913, b32c, 944a, 3d74, 391b, 27ab; 143,489 frames, 24.01 USD, 0 deaths, shield only, no new key item | `scoreboard measure` on the six runs |
@@ -39,7 +39,6 @@ It is 0 and steers nothing yet; it stays described here, and nothing is built fo
 - No agent that edits Ruby, prompts or its own skill code. Code changes stay reviewed pull requests with a `flow_version` bump.
 - No learning during a run: "a run only emits `suggestions.md`; `learn` and `capability` are offline commands" (`AGENTS.md`).
 - No walkthrough knowledge from any source (section 6).
-- No tooling ahead of a measured need: section 7 is not built from this document.
 
 ## 3. Principles
 
@@ -66,7 +65,7 @@ The line is the one of `AGENTS.md`: how to play is public; where to go and what 
 | Some tasks are required and some are optional; people may ask for a thing and give another in return | The chain of exchanges, who wants what |
 | Texts are the source of direction: signs, people, the map's marks | Any paraphrase of a hint the playthrough has not read |
 
-When flows resume, this goes into `docs/AGENT_MANUAL.md` as a "Dungeons" section in its plain style, paraphrased, with a check in `test/agent_manual_test.rb` that the manual names no place or person of the island. The manual is joined to every play message, so that is a flow bump with its gate numbers. Anything with a number enters data as `hypothesis` with its source and is verified by a probe.
+When flows resume, this goes into `docs/AGENT_MANUAL.md` as a "Dungeons" section in its plain style, paraphrased, with a check in `test/agent_manual_test.rb` that the manual names no place or person of the island. The manual is joined to every play message, so that is a flow bump with its gate numbers. Its line 35 ("each needs its own key to enter") is wrong, since not every dungeon has a key: reword it when the section lands. Anything with a number enters data as `hypothesis` with its source and is verified by a probe.
 
 ### 1.2 Blocker report
 
@@ -92,12 +91,14 @@ Classes and what each points to:
 | `skill` | the right intention and no skill able to carry it out | a skill or a learned capability |
 | `perception` | the engine did not see what was on screen or read a text wrongly | perception (ROADMAP 4) |
 
+Tests, fixed before the count: `direction` and `model` together under half of the lost frames means the work is not only objectives and context; `fact` and `skill` together under a fifth means step 4 builds no learner.
+
 **Frames lost per class** (51,255 frames and 18.14 USD over the six stalls): `override` 25,845 (50%, 14.91 USD); `direction` 20,725 over four runs (40%, 1.75 USD); `skill` 4,685 (9%, 1.48 USD); `model`, `fact` and `perception` 0 as the first class.
 
-What this decides, by the tests this spec set itself:
+What this decides, by those tests:
 
 - `direction` and `model` are 40%, under half, so the work is not only objectives and context. But `direction` recurs in every from-boot run at the same village screens, through flows 110 to 115; flows 114 to 116 address it and only 114 was seen in a paid run.
-- `fact` and `skill` are 9%, under a fifth: step 4 builds no learner.
+- **One row decides step 4.** The 25,845-frame stall of 27ab (B15/C15/D15) is classed `override`, so `fact` and `skill` are 9%, under a fifth, and the learner is not indicated. KOHO-167 names a missing low-hp recovery capability; counted as `skill`, the share would be 59.6% and a learner could be indicated. Both readings stand; this row alone moves the result.
 - `override` is half the frames and 82% of the dollars: step 3 comes first.
 - Two kinds of evidence the first draft did not foresee. **Protective refusals are unbounded**: no window or count ended the 547 refusals of one place. **A run can burn most of its budget with 0 deaths**: 27ab spent 90% of 16.61 USD in one absorbing state, and its guard stopped on deaths only (stall guard off, KOHO-167).
 
@@ -109,7 +110,7 @@ Two parts, both at 0 USD.
 
 **(b) Paired replicates at a few forks, and the A/A check.**
 
-- Gates: the 3 of today plus 2 or 3 cut from the runs of step 1, at full health and off the C7..F7 stretch (a checkpoint at one heart tests the one-heart behaviour, not the rules: KOHO-150). `lineage` is recorded per gate (`Bench.lineage_root`) so a test can tell the stretch the rules came from from the others.
+- Gates: the 4 of today plus 2 or 3 cut from the runs of step 1, at full health and off the C7..F7 stretch (a checkpoint at one heart tests the one-heart behaviour, not the rules: KOHO-150). `lineage` is recorded per gate (`Bench.lineage_root`) so a test can tell the stretch the rules came from from the others.
 - Replicate `k` forks the checkpoint `k * 37` frames later (confirm that `Run#fork` at any frame is exact). A candidate and the baseline are compared replicate by replicate: same gate, same offset.
 - Score per play, from `Scoreboard::Measure` on the fork's own segment, in this order: `gains` (key items, first deliveries, dungeons, instruments), `new_places`, `deaths`, then `stall_frames` and `calls`. `hp_lost` is reported, never compared.
 - Each pair is a win, loss or tie: `better` when wins are at least twice the losses and at least 3 more, `worse` the other way, `equal` otherwise.
@@ -122,7 +123,7 @@ It filters candidates; it never decides one (principle 4).
 
 ## Step 3. First use of the judge: delete or bound
 
-**Candidates, from evidence, not from a switch per family.** The ROADMAP's criterion is "a rule that fired in no held-out run". The scoreboard's `rules` table over the six runs of step 1 (143,489 frames off the stretch) names the families that fired in none: heal give-back (109), heal detour (101/105), loop re-offer (101), souvenir (102), offspring fight (110), danger / held back (106/108) and harness override of the model. Those that fired at all did so on the C7..F7 stretch they were written from (g6 to g8, KOHO-148 and KOHO-150). Before relying on a zero, confirm in code that the family's pattern in `Measure::FAMILIES` still matches the justification its rule writes today; a stale pattern reads as a rule that never fires.
+**Candidates, from evidence, not from a switch per family.** The ROADMAP's criterion is "a rule that fired in no held-out run". The scoreboard's `rules` table over the six runs of step 1 (143,489 frames off the stretch) names the families that fired in none: heal give-back (109), heal detour (101/105), loop re-offer (101), souvenir (102), offspring fight (110), danger / held back (106/108), harness override of the model and probe strike (110), whose pattern ('strike the unidentified') matches no text in lib today, so its zero proves nothing. Those that fired at all did so on the C7..F7 stretch they were written from (g6 to g8, KOHO-148 and KOHO-150). Before relying on a zero, confirm in code that the family's pattern in `Measure::FAMILIES` still matches the justification its rule writes today; a stale pattern reads as a rule that never fires.
 
 **Bounded refusals.** The second target comes from the `override` row: every protective refusal is bounded, by a window or a count, and yields to the model's choice, as objective expiry (flow-115) and the model objective hand-over (flow-116) already do. Measured candidates: guarded place (101) 547 in 27ab, zero cap 189 in 27ab and 16 in 6913, heart pickup / disengage (94) 106, hostile no standing (100) 16, retreat (100) 4 in each of 6913 and 27ab, and the one-heart walls. This is a target for deletion or tightening, not a new rule to write now.
 
@@ -132,9 +133,9 @@ It filters candidates; it never decides one (principle 4).
 
 ## Step 4. A learner: not indicated by the evidence so far
 
-`fact` and `skill` together are 9% of the lost frames, so none is built. If a later blocker report puts them above a fifth, the learner is the one that would have produced its top row, in its own plan under `docs/superpowers/plans/`, with: a digest of the play-steering fields of `data/entities.json` checked at resume before anything writes there; a control arm in every trial; no RAM write in a validation; publication through the judge and a paid pair.
+`fact` and `skill` together are 9% of the lost frames, so no learner is built. If a later blocker report puts them above a fifth, the learner is the one that would have produced its top row, in its own plan under `docs/superpowers/plans/`, with: a digest of the play-steering fields of `data/entities.json` checked at resume before anything writes there; a control arm in every trial; no RAM write in a validation; publication through the judge and a paid pair.
 
-## 5. Progress across runs: frontier checkpoints
+## 5. Progress across runs: frontier checkpoints (parked)
 
 No run is "the save". Progress carries through data and through checkpoints a later run may fork from.
 
@@ -142,7 +143,7 @@ No run is "the save". Progress carries through data and through checkpoints a la
 - A new `frontier` is proposed when a run's vector is above every checkpoint's on the first component that differs (instruments, dungeons, key items, places), at the first ready keyframe after the gain. Paid runs that aim at new progress fork from the highest one.
 - A frontier reached by one root lineage is `observed`; it is `verified` when a from-boot run of another lineage, at a frozen flow, reaches the same component. A passed frontier stays as a `regression` gate.
 
-Build it with the gate metadata of step 2; `test/checkpoints_test.rb` checks the computed fields.
+Parked like section 7: not built from this document, and not part of step 2 beyond its `lineage` field.
 
 ## 6. The walkthrough rule in this work
 
@@ -190,7 +191,6 @@ Rules.
 - Only the engine writes a run's `trace.jsonl` and `save/`; judge forks live under `tmp/` or `--root`; a fork may add keyframes to its parent's `keyframes/`.
 - `verified` never below 2 independent checks.
 - Docs in the same commit (`ARCHITECTURE.md`, `docs/OPERATING.md`, `docs/AGENT_SKILLS.md`, `ROADMAP.md` loses what lands); a flow bump lands with its gate numbers.
-- When this spec is done or superseded, change its status line.
 
 ## 9. Risks
 
@@ -201,13 +201,11 @@ Rules.
 | A verdict is a chaotic accident | replicates, paired comparison, the A/A check |
 | The stub is not the model | every deletion and published fact is confirmed by a paid pair or an A/B |
 | A protective rule makes a state absorbing | step 3's bounded refusals; a stall guard on every paid run |
-| The diagnosis smuggles the walkthrough in | section 6 |
 
 ## 10. Owner's decisions (2026-11-27)
 
-1. Budget for the two from-boot runs of step 1: approved.
+1. Budget for the diagnosis runs: approved; step 1 used runs already on file.
 2. Data-only pull requests merge automatically once the nightly cycle exists, under the grant described in section 7.
 3. Stop and measure before the pieces of section 7; in this version that pause is the structure itself.
 4. A model used offline runs through the Claude CLI on the owner's Claude plan; a dollar cap stays as a guard.
 5. The loop must run fast and stay reliable: step 2 (a).
-6. The owner paused new flows on 2026-11-27 pending this spec.
