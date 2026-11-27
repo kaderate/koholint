@@ -62,7 +62,7 @@ class DelegatedAutopilotTest < Minitest::Test
 
   class ChainDone
     def objective_hold(**) = nil
-    def adopt(_objective) = nil
+    def adopt(*, **) = nil
     def next_choice(**) = nil
     def model_called(**) = nil
     def acted(**) = nil
@@ -360,8 +360,41 @@ class DelegatedAutopilotTest < Minitest::Test
       p.decide(p.decision_point_for(now), now, { grid: })
     end
     held = results.first(12).count { |result| result[:justification].to_s.start_with?('loop in') }
-    assert_equal 0, held, 'no loop break while the model objective is younger than MODEL_HOLD_FRAMES'
+    assert_equal 0, held, 'no loop break while the model objective is younger than Objectives::OWN_FRAMES'
     assert results.last(2).any? { |result| result[:justification].to_s.start_with?('loop in') }, 'and the break comes once the hold ran out'
+  end
+
+  # pair-b 391b (flow-115, forked from b32c@13322): obj-7, the model's own reach_cell (5,9) of D12 (179/0), walked D12, C12 and B12 with gotos
+  # and explores, held the autopilot 14 times and found its first new place at 16590. It ends 1800 frames after its start and the harness explores.
+  def test_a_models_own_reach_cell_without_a_new_place_hands_over_to_the_harness_explore
+    log = Koholint::ExploreLog.new
+    log.absorb({ from: { room: 179, map: 0 }, exits: [{ row: 4, col: 0, direction: :left, outcome: :left, to: [178, 0] }],
+                 survey: { sides: { left: [{ row: 4, col: 0 }], up: [{ row: 0, col: 8 }] }, doors: [] } })
+    client = ScriptedClient.new(default: ok('skill' => 'goto', 'params' => { 'row' => 5, 'col' => 9 }))
+    @objectives = Koholint::Objectives.new(trace:, visited: [[177, 0], [178, 0], [179, 0]])
+    p = Koholint::Policies::Delegated.new(client:, registry: Koholint::Skills::Registry.default, objectives: @objectives, manual: '', autopilot: Koholint::Autopilot.new,
+                                          memory: Koholint::Policies::Memory.new(explore_log: log))
+    @objectives.start(frame: 13_327, title: 'Explore east side of this area for a way south', predicate: { kind: 'reach_cell', place: [179, 0], row: 5, col: 9 })
+    step = lambda do |frame, room|
+      now = state(frame:, room_id: room, map_id: 0)
+      p.observe(now, frame:)
+      result = p.decide(p.decision_point_for(now), now, { grid: })
+      if result[:choice].key?(:skill)
+        walked = outcome(:no_path, frame).merge(from: { room:, map: 0, row: 3, col: 4 }, to: { room:, map: 0, row: 3, col: 5 + (frame % 4) })
+        p.after_action(choice: result[:choice], outcome: walked, state: now, frame: frame + 20)
+      end
+      result
+    end
+    held = [[13_400, 179], [14_000, 178], [14_600, 177], [15_100, 178]].map { |frame, room| step.(frame, room) }
+    @objectives.note_text('Un texte jamais lu.')
+    assert_equal ['claude'] * 4, held.map { |result| result[:agent] }
+    assert_equal ['no model call yet', 'last stop not an explore'], held.map { |result| result[:autopilot_hold] }.uniq
+    taken = step.(15_127, 179)
+    assert_equal ['delegated', 'new_place'], [taken[:agent], taken[:choice][:predicate][:kind]]
+    assert_match(/\Aautopilot: obj-1 stalled \(no new place in 1800 frames/, taken[:justification])
+    assert_equal ['stall', 'Explore the nearest untried exits (picked by the harness)'], [@objectives.history.last[:reason], @objectives.current[:title]]
+    first = step.(15_130, 179)
+    assert_equal [true, { skill: 'explore', params: {} }, 4], [first[:autopilot], first[:choice], client.calls.size], 'the harness explores first, whatever the last goto stopped on'
   end
 
   def test_the_exit_bench_applies_only_in_the_context_it_measured
@@ -387,6 +420,7 @@ class DelegatedAutopilotTest < Minitest::Test
     client = ScriptedClient.new(objective: objective(kind: 'reach_place', place: [146, 16]), default: explore)
     @objectives = Koholint::Objectives.new(trace: trace)
     p = Koholint::Policies::Delegated.new(client:, registry: Koholint::Skills::Registry.default, objectives: @objectives, manual: '', memory: Koholint::Policies::Memory.new(explore_log: log))
+    @objectives.start(frame: 100, title: 'go', predicate: { kind: 'reach_place', place: [146, 16] }, candidate: 'place-146-16')
     results = [163, 164, 163, 164, 163, 164, 163, 164, 163, 163].each_with_index.map do |room, i|
       now = state(frame: 100 + (i * 300), room_id: room)
       p.observe(now, frame: now.frame)

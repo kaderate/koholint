@@ -410,7 +410,7 @@ module Koholint
         end
         raise Refusal, 'dialogue_closed needs an open dialogue' if predicate[:kind].to_s == 'dialogue_closed' && !state.dialog_open?
         stalled = @objectives.history.reverse.find { |done| done[:reason] == 'stall' && predicate[:place] && done[:predicate] == predicate && state.frame - done[:ended_frame] < Objectives::STALL_FRAMES }
-        raise Refusal, "#{stalled[:id]} had this predicate and was abandoned at frame #{stalled[:ended_frame]}: #{Objectives::STALL_CAUSE}; choose a different objective" if stalled
+        raise Refusal, "#{stalled[:id]} had this predicate and was abandoned at frame #{stalled[:ended_frame]}: #{Objectives.stall_cause(stalled)}; choose a different objective" if stalled
 
         clear_hemmed
         @refusals.clear

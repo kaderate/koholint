@@ -16,6 +16,12 @@ module Koholint
     ATTEMPT_LIMIT = 10
     STALL_FRAMES = 3600
     STALL_CAUSE = "no new place, no new text, no shorter route and no new cell in #{STALL_FRAMES} frames".freeze
+    OWN_FRAMES = 1800
+    OWN_CAUSE = "no new place in #{OWN_FRAMES} frames, for a place-naming objective of the model's own".freeze
+
+    def self.own?(objective) = !objective[:candidate] && !objective[:autopilot] && objective.dig(:predicate, :place)
+
+    def self.stall_cause(done) = own?(done) ? OWN_CAUSE : STALL_CAUSE
 
     def self.normalize(predicate)
       predicate.to_h.transform_keys(&:to_sym)
@@ -94,7 +100,7 @@ module Koholint
 
       @texts << key
       @new_text = true if @current
-      @last_change_frame = @last_frame if @current
+      @last_change_frame = @last_frame if @current && !self.class.own?(@current)
       true
     end
 
@@ -138,7 +144,7 @@ module Koholint
     end
 
     # An objective lives while it makes measured progress: a place never visited, a text never read, a new shortest route to its place,
-    # or, when it names no place, a cell never walked.
+    # or, when it names no place, a cell never walked. One naming a place that the model wrote itself lives only on places never visited, for OWN_FRAMES.
     def update(state, frame:, distance: nil, walked: nil)
       return nil if state.loading?
 
@@ -156,13 +162,14 @@ module Koholint
       @closest = distance if closer
       wider = playing && walked && walked > (@walked_most ||= walked)
       @walked_most = walked if wider
-      @last_change_frame = frame if first_visit || closer || wider
+      own = self.class.own?(@current)
+      @last_change_frame = frame if first_visit || (!own && (closer || wider))
       @dialogue_seen ||= state.dialog_open?
 
       return finish(:failed, frame:) if died?(state)
       return finish(:achieved, frame:) if achieved?(state, place, cell, first_visit)
       return finish(:abandoned, frame:, reason: 'loop') if @repeat >= @loop_window
-      return finish(:abandoned, frame:, reason: 'stall') if frame - @last_change_frame >= @stall_frames
+      return finish(:abandoned, frame:, reason: 'stall') if frame - @last_change_frame >= (own ? OWN_FRAMES : @stall_frames)
 
       nil
     end

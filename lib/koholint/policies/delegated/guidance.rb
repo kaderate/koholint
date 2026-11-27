@@ -97,8 +97,6 @@ module Koholint
 
         def puzzle_open?(place) = @explore_log.puzzles(place).any? && !@explore_log.bench_concluded?(place)
 
-        MODEL_HOLD_FRAMES = 1800
-
         # Entering a place with an open puzzle and texts read there ends a harness objective so the model chooses the next one with those
         # texts in front of it, once per context and set of texts read there: no new text, no new paid ask. An objective of the model's own
         # is left alone.
@@ -118,10 +116,10 @@ module Koholint
           @puzzle_ask = entry
         end
 
-        # A loop break replaces a harness objective at once, and one the model wrote only after MODEL_HOLD_FRAMES.
+        # A loop break replaces a harness objective at once, and one the model chose only after Objectives::OWN_FRAMES.
         def model_hold?(state)
           current = @objectives.current
-          current && !current[:autopilot] && state.frame - current[:started_frame] < MODEL_HOLD_FRAMES
+          current && !current[:autopilot] && state.frame - current[:started_frame] < Objectives::OWN_FRAMES
         end
 
         # Each puzzle is stated once per visit of its place, not in every prompt.
@@ -436,15 +434,18 @@ module Koholint
 
         def auto_objective(decision_point, state)
           return unless @autopilot && decision_point.name == :choose_objective && !@puzzle_ask
-          return if (@hold = @autopilot.objective_hold(state:, last: @objectives.history.last))
+          last = @objectives.history.last
+          taken = last && last[:reason] == 'stall' && Objectives.own?(last)
+          return if (@hold = @autopilot.objective_hold(state:, last:, taken:))
 
           place = state.place
           return unless @explore_log.work?(place) || @explore_log.route(place)
           return if unmet_person?(state, place)
 
           @objectives.start(frame: state.frame, **AUTO_OBJECTIVE, autopilot: true)
-          @autopilot.adopt(@objectives.current)
-          DecisionPoint.harness_choice(AUTO_OBJECTIVE.dup, 'autopilot: the last explore chain reached a place and achieved its objective; keep exploring', autopilot: true)
+          @autopilot.adopt(@objectives.current, taken:)
+          why = taken ? "#{last[:id]} stalled (#{Objectives::OWN_CAUSE}); explore the nearest untried exits" : 'the last explore chain reached a place and achieved its objective; keep exploring'
+          DecisionPoint.harness_choice(AUTO_OBJECTIVE.dup, "autopilot: #{why}", autopilot: true)
         end
 
         # A person here never tried is offered first at the model's objective choice, which keeping on exploring would skip.

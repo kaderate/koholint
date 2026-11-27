@@ -220,7 +220,7 @@ class ScoreboardTest < Minitest::Test
 
   def test_a_fork_supervisor_ignores_the_parent_prefix_and_counts_from_the_fork_frame
     Dir.mktmpdir do |root|
-      defaults = Scoreboard::Run::DEFAULTS
+      defaults = Scoreboard::Run::DEFAULTS.merge(stall: Scoreboard::Measure::STALL_FRAMES)
       watch = Scoreboard::Run.watcher(fork_run(root, '20261126-000005-aaaa'), defaults)
       assert_nil watch.poll(1.0)
       assert_equal [0, 5030], [watch.deaths, watch.frame]
@@ -231,17 +231,18 @@ class ScoreboardTest < Minitest::Test
   end
 
   def test_the_intro_of_a_boot_run_is_not_a_stall_until_its_second_place
+    defaults = Scoreboard::Run::DEFAULTS.merge(stall: Scoreboard::Measure::STALL_FRAMES)
     Dir.mktmpdir do |root|
       intro = make_run(root, '20261126-000006-aaaa') { |trace| [10, 4700].each { |frame| perceive(trace, frame, 1) } }
-      assert_nil Scoreboard::Run.watcher(intro, Scoreboard::Run::DEFAULTS).poll(1.0)
+      assert_nil Scoreboard::Run.watcher(intro, defaults).poll(1.0)
       assert_equal({ count: 0, longest_frames: 0 }, Scoreboard::Measure.run(intro)[:stalls])
       stalled = make_run(root, '20261126-000006-bbbb') do |trace|
         [[10, 1], [4700, 1], [4800, 2], [8900, 2]].each { |frame, room| perceive(trace, frame, room) }
       end
-      assert_equal 'stall', Scoreboard::Run.watcher(stalled, Scoreboard::Run::DEFAULTS).poll(1.0)
+      assert_equal 'stall', Scoreboard::Run.watcher(stalled, defaults).poll(1.0)
       assert_equal({ count: 1, longest_frames: 4100 }, Scoreboard::Measure.run(stalled)[:stalls])
       calm = make_run(root, '20261126-000006-cccc') { |trace| [[10, 1], [4700, 1], [4800, 2], [8700, 2]].each { |frame, room| perceive(trace, frame, room) } }
-      assert_nil Scoreboard::Run.watcher(calm, Scoreboard::Run::DEFAULTS).poll(1.0)
+      assert_nil Scoreboard::Run.watcher(calm, defaults).poll(1.0)
       assert_equal 0, Scoreboard::Measure.run(calm)[:stalls][:count]
     end
   end

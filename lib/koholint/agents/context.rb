@@ -33,7 +33,7 @@ module Koholint
         fixed = [header(state, link, triggers, place, locked, locked_frames, place_name, hp_lost, died, alerts), grid_block(grid, link, ledger, place), neighbours(grid, link, results, ledger, place),
                  *things_block(grid, talk_log, place, stamp, entities, signs), objective_block(objective, attempts, plan, goal, route), *leads_block(leads, place, resolve),
                  *candidates_block(candidates), *learned_block(learned)]
-        finished = history.map { |h| "- #{h[:id]} #{h[:outcome]}#{h[:reason] ? " (#{h[:reason] == 'stall' ? "stall: #{Objectives::STALL_CAUSE}" : h[:reason]})" : ''}: #{h[:title]}#{' (picked by the harness)' if h[:autopilot]}" }
+        finished = history.map { |h| "- #{h[:id]} #{h[:outcome]}#{h[:reason] ? " (#{h[:reason] == 'stall' ? "stall: #{Objectives.stall_cause(h)}" : h[:reason]})" : ''}: #{h[:title]}#{' (picked by the harness)' if h[:autopilot]}" }
         refused = refusals.last(KEEP_REFUSALS).map { |r| "- #{r[:title]} #{r[:predicate].to_json}: #{r[:reason]}" }
         lines = results.map { |r| "- #{result_line(r)}" }
         notes = trim_manual(manual.to_s)
