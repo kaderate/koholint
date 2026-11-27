@@ -1,6 +1,6 @@
 # Agent skills
 
-The skills, protocols and harness behaviours the agent works with. Versioned with the play flow (currently `flow-117`): update this page, not the README, when a flow changes. Layers and data flow are in [ARCHITECTURE.md](../ARCHITECTURE.md).
+The skills, protocols and harness behaviours the agent works with. Versioned with the play flow (currently `flow-118`): update this page, not the README, when a flow changes. Layers and data flow are in [ARCHITECTURE.md](../ARCHITECTURE.md).
 
 
 - Learned capabilities (`data/capabilities.json`, `bin/koholint capability list`): an `operational` entry is a composite of the skills below, offered in the skill schema and listed under "Learned skills" only while its trigger item is held (flow-49) and its object is on screen (today `sword_on_object_92 row col direction`: stand next to object 92, face it, use the sword, step into its cell). `explore` and `goto` also run it themselves when blocked facing such a cell, and the planner routes through those cells as a last resort. `learn` and `capability publish|retire` are offline commands.
@@ -63,7 +63,8 @@ The skills, protocols and harness behaviours the agent works with. Versioned wit
   before each attack, so the last one may run past it). The viewer counts no autopilot decision as an objective attempt.
 - A ledger counts blocked edges per place; an edge blocked twice is marked doubtful in the context. An objective that makes no
   measured progress for 3600 frames is abandoned `stall` (flow-115 below), with that cause in the finished list; one naming a place
-  that the model wrote itself, with no candidate, after 1800 frames without a place never visited (flow-116 below).
+  that the model wrote itself, with no candidate, after 1800 frames without a place never visited (flow-116 below). An exit or door
+  objective whose explore finds that way unreachable is abandoned `unreachable` at once (flow-118 below).
 - Dialogue pages are advanced automatically (one `decision` with agent `delegated` and cost 0 per page) and read once
   from page sheets.
 - The agent writes a one-line `plan` that the next call sees; the live view shows its reasoning and plan under each
@@ -155,6 +156,12 @@ The skills, protocols and harness behaviours the agent works with. Versioned wit
   context lists it as "hurt Link for N", and a model attack on it is refused at or below its hit. It replaces two rules: the
   session-only one-strike probe of flow-110 (`note_contact`, `probe_choice`, the attack's strike cap from the context) and the
   "no tries in a place that has hurt Link" of flow-107; a type that never hurt Link is tried there again.
+- flow-118: an exit or door objective ends `unreachable` when the explore that follows it, still in its place, reports that way
+  `unreachable`, and its candidate is not offered for the 3600 frames after, like a stalled one (flow-115). Before, the zero cap
+  answered the instant `no_frontier` with an explore toward the reachable place entered least, and that crossing achieved the
+  objective as if Link had left by its way. One rule covers both ends: the flow-108 abandonment of a `held_back` explore now also
+  sets its candidate aside. Forks c1a7 and 5b21 (27ab @31009, flow-117 and the closed flow-118 of #134): 27 of 28 and 28 of 29 paid
+  calls took an exit or the door of C15/D15 this way, one every 54 frames, with Link crossing between C15 and D15.
 - flow-117: the harness no longer makes an objective of a person whose recorded text names an item Link holds (flow-97: talk to them
   holding it, then `use_item`); no run, fork or gate ever fired it. Such a person stays a `person-` or `need-` candidate the model may pick,
   and a souvenir naming a held item is still taken up by the harness (flow-102).

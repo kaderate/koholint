@@ -1224,6 +1224,30 @@ class DelegatedAutopilotTest < Minitest::Test
     assert_match(/unknown candidate exit-sideways/, refused[:justification])
   end
 
+  # Fork c1a7 (27ab @31009, flow-117): 27 of 28 paid calls took an exit or the door of C15/D15 whose explore stopped no_frontier in one
+  # frame with that way unreachable; the zero cap then crossed to the other screen, and the crossing achieved the objective.
+  def test_an_exit_whose_explore_finds_it_unreachable_ends_the_objective_and_leaves_the_menu_for_the_stall_window
+    client = ScriptedClient.new(objective: [ok('candidate' => 'exit-down', 'plan' => 'x', 'goal' => 'g'), ok('candidate' => 'exit-up', 'plan' => 'x', 'goal' => 'g')], default: explore)
+    p = autopiloted(client)
+    beach = ->(frame) { state(frame:, room_id: 226, map_id: 0, x: 136, y: 80, hp: 8) }
+    p.observe(beach.(31014), frame: 31014)
+    p.decide(p.decision_point_for(beach.(31014)), beach.(31014), { grid: OpenGrid.new })
+    follow = p.decide(p.decision_point_for(beach.(31014)), beach.(31014), { grid: })
+    assert_equal({ skill: 'explore', params: { direction: 'down' } }, follow[:choice])
+    at = { room: 226, map: 0, x: 136, y: 80, row: 4, col: 8 }
+    instant = { skill: 'explore', params: { direction: :down }, frames: 1, from: at, to: at, moved_cells: 0, room_changed: false, hp_delta: 0, stopped_by: :no_frontier,
+                place_changed: false, cells_walked: 0, crossed: [], walls: [], blocked_edges: [], exits: [], offered: [], unreachable: [:down],
+                tried_exits: [{ row: 3, col: 0, direction: :left }, { row: 3, col: 9, direction: :right }] }
+    p.after_action(choice: follow[:choice], outcome: instant, state: beach.(31015), frame: 31015)
+    assert_equal [nil, 'unreachable', 'exit-down'], [@objectives.current, *@objectives.history.last&.values_at(:reason, :candidate)]
+    point = p.decision_point_for(beach.(31015))
+    assert_equal :choose_objective, point.name
+    p.decide(point, beach.(31015), { grid: OpenGrid.new })
+    refute_includes client.calls.last[:prompt], '- exit-down:'
+    assert_equal 'exit-up', @objectives.current[:candidate]
+    assert_includes p.send(:build_candidates, beach.(31015 + Koholint::Objectives::STALL_FRAMES), { grid: OpenGrid.new }).map { |candidate| candidate[:id] }, 'exit-down', 'offered again after the stall window'
+  end
+
   def test_a_door_or_a_person_candidate_is_followed_with_an_aimed_explore_or_a_talk
     entities = -> { [{ type: 62, kind: 'npc', cell: [2, 3] }] }
     objects = -> { [{ kind: 'door', cell: [0, 5], object: 226 }] }
