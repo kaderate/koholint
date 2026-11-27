@@ -8,7 +8,7 @@ Command reference for running, resuming and forking runs, the offline censuses, 
 
 GitHub Actions (`.github/workflows/ci.yml`) runs `rake test:ci` on every pull request and push to `main`, and the whole suite with the ROM in 4 shards (`rom`, frame guard included), so nobody runs the full `rake test` on the Mac before a merge; locally, `rake test:fast` and targeted files are enough. Pull requests from forks get no secrets and run `test:ci` only. The shards keep only `tmp/test_times.json` in the Actions cache, so each run splits the jobs by their last durations; the rest of `tmp/` (emulator states derived from the ROM) is never cached. emu-gb is checked out from `kaderate/gemboy` at the commit pinned in `ci.yml` and `learn.yml` (bump both to take a new emu-gb), and third-party actions are pinned to commit SHAs.
 
-**$0 stub gates.** `tools/gates/` plays three checkpoint forks with a stub in place of the model and checks calls, calls at 8 hp or less, hp lost, deaths and the first delivery against `tools/gates/expected.json` per `flow_version`: `ruby tools/gates/gate.rb respawn-171|post-gain-172|sword-obtained|all` (`--check RUN_DIR` for a fork already played). They need the checkpoint runs on the Mac, so CI does not run them; `test/gates_test.rb` covers the counting. Commands and expected numbers: `tools/gates/README.md`.
+**$0 stub gates.** `tools/gates/` plays checkpoint forks with a stub in place of the model and checks calls, calls at 8 hp or less, hp lost, deaths and the first delivery against `tools/gates/expected.json` per `flow_version`: `ruby tools/gates/gate.rb respawn-171|post-gain-172|sword-obtained|no-sword-225|all` (`--check RUN_DIR` for a fork already played). They need the checkpoint runs on the Mac, so CI does not run them; `test/gates_test.rb` covers the counting. Commands and expected numbers: `tools/gates/README.md`.
 
 **Scoreboard.** `tools/scoreboard/` measures how far the agent gets and what it costs: `ruby tools/scoreboard/scoreboard.rb measure RUN_DIR...` (progress vector, cost, deaths, stalls and harness rules fired, from run folders), `run --budget USD [--daily-cap USD] [--from boot|CHECKPOINT]` (the standard run; `--budget` is the total for the invocation, split over its runs, soft by one call per run, refused when today's history spend plus it is above the daily cap, 20 USD by default; at most 2 emulator processes, stopped on deaths, a stall or wall time, or a signal on the scoreboard, one line appended to `~/.capy/work/scoreboard/history.jsonl`), `debt` (the pit index) and `alert` (exit 1 when a guardrail trips). Only `run` spends money; `test/scoreboard_test.rb` needs no ROM. Commands and fields: `tools/scoreboard/README.md`.
 
@@ -63,7 +63,7 @@ journal or the game state.
 trace gains `screen` and `screen_changed`, `affordance` (walk evidence per tile appearance) and a `notable` of kind `grid_overlay_stuck` (over 600 frames of overlay in one
 place, so the grid went dark). The live view has a grid toggle that overlays the believed passability.
 
-**Hurt.** When an action ends with an hp drop and a thing of kind `unknown` or `creature` is nearest Link within the census window, the trace gains a
+**Hurt.** When an action ends with an hp drop and the thing nearest Link within the census window takes the blame (rule: flow-111 in [AGENT_SKILLS.md](AGENT_SKILLS.md)), the trace gains a
 `notable` of kind `hurt` whose `detail` holds its `type`, the `hit` (the drop), the `place` and its `cell`.
 
 **Resume and fork.** `resume` continues a run with the same `flow_version` and ROM hash and rebuilds the ledger and
@@ -93,7 +93,7 @@ entity table, records its position, type and matching sprites, then in throwaway
 places Link next to it on each side and presses A, with a control copy where the slot is cleared (a dialogue that also
 opens in the control is not the entity's); pins Link on it for 90 frames and compares health with the control; watches
 whether it moves; and talks to it twice and at a shifted frame to compare conversation signatures. Reports go to
-`tmp/entities/*.json` and feed `data/entities.json` (kinds, and with the runs' `hurt` notables the `hurts` facts) and `data/addresses.json`.
+`tmp/entities/*.json` and feed `data/entities.json` (kinds, `hurts` facts) and `data/addresses.json`.
 
 ## Door census
 

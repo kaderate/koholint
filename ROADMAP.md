@@ -7,7 +7,7 @@ Only what is left to do. When something lands, delete it here (git is the histor
 ## Direction (independent evaluation KOHO-148 and the Captain's framework of 2026-11-26)
 - Progress is the vector of `tools/scoreboard` (instruments 0-8, dungeons entered, key items, places seen); while no instrument is held, key items and places seen per dollar are the leading indicators. Guardrails: deaths and model calls per 1000 frames, the pit index (`scoreboard debt`), dollars per day.
 - One rule per incident is frozen: no new harness rule written from a single incident until a held-out validation exists (a from-zero run at a frozen flow, a gate in another zone than the one the rules came from). The incidents below are evidence for the consolidations, not a backlog of rules.
-- Delete before adding: consolidate first (an objective stack in place of the heal give-back, loop re-offer and respawn patches; hostility from damage as typed data, started by flow-111), a flow announces the number it moves, and a rule that fired in no held-out run is a candidate for removal.
+- Delete before adding: consolidate first (an objective stack in place of the heal give-back, loop re-offer and respawn patches), a flow announces the number it moves, and a rule that fired in no held-out run is a candidate for removal.
 
 ## Next, in order
 1. **World model from anomalies and puzzle solving.** Today the harness replans around what surprised it, and the surprise is lost (a door that leads where the map says it should not, a wall that was open, an exit that is not where the screen geometry puts it). Make the surprise the signal.

@@ -61,11 +61,8 @@ The skills, protocols and harness behaviours the agent works with. Versioned wit
   no target is left, health is below 2 hearts or a heart below its level at the last call, an attack stops any other
   way (a room change is one: `room_change` ends the chain), or after 8 attacks or 900 frames since that call (checked
   before each attack, so the last one may run past it). The viewer counts no autopilot decision as an objective attempt.
-- A ledger counts blocked edges per place; an edge blocked twice is marked doubtful in the context. An objective lives while it
-  makes measured progress (flow-115): a place never visited, a text never read, a new shortest known route to its place, or, when it
-  names no place, a cell never walked; after 3600 frames without any it is abandoned (`stall`, with that cause in the finished list)
-  and the model chooses again with the facts. The same place-naming predicate set again within 3600 frames of that stall is refused,
-  and its candidate is not offered in that window.
+- A ledger counts blocked edges per place; an edge blocked twice is marked doubtful in the context. An objective that makes no
+  measured progress for 3600 frames is abandoned `stall` (flow-115 below), with that cause in the finished list.
 - Dialogue pages are advanced automatically (one `decision` with agent `delegated` and cost 0 per page) and read once
   from page sheets.
 - The agent writes a one-line `plan` that the next call sees; the live view shows its reasoning and plan under each
@@ -148,7 +145,7 @@ The skills, protocols and harness behaviours the agent works with. Versioned wit
   it is still a frontier, taken when nothing else here is reachable, before a route to another place. An explore that stops `no_frontier`
   in at most one frame is answered by the harness at the next decision, not after three, since from the same cell it would find none again.
 - flow-111: damage teaches hostility, as typed data. A `hurts` fact on a data/entities.json entry (value = hit, `confidence`,
-  `verified_count`, `source`; written offline from the entity census and the runs' notables, never by a run) and the run's own evidence,
+  `verified_count`, `source`; written offline from the entity census, never by a run) and the run's own evidence,
   a `notable` of kind `hurt` when an action ends with an hp drop (the drop is its hit; rebuilt from the lineage trace on a resume or a
   fork): of everything within the census window (8 px across, 16 px down or up), the nearest takes it if its type already hurt, and
   otherwise only if Link is not within a cell of the reach of an enemy (catalogued, or a type that already hurt) and it is of kind
@@ -160,7 +157,7 @@ The skills, protocols and harness behaviours the agent works with. Versioned wit
 - flow-115: an objective expires on no measured progress, and leads no longer reopen people. Progress is a place never visited, a
   text never read, a new shortest known route (hops over the explore log) to the objective's place, or, for an objective naming no
   place, a cell never walked; after 3600 frames without any the objective is abandoned `stall`, and the model may not set the same
-  place-naming predicate again within 3600 frames. It replaces the stall on an unchanged position (1800 frames), the keep-alive of dialogues and
+  place-naming predicate again within 3600 frames of that stall, whose candidate is not offered in that window either. It replaces the stall on an unchanged position (1800 frames), the keep-alive of dialogues and
   locked phases, and the `unreachable` counts of blocked results and `no_path` stops. A person whose last talk left their texts
   exhausted is not talked to again by the harness until a milestone or an item changes. b32c (flow-112): obj-7 "reach D12 column 9"
   lived 6364 frames over C11, C12, D11 and D12, and new leads reopened Marine and Tarkin four times (2093 frames, texts already read).
@@ -169,7 +166,7 @@ The skills, protocols and harness behaviours the agent works with. Versioned wit
   the screen it opens from lies; no pocket or retreat fallback). Work here keeps every kind explore knows (clearable objects, stone
   pushes, frontiers), filtered by side. With neither, it moves nowhere and stops `nothing_toward`, its `cause` naming the nearest work, e.g.
   "no untried work toward right; the nearest is on the way to 65-0: the left exit at (4,0)". The direction was only a tie-break in
-  the first non-empty candidate class (2c93 98500 and d871 101068: asked right, went left). Explores the harness issues carry no direction.
+  the first non-empty candidate class (2c93 98500 and d871 101068: asked right, went left). Explores the harness issues after a benign stop carry no direction; one that follows an `exit` objective carries its side. `nothing_toward` counts as stuck like `no_frontier`.
 - flow-113: no fight without a sword. The harness fights on sight only with the sword on A or B, so explore no longer stops `enemy`
   without one, and `attack` is offered to the model only while the sword is on A or B,
   the same condition, so an unequipped sword cannot loop into refusals. The autopilot's tries and touches of unknown things also wait where a strike would be refused (Link at or
