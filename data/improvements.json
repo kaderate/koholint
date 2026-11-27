@@ -13,5 +13,51 @@
     "trials": [],
     "verdict": null,
     "evidence": "scoreboard diagnose on 27ab: top stall by dollars, 25845 frames, 14.91 USD, 441 calls (411 at one heart) on D15 C15 B15; 'guarded place (101)' answered 547 decisions against 425 model decisions and abandoned 547 objectives (reason guarded); zero cap 189, heart pickup / disengage 106. Testing it needs game code (a bound in lib/koholint/policies/delegated/guidance.rb#guarded) and a flow bump."
+  },
+  {
+    "id": "b32c-model-objective-handover",
+    "kind": "rule",
+    "stall": {
+      "run": "20261127-001021-b32c",
+      "from": 15520,
+      "to": 19686,
+      "class": "direction"
+    },
+    "status": "testing",
+    "change": "A model's own place objective no longer holds the autopilot for good: objectives expire after 3600 frames without progress (flow-115) and a model's place objective hands over to the harness's exit taking after 1800 frames (flow-116); both are on main, so the candidate is main against the flow-112 run.",
+    "trials": [
+      {
+        "run": "20261127-001021-b32c",
+        "arm": "baseline",
+        "from": 15520,
+        "frames": 4166,
+        "usd": 0.4295,
+        "calls": 17,
+        "new_places": 1,
+        "longest_stall": 4166
+      },
+      {
+        "run": "20261127-182315-7391",
+        "arm": "candidate",
+        "from": 15520,
+        "frames": 10408,
+        "usd": 0.7336,
+        "calls": 26,
+        "new_places": 16,
+        "longest_stall": 1534
+      },
+      {
+        "run": "20261127-182315-bcbb",
+        "arm": "candidate",
+        "from": 15520,
+        "frames": 9639,
+        "usd": 0.71,
+        "calls": 26,
+        "new_places": 11,
+        "longest_stall": 2309
+      }
+    ],
+    "verdict": null,
+    "evidence": "scoreboard diagnose on b32c: direction, 4166 frames, 0.43 USD, 17 model calls and no rule family; the model's reach_cell objective of frame 13322 (east side of D12) was open through the whole stall. scoreboard pair at 15520 on main cedadf43 (flow-116), 0.70 USD per fork: 16 and 11 new places (1 in the baseline, the interior 203/16 that all three count), longest gap 1534 and 2309 frames, 0 deaths; within the baseline's 4166 frames, 5 and 2. Confounded: the resumed fork abandons the inherited objective at once (objective reason 'resume'), so neither expiry nor hand-over fired, and flows 113 to 116 all differ from the baseline; the forks show the stall ends once the objective is gone, not which mechanism ends it on a live run. Isolating test, no game code: fork b32c at 13322, before the model sets that objective, on main, and check that the hand-over fires near 15122 (KOHO-163's flow-115 forks there made 14 and 3 new places)."
   }
 ]
