@@ -261,8 +261,8 @@ class DelegatedPolicyTest < Minitest::Test
     @objectives.abandon(frame: 200, reason: 'stall')
     refused = decide(p, state(frame: 300)).last
     assert refused[:refused], refused.inspect
-    assert_equal 'obj-1 had this predicate and was abandoned at frame 200: no new place, no new text, no shorter route and no new cell in 3600 frames; choose a different objective', refused[:justification]
-    assert_includes client.calls.last[:prompt], 'obj-1 abandoned (stall: no new place, no new text, no shorter route and no new cell in 3600 frames): go'
+    assert_equal "obj-1 had this predicate and was abandoned at frame 200: no new place in 1800 frames, for a place-naming objective of the model's own; choose a different objective", refused[:justification]
+    assert_includes client.calls.last[:prompt], "obj-1 abandoned (stall: no new place in 1800 frames, for a place-naming objective of the model's own): go"
     assert_nil @objectives.current
     refute decide(p, state(frame: 3800)).last[:fallback]
     assert_equal 'obj-2', @objectives.current[:id]
@@ -284,7 +284,7 @@ class DelegatedPolicyTest < Minitest::Test
       @objectives = Koholint::Objectives.new(trace:, visited: [[1, 0], [2, 0], [3, 0]])
       p = Koholint::Policies::Delegated.new(client: ScriptedClient.new, registry: Koholint::Skills::Registry.default, objectives: @objectives, manual: '',
                                             memory: Koholint::Policies::Memory.new(explore_log:))
-      @objectives.start(frame: 100, title: 'go', predicate:)
+      @objectives.start(frame: 100, title: 'go', predicate:, candidate: 'place-3-0')
       [100, 3000, 3700].zip(rooms).each do |frame, room|
         walk&.call(explore_log, frame)
         p.observe(state(frame:, room_id: room, map_id: 0), frame:)
@@ -611,7 +611,7 @@ class DelegatedPolicyTest < Minitest::Test
   end
 
   def test_the_page_cap_is_read_and_advanced_once_then_the_agent_drives_until_the_dialogue_closes
-    client = ScriptedClient.new(objective: objective, skill: [ok('skill' => 'explore', 'params' => {}, 'transcription' => 'Early'),
+    client = ScriptedClient.new(objective: ok('title' => 'go', 'predicate' => { 'kind' => 'new_place' }), skill: [ok('skill' => 'explore', 'params' => {}, 'transcription' => 'Early'),
                                                               ok('skill' => 'advance_dialogue', 'params' => {}, 'transcription' => 'Late'),
                                                               ok('skill' => 'advance_dialogue', 'params' => {}, 'transcription' => 'Driven'),
                                                               ok('skill' => 'wait', 'params' => { 'frames' => 3 })])

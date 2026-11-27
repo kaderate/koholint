@@ -13,7 +13,7 @@ module Scoreboard
   # at a time, each stopped cleanly (SIGINT, as Ctrl-C) on a wall-time limit, on deaths, or on a stall.
   module Run
     MAX_JOBS = 2
-    DEFAULTS = { budget: 4.0, daily_cap: Alert::DAILY_USD, frames: 80_000, minutes: 180, max_seconds: 14_400, max_deaths: 3, stall: 4000, jobs: MAX_JOBS, poll: 15, appear: 20, grace: 120 }.freeze
+    DEFAULTS = { budget: 4.0, daily_cap: Alert::DAILY_USD, frames: 80_000, minutes: 180, max_seconds: 14_400, max_deaths: 3, stall: 6000, jobs: MAX_JOBS, poll: 15, appear: 20, grace: 120 }.freeze
 
     class Refused < StandardError; end
 

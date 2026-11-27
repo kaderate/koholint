@@ -1,6 +1,6 @@
 # Agent skills
 
-The skills, protocols and harness behaviours the agent works with. Versioned with the play flow (currently `flow-115`): update this page, not the README, when a flow changes. Layers and data flow are in [ARCHITECTURE.md](../ARCHITECTURE.md).
+The skills, protocols and harness behaviours the agent works with. Versioned with the play flow (currently `flow-116`): update this page, not the README, when a flow changes. Layers and data flow are in [ARCHITECTURE.md](../ARCHITECTURE.md).
 
 
 - Learned capabilities (`data/capabilities.json`, `bin/koholint capability list`): an `operational` entry is a composite of the skills below, offered in the skill schema and listed under "Learned skills" only while its trigger item is held (flow-49) and its object is on screen (today `sword_on_object_92 row col direction`: stand next to object 92, face it, use the sword, step into its cell). `explore` and `goto` also run it themselves when blocked facing such a cell, and the planner routes through those cells as a last resort. `learn` and `capability publish|retire` are offline commands.
@@ -62,7 +62,8 @@ The skills, protocols and harness behaviours the agent works with. Versioned wit
   way (a room change is one: `room_change` ends the chain), or after 8 attacks or 900 frames since that call (checked
   before each attack, so the last one may run past it). The viewer counts no autopilot decision as an objective attempt.
 - A ledger counts blocked edges per place; an edge blocked twice is marked doubtful in the context. An objective that makes no
-  measured progress for 3600 frames is abandoned `stall` (flow-115 below), with that cause in the finished list.
+  measured progress for 3600 frames is abandoned `stall` (flow-115 below), with that cause in the finished list; one naming a place
+  that the model wrote itself, with no candidate, after 1800 frames without a place never visited (flow-116 below).
 - Dialogue pages are advanced automatically (one `decision` with agent `delegated` and cost 0 per page) and read once
   from page sheets.
 - The agent writes a one-line `plan` that the next call sees; the live view shows its reasoning and plan under each
@@ -154,6 +155,13 @@ The skills, protocols and harness behaviours the agent works with. Versioned wit
   context lists it as "hurt Link for N", and a model attack on it is refused at or below its hit. It replaces two rules: the
   session-only one-strike probe of flow-110 (`note_contact`, `probe_choice`, the attack's strike cap from the context) and the
   "no tries in a place that has hurt Link" of flow-107; a type that never hurt Link is tried there again.
+- flow-116: a model's own objective no longer switches off the harness's exit taking. An objective naming a place (`reach_place`,
+  `reach_cell`, `leave_place`) that the model wrote itself, with no candidate, lives only on a place never visited: 1800 frames
+  without one (from its start or its last new place) and it is abandoned `stall` ("no new place in 1800 frames"); a shorter route, a
+  new text or a cell never walked no longer keeps it. The harness then starts "Explore the nearest untried exits" at once instead of
+  a paid `choose_objective`, and takes its first `explore` itself, whatever the model's last skill stopped on. Candidates and harness
+  objectives keep the flow-115 measure. Pair-b 391b (flow-115, from b32c@13322): obj-7, reach_cell (5,9) of D12, lived 4901 frames
+  over D12, C12 and B12, held the autopilot 14 times, and found its first new place (D11) 3268 frames after its start.
 - flow-115: an objective expires on no measured progress, and leads no longer reopen people. Progress is a place never visited, a
   text never read, a new shortest known route (hops over the explore log) to the objective's place, or, for an objective naming no
   place, a cell never walked; after 3600 frames without any the objective is abandoned `stall`, and the model may not set the same

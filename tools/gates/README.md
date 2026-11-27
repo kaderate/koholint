@@ -49,6 +49,10 @@ The numbers repeat only at the same code and the same data. Unlike `bin/koholint
 | flow-115 | post-gain-172 | 65 | 0 | 4 | 0 | 99292 |
 | flow-115 | sword-obtained | 47 | 27 | 8 | 1 | — |
 | flow-115 | no-sword-225 | 19 | 2 | 24 | 1 | — |
+| flow-116 | respawn-171 | 69 | 0 | 12 | 0 | 100084 |
+| flow-116 | post-gain-172 | 65 | 0 | 4 | 0 | 99292 |
+| flow-116 | sword-obtained | 47 | 27 | 8 | 1 | — |
+| flow-116 | no-sword-225 | 19 | 2 | 24 | 1 | — |
 
 What each number counts, from the fork frame on:
 - **calls:** decisions the stub answered.

@@ -434,6 +434,18 @@ class AutopilotTest < Minitest::Test
     assert pilot.next_choice(state: state(frame: 400), objective: objective(id: 'obj-2'))
   end
 
+  def test_an_objective_taken_from_a_stalled_one_of_the_models_starts_with_the_harness_step
+    pilot = primed(stop: :no_path)
+    stalled = { id: 'obj-1', outcome: :abandoned, reason: 'stall' }
+    assert_equal 'last stop no_path', pilot.objective_hold(state: state, last: stalled)
+    assert_nil pilot.objective_hold(state: state, last: stalled, taken: true)
+    assert_equal 'new lead or goal', primed(stop: :no_path, news: true).objective_hold(state: state, last: stalled, taken: true)
+    pilot.adopt({ id: 'obj-2' }, taken: true)
+    assert_equal({ skill: 'explore', params: {} }, pilot.next_choice(state: state, objective: objective(id: 'obj-2'))[:choice])
+    pilot.acted(skill: 'explore', outcome: { stopped_by: :no_frontier })
+    assert_equal 'last stop no_frontier', pilot.hold_reason(state: state, objective: objective(id: 'obj-2'))
+  end
+
   def foe(row, col, type: 9, kind: 'enemy', slot: 3) = { slot:, type:, kind:, cell: [row, col] }
 
   def fought(stop: :done, type: 9, hp: 24)

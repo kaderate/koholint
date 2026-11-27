@@ -23,7 +23,7 @@ class ObjectivesTest < Minitest::Test
 
   def events = Koholint::Trace.read(@path).select { |e| e['type'] == 'objective' }
 
-  def start(predicate, frame: 0) = @objectives.start(frame:, title: 't', predicate:)
+  def start(predicate, frame: 0, **extra) = @objectives.start(frame:, title: 't', predicate:, **extra)
 
   def test_predicate_validation
     assert Koholint::Objectives.valid_predicate?({ kind: 'leave_place', place: [1, 2] })
@@ -98,7 +98,7 @@ class ObjectivesTest < Minitest::Test
   end
 
   def test_stall_abandons
-    start({ kind: 'reach_place', place: [7, 8] })
+    start({ kind: 'reach_place', place: [7, 8] }, candidate: 'place-7-8')
     assert_nil @objectives.update(state(frame: 10), frame: 10)
     assert_nil @objectives.update(state(frame: 99, x: 90), frame: 99)
     assert_equal :abandoned, @objectives.update(state(frame: 100, x: 40), frame: 100)
@@ -109,7 +109,7 @@ class ObjectivesTest < Minitest::Test
   # b32c (flow-112) obj-7 at 13322: "reach D12 column 9" walked C11, C12, D11 and D12 for 6364 frames, never closed, and held the autopilot.
   def test_only_a_new_place_a_new_text_or_a_shorter_route_to_its_place_keeps_an_objective
     @objectives.update(state(frame: 0, room: 9), frame: 0)
-    start({ kind: 'reach_place', place: [7, 8] })
+    start({ kind: 'reach_place', place: [7, 8] }, candidate: 'place-7-8')
     @objectives.update(state(frame: 1, room: 9), frame: 1, distance: 3)
     assert_nil @objectives.update(state(frame: 80, room: 10), frame: 80, distance: 2), 'a shorter route'
     assert_nil @objectives.update(state(frame: 170, room: 9), frame: 170, distance: 3), 'a known place again'
@@ -120,8 +120,23 @@ class ObjectivesTest < Minitest::Test
     assert_equal 'stall', events.last['reason']
   end
 
+  # pair-b 391b (flow-115) obj-7 at 13327: the model's own reach_cell (5,9) of D12 lived 4901 frames over D12, C12 and B12, its first new place at 16590.
+  def test_a_place_naming_objective_of_the_models_own_lives_only_on_new_places_for_own_frames
+    [177, 178, 179].each_with_index { |room, i| @objectives.update(state(frame: 13_300 + i, room:), frame: 13_300 + i) }
+    start({ kind: 'reach_cell', place: [179, 2], row: 5, col: 9 }, frame: 13_327)
+    @objectives.update(state(frame: 14_000, room: 178), frame: 14_000, distance: 1)
+    assert @objectives.note_text('A text never read before')
+    assert_nil @objectives.update(state(frame: 15_000, room: 179), frame: 15_000, distance: 0), 'a shorter route and a new text are not progress for it'
+    assert_equal :abandoned, @objectives.update(state(frame: 15_127, room: 179), frame: 15_127)
+    assert_equal ['stall', Koholint::Objectives::OWN_CAUSE], [events.last['reason'], Koholint::Objectives.stall_cause(@objectives.history.last)]
+    start({ kind: 'reach_cell', place: [179, 2], row: 6, col: 9 }, frame: 16_000)
+    assert_nil @objectives.update(state(frame: 16_590, room: 163), frame: 16_590), 'a place never visited'
+    assert_nil @objectives.update(state(frame: 18_389, room: 179), frame: 18_389)
+    assert_equal :abandoned, @objectives.update(state(frame: 18_390, room: 179), frame: 18_390)
+  end
+
   def test_open_dialogue_with_animating_counter_stalls
-    start({ kind: 'reach_place', place: [7, 8] })
+    start({ kind: 'reach_place', place: [7, 8] }, candidate: 'place-7-8')
     @objectives.update(state(frame: 1, dialog: 134), frame: 1)
     assert_nil @objectives.update(state(frame: 60, dialog: 137), frame: 60)
     assert_nil @objectives.update(state(frame: 99, dialog: 140), frame: 99)

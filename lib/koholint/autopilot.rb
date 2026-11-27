@@ -77,10 +77,14 @@ module Koholint
       @goto_done = false
     end
 
-    def adopt(objective) = @objective = objective&.dig(:id)
+    def adopt(objective, taken: false)
+      @objective = objective&.dig(:id)
+      @taken = taken
+    end
 
     def acted(skill:, outcome:)
       @acted = true
+      @taken = false
       @last_skill = skill.to_s unless %w[wait advance_dialogue].include?(skill.to_s)
       @attack_stop = skill.to_s == 'attack' && outcome.is_a?(Hash) && !@sighted ? outcome[:stopped_by].to_s : nil unless skill.to_s == 'wait'
       @sighted = false unless skill.to_s == 'wait'
@@ -112,7 +116,7 @@ module Koholint
       heal = target&.dig(:heal_below)
       fresh = follow && follow[:skill] != 'explore' && follow[:skill] != @last_skill
       first = follow && target && (!@acted || fresh)
-      return "last stop #{@stop || 'not an explore'}" unless heal || first || BENIGN.include?(@stop) || @stop == TALKED || (@stop == FOUGHT && target)
+      return "last stop #{@stop || 'not an explore'}" unless heal || first || @taken || BENIGN.include?(@stop) || @stop == TALKED || (@stop == FOUGHT && target)
       return 'target followed' if target && @acted && follow && follow[:skill] != 'explore' && !fresh
 
       common = common_hold(state, news: !target || @stop == TALKED, health: !heal && (!fresh || @stop == FOUGHT))
@@ -285,10 +289,10 @@ module Koholint
       DecisionPoint.harness_choice(DOOR_STEP, "autopilot: step up through the door at (#{row - 1},#{col}) the goto ended below", autopilot: true)
     end
 
-    def objective_hold(state:, last:)
+    def objective_hold(state:, last:, taken: false)
       return 'no model call yet' unless @since
-      return "last stop #{@stop || 'not an explore'}" unless ARRIVED.include?(@stop)
-      return 'last objective not achieved by the chain' unless last && last[:outcome].to_s == 'achieved' && last[:id] == @objective
+      return "last stop #{@stop || 'not an explore'}" unless taken || ARRIVED.include?(@stop)
+      return 'last objective not achieved by the chain' unless taken || (last && last[:outcome].to_s == 'achieved' && last[:id] == @objective)
 
       common_hold(state) || cap_hold(state)
     end
