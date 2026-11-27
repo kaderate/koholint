@@ -15,6 +15,7 @@ module Koholint
 
     ATTEMPT_LIMIT = 10
     STALL_FRAMES = 3600
+    STALL_CAUSE = "no new place, no new text and no shorter route in #{STALL_FRAMES} frames".freeze
 
     def self.normalize(predicate)
       predicate.to_h.transform_keys(&:to_sym)

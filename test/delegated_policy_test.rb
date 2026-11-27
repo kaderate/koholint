@@ -246,11 +246,43 @@ class DelegatedPolicyTest < Minitest::Test
     client = ScriptedClient.new(objective: [objective(kind: 'reach_place', place: [1, 2])] * 2, skill: [walk] * 2)
     p = policy(client)
     hemmed(p)
-    @objectives.abandon(frame: 200, reason: 'stall')
+    @objectives.abandon(frame: 200, reason: 'loop')
     _point, result = decide(p)
     assert_equal 'claude', result[:agent]
     assert @objectives.current
     assert_equal 'claude', decide(p).last[:agent]
+  end
+
+  # b32c: a model-set reach_cell that never closed could be written again for a fresh stall window.
+  def test_an_objective_abandoned_for_stall_is_refused_with_its_cause_for_a_stall_window
+    client = ScriptedClient.new(objective: [objective(kind: 'reach_place', place: [1, 2])] * 3)
+    p = policy(client)
+    decide(p)
+    @objectives.abandon(frame: 200, reason: 'stall')
+    refused = decide(p, state(frame: 300)).last
+    assert refused[:refused], refused.inspect
+    assert_equal 'obj-1 had this predicate and was abandoned at frame 200: no new place, no new text and no shorter route in 3600 frames; choose a different objective', refused[:justification]
+    assert_includes client.calls.last[:prompt], 'obj-1 abandoned (stall: no new place, no new text and no shorter route in 3600 frames): go'
+    assert_nil @objectives.current
+    refute decide(p, state(frame: 3800)).last[:fallback]
+    assert_equal 'obj-2', @objectives.current[:id]
+  end
+
+  # no-sword-225 (flow-115 4e39): the harness's explore objective names no place and expired at 42114 walking known screens toward 194/0, reached at 42701.
+  def test_an_objective_naming_no_place_keeps_alive_while_the_explore_route_to_untried_work_shortens
+    log = Koholint::ExploreLog.new
+    log.absorb({ from: { room: 1, map: 0 }, survey: { sides: { right: [{ row: 4, col: 9 }] }, doors: [] }, exits: [{ row: 4, col: 9, direction: :right, outcome: :left, to: [2, 0] }] })
+    log.absorb({ from: { room: 2, map: 0 }, survey: { sides: { left: [{ row: 4, col: 0 }], right: [{ row: 4, col: 9 }] }, doors: [] },
+                 exits: [{ row: 4, col: 0, direction: :left, outcome: :left, to: [1, 0] }, { row: 4, col: 9, direction: :right, outcome: :left, to: [3, 0] }] })
+    lives = [log, Koholint::ExploreLog.new].map do |explore_log|
+      @objectives = Koholint::Objectives.new(trace:, visited: [[1, 0], [2, 0], [3, 0]])
+      p = Koholint::Policies::Delegated.new(client: ScriptedClient.new, registry: Koholint::Skills::Registry.default, objectives: @objectives, manual: '',
+                                            memory: Koholint::Policies::Memory.new(explore_log:))
+      @objectives.start(frame: 100, title: 'Explore the nearest untried exits', predicate: { 'kind' => 'new_place' }, autopilot: true)
+      [[100, 1], [3000, 2], [3700, 2]].each { |frame, room| p.observe(state(frame:, room_id: room, map_id: 0), frame:) }
+      @objectives.current ? :kept : @objectives.history.last[:reason]
+    end
+    assert_equal [:kept, 'stall'], lives
   end
 
   def test_dialogue_closed_is_rejected_while_no_dialogue_is_open

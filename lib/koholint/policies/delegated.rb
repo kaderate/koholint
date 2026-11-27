@@ -350,8 +350,12 @@ module Koholint
 
       def update_objective(state, frame)
         current = @objectives.current
-        goal = current&.dig(:target, :place) || (current&.dig(:predicate, :place) if %w[reach_place reach_cell].include?(current&.dig(:predicate, :kind).to_s))
-        @distance = [state.place, goal, goal && @explore_log.path(state.place, goal:, ban: false)&.size] unless @distance&.first(2) == [state.place, goal]
+        named = current&.dig(:target, :place) || (current&.dig(:predicate, :place) if %w[reach_place reach_cell].include?(current&.dig(:predicate, :kind).to_s))
+        unless @distance&.first(2) == [state.place, named]
+          # An objective naming no place counts the explore route to the nearest untried work.
+          goal = named || (@explore_log.route(state.place)&.dig(:goal) if current)
+          @distance = [state.place, named, goal && @explore_log.path(state.place, goal:, ban: false)&.size]
+        end
         track { @objectives.update(state, frame:, distance: @distance.last) }
       end
 
@@ -409,6 +413,8 @@ module Koholint
           raise Refusal, 'reach_cell target is already reachable over cells observed free; choose a goal that needs exploration'
         end
         raise Refusal, 'dialogue_closed needs an open dialogue' if predicate[:kind].to_s == 'dialogue_closed' && !state.dialog_open?
+        stalled = @objectives.history.reverse.find { |done| done[:reason] == 'stall' && done[:predicate] == predicate && state.frame - done[:ended_frame] < Objectives::STALL_FRAMES }
+        raise Refusal, "#{stalled[:id]} had this predicate and was abandoned at frame #{stalled[:ended_frame]}: #{Objectives::STALL_CAUSE}; choose a different objective" if stalled
 
         clear_hemmed
         @refusals.clear
