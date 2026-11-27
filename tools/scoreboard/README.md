@@ -41,7 +41,7 @@ Forks `RUN_DIR` at `--at-frame` (a stall's start from `diagnose`) `--forks` time
 
 ## The candidate registry
 
-`data/improvements.json` lists the loop's candidates; `Improvements.load` validates it and `test/improvement_loop_test.rb` loads it. Each entry has exactly: `id` (lowercase words joined by dashes), `kind` (`fact`, `rule` or `skill`), `stall` (`run` id, `from` and `to` frames, `class` of diagnose), `status` (`proposed`, `testing`, `published`, `failed`), `change` (what the candidate does, one sentence), `trials` (each `run`, `arm` `baseline` or `candidate`, `from`, `frames`, `usd`, `calls`, `new_places`, `longest_stall`, as `pair` prints them), `verdict` (null until `published` or `failed`, then required) and `evidence`. `published` needs 2 candidate trials.
+`data/improvements.json` lists the loop's candidates; `Improvements.load` validates it and `test/improvement_loop_test.rb` loads it. Each entry has exactly: `id` (lowercase words joined by dashes), `kind` (`fact`, `rule` or `skill`), `stall` (`run` id, `from` and `to` frames, `class` of diagnose), `status` (`proposed`, `testing`, `published`, `failed`), `change` (what the candidate does, one sentence), `trials` (each `run`, `arm` `baseline` or `candidate`, `from`, `frames`, `usd`, `calls`, `new_places`, `longest_stall`, as `pair` prints them), `verdict` (null until `published` or `failed`, then required) and `evidence`. `published` needs 2 candidate trials. The atlas lists it with the other facts of `data/` (status, evidence, kind and change); no run reads it.
 
 ## run
 

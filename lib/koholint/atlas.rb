@@ -24,7 +24,7 @@ module Koholint
     STATUSES = %w[open refuted tested].freeze
     INHERITED = 'inherited'.freeze
     DATA = File.expand_path('../../data', __dir__)
-    FACTS = %w[addresses entities items modes place_kinds geometry exits capabilities checkpoints vocabulary souvenirs].freeze
+    FACTS = %w[addresses entities items modes place_kinds geometry exits capabilities checkpoints vocabulary souvenirs improvements].freeze
     VERIFIED_AT = 2
     HEAT_COLS = Geometry::COLS
     HEAT_ROWS = Geometry::ROWS
@@ -95,6 +95,8 @@ module Koholint
         end
       when 'checkpoints'
         data.map { |entry| { label: entry['name'], status: nil, verified_count: nil, source: entry['source'], note: "run #{entry['run']}, frame #{entry['frame']}, #{entry['flow']}" } }
+      when 'improvements'
+        data.map { |entry| { label: entry['id'], status: entry['status'], verified_count: nil, source: entry['evidence'], note: "#{entry['kind']}: #{entry['change']}" } }
       when 'geometry'
         data.map { |key, entry| { label: key, status: nil, verified_count: entry['verified_count'], source: entry['provenance'], note: JSON.generate(entry['value']) } }
       else
