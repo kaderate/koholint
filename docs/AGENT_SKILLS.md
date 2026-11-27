@@ -161,7 +161,7 @@ The skills, protocols and harness behaviours the agent works with. Versioned wit
   new text or a cell never walked no longer keeps it. The harness then starts "Explore the nearest untried exits" at once instead of
   a paid `choose_objective`, and takes its first `explore` itself, whatever the model's last skill stopped on. Candidates and harness
   objectives keep the flow-115 measure. Pair-b 391b (flow-115, from b32c@13322): obj-7, reach_cell (5,9) of D12, lived 4901 frames
-  over D12, C12 and B12, held the autopilot 14 times, and found its first new place (D11) 3268 frames after its start.
+  over D12, C12 and B12, held the autopilot 14 times, and found its first new place (D11) 3263 frames after its start.
 - flow-115: an objective expires on no measured progress, and leads no longer reopen people. Progress is a place never visited, a
   text never read, a new shortest known route (hops over the explore log) to the objective's place, or, for an objective naming no
   place, a cell never walked; after 3600 frames without any the objective is abandoned `stall`, and the model may not set the same

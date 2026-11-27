@@ -360,7 +360,7 @@ class DelegatedAutopilotTest < Minitest::Test
       p.decide(p.decision_point_for(now), now, { grid: })
     end
     held = results.first(12).count { |result| result[:justification].to_s.start_with?('loop in') }
-    assert_equal 0, held, 'no loop break while the model objective is younger than MODEL_HOLD_FRAMES'
+    assert_equal 0, held, 'no loop break while the model objective is younger than Objectives::OWN_FRAMES'
     assert results.last(2).any? { |result| result[:justification].to_s.start_with?('loop in') }, 'and the break comes once the hold ran out'
   end
 

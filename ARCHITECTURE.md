@@ -121,7 +121,7 @@ text in another branch names an item Link holds, in place of that person's own c
 
 **Objectives and leads** — `objectives.rb`: a short goal with a predicate the harness checks from memory (`leave_place`,
 `reach_place`, `reach_cell`, `dialogue_closed`, `new_place`, `new_text`, …); the engine traces started, achieved, abandoned and
-failed. An objective with no measured progress (a place, a text or a shorter known route to its place, else a cell never walked) for 3600 frames is abandoned `stall`. The agent's long-term `goal` is its own text. `leads.rb` holds claims the agent quotes from texts it read, with a status
+failed. An objective with no measured progress (a place, a text or a shorter known route to its place, else a cell never walked) for 3600 frames is abandoned `stall`; a place-naming one the model wrote itself, with no candidate, after 1800 frames without a place never visited. The agent's long-term `goal` is its own text. `leads.rb` holds claims the agent quotes from texts it read, with a status
 derived from the objectives that followed them, and the place names; `lead_check.rb` drops a lead that names an item the text
 does not (the walkthrough rule), withholds the claim of one naming a person, role or thing of `data/vocabulary.json` that no
 text read names, and `koholint check-leads` audits traces for it.
