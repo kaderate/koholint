@@ -76,8 +76,9 @@ New or changed pieces, by phase:
 | 6 | `data/params.json` and `tune` | data plus offline search | one bump for the extraction, numbers unchanged |
 | 7 | `improve`: the nightly cycle, publish and retire proposals | orchestrator | no |
 | 8 | Scoreboard `autonomy` section | tooling | no |
+| 9 | Game knowledge in the manual and dungeon perception | manual, perception, data | yes |
 
-Order is 0, 1, 2, then 3, 4, then 5, 6 in either order, then 7, 8. Phases 0 to 2 are a complete small loop on their own and should ship before anything else is started.
+Order is 0, 1, 2, then 3, 4, then 5, 6 in either order, then 7, 8. Phases 0 to 2 are a complete small loop on their own and should ship before anything else is started. Phase 9 depends on none of the others and can be built beside phases 0 to 2: without it the goal (instruments, dungeons) cannot be measured at all.
 
 ---
 
@@ -118,11 +119,41 @@ ruby tools/gates/judge.rb --overlay DIR [--split tune|held_out|all] [--root DIR]
 - Exit 0 on `better` or `equal`, 1 on `worse`.
 - Publication rule used by phase 7: held-out is not `worse` **and** (tune or held-out is `better`). A change with no effect anywhere is not published; it stays `validated`.
 
-**0.5 The stub is not the model.** The stub judge filters; it does not prove. Once a week, or after 3 published changes, the standard paid `scoreboard run` (from boot plus one held-out checkpoint) is the confirmation, and its line is what phase 8 reads.
+**0.5 Speed: a verdict in seconds, a cycle in minutes.** The owner's requirement: the loop must run fast and stay reliable. Measured on main: about 96 frames per second per emulator process with YJIT (the v2 design), so one 12000-frame gate is about 2 minutes of one core; the Mac has 14 cores. Played naively, every candidate against every gate, the judge would take hours. Determinism buys the speed back without giving up reliability, in this order:
+
+1. **Read set (exact skip).** While a gate's baseline plays, record every learned-data key the play actually reads: entity type, object id, capability id, exit edge, parameter name (a `reads.json` beside the fork, written by the loaders through one recording hook). A candidate overlay that changes no key of a gate's read set gives a play identical to the baseline frame for frame, so the gate is `equal` without being played. This is a proof, not a heuristic; a ROM test checks it on one gate by playing anyway.
+2. **Fork at the first read.** When the overlay does touch the read set, the candidate equals the baseline up to the first frame that reads a changed key. Fork the candidate from the baseline's keyframe just before that frame and play only the rest. For this the judge's baseline forks write a keyframe every 600 frames instead of 1800.
+3. **Baseline cache.** Baseline plays, their read sets and their keyframes are cached by (gate, harness sha, data digests) under the gates root and reused by every candidate of the cycle and of later cycles.
+4. **Parallel.** One process per gate play, up to the number of cores minus 2 (`--jobs`), with the job queue of the `Rakefile` (longest first, from recorded timings).
+5. **Short gates for search, long gates for publication.** A gate carries `frames`: the tune gates keep 12000; add **micro gates** of 2000 to 3000 frames cut at the places where the anomalies of phase 3 occur. Search (phase 6) and per-fact judging (phase 7 step 4) use micro gates and whatever full gates the read set leaves; the full set is played once, on the union, before publication.
+6. **Early stop.** A candidate play stops as soon as the frames left cannot change its verdict against the baseline. Only stops provable from the lexicographic order are allowed: a candidate that already shows more gains than the baseline's final total is `better` whatever follows; a candidate with fewer gains is never stopped early, because a gain may still come.
+
+Three tiers follow, each with a wall-time budget that is part of "done when":
+
+| Tier | What | Frames | Budget on the Mac |
+|---|---|---|---|
+| 1 | one experiment trial (phase 4) | 100 to 600 | under 10 s |
+| 2 | one candidate fact against the gates its change can affect | micro gates, forked at the first read | under 60 s |
+| 3 | the union of accepted facts against every gate, both splits | full gates, parallel | under 5 min |
+
+A whole `improve` cycle (phase 7) with templates only must finish in under 15 minutes for 20 hypotheses. `judge.rb` prints the wall time per tier and how many gate plays the read set and the cache avoided; a tier over its budget is a failed check in the cycle's report, not a silent slowdown.
+
+Also measure once, and record in `docs/OPERATING.md`, the frames per second of a stub gate with and without `--grid` and screen captures: if perception costs more than the emulator, the judge's forks skip what a stub never reads (place screenshots, viewer feed). Do not change the emulator in this spec.
+
+**0.6 The stub is not the model.** The stub judge filters; it does not prove. Once a week, or after 3 published changes, the standard paid `scoreboard run` (from boot plus one held-out checkpoint) is the confirmation, and its line is what phase 8 reads.
+
+**0.7 Frontier checkpoints: how progress carries from run to run.** No run is "the save". Progress carries through data (every later run loads it) and through checkpoints (a later run may fork from one). Make the second explicit and checked:
+
+- `data/checkpoints.json` entries gain `lineage` (computed), `vector` (the scoreboard progress vector at that frame) and `role`: `frontier`, `held_out` or `regression`.
+- **Promotion.** `bin/koholint checkpoint propose <run_dir>` (offline) proposes a new `frontier` when a run's progress vector is strictly above every existing checkpoint's on its first component that differs (instruments, dungeons, key items, then places), at the first ready keyframe after the gain, with full health or the health it had. A person or the cycle of phase 7 commits it; it is data.
+- **Advance from the frontier.** Paid runs that aim at new progress fork from the highest frontier; that is what keeps a run from paying again for the intro.
+- **Prove from boot.** A frontier reached by one root lineage only is `observed`. It becomes `verified` when a from-boot run of another lineage, at a flow frozen for that run, reaches the same vector component. The scoreboard shows the highest frontier and the highest verified frontier side by side; the gap between them is the amount of progress that rests on one lineage. Each paid confirmation of 0.6 includes one from-boot run for this reason.
+- **Old frontiers become gates.** When a frontier is passed, its checkpoint stays as a `regression` gate (tune split), so what was once reached stays reachable.
+- `test/checkpoints_test.rb` checks the computed fields, and that a `verified` frontier names 2 lineages.
 
 **Tests.** ROM-free: split and lineage validation on fixtures, the comparison function on tables of numbers, overlay path resolution. ROM: one short gate played with an empty overlay equals the baseline exactly.
 
-**Done when.** `judge.rb --overlay <empty dir> --split all` prints `equal` on every gate twice in a row, and `gates_test.rb` enforces the split rules.
+**Done when.** `judge.rb --overlay <empty dir> --split all` prints `equal` on every gate twice in a row, the second time from the cache in under 5 seconds; an overlay that changes one fact no gate reads is judged `equal` with zero gate plays; the three tier budgets of 0.5 hold on the Mac; and `gates_test.rb` enforces the split rules.
 
 ## Phase 1. A digest for entity facts
 
@@ -252,11 +283,29 @@ For anomalies no template covers. A strong model, called offline, once per anoma
 bin/koholint analyse <run_dir>... [--limit N] [--max-dollars X] [--model M]
 ```
 
-- **Input per call:** one anomaly cluster (same kind, place and subject), the texts read at that place by this lineage (`leads.texts_at`), the place card, the screenshot at the anomaly frame, the items held, the list of skills and oracles, and every experiment already tried on that subject with its result (so negatives are not proposed again).
+- **Input per call:** one anomaly cluster (same kind, place and subject), the texts read at that place by this lineage (`leads.texts_at`), the place card, a **filmstrip** of the anomaly (below), the items held, the list of skills and oracles, and every experiment already tried on that subject with its result (so negatives are not proposed again).
+- **Filmstrip instead of video.** The model reads images, not video, and `agents/claude_cli.rb` already sends several images in one call. Because a run replays exactly, the command replays the window around the anomaly from the nearest keyframe and captures 8 frames by default (`--frames-shown`, at most 12): 2 before the action starts, 4 spread over the action, 2 after it settles (the readiness gate says when). Each image is labelled in the prompt with its frame number, Link's cell and hp, and what changed in the entity table and the room objects since the previous image, so the model reads motion from numbers as well as from pixels. Captures go to `tmp/analyse/` and are never committed. This is for the offline analyst only: play decisions keep one image, because several images per decision would multiply the cost of every call with no measured need.
 - **Output:** a JSON schema (enforced by `agents/claude_cli.rb`, as decisions are) of at most 3 experiments in the phase 4 format, each with a one-sentence `rationale` that must quote the observation or in-game text it rests on.
 - **Validation before anything runs:** the phase 4 validator; the walkthrough guard of section 6; a budget in frames per experiment.
 - Accepted proposals are written to `data/experiments.json` as `hypothesis`, their `source` naming the analyst model and the anomaly; refused ones go to the command's output with the reason. The analyst never writes a status, a fact or code.
-- A new system prompt lives in `agents/prompts.rb`; it is offline, so it does not join the `prompts_sha` of runs (confirm how that digest is built and keep the analyst prompt out of it).
+- A new system prompt lives beside the play prompts but outside their digest: `Prompts.digest` hashes every string constant of `Agents::Prompts`, so the analyst prompt goes in its own module (`Agents::AnalystPrompts`), or a resume of every run would break.
+
+The system prompt, to be adjusted only with a measured reason:
+
+```text
+You are the offline analyst of a harness that plays a Game Boy action-adventure game. You do not play. A deterministic engine played, something happened that its world model did not predict, and you propose experiments that would explain it.
+
+What you receive: one anomaly (what the engine expected, what it observed, the action that carried the prediction), a filmstrip of labelled frames around it, the texts this playthrough read in that place, what is on the screen as typed data, the items held, the experiments already tried on this subject with their results, and the lists of skills and oracles you may use.
+
+What you return: at most 3 experiments in the given JSON schema, most informative first. An experiment is a short sequence of skills run from a saved state, a control that omits one step, and one oracle that reads the effect. It must be able to fail: say in the rationale what observation or quoted text it rests on, and what result would refute it.
+
+Rules.
+- You know how games of this kind work (pushing, items used on things and people, switches, keys, enemies with weak points) and may use that freely.
+- You must not use any memory of this particular game: no place, person, item location, solution or order of events that is not in what you were given. Refer only to places, object types, entity types and items listed in the input. A proposal that names anything else is discarded.
+- Do not repeat an experiment already tried, and do not propose one that differs from a tried one only by a wait.
+- Prefer the experiment that separates two explanations over the one that confirms your favourite.
+- You never state a fact. The bench decides; an empty list is a valid answer when nothing testable comes to mind.
+```
 - **Measure the analyst itself:** share of its hypotheses that end `validated`, dollars per validated hypothesis, against the templates' share. Below the templates after 20 clusters, keep templates only and say so in `ROADMAP.md`.
 
 **Tests.** With a stub client: schema refusals, guard refusals, deduplication against tried experiments, budget stop.
@@ -309,44 +358,21 @@ Add an `autonomy` section to `tools/scoreboard` (`measure` and `debt`), from git
 
 `scoreboard alert` gains one reason: 10 cycles in a row with experiments run and no published change (the loop is spinning).
 
----
+## Phase 9. Game knowledge that is fixed, and the perception that makes the goal measurable
 
-## 6. The walkthrough guard
+Two different things, both missing. The model lacks general knowledge it is allowed to have; the engine cannot see a dungeon, a key or an instrument, so the scoreboard reads `null` for instruments and dungeons whatever happens.
 
-The rule of `AGENTS.md` applies to the analyst more than to anything else, because a strong model knows the game.
+**9.1 What may be written down for good.** The line is the one of `AGENTS.md`: how to play is public; where to go and what to do next is not. A test for any sentence: *would it still be true in another game of the series?* If yes it is a mechanic; if it is only true on this island it is a walkthrough.
 
-- The analyst's prompt states the rule and receives **only** what this lineage observed: its texts, its place cards, its screenshots, its inventory.
-- A proposal may reference only: places already seen by the lineage, object and entity types already seen, items currently held, skills and oracles from the closed lists. A validator enforces it mechanically from the trace; a proposal naming anything else is refused. This reuses the idea of `lead_check.rb` and `data/vocabulary.json`.
-- No free-text field of a proposal reaches a play prompt. Only typed facts do, with their measured reason (a quoted in-game text or a number).
-- Templates are deterministic and reference nothing by name, so they need no guard.
-- Mechanics are allowed ("pushing may move things", "items can be used on people"): how to play is public; where to go is not.
-
-## 7. Invariants every phase keeps
-
-- Time is the frame; no sleep or wall clock in game logic. Budgets of offline commands may use wall time as the scoreboard supervisor does.
-- Only the engine writes a run's `trace.jsonl` and `save/`; experiments run on forks under `tmp/` or `--root`; a fork may add keyframes to its parent's `keyframes/`.
-- No RAM write in a validation. Censuses may place Link; an experiment that validates a capability or a fact reaches its state through skills only (the 2026-11-12 slice explains why). The hurts census of phase 2 is a census.
-- `verified` never below 2 independent checks; trials of one lineage stay `observed` or `hypothesis`.
-- English everywhere, one-line imperative commits, almost no comments, short hash syntax.
-- Docs in the same commit: `ARCHITECTURE.md` for a layer, data flow or run artifact; `docs/OPERATING.md` for commands and fields; `docs/AGENT_SKILLS.md` for a flow change; `ROADMAP.md` loses the items that land (1(a), 1(c), 1(d), the hurts incident, parts of 2). `test/docs_test.rb` checks commands, flags and paths named in docs.
-- Tests: `rake test:fast` and targeted files locally; CI runs the ROM shards. A flow bump lands with its gate numbers (`test/gates_test.rb`).
-- When this spec is done or superseded, change its status line; put the working plan of a phase in `docs/superpowers/plans/` and delete it once landed.
-
-## 8. Risks and what to do about them
-
-| Risk | Guard |
+| Allowed (the manual and genre knowledge) | Not allowed |
 |---|---|
-| The loop overfits the gates as people overfit one lineage | held-out split never used for search; new from-boot checkpoints added every time a paid from-boot run is played; weekly paid confirmation |
-| The stub's choices differ from the model's, so a stub gain is no model gain | phase 0.5; autonomous gains are counted on the paid scoreboard line only |
-| Meta-work feels like progress while the game stalls (the v1 lesson in `docs/RETROSPECTIVE.md`) | phases 0 to 2 first and small; phase 8's alert; stop after phase 4 and measure before building 5 to 7 |
-| A wrong learned fact blocks a way for good (an object learned solid that an item opens) | facts carry a context (milestone and held items, as exit edges do); a new item held reopens the hypotheses on subjects learned solid (today's `learn` trigger) |
-| Experiments explode in number | closed lists, per-cycle frame budget, deduplication on (subject, sequence, context), negatives kept |
-| The analyst leaks game knowledge | section 6, enforced by a validator with tests |
-| Data files grow unreadable | trials stay in the entry they support; `improvements.json` is append-only and summarized by the scoreboard, not read by people |
+| The goal: 8 dungeons, a boss in each, 8 instruments | Which dungeon comes first, or any order |
+| Controls, screens, save, game over, hearts and heart pieces (already in `docs/AGENT_MANUAL.md`) | Where anything is: a key, an item, a dungeon entrance, a person |
+| A dungeon needs its own key to be entered | Which key opens which dungeon and where it is found |
+| Inside a dungeon: small keys open locked doors and are spent; one special key opens the boss door; a map and a compass may be found; some doors open when a room's enemies are defeated or a switch is pressed; blocks can be pushed; stairs link floors | The solution of any room, the path through any dungeon |
+| A dungeon usually holds an item, and such an item often opens ways that were closed before, inside and outside | Which item opens which obstacle |
+| Some tasks are required and some are optional; people may ask for a thing and give another in return | The chain of exchanges, who wants what |
+| Texts are the source of direction: signs, people, the owl, the map's marks | Any paraphrase of a hint the playthrough has not read |
 
-## 9. Owner's decisions (2026-11-27)
-
-1. Budget for phase 0.2: approved (2 from-boot runs, about 8 to 16 USD in total on past numbers).
-2. The data-only pull requests of phase 7 merge automatically, under the grant described in that phase.
-3. Stop and measure after phase 4 before building phases 5 to 7.
-4. The analyst of phase 5 runs through the Claude CLI on the owner's Claude plan, so no dollar budget blocks it; `--max-dollars` stays as a guard with a default the owner can raise. The model is chosen when phase 5 starts, after the pause of decision 3.
+- Extend `docs/AGENT_MANUAL.md` with a "Dungeons" section and the item-opens-ways and required-or-optional notions, in the same plain style, paraphrased (no booklet text is reproduced). It is joined to every play message, so it changes play: a flow bump with its gate numbers.
+- `test/agent_manual_test.rb` gains a check that the manual names no place of the island, no person and no item beyond those the booklet's mechanics name, against a small allow list. A rule a script can check is a validator.
