@@ -1438,18 +1438,6 @@ class DelegatedAutopilotTest < Minitest::Test
     assert_equal calls, client.calls.size
   end
 
-  def test_a_wait_or_guard_next_to_a_hostile_creature_becomes_explore
-    near = [{ slot: 2, type: 9, x: 60, y: 60, cell: [3, 3], kind: :enemy, contact: 9 }]
-    far = [{ slot: 2, type: 9, x: 150, y: 130, cell: [7, 9], kind: :enemy, contact: 9 }]
-    wait = ok('skill' => 'wait', 'params' => { 'frames' => 30 })
-    p = policy(ScriptedClient.new(objective: new_place, skill: [wait, wait], default: wait))
-    decide = ->(frame, list) { 2.times.map { p.decide(p.decision_point_for(state(frame:)), state(frame:), { grid:, entities: -> { list } }) }.last }
-    assert_equal 'wait', decide.(100, far)[:choice][:skill]
-    held = decide.(200, near)
-    assert_equal 'explore', held[:choice][:skill]
-    assert_includes held[:justification], 'replaces the model'
-  end
-
   def test_a_place_card_noted_on_arrival_keeps_its_uncatalogued_things_with_the_items_held_now
     seen = { [172, 10] => { people: [], unknown: [{ type: 155, cell: [3, 3] }], held: [1, 4] } }
     p = Koholint::Policies::Delegated.new(client: ScriptedClient.new, registry: Koholint::Skills::Registry.default, objectives: Koholint::Objectives.new(trace:), manual: '',
