@@ -70,7 +70,8 @@ module Koholint
           @ban = context[:ban]
           @fragile = context[:fragile]
           @retreat = context[:retreat]
-          @hint = direction || @aim[:direction]
+          @hint = @aim[:direction]
+          @toward = direction
           @place = @start.place
           @ledger = context[:ledger]
           @talk_log = context[:talk_log]
@@ -93,7 +94,7 @@ module Koholint
           @doors = objects.select { |object| object[:kind].to_s == 'door' && object[:cell][0] < Geometry::ROWS - 1 }.map { |object| object[:cell] }
           @crumbling = objects.select { |object| object[:kind].to_s == 'crumbling' }.map { |object| object[:cell] }
           @survey = @known && survey
-          @route = @unreachable = @dead_end = @backs = @routed_off = nil
+          @route = @unreachable = @dead_end = @backs = @routed_off = @nearest = nil
           @entering = 0
           @cell = @start.cell
           @offered = near_objects(@cell)
@@ -139,6 +140,7 @@ module Koholint
           merged[:cause] = @fail_cause if @stopped_by == :blocked && @fail_cause
           merged[:untried_objects] = @untried.map { |row, col| { row:, col: } } if @stopped_by == :untried_object
           merged[:tried_exits] = @log ? @log.tried_exits(@place) : [] if @stopped_by == :no_frontier
+          merged[:cause] = nearest_cause if @stopped_by == :nothing_toward
           merged[:cause] = @planner ? 'no current cell' : 'no grid' if @stopped_by == :no_frontier && !(@planner && @attempt_from)
           merged
         end
@@ -146,6 +148,12 @@ module Koholint
         private
 
         def hard_cap = Float::INFINITY
+
+        def nearest_cause
+          asked, work, route = @nearest
+          way = route ? "on the way to #{route[:goal].join('-')}" : 'here'
+          "no untried work toward #{asked}; the nearest is #{way}: the #{work[:direction]} #{work[:kind]} at (#{work[:cell].join(',')})"
+        end
 
         def blocked_at_for(_state) = @blocked.last&.dup
 
@@ -288,7 +296,10 @@ module Koholint
           @attempt_from = state.cell
           target = @planner && @attempt_from && candidates(@attempt_from).first
           unless target
-            @stop = :no_frontier
+            asked, @toward = @toward, nil
+            @route = @dead_end = nil if asked
+            @nearest = asked && @planner && @attempt_from && candidates(@attempt_from).first&.then { |c| [asked, c, @route] }
+            @stop = @nearest ? :nothing_toward : :no_frontier
             return nil
           end
 
@@ -406,11 +417,13 @@ module Koholint
           path_to = ->(cell) { paths.fetch(cell) { paths[cell] = @planner.path(from:, to: cell) } }
           safe = {}
           safe_to = ->(cell) { safe.fetch(cell) { safe[cell] = @planner.path(from:, to: cell, cross_margin: false) } }
-          clear = clearable(from, safe_to)
+          # Given a direction, work here counts only on that side; routes go only to places that lie that way.
+          side = ->(found) { @toward ? found.select { |c| (c[:opens] || c).then { |aim| aim[:kind] != :door && aim[:direction] == @toward } } : found }
+          clear = side.(clearable(from, safe_to))
           return order(clear) if clear.any?
 
           objects = object_cells
-          frontier = gather(from, safe_to) { |cell, direction| frontier_kind(cell, direction) unless objects.include?(Geometry.step(cell, direction)) }
+          frontier = side.(gather(from, safe_to) { |cell, direction| frontier_kind(cell, direction) unless objects.include?(Geometry.step(cell, direction)) })
           return order(frontier) if frontier.any? && opened?
 
           if @aim[:place] && @aim[:place] != @place
@@ -422,10 +435,10 @@ module Koholint
               return []
             end
           end
-          back, local = untried(from, path_to).partition { |candidate| way_back?(candidate) }
+          back, local = side.(untried(from, path_to)).partition { |candidate| way_back?(candidate) }
           return order(local) if local.any?
 
-          pushed = pushes(untried(from, nil).reject { |candidate| way_back?(candidate) })
+          pushed = side.(pushes(untried(from, nil).reject { |candidate| way_back?(candidate) }))
           return order(pushed) if pushed.any?
 
           return order(frontier) if frontier.any? && (@fresh || untried(from, nil).any? || @log&.untried?(@place))
@@ -499,7 +512,7 @@ module Koholint
           avoid = []
           first = nil
           goal = @aim[:place] if @aim[:place] != @place
-          while (hop = @log&.route(@place, goal:, avoid:, ban: goal.nil? || @ban))
+          while (hop = @log&.route(@place, goal:, avoid:, ban: goal.nil? || @ban, toward: @toward))
             first ||= hop
             via = hop[:via]
             way = ->(path) { via.is_a?(Array) ? doors(path, @doors | [via]) { |door| door == via } : gather(from, path) { |cell, direction| :exit if direction == via && Geometry.step(cell, direction).nil? } }
@@ -518,7 +531,7 @@ module Koholint
           end
           @route = { goal: first[:goal], next: first[:next] } if first
           @dead_end = true if first
-          side = @log&.pocket_side(@place, from) || retreat_side or return []
+          side = !@toward && (@log&.pocket_side(@place, from) || retreat_side) or return []
           return [] if @log.dangerous.include?(@log.ways(@place)[side])
 
           gather(from, path_to) { |cell, direction| :exit if direction == side && Geometry.step(cell, direction).nil? }

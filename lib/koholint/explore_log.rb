@@ -4,6 +4,7 @@ require 'koholint/geometry'
 require 'koholint/ledger'
 require 'koholint/navigation/planner'
 require 'koholint/place_card'
+require 'koholint/place_kinds'
 
 module Koholint
   class ExploreLog
@@ -382,8 +383,8 @@ module Koholint
     # skip: places not to aim at (a loop's own places), still crossed on the way.
     # lifted: the route needs a cut way, which only an explore with no aim takes.
     # ban: keep out of the dangerous places, on by default for a route to work; a route to work picked elsewhere passes it with its goal.
-    def route(from, goal: nil, avoid: [], skip: [], ban: goal.nil?)
-      hops, lifted = lifting_path(from, goal:, avoid:, skip:, ban:)
+    def route(from, goal: nil, avoid: [], skip: [], ban: goal.nil?, toward: nil)
+      hops, lifted = lifting_path(from, goal:, avoid:, skip:, ban:, toward:)
       return nil unless hops
 
       { goal: hops.last[:to], next: hops.first[:to], via: hops.first[:via], **(lifted ? { lifted: true } : {}) }
@@ -409,11 +410,11 @@ module Koholint
     def path(from, goal: nil, avoid: [], skip: [], ban: goal.nil?) = lifting_path(from, goal:, avoid:, skip:, ban:)&.first
 
     # With no work reachable under the cuts, live cuts not yet tried in their episode are ignored, oldest first; a route to a goal keeps them all.
-    def lifting_path(from, goal:, avoid:, skip:, ban: goal.nil?)
+    def lifting_path(from, goal:, avoid:, skip:, ban: goal.nil?, toward: nil)
       lifted = []
       loop do
         TIERS.each do |tier|
-          found = search(from, goal:, avoid:, skip:, tier:, lifted:, ban:)
+          found = search(from, goal:, avoid:, skip:, tier:, lifted:, ban:, toward:)
           return [found, lifted.any?] if found
         end
         return nil if goal
@@ -424,14 +425,14 @@ module Koholint
     end
 
     # A place is searched once per side it is entered by, since a way cut off from one side may be reached from another.
-    def search(from, goal:, avoid:, skip:, tier:, lifted: [], ban: goal.nil?)
+    def search(from, goal:, avoid:, skip:, tier:, lifted: [], ban: goal.nil?, toward: nil)
       start = [from, @entered[from]]
       seen = { start => nil }
       queue = [start]
       until queue.empty?
         state = queue.shift
         place, came = state
-        return hops_to(seen, state) if place != from && (goal ? place == goal : work?(place, came, lifted) && !skip.include?(place))
+        return hops_to(seen, state) if place != from && (goal ? place == goal : work?(place, came, lifted) && !skip.include?(place) && (!toward || lies?(from, place, toward)))
 
         ways(place).each do |key, to|
           ahead = [to, entry(place, key)]
@@ -446,6 +447,15 @@ module Koholint
     end
 
     def beyond?(tier, place, key) = tier == :consistent && contradicted?(place, key)
+
+    # Whether a screen lies farther toward a side than another on the same map grid; an interior lies where the screen it opens from lies.
+    def lies?(from, place, side)
+      from, place = [from, place].map { |at| PlaceKinds.grid?(at) ? at : @edges.find { |screen, ways| PlaceKinds.grid?(screen) && ways.value?(at) }&.first || at }
+      return false unless from[1] == place[1] && PlaceKinds.grid?(from) && PlaceKinds.grid?(place)
+
+      (fc, fr), (pc, pr) = PlaceKinds.cell(from), PlaceKinds.cell(place)
+      { up: fr - pr, down: pr - fr, left: fc - pc, right: pc - fc }.fetch(side).positive?
+    end
 
     # A bench edge replaces an assumed way back, never a way the run crossed.
     def ways(place)

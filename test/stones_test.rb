@@ -264,6 +264,14 @@ class StonesTest < Minitest::Test
     assert_includes [room.objects[2][5], room.objects[4][5]], FIXED
     assert_equal FLOOR, room.objects[3][6]
   end
+  def test_a_direction_keeps_the_pushes_that_open_an_exit_on_that_side
+    room = -> { Room.new(JAM, start: at([3, 1]), exits: [[[3, 9], :right]]) }
+    right, = play('explore', { 'direction' => 'right' }, (r = room.()), JAM, limit: 2, grid: LiveGrid.new(r, JAM))
+    assert_equal :push, right.dig(:target, :kind), right.inspect
+    left, = play('explore', { 'direction' => 'left' }, (r = room.()), JAM, limit: 2, grid: LiveGrid.new(r, JAM))
+    assert_equal :nothing_toward, left[:stopped_by], left.inspect
+  end
+
   # Gate run 1d73, 171/10: walks into cells pushes had emptied left the stone's look believed walkable, so routes ran through stones.
   class StaleGrid < LiveGrid
     def passable(row, col, _direction) = @rows[row][col] == '#' ? :no : :yes
@@ -346,7 +354,7 @@ class StonesTest < Minitest::Test
   end
   def test_a_push_ranks_by_the_exit_it_opens
     room = Room.new(JAM, start: at([3, 1]))
-    run = Koholint::Skills::Explore.new.start(state(room), { direction: 'right' }, { grid: LiveGrid.new(room, JAM), room_objects: room.reader })
+    run = Koholint::Skills::Explore.new.start(state(room), {}, { grid: LiveGrid.new(room, JAM), room_objects: room.reader, aim: { direction: :right } })
     push = { kind: :push, cell: [4, 5], direction: :up, path: Array.new(6), opens: { kind: :exit, cell: [3, 9], direction: :right } }
     frontier = { kind: :frontier, cell: [2, 2], direction: :up, path: Array.new(2) }
     assert_equal [push, frontier], run.send(:order, [frontier, push]), 'the hint names the exit, not the push'

@@ -39,7 +39,7 @@ module Koholint
               direction = PATH_SKILLS.include?(skill) ? Ledger.pick(outcome[:blocked_at], :direction)&.to_s : (params[:direction] || params['direction']).to_s
               @locks << { direction:, pos: }
               @locks.shift while @locks.size > LOCK_BUFFER
-            elsif stopped != 'no_path' && !(stopped == 'no_frontier' && outcome[:moved_cells].to_i.zero?)
+            elsif stopped != 'no_path' && !(%w[no_frontier nothing_toward].include?(stopped) && outcome[:moved_cells].to_i.zero?)
               @locks.clear
             end
           end
