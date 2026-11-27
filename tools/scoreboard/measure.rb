@@ -22,7 +22,6 @@ module Scoreboard
       ['rule', 'retreat (100)', '\\(retreat by the'], ['rule', 'guarded place (101)', 'is guarded \\('], ['rule', 'hostile no standing (100)', 'no standing next to a hostile'],
       ['rule', 'zero cap (zero_watch)', 'in at most one frame|walking no cell'], ['rule', 'heart pickup / disengage (94)', 'pick up the heart|disengage at'],
       ['rule', 'fight on sight (90/100)', 'autopilot: fight type|keep fighting'], ['rule', 'try never-tried / still entity', 'never-tried (entity|object)|walk onto the still entity'],
-      ['rule', 'danger / held back (106/108)', 'dangerous|would take|held back|held_back'],
       ['base', 'autopilot explore chain', '\\Aautopilot: (explore again|follow the objective target|the last explore chain|step up through)'],
       ['rule', 'harness override of model', "replaces the model's"]
     ].map { |kind, name, pattern| [kind, name, Regexp.new(pattern)] }.freeze
