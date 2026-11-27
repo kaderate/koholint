@@ -64,7 +64,8 @@ The skills, protocols and harness behaviours the agent works with. Versioned wit
 - A ledger counts blocked edges per place; an edge blocked twice is marked doubtful in the context. An objective lives while it
   makes measured progress (flow-115): a place never visited, a text never read, a new shortest known route to its place, or, when it
   names no place, a cell never walked; after 3600 frames without any it is abandoned (`stall`, with that cause in the finished list)
-  and the model chooses again with the facts. The same place-naming predicate set again within 3600 frames of that stall is refused.
+  and the model chooses again with the facts. The same place-naming predicate set again within 3600 frames of that stall is refused,
+  and its candidate is not offered in that window.
 - Dialogue pages are advanced automatically (one `decision` with agent `delegated` and cost 0 per page) and read once
   from page sheets.
 - The agent writes a one-line `plan` that the next call sees; the live view shows its reasoning and plan under each

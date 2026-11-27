@@ -1323,7 +1323,7 @@ class DelegatedAutopilotTest < Minitest::Test
     p = autopiloted(ScriptedClient.new(objective: []))
     p.instance_variable_get(:@cards)[[9, 0]] = { people: [{ type: 70, cell: [1, 1] }], held: [] }
     holding = state(inventory: [12] + Array.new(9, 0))
-    offered = -> { p.send(:build_candidates, holding, { grid: }).map { |c| c[:id] } }
+    offered = ->(at = holding) { p.send(:build_candidates, at, { grid: }).map { |c| c[:id] } }
     assert_includes offered.(), 'person-9-0-t70'
     @objectives.start(frame: 100, title: 'Go talk', predicate: { kind: 'reach_place', place: [9, 0] }, candidate: 'person-9-0-t70',
                       target: { kind: 'person', place: [9, 0], type: 70, cell: [1, 1] })
@@ -1331,7 +1331,8 @@ class DelegatedAutopilotTest < Minitest::Test
     assert_equal :abandoned, @objectives.update(holding, frame: 3700)
     refute_includes offered.(), 'person-9-0-t70'
     p.instance_variable_get(:@explore_log).absorb({ from: { room: 163, map: 16 }, exits: [{ row: 0, col: 5, direction: :up, outcome: :left, to: [9, 0] }] })
-    assert_includes offered.(), 'person-9-0-t70', 'a route to it reopens it'
+    refute_includes offered.(), 'person-9-0-t70', 'not within the stall window'
+    assert_includes offered.(state(frame: 7300, inventory: [12] + Array.new(9, 0))), 'person-9-0-t70', 'a route to it reopens it'
     events = Koholint::Trace.read(File.join(@dir, 'trace.jsonl'))
     assert_equal ['person-9-0-t70'], Koholint::Policies::Memory.stalled(events), 'a resumed run keeps it'
   end

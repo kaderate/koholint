@@ -448,6 +448,9 @@ module Koholint
         stalled = @stalled | @objectives.history.filter_map { |done| done[:candidate] if done[:reason] == 'stall' }
         hops = @explore_log.hops(place)
         @candidates.reject! { |candidate| stalled.include?(candidate[:id]) && (where = candidate.dig(:target, :place)) && where != place && !hops.key?(where) }
+        # One that stalled within the stall window is not offered at all: setting it again would be refused.
+        recent = @objectives.history.filter_map { |done| done[:candidate] if done[:reason] == 'stall' && state.frame - done[:ended_frame] < Objectives::STALL_FRAMES }
+        @candidates.reject! { |candidate| recent.include?(candidate[:id]) }
         @candidates.reject! { |candidate| candidate[:id].start_with?('person-', 'examine-') && @hurts.hit(candidate.dig(:target, :type)) }
         @candidates.each { |candidate| offer_puzzle(candidate[:target][:place]) if candidate[:id].start_with?('puzzle-') }
         @candidates
