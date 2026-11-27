@@ -15,7 +15,7 @@ module Koholint
 
     ATTEMPT_LIMIT = 10
     STALL_FRAMES = 3600
-    STALL_CAUSE = "no new place, no new text and no shorter route in #{STALL_FRAMES} frames".freeze
+    STALL_CAUSE = "no new place, no new text, no shorter route and no new cell in #{STALL_FRAMES} frames".freeze
 
     def self.normalize(predicate)
       predicate.to_h.transform_keys(&:to_sym)
@@ -73,7 +73,7 @@ module Koholint
       id = "obj-#{@counter}"
       extra = { because:, candidate:, target:, autopilot: (true if autopilot) }.compact
       @current = { id:, title:, predicate: self.class.normalize(predicate), started_frame: frame, attempts: [], **extra }
-      @closest = nil
+      @closest = @walked_most = nil
       @last_change_frame = frame
       @seen_alive = false
       @dialogue_seen = false
@@ -137,8 +137,9 @@ module Koholint
       @last_key = key
     end
 
-    # An objective lives while it makes measured progress: a place never visited, a text never read, or a new shortest route to its place.
-    def update(state, frame:, distance: nil)
+    # An objective lives while it makes measured progress: a place never visited, a text never read, a new shortest route to its place,
+    # or, when it names no place, a cell never walked.
+    def update(state, frame:, distance: nil, walked: nil)
       return nil if state.loading?
 
       playing = %i[playing locked dialogue].include?(state.phase)
@@ -153,7 +154,9 @@ module Koholint
       @last_state_part = [place, position]
       closer = playing && distance && (@closest.nil? || distance < @closest)
       @closest = distance if closer
-      @last_change_frame = frame if first_visit || closer
+      wider = playing && walked && walked > (@walked_most ||= walked)
+      @walked_most = walked if wider
+      @last_change_frame = frame if first_visit || closer || wider
       @dialogue_seen ||= state.dialog_open?
 
       return finish(:failed, frame:) if died?(state)

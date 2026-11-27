@@ -261,28 +261,41 @@ class DelegatedPolicyTest < Minitest::Test
     @objectives.abandon(frame: 200, reason: 'stall')
     refused = decide(p, state(frame: 300)).last
     assert refused[:refused], refused.inspect
-    assert_equal 'obj-1 had this predicate and was abandoned at frame 200: no new place, no new text and no shorter route in 3600 frames; choose a different objective', refused[:justification]
-    assert_includes client.calls.last[:prompt], 'obj-1 abandoned (stall: no new place, no new text and no shorter route in 3600 frames): go'
+    assert_equal 'obj-1 had this predicate and was abandoned at frame 200: no new place, no new text, no shorter route and no new cell in 3600 frames; choose a different objective', refused[:justification]
+    assert_includes client.calls.last[:prompt], 'obj-1 abandoned (stall: no new place, no new text, no shorter route and no new cell in 3600 frames): go'
     assert_nil @objectives.current
     refute decide(p, state(frame: 3800)).last[:fallback]
     assert_equal 'obj-2', @objectives.current[:id]
+    explore = { 'kind' => 'new_place' }
+    p = policy(ScriptedClient.new(objective: ok('title' => 'go', 'predicate' => explore)))
+    @objectives.start(frame: 100, title: 'go', predicate: explore)
+    @objectives.abandon(frame: 200, reason: 'stall')
+    refute decide(p, state(frame: 300)).last[:fallback], 'a predicate naming no place is not the same objective elsewhere'
   end
 
-  # no-sword-225 (flow-115 4e39): the harness's explore objective names no place and expired at 42114 walking known screens toward 194/0, reached at 42701.
-  def test_an_objective_naming_no_place_keeps_alive_while_the_explore_route_to_untried_work_shortens
+  # no-sword-225 (flow-115 4e39): the harness's explore objective names no place and expired at 42114 while explore walked 48 new cells of
+  # A16, A15 and A14 (240/0, 224/0, 208/0) on its way to 194/0, reached at 42701.
+  def test_an_objective_lives_on_a_shorter_route_to_its_place_or_when_it_names_none_on_cells_never_walked
     log = Koholint::ExploreLog.new
     log.absorb({ from: { room: 1, map: 0 }, survey: { sides: { right: [{ row: 4, col: 9 }] }, doors: [] }, exits: [{ row: 4, col: 9, direction: :right, outcome: :left, to: [2, 0] }] })
     log.absorb({ from: { room: 2, map: 0 }, survey: { sides: { left: [{ row: 4, col: 0 }], right: [{ row: 4, col: 9 }] }, doors: [] },
                  exits: [{ row: 4, col: 0, direction: :left, outcome: :left, to: [1, 0] }, { row: 4, col: 9, direction: :right, outcome: :left, to: [3, 0] }] })
-    lives = [log, Koholint::ExploreLog.new].map do |explore_log|
+    live = lambda do |predicate, explore_log, rooms, &walk|
       @objectives = Koholint::Objectives.new(trace:, visited: [[1, 0], [2, 0], [3, 0]])
       p = Koholint::Policies::Delegated.new(client: ScriptedClient.new, registry: Koholint::Skills::Registry.default, objectives: @objectives, manual: '',
                                             memory: Koholint::Policies::Memory.new(explore_log:))
-      @objectives.start(frame: 100, title: 'Explore the nearest untried exits', predicate: { 'kind' => 'new_place' }, autopilot: true)
-      [[100, 1], [3000, 2], [3700, 2]].each { |frame, room| p.observe(state(frame:, room_id: room, map_id: 0), frame:) }
+      @objectives.start(frame: 100, title: 'go', predicate:)
+      [100, 3000, 3700].zip(rooms).each do |frame, room|
+        walk&.call(explore_log, frame)
+        p.observe(state(frame:, room_id: room, map_id: 0), frame:)
+      end
       @objectives.current ? :kept : @objectives.history.last[:reason]
     end
-    assert_equal [:kept, 'stall'], lives
+    reach = { 'kind' => 'reach_place', 'place' => [3, 0] }
+    assert_equal [:kept, 'stall'], [log, Koholint::ExploreLog.new].map { |explore_log| live.(reach, explore_log, [1, 2, 2]) }
+    new_place = { 'kind' => 'new_place' }
+    walked = live.(new_place, Koholint::ExploreLog.new, [2, 2, 2]) { |explore_log, frame| explore_log.walk([2, 0], [3, frame / 1000]) }
+    assert_equal [:kept, 'stall'], [walked, live.(new_place, log, [2, 2, 2])]
   end
 
   def test_dialogue_closed_is_rejected_while_no_dialogue_is_open

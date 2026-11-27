@@ -62,9 +62,9 @@ The skills, protocols and harness behaviours the agent works with. Versioned wit
   way (a room change is one: `room_change` ends the chain), or after 8 attacks or 900 frames since that call (checked
   before each attack, so the last one may run past it). The viewer counts no autopilot decision as an objective attempt.
 - A ledger counts blocked edges per place; an edge blocked twice is marked doubtful in the context. An objective lives while it
-  makes measured progress (flow-115): a place never visited, a text never read, or a new shortest known route to its place (to the
-  explore route's goal when it names none); after 3600 frames without any it is abandoned (`stall`, with that cause in the finished
-  list) and the model chooses again with the facts. The same predicate set again within 3600 frames of that stall is refused.
+  makes measured progress (flow-115): a place never visited, a text never read, a new shortest known route to its place, or, when it
+  names no place, a cell never walked; after 3600 frames without any it is abandoned (`stall`, with that cause in the finished list)
+  and the model chooses again with the facts. The same place-naming predicate set again within 3600 frames of that stall is refused.
 - Dialogue pages are advanced automatically (one `decision` with agent `delegated` and cost 0 per page) and read once
   from page sheets.
 - The agent writes a one-line `plan` that the next call sees; the live view shows its reasoning and plan under each
@@ -157,9 +157,9 @@ The skills, protocols and harness behaviours the agent works with. Versioned wit
   session-only one-strike probe of flow-110 (`note_contact`, `probe_choice`, the attack's strike cap from the context) and the
   "no tries in a place that has hurt Link" of flow-107; a type that never hurt Link is tried there again.
 - flow-115: an objective expires on no measured progress, and leads no longer reopen people. Progress is a place never visited, a
-  text never read, or a new shortest known route (hops over the explore log) to the objective's place, or to the explore route's
-  goal for an objective naming no place; after 3600 frames without any the objective is abandoned `stall`, and the model may not set
-  the same predicate again within 3600 frames. It replaces the stall on an unchanged position (1800 frames), the keep-alive of dialogues and
+  text never read, a new shortest known route (hops over the explore log) to the objective's place, or, for an objective naming no
+  place, a cell never walked; after 3600 frames without any the objective is abandoned `stall`, and the model may not set the same
+  place-naming predicate again within 3600 frames. It replaces the stall on an unchanged position (1800 frames), the keep-alive of dialogues and
   locked phases, and the `unreachable` counts of blocked results and `no_path` stops. A person whose last talk left their texts
   exhausted is not talked to again by the harness until a milestone or an item changes. b32c (flow-112): obj-7 "reach D12 column 9"
   lived 6364 frames over C11, C12, D11 and D12, and new leads reopened Marine and Tarkin four times (2093 frames, texts already read).
