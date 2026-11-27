@@ -8,11 +8,42 @@
       "to": 52214,
       "class": "override"
     },
-    "status": "proposed",
-    "change": "Bound the guarded place rule (101): after a count of guarded verdicts on the same place within a window, it stops abandoning the objective and the model's choice stands.",
-    "trials": [],
-    "verdict": null,
-    "evidence": "scoreboard diagnose on 27ab: top stall by dollars, 25845 frames, 14.91 USD, 441 calls (411 at one heart) on D15 C15 B15; 'guarded place (101)' answered 547 decisions against 425 model decisions and abandoned 547 objectives (reason guarded); zero cap 189, heart pickup / disengage 106. Testing it needs game code (a bound in lib/koholint/policies/delegated/guidance.rb#guarded) and a flow bump."
+    "status": "failed",
+    "change": "Bound the protections from enemies (one-heart contact zones, disengage, zero-cap retreats, dangerous places, the fragile hold, the hurtful-attack refusal) by a clock: after 3600 frames with no hp change, no place never seen and no lead they stop applying until the next change; delete the guarded place and no-standing rules (flow-118, #134).",
+    "trials": [
+      {
+        "run": "20261127-134720-27ab",
+        "arm": "baseline",
+        "from": 31009,
+        "frames": 1846,
+        "usd": 0.719,
+        "calls": 23,
+        "new_places": 0,
+        "longest_stall": 1846
+      },
+      {
+        "run": "20261127-193027-c1a7",
+        "arm": "baseline",
+        "from": 31009,
+        "frames": 1475,
+        "usd": 0.7029,
+        "calls": 28,
+        "new_places": 0,
+        "longest_stall": 1475
+      },
+      {
+        "run": "20261127-193027-5b21",
+        "arm": "candidate",
+        "from": 31009,
+        "frames": 1529,
+        "usd": 0.7046,
+        "calls": 29,
+        "new_places": 0,
+        "longest_stall": 1529
+      }
+    ],
+    "verdict": "Failed at the paired fork from 27ab at 31009 (first decision after the clock lifts): the candidate spent 1529 frames and 29 calls at one heart for 0.70 USD against 1475 and 28 for the main baseline (1846 and 23 for the recorded 27ab row), and Link stayed on C15/D15 at 8 hp with no game over. The bound was active (UNGUARDED in all 29 prompts) but nothing it lifts was refusing the model there.",
+    "evidence": "Diagnose on 27ab: 25845 frames, 14.91 USD on B15-D15; from 27378 at 8 hp, 411 calls and 13.76 USD with no hp change, new place or lead. The 547 guarded answers were one 547-frame loop with no model call (50664-51210). In both forks at 31009 the same loop holds: the model picks a leave-by-side objective, the autopilot explore toward that side stops no_frontier in one frame, the zero cap sends explore to the reachable place entered least, the crossing to the neighbouring screen achieves leave_place, and the model is asked again: 2 paid calls per about 108 frames, in the baseline as in the candidate. Stub gate sword-obtained moved with the bound (47/27/8/1 to 50/50/4/0: no ping-pong, no death)."
   },
   {
     "id": "b32c-model-objective-handover",
