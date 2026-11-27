@@ -2,12 +2,16 @@ $LOAD_PATH.unshift(File.expand_path('../../lib', __dir__))
 require 'optparse'
 require_relative 'alert'
 require_relative 'debt'
+require_relative 'diagnose'
 require_relative 'measure'
+require_relative 'pair'
 require_relative 'run'
 require_relative 'runs'
 
 # ruby tools/scoreboard/scoreboard.rb measure RUN_DIR... [--json]
+# ruby tools/scoreboard/scoreboard.rb diagnose RUN_DIR... [--json]
 # ruby tools/scoreboard/scoreboard.rb run [--budget USD] [--daily-cap USD] [--from boot|CHECKPOINT]... [--root DIR] [--history FILE]
+# ruby tools/scoreboard/scoreboard.rb pair RUN_DIR --at-frame N --max-dollars USD [--forks N] [--variant REF] [--root DIR]
 # ruby tools/scoreboard/scoreboard.rb debt [--window N] [--last N] [--ref REF]
 # ruby tools/scoreboard/scoreboard.rb alert [--history FILE]
 module Scoreboard
@@ -35,6 +39,10 @@ module Scoreboard
       parser.on('--max-deaths N', Integer) { |value| options[:max_deaths] = value }
       parser.on('--stall FRAMES', Integer) { |value| options[:stall] = value }
       parser.on('--koholint PATH') { |value| options[:koholint] = File.expand_path(value) }
+      parser.on('--at-frame N', Integer) { |value| options[:at_frame] = value }
+      parser.on('--max-dollars USD', Float) { |value| options[:max_dollars] = value }
+      parser.on('--forks N', Integer) { |value| options[:forks] = value }
+      parser.on('--variant REF') { |value| options[:variant] = value }
     end.parse!(argv)
     roots = options[:roots].empty? ? Runs::ROOTS : options[:roots]
     case command
@@ -42,6 +50,11 @@ module Scoreboard
       abort 'usage: scoreboard measure RUN_DIR...' if argv.empty?
       results = argv.map { |dir| Measure.run(File.expand_path(dir)) }
       out.puts options[:json] ? JSON.pretty_generate(results) : Measure.table(results)
+      0
+    when 'diagnose'
+      abort 'usage: scoreboard diagnose RUN_DIR...' if argv.empty?
+      stalls = argv.flat_map { |dir| Diagnose.run(File.expand_path(dir)) }
+      out.puts options[:json] ? JSON.pretty_generate(stalls) : Diagnose.table(stalls)
       0
     when 'run'
       from = options[:from].empty? ? ['boot'] : options[:from]
@@ -53,6 +66,15 @@ module Scoreboard
       end
       out.puts JSON.pretty_generate(line.slice('date', 'flow', 'harness_sha', 'usd', 'branches', 'primary'))
       line['runs'].all? { |run| run['error'].nil? } ? 0 : 1
+    when 'pair'
+      abort 'usage: scoreboard pair RUN_DIR --at-frame N --max-dollars USD (dollars per fork)' unless argv.size == 1 && options[:at_frame] && options[:max_dollars]
+      begin
+        Pair.play(parent: File.expand_path(argv.first), root: options[:root], koholint: options[:koholint], repo: options[:repo], history: options[:history], out:,
+                  **options.slice(:at_frame, :max_dollars, :forks, :variant, :daily_cap, :max_seconds, :max_deaths, :stall))
+      rescue Run::Refused => e
+        abort "scoreboard: #{e.message}"
+      end
+      0
     when 'debt'
       report = Debt.report(repo: options[:repo], ref: options[:ref], window: options[:window], roots:, history: Runs.history(options[:history]), last: options[:last])
       out.puts options[:json] ? JSON.pretty_generate(report) : Debt.text(report)
@@ -62,7 +84,7 @@ module Scoreboard
       out.puts(reasons.empty? ? 'no guardrail tripped' : reasons.map { |reason| "ALERT: #{reason}" })
       reasons.empty? ? 0 : 1
     else
-      abort 'usage: scoreboard measure|run|debt|alert'
+      abort 'usage: scoreboard measure|diagnose|run|pair|debt|alert'
     end
   end
 end

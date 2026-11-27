@@ -56,20 +56,25 @@ module Scoreboard
     def death?(event) = event['type'] == 'notable' && event['kind'] == 'death'
 
     # The progress vector counts the whole run, inherited prefix included; cost, deaths, stalls and rules count the run's own segment.
-    def run(dir)
+    # A run measured from `start` (its fork frame unless given): places seen before it are not new, and stalls count from it.
+    def segment(dir, start: nil)
       manifest = read_json(File.join(dir, 'manifest.json'))
-      parent = manifest['parent'].is_a?(Hash) ? manifest['parent'] : {}
-      start = fork_frame(manifest)
+      start ||= fork_frame(manifest)
       events = Koholint::Trace.read(File.join(dir, 'trace.jsonl'))
+      before = events.filter_map { |event| place_of(event) if event['frame'].to_i < start }.to_set
+      { manifest:, start:, events:, before:, new_frames: new_place_frames(events, start, before), last: events.map { |event| event['frame'].to_i }.max || 0 }
+    end
+
+    def run(dir, start: nil)
+      manifest, start, events, before, new_frames, last = segment(dir, start:).values_at(:manifest, :start, :events, :before, :new_frames, :last)
+      parent = manifest['parent'].is_a?(Hash) ? manifest['parent'] : {}
       own = events.select { |event| event['frame'].to_i >= start }
-      frames = [(events.map { |event| event['frame'].to_i }.max || 0) - start, 0].max
+      frames = [last - start, 0].max
       decisions = own.select { |event| event['type'] == 'decision' }
       calls = decisions.select { |event| event['agent'] == 'claude' }
       usd = decisions.sum { |event| event['cost_usd'].to_f }
       deaths = own.count { |event| death?(event) }
       per = ->(count) { frames.positive? ? (1000.0 * count / frames).round(3) : nil }
-      before = events.filter_map { |event| place_of(event) if event['frame'].to_i < start }.to_set
-      new_frames = new_place_frames(events, start, before)
       progress = progress(events, read_json(File.join(dir, 'summary.json')))
       {
         run: File.basename(dir), tag: manifest['tag'], flow: manifest['flow_version'], harness_sha: manifest['harness_sha'].to_s[0, 8],
@@ -113,12 +118,14 @@ module Scoreboard
 
     # The intro (title, name entry, opening dialogues) is not a stall: spans count from the frame the run has seen INTRO_PLACES places, or from
     # the fork frame when its prefix already has them.
-    def stalls(new_frames, last, start:, before:)
+    def spans(new_frames, last, start:, before:)
       from = before >= INTRO_PLACES ? start : new_frames[INTRO_PLACES - before - 1]
-      return { count: 0, longest_frames: 0 } unless from
+      from ? [from, *new_frames.select { |frame| frame > from }, last].each_cons(2).to_a : []
+    end
 
-      spans = [from, *new_frames.select { |frame| frame > from }, last].each_cons(2).map { |left, right| right - left }
-      { count: spans.count { |span| span >= STALL_FRAMES }, longest_frames: spans.max || 0 }
+    def stalls(new_frames, last, start:, before:)
+      lengths = spans(new_frames, last, start:, before:).map { |left, right| right - left }
+      { count: lengths.count { |span| span >= STALL_FRAMES }, longest_frames: lengths.max || 0 }
     end
 
     def rules(decisions)

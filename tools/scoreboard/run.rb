@@ -70,31 +70,40 @@ module Scoreboard
 
     def play(froms:, root:, koholint:, repo:, history:, day: Time.now.strftime('%Y%m%d'), roots: Runs::ROOTS, out: $stdout, **options)
       settings = DEFAULTS.merge(options)
-      spent = Runs.history(history).sum { |line| Time.parse(line['date'].to_s).localtime.strftime('%Y%m%d') == day ? line['usd'].to_f : 0.0 rescue 0.0 }
-      raise Refused, format('%.2f USD already spent today plus a budget of %.2f is above the %.2f USD daily cap', spent, settings[:budget], settings[:daily_cap]) if spent + settings[:budget] > settings[:daily_cap]
-
+      daily_cap!(history, day, settings[:budget], settings[:daily_cap])
       total = settings[:budget]
       settings[:budget] = (total / froms.size).round(4)
-      queue = Queue.new
-      froms.each { |from| queue << from }
-      results = Queue.new
       started = []
-      workers = Array.new([settings[:jobs], MAX_JOBS].min) do
-        Thread.new do
-          while (from = (queue.pop(true) rescue nil))
-            results << once(from, root:, koholint:, day:, roots:, settings:, out:, started:)
-          end
-        end
-      end
-      workers.each(&:join)
-      runs = Array.new(results.size) { results.pop }.sort_by { |run| froms.index(run[:from]) }
+      runs = parallel(froms, settings[:jobs]) { |from| once(from, root:, koholint:, day:, roots:, settings:, out:, started:) }
       line = entry(runs, repo:, budget: total, froms:)
       FileUtils.mkdir_p(File.dirname(history))
       File.open(history, 'a') { |file| file.puts(JSON.generate(line)) }
       line
     ensure
-      workers&.each(&:kill)
       started&.each { |pid| stop(pid, settings) }
+    end
+
+    def daily_cap!(history, day, budget, cap)
+      spent = Runs.history(history).sum { |line| Time.parse(line['date'].to_s).localtime.strftime('%Y%m%d') == day ? line['usd'].to_f : 0.0 rescue 0.0 }
+      raise Refused, format('%.2f USD already spent today plus a budget of %.2f is above the %.2f USD daily cap', spent, budget, cap) if spent + budget > cap
+    end
+
+    # The block's results in the order of the items, at most `jobs` (never above MAX_JOBS) running at a time.
+    def parallel(items, jobs)
+      queue = Queue.new
+      items.each_with_index { |item, index| queue << [item, index] }
+      results = Array.new(items.size)
+      workers = Array.new([jobs, MAX_JOBS].min) do
+        Thread.new do
+          while (job = (queue.pop(true) rescue nil))
+            results[job.last] = yield(job.first)
+          end
+        end
+      end
+      workers.each(&:join)
+      results
+    ensure
+      workers&.each(&:kill)
     end
 
     def once(from, root:, koholint:, day:, roots:, settings:, out:, started:)
@@ -116,8 +125,12 @@ module Scoreboard
       require 'koholint/checkpoints'
       point = Koholint::Checkpoints.catalogue.fetch(from) { raise ArgumentError, "no checkpoint #{from}" }
       parent = Runs.dirs(roots).find { |dir| File.basename(dir) == point['run'] } or raise ArgumentError, "run #{point['run']} of #{from} not found"
-      forked = IO.popen(command(koholint, 'fork', parent, '--at-frame', point['frame'].to_s, '--tag', tag, '--root', root), &:read)
-      dir = forked[/^run (.+)$/, 1] or raise "fork of #{from} failed: #{forked}"
+      fork_and_resume(parent, point['frame'], tag:, root:, koholint:, shared:, started:)
+    end
+
+    def fork_and_resume(parent, frame, tag:, root:, koholint:, shared:, started:)
+      forked = IO.popen(command(koholint, 'fork', parent, '--at-frame', frame.to_s, '--tag', tag, '--root', root), &:read)
+      dir = forked[/^run (.+)$/, 1] or raise "fork of #{File.basename(parent)} at #{frame} failed: #{forked}"
       [dir, spawn_run(command(koholint, 'resume', dir, *shared), started)]
     end
 
