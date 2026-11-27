@@ -113,6 +113,15 @@ class AgentsContextTest < Minitest::Test
                           'type 47 at (2,7) (not identified), type 110 at (3,3) (gives no dialogue)'
   end
 
+  def test_a_catalogued_creature_that_never_moves_is_listed_as_such
+    kinds = Koholint::Entities.catalogue
+    palms = [[8, 32], [104, 32], [8, 96], [104, 96]].each_with_index.map do |(x, y), slot|
+      { slot:, type: 205, x:, y:, cell: Koholint::Geometry.cell_for(x, y), kind: kinds[205][:kind], verified: kinds[205][:verified], moves: kinds[205][:moves] }
+    end
+    text = build(talk_log: Koholint::TalkLog.new, entities: palms)
+    assert_includes text, 'type 205 at (1,0) (gives no dialogue, not an enemy, never moves), type 205 at (1,6) (gives no dialogue, not an enemy, never moves)'
+  end
+
   def test_chests_on_screen_say_how_they_open_and_whether_a_route_reaches_them
     chests = [{ object: 160, cell: [3, 4], kind: :chest, verified: true, reachable: true }, { object: 160, cell: [5, 6], kind: :chest, verified: true, reachable: false },
               { object: 161, cell: [1, 8], kind: :chest, verified: true, open: true }]
