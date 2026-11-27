@@ -61,6 +61,19 @@ jobs:
           age-key: ${{ secrets.ROM_AGE_KEY }}
           download: on-miss
 
+  rom-skipped:
+    # A skipped matrix job reports under its unexpanded name, so the required shard checks would stay pending
+    name: rake test (ROM, shard ${{ matrix.shard }}/4)
+    needs: changes
+    if: needs.changes.outputs.docs_only == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 2
+    strategy:
+      matrix:
+        shard: [1, 2, 3, 4]
+    steps:
+      - run: echo "docs-only pull request, ROM shards skipped"
+
   rom:
     name: rake test (ROM, shard ${{ matrix.shard }}/4)
     needs: rom-fetch
