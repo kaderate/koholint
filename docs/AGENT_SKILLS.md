@@ -163,7 +163,9 @@ The skills, protocols and harness behaviours the agent works with. Versioned wit
   explore's hold at the lineage hit is off, and a model attack on a type that hurt Link is no longer refused; the prompt says so in an
   `UNGUARDED` line. 27ab (flow-115) spent 24,836 frames and 13.76 USD (411 calls) at one heart on B15-D15 from frame 27378 with none
   of these changes, and the disengage walk undid the model's steps toward an enemy (51899-51956) while it planned a game over to
-  restore its hearts.
+  restore its hearts. The guard of flow-101 is gone: a third retreat by the same side within 3000 frames is no longer sent and the
+  zero-frame cap waits, where marking the place guarded set the objective aside for an explore; in 27ab that explore found nothing at
+  once and the guard answered 547 times in 547 frames (50664-51210, C15) with no model call, until a hit.
 - flow-117: the harness no longer makes an objective of a person whose recorded text names an item Link holds (flow-97: talk to them
   holding it, then `use_item`); no run, fork or gate ever fired it. Such a person stays a `person-` or `need-` candidate the model may pick,
   and a souvenir naming a held item is still taken up by the harness (flow-102).
@@ -209,7 +211,7 @@ The skills, protocols and harness behaviours the agent works with. Versioned wit
   whose route exit is out of reach from where Link stands stops (`held_back`) instead of going after local work, and the objective
   is abandoned (`unreachable`), so the model chooses next.
 - flow-106: danger is measured per place: the largest hp drop between two decisions in each place, read back from the trace. A place whose measured hit is at or above Link's health is
-  never entered, as a hop or a destination, by a route to work (the harness's loop, zero-frame and guarded redirects, explore's own
+  never entered, as a hop or a destination, by a route to work (the harness's loop and zero-frame redirects, explore's own
   search for work, explore following such a redirect) or by the least-visited fallback, and never left into by a pocket or retreat
   side; an objective's route may still cross it. When those places are the only ways left, or the way back leads into one, the
   zero-frame cap hands the choice to the model once per spot instead of waiting or retreating, its context listing those places
@@ -233,9 +235,9 @@ The skills, protocols and harness behaviours the agent works with. Versioned wit
 - flow-101: explore never plans a walk into a stone on screen, even one whose look was walked on after a push emptied its cell, so
   the stone search's pushes open the way. At one heart or less, an objective whose route crosses a place where enemies were seen
   first goes to the nearest place where a talk healed Link (read from the hp rises after a dialogue), up to twice, and the heal
-  objective holds until Link's hp rises, however many people the place shows. Sent back by the same side of a place twice within 3000 frames, the third time
-  marks the place guarded: the objective is set aside and explore heads for work elsewhere. A need or souvenir objective a loop break,
-  heal detour or guard set aside is offered again once per drop, up to twice, while the menu still offers it. The heal
+  objective holds until Link's hp rises, however many people the place shows. Sent back by the same side of a place twice within 3000 frames, Link is not
+  sent back a third time (flow-118). A need or souvenir objective a loop break or
+  heal detour set aside is offered again once per drop, up to twice, while the menu still offers it. The heal
   detours, retreats and re-offers are read back from the trace on resume. A souvenir is retired once its item, used in
   its place, opened a dialogue and left both buttons. A frontier whose walk opened a dialogue twice, on any visits, is no work there.
 - flow-100: the harness never waits beside a hostile at any health: when explore finds no way out while a hostile's contact zone

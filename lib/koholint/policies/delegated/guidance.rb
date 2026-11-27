@@ -356,7 +356,7 @@ module Koholint
             end
             retreat = false
           end
-          return guarded(state, context) if retreat && retreats(state) >= RETREAT_CAP
+          retreat &&= retreats(state) < RETREAT_CAP
           @retreated = { spot:, hp: state.health } if retreat
           side = Array(@explore_log.entered(place)).flatten.join('-')
           @retreats << [place, side, state.frame] if retreat
@@ -366,8 +366,7 @@ module Koholint
           @zero_watch.capping(choice[:skill])
           what = if route then "explore toward #{goal.join('-')}, the nearest place with untried work"
                  elsif away then "no place has untried work: explore toward #{goal.join('-')}, the reachable place entered least"
-                 elsif pressed then 'no way out with a hostile in touch: leave by the side Link came in'
-                 elsif retreat then "no way out at one heart after #{DEADLOCK_WAITS} waits: leave by the side Link came in"
+                 elsif retreat then "no way out #{pressed ? 'with a hostile in touch' : "at one heart after #{DEADLOCK_WAITS} waits"}: leave by the side Link came in"
                  else "wait #{ZERO_WAIT[:params][:frames]} frames before asking again"
                  end
           what = "#{what} (retreat by the #{side} side)" if retreat
@@ -377,20 +376,6 @@ module Koholint
         def retreats(state)
           came = Array(@explore_log.entered(state.place)).flatten.join('-')
           @retreats.count { |place, side, frame| place == state.place && side == came && state.frame - frame < RETREAT_WINDOW }
-        end
-
-        # Sent back by the same side of the same place RETREAT_CAP times within RETREAT_WINDOW frames, the way is guarded: the objective is set
-        # aside (taken up again later) and explore heads for work elsewhere instead of coming back to retreat again.
-        def guarded(state, context)
-          place = state.place
-          @notes << { kind: 'stuck', detail: "guarded: sent back by the #{@explore_log.entered(place)} side of #{place.join('-')} #{RETREAT_CAP} times in #{RETREAT_WINDOW} frames" }
-          note_dropped(@objectives.current, any: true)
-          @objectives.abandon(frame: state.frame, reason: 'guarded')
-          @objectives.start(frame: state.frame, **AUTO_OBJECTIVE, autopilot: true)
-          @autopilot&.adopt(@objectives.current)
-          route = @explore_log.route(place, skip: [place])
-          context.merge!(aim: { place: route[:goal] }, ban: true) if route && !route[:lifted]
-          DecisionPoint.harness_choice(EXPLORE, "#{place.join('-')} is guarded (#{RETREAT_CAP} retreats in #{RETREAT_WINDOW} frames): explore #{route ? "toward #{route[:goal].join('-')}" : 'elsewhere'}", autopilot: true)
         end
 
         # A reachable souvenir naming a held item by its pickup text is taken up like a lineage text, once; a drop is re-offered by the rules above.
