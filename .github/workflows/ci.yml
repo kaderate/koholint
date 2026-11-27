@@ -9,6 +9,25 @@ permissions:
   contents: read
 
 jobs:
+  changes:
+    name: changes
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    outputs:
+      docs_only: ${{ steps.docs.outputs.docs_only }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 2
+      - id: docs
+        # On a pull request HEAD is the merge commit, so HEAD^ is the base tip
+        run: |
+          if [ "$GITHUB_EVENT_NAME" = pull_request ]; then
+            echo "docs_only=$(git diff --name-only --no-renames HEAD^ HEAD | .github/scripts/docs-only.sh)" >> "$GITHUB_OUTPUT"
+          else
+            echo docs_only=false >> "$GITHUB_OUTPUT"
+          fi
+
   test:
     name: rake test:ci
     runs-on: ubuntu-24.04
@@ -29,8 +48,9 @@ jobs:
 
   rom-fetch:
     name: fetch ROM
-    # Fork pull requests get no secrets: they run test:ci only
-    if: github.event_name == 'push' || github.event.pull_request.head.repo.full_name == github.repository
+    needs: changes
+    # Fork pull requests get no secrets: they run test:ci only; docs-only pull requests skip the ROM jobs
+    if: needs.changes.outputs.docs_only != 'true' && (github.event_name == 'push' || github.event.pull_request.head.repo.full_name == github.repository)
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     steps:
