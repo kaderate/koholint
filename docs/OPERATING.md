@@ -222,3 +222,4 @@ by importance, rejected leads, objectives by kind, `because` uses, talks, talks 
 
 `resume` and `fork` on an archived run decompress the trace back to `trace.jsonl` (archive again after the stop);
 `fork` rebuilds missing saves by replay, checked against their `sav_sha256`.
+
