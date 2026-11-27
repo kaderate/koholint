@@ -139,6 +139,7 @@ class ImprovementLoopTest < Minitest::Test
       assert_equal 2, calls.count { |call| call.start_with?("fork #{parent} --at-frame 1000 --tag pair-eeee-1000-candidate-") }
       assert_equal 2, calls.count { |call| call.start_with?('resume ') && call.include?('--max-dollars 0.7') }
       assert_includes out.string, 'A/B pair-eeee-1000'
+      assert_equal [['pair', 0.5]], File.readlines(File.join(root, 'history.jsonl')).map { |line| JSON.parse(line).values_at('kind', 'usd') }
     end
   end
 

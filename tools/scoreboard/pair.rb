@@ -1,4 +1,6 @@
 require 'fileutils'
+require 'json'
+require 'time'
 require 'koholint/ab'
 require_relative 'measure'
 require_relative 'run'
@@ -6,7 +8,8 @@ require_relative 'run'
 module Scoreboard
   # The stall-start paired fork: forks of one run at one frame, each resumed at `max_dollars` under the run supervisor. The candidate is this
   # checkout, or the git ref `variant` checked out in a throwaway worktree, in which case this checkout plays the baseline forks; without a
-  # variant the baseline is the parent's own recorded segment from the same frame. It prints the numbers and ab-report; it judges nothing.
+  # variant the baseline is the parent's own recorded segment from the same frame. Its spend goes to the history, so the daily cap counts it.
+  # It prints the numbers and ab-report; it judges nothing.
   module Pair
     module_function
 
@@ -27,6 +30,9 @@ module Scoreboard
         reason = Run.supervise(dir, pid, settings)
         Measure.run(dir).merge(arm:, stop_request: reason)
       end
+      usd = runs.sum { |run| run[:cost][:usd] }.round(4)
+      FileUtils.mkdir_p(File.dirname(history))
+      File.open(history, 'a') { |file| file.puts(JSON.generate(date: Time.now.utc.iso8601, kind: 'pair', parent: File.basename(parent), at_frame:, usd:)) }
       rows = [Measure.run(parent, start: at_frame).merge(arm: variant ? 'recorded' : 'baseline'), *runs]
       out.puts table(rows, at_frame)
       out.print Koholint::AB.markdown(Koholint::AB.report(prefix:, root:))
