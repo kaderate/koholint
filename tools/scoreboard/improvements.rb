@@ -45,7 +45,8 @@ module Scoreboard
       decided = %w[published failed].include?(entry['status'])
       raise Invalid, "#{id}: a #{entry['status']} candidate needs a verdict" if decided && !text?(entry['verdict'])
       raise Invalid, "#{id}: only a published or failed candidate has a verdict" unless decided || entry['verdict'].nil?
-      raise Invalid, "#{id}: published needs #{PUBLISHED_AT} trials of the candidate" if entry['status'] == 'published' && entry['trials'].count { |trial| trial['arm'] == 'candidate' } < PUBLISHED_AT
+      arms = entry['trials'].map { |trial| trial['arm'] }
+      raise Invalid, "#{id}: published needs #{PUBLISHED_AT} candidate trials and a baseline" if entry['status'] == 'published' && (arms.count('candidate') < PUBLISHED_AT || !arms.include?('baseline'))
     end
 
     def stall!(id, stall)

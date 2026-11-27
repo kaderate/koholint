@@ -84,7 +84,8 @@ class ImprovementLoopTest < Minitest::Test
     Scoreboard::Improvements.validate!(candidate)
     Scoreboard::Improvements.validate!(candidate('status' => 'published', 'verdict' => 'shorter stall', 'trials' => [trial('candidate'), trial('candidate'), trial('baseline')]))
     bad = [candidate('kind' => 'prompt'), candidate('status' => 'done'), candidate('status' => 'failed'), candidate('verdict' => 'early'),
-           candidate('status' => 'published', 'verdict' => 'one trial', 'trials' => [trial('candidate')]), candidate('trials' => [trial('other')]),
+           candidate('status' => 'published', 'verdict' => 'one trial', 'trials' => [trial('candidate'), trial('baseline')]),
+           candidate('status' => 'published', 'verdict' => 'no baseline', 'trials' => [trial('candidate'), trial('candidate')]), candidate('trials' => [trial('other')]),
            candidate('stall' => { 'run' => 'b32c', 'from' => 1, 'to' => 2, 'class' => 'direction' }), candidate('stall' => candidate['stall'].merge('class' => 'luck')),
            candidate('evidence' => ' '), candidate.merge('extra' => 1)]
     bad.each { |entry| assert_raises(Scoreboard::Improvements::Invalid, entry.inspect) { Scoreboard::Improvements.validate!(entry) } }
@@ -95,7 +96,7 @@ class ImprovementLoopTest < Minitest::Test
     end
   end
 
-  def fake_koholint(root)
+  def fake_koholint(root, fail_tag: 'none')
     fake = File.join(root, 'fake.rb')
     File.write(fake, <<~RUBY)
       require 'json'
@@ -107,6 +108,7 @@ class ImprovementLoopTest < Minitest::Test
       File.open(#{File.join(root, 'calls').inspect}, 'a') { |file| file.puts(([command] + args).join(' ')) }
       if command == 'fork'
         tag = args[args.index('--tag') + 1]
+        abort 'fork failed' if tag.end_with?(#{fail_tag.inspect})
         dir = File.join(args[args.index('--root') + 1], "20261127-\#{format('%06d', tag[/\\d+\\z/].to_i)}-dddd")
         FileUtils.mkdir_p(dir)
         File.write(File.join(dir, 'manifest.json'), JSON.generate('flow_version' => 'flow-9', 'tag' => tag, 'parent' => { 'id' => 'p', 'frame' => 1000 }))
@@ -127,19 +129,34 @@ class ImprovementLoopTest < Minitest::Test
         perceive(trace, 10, 1)
         perceive(trace, 20, 2)
         decide(trace, 2000, usd: 0.4)
+        decide(trace, 3000, usd: 0.4)
+        decide(trace, 4000, usd: 0.4)
         trace.emit(:stop, frame: 6000, reason: 'dollars')
       end
       out = StringIO.new
       rows = Scoreboard::Pair.play(parent:, at_frame: 1000, max_dollars: 0.7, root: File.join(root, 'runs'), koholint: fake_koholint(root), repo: File.expand_path('..', __dir__),
                                    history: File.join(root, 'history.jsonl'), day: '20261127', out:, poll: 0.05)
-      assert_match(/2 fork\(s\) per arm of 20261127-000003-eeee at frame 1000, 0.7 USD each, 1.4 USD at most/, out.string.lines.first)
+      assert_match(/2 fork\(s\) per arm of 20261127-000003-eeee at frame 1000, 0.7 USD each, 1.4 USD at most \(soft/, out.string.lines.first)
       assert_equal %w[baseline candidate candidate], rows.map { |row| row[:arm] }
-      assert_equal [[0.4, 0, 5000], [0.25, 1, 600], [0.25, 1, 600]], rows.map { |row| [row[:cost][:usd], row[:new_places], row[:frames]] }
+      assert_equal [[0.8, 0, 2000], [0.25, 1, 600], [0.25, 1, 600]], rows.map { |row| [row[:cost][:usd], row[:new_places], row[:frames]] }
       calls = File.readlines(File.join(root, 'calls'), chomp: true)
       assert_equal 2, calls.count { |call| call.start_with?("fork #{parent} --at-frame 1000 --tag pair-eeee-1000-candidate-") }
       assert_equal 2, calls.count { |call| call.start_with?('resume ') && call.include?('--max-dollars 0.7') }
-      assert_includes out.string, 'A/B pair-eeee-1000'
       assert_equal [['pair', 0.5]], File.readlines(File.join(root, 'history.jsonl')).map { |line| JSON.parse(line).values_at('kind', 'usd') }
+    end
+  end
+
+  def test_a_failing_fork_leaves_the_others_and_their_spend_in_the_history
+    Dir.mktmpdir do |root|
+      parent = make_run(root, '20261127-000004-ffff') do |trace|
+        perceive(trace, 10, 1)
+        perceive(trace, 20, 2)
+        trace.emit(:stop, frame: 6000, reason: 'dollars')
+      end
+      rows = Scoreboard::Pair.play(parent:, at_frame: 1000, max_dollars: 0.7, root: File.join(root, 'runs'), koholint: fake_koholint(root, fail_tag: '-2'),
+                                   repo: File.expand_path('..', __dir__), history: File.join(root, 'history.jsonl'), day: '20261127', out: StringIO.new, poll: 0.05, jobs: 1)
+      assert_equal [nil, nil, 'RuntimeError'], rows.map { |row| row[:error]&.split(':')&.first }
+      assert_equal [['pair', 0.25]], File.readlines(File.join(root, 'history.jsonl')).map { |line| JSON.parse(line).values_at('kind', 'usd') }
     end
   end
 

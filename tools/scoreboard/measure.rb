@@ -49,17 +49,18 @@ module Scoreboard
     def death?(event) = event['type'] == 'notable' && event['kind'] == 'death'
 
     # The progress vector counts the whole run, inherited prefix included; cost, deaths, stalls and rules count the run's own segment.
-    # A run measured from `start` (its fork frame unless given): places seen before it are not new, and stalls count from it.
-    def segment(dir, start: nil)
+    # A run measured from `start` (its fork frame unless given) to `upto` (its end unless given): places seen before `start` are not new.
+    def segment(dir, start: nil, upto: nil)
       manifest = Koholint::Summary.read_json(File.join(dir, 'manifest.json'))
       start ||= fork_frame(manifest)
       events = Koholint::Trace.read(File.join(dir, 'trace.jsonl'))
+      events = events.select { |event| event['frame'].to_i <= upto } if upto
       before = events.filter_map { |event| place_of(event) if event['frame'].to_i < start }.to_set
       { manifest:, start:, events:, before:, new_frames: new_place_frames(events, start, before), last: events.map { |event| event['frame'].to_i }.max || 0 }
     end
 
-    def run(dir, start: nil)
-      manifest, start, events, before, new_frames, last = segment(dir, start:).values_at(:manifest, :start, :events, :before, :new_frames, :last)
+    def run(dir, start: nil, upto: nil)
+      manifest, start, events, before, new_frames, last = segment(dir, start:, upto:).values_at(:manifest, :start, :events, :before, :new_frames, :last)
       parent = manifest['parent'].is_a?(Hash) ? manifest['parent'] : {}
       own = events.select { |event| event['frame'].to_i >= start }
       frames = [last - start, 0].max
