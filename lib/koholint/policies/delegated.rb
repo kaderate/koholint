@@ -282,7 +282,7 @@ module Koholint
         remember_text(transcription[:transcription], state) unless @reading
         notes = notes_for(reply.output, transcription[:transcription], state)
         result = answer(choice, reply, reply.output).merge(plan ? { plan: } : {}).merge(transcription).merge(notes)
-        continue_dialogue(keep_moving(@images ? override_for_revisit(result, decision_point, state) : result, state), state)
+        continue_dialogue(@images ? override_for_revisit(result, decision_point, state) : result, state)
       rescue NameError, TypeError
         raise
       rescue StandardError => e

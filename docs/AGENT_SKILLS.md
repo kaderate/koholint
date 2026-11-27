@@ -165,7 +165,9 @@ The skills, protocols and harness behaviours the agent works with. Versioned wit
   of these changes, and the disengage walk undid the model's steps toward an enemy (51899-51956) while it planned a game over to
   restore its hearts. The guard of flow-101 is gone: a third retreat by the same side within 3000 frames is no longer sent and the
   zero-frame cap waits, where marking the place guarded set the objective aside for an explore; in 27ab that explore found nothing at
-  once and the guard answered 547 times in 547 frames (50664-51210, C15) with no model call, until a hit.
+  once and the guard answered 547 times in 547 frames (50664-51210, C15) with no model call, until a hit. The model's `guard` or `wait`
+  within 32 px of a hostile is no longer replaced by an explore (flow-36): its 16 firings in the six paid runs were all in that stall,
+  none followed by a new place within 1500 frames (KOHO-174).
 - flow-117: the harness no longer makes an objective of a person whose recorded text names an item Link holds (flow-97: talk to them
   holding it, then `use_item`); no run, fork or gate ever fired it. Such a person stays a `person-` or `need-` candidate the model may pick,
   and a souvenir naming a held item is still taken up by the harness (flow-102).

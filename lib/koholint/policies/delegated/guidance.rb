@@ -5,17 +5,6 @@ module Koholint
   module Policies
     class Delegated < Base
       module Guidance
-        STAND_SKILLS = %w[guard wait].freeze
-        STAND_MARGIN = 32
-
-        def keep_moving(result, state)
-          choice = result[:choice]
-          return result unless choice.is_a?(Hash) && STAND_SKILLS.include?(choice[:skill].to_s) && state.phase == :playing && !state.dialog_open?
-          return result unless Navigation::Threat.within?(Navigation::Threat.of(entities_now), state.x, state.y, margin: STAND_MARGIN)
-
-          result.merge(choice: EXPLORE, justification: "harness: no standing next to a hostile creature (replaces the model's #{choice[:skill]}): #{result[:justification]}", autopilot: false)
-        end
-
         private
 
         def objective_place
