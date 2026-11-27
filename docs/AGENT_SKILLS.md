@@ -164,7 +164,7 @@ The skills, protocols and harness behaviours the agent works with. Versioned wit
   `UNGUARDED` line. 27ab (flow-115) spent 24,836 frames and 13.76 USD (411 calls) at one heart on B15-D15 from frame 27378 with none
   of these changes, and the disengage walk undid the model's steps toward an enemy (51899-51956) while it planned a game over to
   restore its hearts. Gate sword-obtained (9ba1 @60404, 8 hp since 56731, nothing new since 58798) lifts them at 62398: the disengage
-  walk no longer sends Link back between C16 and C15, explore leaves through A15 to A13 and B13, and Link no longer dies after waiting
+  walk no longer sends Link back between C16 and C15, explore goes up column A to row 13 and reaches D13 (195/0), and Link no longer dies after waiting
   beside a hostile at 4 hp (47/27/8/1 before, 50/50/4/0 now; all 50 calls at 8 hp or less since no death refills the hearts). The guard of flow-101 is gone: a third retreat by the same side within 3000 frames is no longer sent and the
   zero-frame cap waits, where marking the place guarded set the objective aside for an explore; in 27ab that explore found nothing at
   once and the guard answered 547 times in 547 frames (50664-51210, C15) with no model call, until a hit. The model's `guard` or `wait`
