@@ -155,8 +155,9 @@ The skills, protocols and harness behaviours the agent works with. Versioned wit
   session-only one-strike probe of flow-110 (`note_contact`, `probe_choice`, the attack's strike cap from the context) and the
   "no tries in a place that has hurt Link" of flow-107; a type that never hurt Link is tried there again.
 - flow-114: `explore(direction)` is truthful. It takes only untried exits and frontiers on that side of the place, else a route over
-  the known graph to the nearest place with work whose screen lies that way on the map grid (detours allowed; interiors lie nowhere; no
-  pocket or retreat fallback). With neither, it moves nowhere and stops `nothing_toward`, its `cause` naming the nearest work, e.g.
+  the known graph to the nearest place with work whose screen lies that way on the map grid (detours allowed; an interior lies where
+  the screen it opens from lies; no pocket or retreat fallback). Work here keeps every kind explore knows (clearable objects, stone
+  pushes, frontiers), filtered by side. With neither, it moves nowhere and stops `nothing_toward`, its `cause` naming the nearest work, e.g.
   "no untried work toward right; the nearest is on the way to 65-0: the left exit at (4,0)". The direction was only a tie-break in
   the first non-empty candidate class (2c93 98500 and d871 101068: asked right, went left). Explores the harness issues carry no direction.
 - flow-113: no fight without a sword. The harness fights on sight only with the sword on A or B, so explore no longer stops `enemy`

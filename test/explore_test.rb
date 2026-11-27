@@ -319,6 +319,9 @@ class ExploreTest < Minitest::Test
     assert_equal 'no untried work toward right; the nearest is on the way to 0-0: the left exit at (4,0)', right[:cause]
     log.absorb({ from: { room: 2, map: 0 }, exits: [{ row: 2, col: 4, direction: :up, outcome: :left, to: [162, 14], kind: :door }] })
     assert_equal [162, 14], log.route([1, 0], toward: :right)&.dig(:goal), 'an interior lies where the screen it opens from lies'
+    gridless = registry.start('explore', state, { 'direction' => 'right' }, { explore_log: log })
+    20.times { gridless.next_input(state) or break }
+    assert_equal [:no_frontier, 'no grid'], gridless.result(state).values_at(:stopped_by, :cause)
   end
 
   def test_untried_exits_that_cannot_be_reached_yet_send_explore_to_the_frontier_before_another_place

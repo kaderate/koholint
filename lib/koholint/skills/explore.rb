@@ -70,7 +70,7 @@ module Koholint
           @ban = context[:ban]
           @fragile = context[:fragile]
           @retreat = context[:retreat]
-          @hint = direction || @aim[:direction]
+          @hint = @aim[:direction]
           @toward = direction
           @place = @start.place
           @ledger = context[:ledger]
@@ -298,7 +298,7 @@ module Koholint
           unless target
             asked, @toward = @toward, nil
             @route = @dead_end = nil if asked
-            @nearest = asked && candidates(@attempt_from).first&.then { |c| [asked, c, @route] }
+            @nearest = asked && @planner && @attempt_from && candidates(@attempt_from).first&.then { |c| [asked, c, @route] }
             @stop = @nearest ? :nothing_toward : :no_frontier
             return nil
           end
@@ -417,13 +417,13 @@ module Koholint
           path_to = ->(cell) { paths.fetch(cell) { paths[cell] = @planner.path(from:, to: cell) } }
           safe = {}
           safe_to = ->(cell) { safe.fetch(cell) { safe[cell] = @planner.path(from:, to: cell, cross_margin: false) } }
-          return order(toward(from, path_to, safe_to)) if @toward
-
-          clear = clearable(from, safe_to)
+          # Given a direction, work here counts only on that side; routes go only to places that lie that way.
+          side = ->(found) { @toward ? found.select { |c| (c[:opens] || c).then { |aim| aim[:kind] != :door && aim[:direction] == @toward } } : found }
+          clear = side.(clearable(from, safe_to))
           return order(clear) if clear.any?
 
           objects = object_cells
-          frontier = gather(from, safe_to) { |cell, direction| frontier_kind(cell, direction) unless objects.include?(Geometry.step(cell, direction)) }
+          frontier = side.(gather(from, safe_to) { |cell, direction| frontier_kind(cell, direction) unless objects.include?(Geometry.step(cell, direction)) })
           return order(frontier) if frontier.any? && opened?
 
           if @aim[:place] && @aim[:place] != @place
@@ -435,10 +435,10 @@ module Koholint
               return []
             end
           end
-          back, local = untried(from, path_to).partition { |candidate| way_back?(candidate) }
+          back, local = side.(untried(from, path_to)).partition { |candidate| way_back?(candidate) }
           return order(local) if local.any?
 
-          pushed = pushes(untried(from, nil).reject { |candidate| way_back?(candidate) })
+          pushed = side.(pushes(untried(from, nil).reject { |candidate| way_back?(candidate) }))
           return order(pushed) if pushed.any?
 
           return order(frontier) if frontier.any? && (@fresh || untried(from, nil).any? || @log&.untried?(@place))
@@ -451,12 +451,6 @@ module Koholint
           return order(routed) if routed.any?
 
           order(frontier)
-        end
-
-        # Given a direction, explore takes only work on that side here, else a route to the nearest place with work that lies that way.
-        def toward(from, path_to, safe_to)
-          here = (untried(from, path_to) + gather(from, safe_to) { |cell, direction| frontier_kind(cell, direction) }).select { |c| c[:kind] != :door && c[:direction] == @toward }
-          here.any? ? here : routed(from, path_to)
         end
 
         # A side known only as the assumed way back, never crossed, still counts as untried, after every other reachable piece of work here.

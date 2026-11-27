@@ -67,7 +67,7 @@ module Koholint
       SCREEN_WAIT_LIMIT_FRAMES = 300
       SPEAKER_LIMIT = Trace::SPEAKER_MAX
       REVISIT_BUDGET_SHARE = 0.05
-      STUCK_STOPS = %w[no_frontier no_path blocked stalled].freeze
+      STUCK_STOPS = %w[no_frontier no_path blocked stalled nothing_toward].freeze
       STUCK_AT = 6
       ZERO_WAIT = { skill: 'wait', params: { frames: 120 } }.freeze
       DEADLOCK_WAITS = 3
