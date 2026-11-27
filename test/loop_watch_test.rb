@@ -68,4 +68,19 @@ class LoopWatchTest < Minitest::Test
     events << { 'type' => 'decision', 'frame' => 80, 'justification' => 'the heal is over: souvenir-162-14-t64, set aside for it, is taken up again' }
     assert_nil Koholint::LoopWatch.from_events(events).pending_hint
   end
+
+  # Run 27ab, B15-D15 (225/0-227/0): 8 hp from frame 27378, no new place after 26369 and no lead (excerpt of its perceptions, 26369-31100).
+  def test_nothing_changing_for_the_stall_window_is_a_stall_live_and_after_a_resume
+    events = File.foreach(File.join(__dir__, 'fixtures/27ab-one-heart.jsonl')).map { |line| JSON.parse(line) }
+    live = Koholint::LoopWatch.new
+    events.each { |event| live.observe(place: [event['state']['room_id'], 0], frame: event['frame'], hp: event['state']['hp']) if event['state']['game_mode'] == 0x0B }
+    resumed = Koholint::LoopWatch.from_events(events)
+    stall = 27_378 + Koholint::Objectives::STALL_FRAMES
+    assert_equal [[false, true]] * 2, [live, resumed].map { |watch| [watch.stalled?(stall - 1), watch.stalled?(stall)] }
+    resumed = Koholint::LoopWatch.from_events(events + [{ 'type' => 'lead', 'frame' => 30_000 }])
+    refute resumed.stalled?(stall), 'a lead is a change'
+    resumed.observe(place: [225, 0], frame: stall + 700, hp: 4)
+    refute resumed.stalled?(stall + 700), 'so is a hit'
+    refute Koholint::LoopWatch.new.stalled?(stall), 'nothing observed is no stall'
+  end
 end

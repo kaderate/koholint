@@ -222,15 +222,15 @@ module Koholint
         Geometry::DIRECTIONS.any? { |way| @footing_grid.passable(*cell, way) == :yes } && !@footing.hole?(state, cell) && !(@footing_grid.respond_to?(:hole?) && @footing_grid.hole?(*cell))
       end
 
-      # At one heart or less, every enemy contact zone grows by a cell and is never crossed.
-      def low_health? = @start.health.to_i <= Perception::HP_PER_HEART
+      # At one heart or less, every enemy contact zone grows by a cell and is never crossed, until the policy lifts it (context[:unguarded]).
+      def low_health?(context) = !context[:unguarded] && @start.health.to_i <= Perception::HP_PER_HEART
 
       def danger_of(context)
-        margin = Entities::DANGER_MARGIN + (low_health? ? Geometry::CELL : 0)
+        margin = Entities::DANGER_MARGIN + (low_health?(context) ? Geometry::CELL : 0)
         context[:entities] && -> { Entities.danger_cells(Array(context[:entities].call), margin:) }
       end
 
-      def contact_of(context) = low_health? && context[:entities] ? -> { Entities.danger_cells(Array(context[:entities].call)) } : nil
+      def contact_of(context) = low_health?(context) && context[:entities] ? -> { Entities.danger_cells(Array(context[:entities].call)) } : nil
 
       # A step heads away when no enemy within a cell of its touch lies ahead of it, measured from where Link stands when the step starts in his cell.
       def away_of(context)

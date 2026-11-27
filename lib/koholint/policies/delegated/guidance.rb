@@ -70,6 +70,10 @@ module Koholint
             lines << "STUCK: #{STUCK_AT} results in a row here found no frontier, no path or were blocked, without reaching a new cell. The grid may be wrong: " \
                      'try the cells marked doubtful, step onto stairs or narrow gaps from the cell centre, and read the grid against the screen image.'
           end
+          if @unguarded
+            lines << "UNGUARDED: no hp change, no new place and no new lead in #{Objectives::STALL_FRAMES} frames, so the harness no longer keeps Link out of enemy contact zones " \
+                     'or out of the places where one hit would take his hp: walk, step, goto and explore go where you send them.'
+          end
           lines.concat(fresh_puzzles(place).map { |puzzle| puzzle_line(puzzle) })
           lines.concat(puzzle_texts(place, objective:))
         end
@@ -162,7 +166,7 @@ module Koholint
         def autopilot_choice(decision_point, state, context)
           return unless @autopilot && decision_point.name == :choose_skill && !@sequence && !@reading && !hemmed?(state)
 
-          disengage = @autopilot.disengage_choice(state:, entities: entities_now, grid: context[:grid])
+          disengage = @autopilot.disengage_choice(state:, entities: entities_now, grid: context[:grid]) unless @unguarded
           return disengage.tap { @autopilot_acting = true } if disengage
 
           heart = @autopilot.heart_choice(state:, entities: entities_now, grid: context[:grid])
@@ -338,9 +342,9 @@ module Koholint
           goal = (route || away)&.dig(:goal)
           context.merge!(aim: { place: goal }, ban: true) if goal && !route&.dig(:lifted)
           spot = [place, state.cell]
-          low = !goal && state.health <= Perception::HP_PER_HEART
+          low = !goal && !@unguarded && state.health <= Perception::HP_PER_HEART
           @deadlock = nil unless low && @deadlock&.dig(:spot) == spot
-          zone = !goal && state.cell ? Entities.danger_cells(entities_now) : []
+          zone = !goal && state.cell && !@unguarded ? Entities.danger_cells(entities_now) : []
           pressed = ([state.cell] + Geometry::DELTAS.values.map { |dr, dc| [state.cell[0] + dr, state.cell[1] + dc] }).intersect?(zone) if zone.any?
           retreat = @retreated&.dig(:spot) != spot && (pressed || (low && @deadlock && @deadlock[:waits] >= DEADLOCK_WAITS))
           # With the dangerous places the only ways left, or the way back leading into one, the model chooses once per spot, its context listing them;

@@ -1,4 +1,5 @@
 require 'koholint/game_state'
+require 'koholint/objectives'
 
 module Koholint
   class LoopWatch
@@ -14,7 +15,8 @@ module Koholint
       watch = new
       events.each do |event|
         state = event['state'] if event['type'] == 'perception'
-        watch.observe(place: [state['room_id'], state['map_id']], frame: event['frame']) if state && state['game_mode'] == Koholint::PLAY_MODE
+        watch.observe(place: [state['room_id'], state['map_id']], frame: event['frame'], hp: state['hp']) if state && state['game_mode'] == Koholint::PLAY_MODE
+        watch.news!(event['frame']) if event['type'] == 'lead'
         watch.act! if event['type'] == 'decision' && event['justification'].to_s.start_with?(BREAK, HEAL_OVER)
       end
       watch.notes.clear
@@ -35,7 +37,14 @@ module Koholint
 
     def pending_hint = (@hint unless @acted)
 
-    def observe(place:, frame:)
+    def news!(frame) = @changed = frame
+
+    # No hp change, no place never seen and no lead for Objectives::STALL_FRAMES: the protections that keep Link from enemies stop applying.
+    def stalled?(frame) = !@changed.nil? && frame - @changed >= Objectives::STALL_FRAMES
+
+    def observe(place:, frame:, hp: nil)
+      @changed = frame unless @seen[place] && hp == @hp
+      @hp = hp
       return if place == @place
 
       @place = place

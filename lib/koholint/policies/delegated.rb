@@ -184,8 +184,10 @@ module Koholint
         @hold = nil
         @leads.note_held(Items.held_ids(state))
         @explore_log.in_context(Exits.context(state))
-        @explore_log.dangerous = @healers.dangerous(state.health) if state.health
-        context[:fragile] = true if @healers.hit && state.health && state.health <= @healers.hit
+        @unguarded = @loop_watch.stalled?(state.frame)
+        context[:unguarded] = true if @unguarded
+        @explore_log.dangerous = (@unguarded ? [] : @healers.dangerous(state.health)) if state.health
+        context[:fragile] = true if !@unguarded && @healers.hit && state.health && state.health <= @healers.hit
         @zero_watch.in_context(Exits.context(state))
         @explore_log.use_bench(Exits.for_context(@exits, Exits.context(state))) if @exits
         @puzzles_offered = []
@@ -198,6 +200,7 @@ module Koholint
         news = !Array(result[:leads]).empty? || !result[:goal].nil?
         @autopilot&.model_called(state:, objective: @objectives.current, news:) if @asked
         @zero_watch.news! if news
+        @loop_watch.news!(state.frame) unless Array(result[:leads]).empty?
         notes = @revisit.notes + @notes
         @notes = []
         puzzles = @explore_log.new_puzzles(place: state.place, cell: state.cell)
@@ -376,7 +379,7 @@ module Koholint
       end
 
       def refuse_hurtful_attack(choice, state)
-        return unless choice[:skill] == 'attack'
+        return unless choice[:skill] == 'attack' && !@unguarded
 
         params = choice[:params].transform_keys(&:to_sym)
         target = Entities.near(@entities, [params[:row], params[:col]]) or return

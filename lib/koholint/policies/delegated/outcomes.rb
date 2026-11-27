@@ -58,7 +58,7 @@ module Koholint
         def note_loop(state, frame)
           return unless state.game_mode == PLAY_MODE
 
-          @loop_watch.observe(place: state.place, frame:)
+          @loop_watch.observe(place: state.place, frame:, hp: state.hp)
           @notes.concat(@loop_watch.notes)
           @loop_watch.notes.clear
         end

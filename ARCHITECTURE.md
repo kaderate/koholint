@@ -111,7 +111,9 @@ Every policy inherits the no-op hooks of `policies/base.rb` (`observe`, `prepare
   objectives. An invalid answer falls back to a wait; 5 fallbacks in a row stop the run.
 - `policies/start_game.rb` runs the intro and wraps the policy of every CLI run, forwarding the hooks to it.
 - `policies/walk_and_talk.rb` is the deterministic baseline.
-- `loop_watch.rb` and `zero_watch.rb` detect loops across places and skills that keep ending at once.
+- `loop_watch.rb` and `zero_watch.rb` detect loops across places and skills that keep ending at once. The loop watch also dates the
+  last change (hp, a place never seen, a lead); once nothing changed for 3600 frames the policy lifts its protections from enemies
+  (one-heart contact zones, disengage, retreats, dangerous places) until the next change.
 
 **Candidates** — `candidates.rb` builds the `choose_objective` menu: people, signs and unidentified things here, exits and
 doors, chests, known places with untried work, people and signs of other places from their last card, unidentified things

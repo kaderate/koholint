@@ -893,6 +893,29 @@ class DelegatedAutopilotTest < Minitest::Test
     assert_equal [['wait', nil]] * 4, answers.(24), 'above one heart the waits go on'
   end
 
+  # Run 27ab, B15 (225/0) at frame 27430: at 8 hp beside an urchin the autopilot disengaged before the model decided, and the walk
+  # stopped short of the contact zone grown at one heart; this held from 27378 to 52214 with no hp change, no new place and no lead.
+  # Rebuilt from the run's perceptions (26369-31100), it holds for Objectives::STALL_FRAMES, then the model's walk reaches the game.
+  def test_27ab_one_heart_protections_stop_after_the_stall_window_and_the_model_walk_stands
+    events = File.foreach(File.join(__dir__, 'fixtures/27ab-one-heart.jsonl')).map { |line| JSON.parse(line) }
+    client = ScriptedClient.new(objective: new_place, default: walk('left'))
+    @objectives = Koholint::Objectives.new(trace: trace)
+    p = Koholint::Policies::Delegated.new(client:, registry: Koholint::Skills::Registry.default, objectives: @objectives, manual: '',
+                                          autopilot: Koholint::Autopilot.new, memory: Koholint::Policies::Memory.from_events(events))
+    urchin = { slot: 4, type: 197, kind: 'enemy', x: 120, y: 76, cell: [4, 7] }
+    stall = 27_378 + Koholint::Objectives::STALL_FRAMES
+    answers = [stall - 100, stall - 99, stall - 98, stall].map do |frame|
+      now = state(frame:, room_id: 225, map_id: 0, x: 136, y: 60, hp: 8)
+      p.observe(now, frame:)
+      context = { grid:, entities: -> { [urchin] } }
+      result = p.decide(p.decision_point_for(now), now, context)
+      run = Koholint::Skills::Registry.default.fetch('walk').start(now, { direction: 'left', cells: 1 }, context)
+      [result[:justification][/\A(loop in|autopilot: disengage)/] || result[:agent], run.next_input(now)]
+    end
+    assert_equal [['loop in', nil], ['claude', nil], ['autopilot: disengage', nil], ['claude', [:left]]], answers
+    assert_match(/UNGUARDED/, client.calls.last[:prompt])
+  end
+
   # Run 5442, 66/0 at 24 hp: two 120-frame waits beside the type 27s took Link from 24 to 8 hp.
   def test_at_full_health_with_a_hostile_in_touch_explore_leaves_by_the_side_link_came_in_without_waiting
     client = ScriptedClient.new(objective: new_place, default: explore)

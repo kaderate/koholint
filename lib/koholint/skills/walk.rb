@@ -13,7 +13,7 @@ module Koholint
           super(**rest)
           @direction = direction
           @cells = cells
-          @danger = low_health? ? danger_of(context) : nil
+          @danger = low_health?(context) ? danger_of(context) : nil
           @away = away_of(context)
           @position = [@start.x, @start.y]
           @still = 0

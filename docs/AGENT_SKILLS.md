@@ -1,6 +1,6 @@
 # Agent skills
 
-The skills, protocols and harness behaviours the agent works with. Versioned with the play flow (currently `flow-117`): update this page, not the README, when a flow changes. Layers and data flow are in [ARCHITECTURE.md](../ARCHITECTURE.md).
+The skills, protocols and harness behaviours the agent works with. Versioned with the play flow (currently `flow-118`): update this page, not the README, when a flow changes. Layers and data flow are in [ARCHITECTURE.md](../ARCHITECTURE.md).
 
 
 - Learned capabilities (`data/capabilities.json`, `bin/koholint capability list`): an `operational` entry is a composite of the skills below, offered in the skill schema and listed under "Learned skills" only while its trigger item is held (flow-49) and its object is on screen (today `sword_on_object_92 row col direction`: stand next to object 92, face it, use the sword, step into its cell). `explore` and `goto` also run it themselves when blocked facing such a cell, and the planner routes through those cells as a last resort. `learn` and `capability publish|retire` are offline commands.
@@ -106,7 +106,7 @@ The skills, protocols and harness behaviours the agent works with. Versioned wit
   continues with the first option that does not quit (`notable` `death`); a health drop emits a `notable` `damage` and
   the next prompt's health line shows the hearts lost since the last model call. Low health has one rule (flow-68): at one heart or less (`health <= HP_PER_HEART`)
   walk, goto and explore grow every enemy contact zone by a cell, crossed only as a last resort (the contact zone
-  never); the disengage walk below steps away from a near enemy. Six fruitless results in one
+  never); the disengage walk below steps away from a near enemy (both lifted after 3600 frames without change, flow-118). Six fruitless results in one
   place without a new cell emit a `notable` `stuck` and a `STUCK` reset hint; a known place entered 4 times within 3600 frames
   with no new place emits a `notable` `stuck` (`loop: ...`) and a `LOOP` hint until a new place; the harness then explores toward
   the nearest place with untried work outside the loop (flow-66: the loop's places are not aimed at, only crossed) or, when none is left, toward the reachable place entered least outside the loop.
@@ -155,6 +155,15 @@ The skills, protocols and harness behaviours the agent works with. Versioned wit
   context lists it as "hurt Link for N", and a model attack on it is refused at or below its hit. It replaces two rules: the
   session-only one-strike probe of flow-110 (`note_contact`, `probe_choice`, the attack's strike cap from the context) and the
   "no tries in a place that has hurt Link" of flow-107; a type that never hurt Link is tried there again.
+- flow-118: the protections that keep Link from enemies hold only while something changes: an hp change, a place never seen or a new
+  lead (`LoopWatch#stalled?`, rebuilt from the trace's perceptions and leads on a resume or a fork). After `Objectives::STALL_FRAMES`
+  (3600) frames with none, they stop applying until the next change: walk, goto and explore no longer grow the contact zones at one
+  heart (no `danger` stop, no route refused for the contact zones alone), the autopilot no longer disengages, the zero-frame cap no
+  longer retreats, no place is barred as one whose measured hit would take Link's hp (no route ban, no `held_back`, no prompt line),
+  explore's hold at the lineage hit is off, and a model attack on a type that hurt Link is no longer refused; the prompt says so in an
+  `UNGUARDED` line. 27ab (flow-115) spent 24,836 frames and 13.76 USD (411 calls) at one heart on B15-D15 from frame 27378 with none
+  of these changes, and the disengage walk undid the model's steps toward an enemy (51899-51956) while it planned a game over to
+  restore its hearts.
 - flow-117: the harness no longer makes an objective of a person whose recorded text names an item Link holds (flow-97: talk to them
   holding it, then `use_item`); no run, fork or gate ever fired it. Such a person stays a `person-` or `need-` candidate the model may pick,
   and a souvenir naming a held item is still taken up by the harness (flow-102).
