@@ -152,18 +152,17 @@ class RevisitTest < Minitest::Test
     assert act
   end
 
-  def test_new_leads_reopen_people_without_spending_the_stamps_of_the_visit
-    stamps = (0..4).map { |leads| ['shield', [4], leads] }
+  # b32c (flow-112) 17294-19387: new leads reopened Marine and Tarkin in 163/16 four times, every text already read (2093 frames).
+  def test_new_leads_do_not_reopen_people_whose_texts_ran_out_but_an_item_does
+    stamps = (0..2).map { |leads| ['shield', [4], leads] }
     act(entities: [people.first], stamp: stamps[0])
     2.times do
       say(62, 'Hello there.', stamp: stamps[0])
       act(entities: [people.first], stamp: stamps[0])
     end
     assert_nil act(entities: [people.first], stamp: stamps[0])
-    stamps.drop(1).each do |stamp|
-      assert_equal 62, act(entities: [people.first], stamp:)[:npc][:type]
-      2.times { say(62, 'Hello there.', stamp:) }
-    end
+    stamps.drop(1).each { |stamp| assert_nil act(entities: [people.first], stamp:) }
+    assert_equal 62, act(entities: [people.first], stamp: ['shield', [4, 12], 2])[:npc][:type]
   end
 
   def test_a_moving_creature_next_to_link_does_not_block_the_engagement

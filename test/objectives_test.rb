@@ -100,18 +100,32 @@ class ObjectivesTest < Minitest::Test
   def test_stall_abandons
     start({ kind: 'reach_place', place: [7, 8] })
     assert_nil @objectives.update(state(frame: 10), frame: 10)
-    assert_nil @objectives.update(state(frame: 109), frame: 109)
-    assert_equal :abandoned, @objectives.update(state(frame: 110), frame: 110)
+    assert_nil @objectives.update(state(frame: 99, x: 90), frame: 99)
+    assert_equal :abandoned, @objectives.update(state(frame: 100, x: 40), frame: 100)
     assert_equal 'stall', events.last['reason']
     assert_nil @objectives.current
+  end
+
+  # b32c (flow-112) obj-7 at 13322: "reach D12 column 9" walked C11, C12, D11 and D12 for 6364 frames, never closed, and held the autopilot.
+  def test_only_a_new_place_a_new_text_or_a_shorter_route_to_its_place_keeps_an_objective
+    @objectives.update(state(frame: 0, room: 9), frame: 0)
+    start({ kind: 'reach_place', place: [7, 8] })
+    @objectives.update(state(frame: 1, room: 9), frame: 1, distance: 3)
+    assert_nil @objectives.update(state(frame: 80, room: 10), frame: 80, distance: 2), 'a shorter route'
+    assert_nil @objectives.update(state(frame: 170, room: 9), frame: 170, distance: 3), 'a known place again'
+    assert @objectives.note_text('A text never read before')
+    assert_nil @objectives.update(state(frame: 260, room: 11), frame: 260, distance: 3), 'a new text at 170 is progress'
+    assert_nil @objectives.update(state(frame: 330, room: 12), frame: 330), 'a place never visited'
+    assert_equal :abandoned, @objectives.update(state(frame: 430, room: 9, dialog: 134), frame: 430, distance: 3)
+    assert_equal 'stall', events.last['reason']
   end
 
   def test_open_dialogue_with_animating_counter_stalls
     start({ kind: 'reach_place', place: [7, 8] })
     @objectives.update(state(frame: 1, dialog: 134), frame: 1)
     assert_nil @objectives.update(state(frame: 60, dialog: 137), frame: 60)
-    assert_nil @objectives.update(state(frame: 100, dialog: 140), frame: 100)
-    assert_equal :abandoned, @objectives.update(state(frame: 101, dialog: 141), frame: 101)
+    assert_nil @objectives.update(state(frame: 99, dialog: 140), frame: 99)
+    assert_equal :abandoned, @objectives.update(state(frame: 100, dialog: 141), frame: 100)
     assert_equal 'stall', events.last['reason']
   end
 
@@ -123,20 +137,6 @@ class ObjectivesTest < Minitest::Test
     @objectives.record_attempt(skill: 'wait', params: {}, result_summary: 'ok')
     assert_equal :abandoned, @objectives.update(state(frame: 3, dialog: 137), frame: 3)
     assert_equal 'loop', events.last['reason']
-  end
-
-  def test_dialogue_opening_counts_as_a_change
-    start({ kind: 'reach_place', place: [7, 8] })
-    @objectives.update(state(frame: 1), frame: 1)
-    assert_nil @objectives.update(state(frame: 90, dialog: 134), frame: 90)
-    assert_nil @objectives.update(state(frame: 150, dialog: 140), frame: 150)
-  end
-
-  def test_change_resets_stall
-    start({ kind: 'reach_place', place: [7, 8] })
-    @objectives.update(state(frame: 10), frame: 10)
-    assert_nil @objectives.update(state(frame: 100, x: 48), frame: 100)
-    assert_nil @objectives.update(state(frame: 199, x: 48), frame: 199)
   end
 
   def test_loop_abandons_after_window
@@ -193,8 +193,6 @@ class ObjectivesTest < Minitest::Test
   def test_update_without_current_is_nil
     assert_nil @objectives.update(state, frame: 1)
   end
-
-  def blocked(row: 3, col: 4, direction: 'up') = { row:, col:, direction: }
 
   def test_new_place_not_achieved_in_starting_place
     start({ kind: 'new_place' })
@@ -304,95 +302,6 @@ class ObjectivesTest < Minitest::Test
     assert_equal :achieved, objectives.update(state(room: 1), frame: 2)
   end
 
-  def test_six_same_pair_blocks_abandon_reach_cell
-    target = { kind: 'reach_cell', place: [1, 2], row: 0, col: 0 }
-    start(target)
-    5.times { assert_nil @objectives.note_blocked(blocked_at: blocked, target:) }
-    assert_equal :abandoned, @objectives.note_blocked(blocked_at: blocked, target:)
-    done = events.last
-    assert_equal ['abandoned', 'unreachable'], [done['status'], done['reason']]
-    assert_equal 2, events.size
-  end
-
-  def test_mixed_blocks_total_eight_abandons_reach_cell_with_one_terminal_event
-    target = { kind: 'reach_cell', place: [1, 2], row: 0, col: 0 }
-    start(target)
-    7.times { |i| assert_nil @objectives.note_blocked(blocked_at: blocked(col: i), target:) }
-    assert_equal :abandoned, @objectives.note_blocked(blocked_at: blocked(col: 8), target:)
-    assert_equal 'unreachable', events.last['reason']
-    assert_nil @objectives.note_blocked(blocked_at: blocked, target:)
-    assert_equal 2, events.size
-  end
-
-  def test_other_kinds_survive_any_number_of_blocked_results
-    [{ kind: 'leave_place', place: [1, 2] }, { kind: 'reach_place', place: [1, 2] }, { kind: 'new_place' }, { kind: 'dialogue_closed' }].each do |target|
-      start(target)
-      20.times { |i| assert_nil @objectives.note_blocked(blocked_at: blocked(col: i % 3), target:) }
-      assert @objectives.current
-      @objectives.abandon(frame: 1, reason: 'x')
-    end
-  end
-
-  def test_leave_place_abandons_after_six_no_path_with_one_terminal_event
-    start({ kind: 'leave_place', place: [1, 2] })
-    5.times { |i| assert_nil @objectives.note_no_path(frame: i) }
-    assert_equal :abandoned, @objectives.note_no_path(frame: 6)
-    assert_equal 'unreachable', events.last['reason']
-    assert_nil @objectives.note_no_path(frame: 7)
-    assert_equal 2, events.size
-  end
-
-  def test_reach_cell_abandons_after_three_no_path
-    start({ kind: 'reach_cell', place: [1, 2], row: 0, col: 0 })
-    2.times { |i| assert_nil @objectives.note_no_path(frame: i) }
-    assert_equal :abandoned, @objectives.note_no_path(frame: 3)
-    assert_equal 2, events.size
-  end
-
-  def test_mixed_blocks_on_reach_cell_do_not_trip_pairs
-    target = { kind: 'reach_cell', place: [1, 2], row: 0, col: 0 }
-    start(target)
-    7.times { |i| assert_nil @objectives.note_blocked(blocked_at: blocked(col: i % 2), target:) }
-  end
-
-  def test_same_pair_only_counts_for_reach_cell
-    target = { kind: 'leave_place', place: [1, 2] }
-    start(target)
-    7.times { assert_nil @objectives.note_blocked(blocked_at: blocked, target:) }
-  end
-
-  def test_block_counters_reset_on_new_objective
-    target = { kind: 'reach_cell', place: [1, 2], row: 0, col: 0 }
-    start(target)
-    5.times { @objectives.note_blocked(blocked_at: blocked, target:) }
-    start(target, frame: 1)
-    5.times { assert_nil @objectives.note_blocked(blocked_at: blocked, target:) }
-  end
-
-  def test_unreachable_event_carries_the_passed_frame
-    target = { kind: 'reach_cell', place: [1, 2], row: 0, col: 0 }
-    start(target)
-    7.times { |i| @objectives.note_blocked(blocked_at: blocked(col: i), target:, frame: 50) }
-    @objectives.note_blocked(blocked_at: blocked(col: 8), target:, frame: 77)
-    assert_equal 77, events.last['frame']
-  end
-
-  def test_note_blocked_accepts_string_keys_and_directions
-    target = { 'kind' => 'reach_cell', 'place' => [1, 2], 'row' => 0, 'col' => 0 }
-    start(target)
-    3.times { @objectives.note_blocked(blocked_at: { 'row' => 3, 'col' => 4, 'direction' => 'up' }, target:) }
-    2.times { @objectives.note_blocked(blocked_at: { row: 3, col: 4, direction: :up }, target:) }
-    assert_equal :abandoned, @objectives.note_blocked(blocked_at: { 'row' => 3, 'col' => 4, 'direction' => :up }, target:)
-    assert_equal 'unreachable', events.last['reason']
-  end
-
-  def test_reach_cell_abandons_at_eight_mixed_blocks
-    target = { kind: 'reach_cell', place: [1, 2], row: 0, col: 0 }
-    start(target)
-    7.times { |i| assert_nil @objectives.note_blocked(blocked_at: blocked(col: i), target:) }
-    assert_equal :abandoned, @objectives.note_blocked(blocked_at: blocked(col: 7), target:)
-  end
-
   def test_visits_are_recorded_without_an_active_objective
     start({ kind: 'new_place' })
     @objectives.update(state, frame: 1)
@@ -401,23 +310,6 @@ class ObjectivesTest < Minitest::Test
     start({ kind: 'new_place' }, frame: 4)
     assert_nil @objectives.update(state(room: 9), frame: 5)
     assert_equal :achieved, @objectives.update(state(room: 5), frame: 6)
-  end
-
-  def test_no_path_abandons_as_unreachable_at_the_sixth
-    start({ kind: 'reach_place', place: [7, 8] })
-    5.times { |i| assert_nil @objectives.note_no_path(frame: i) }
-    assert_equal :abandoned, @objectives.note_no_path(frame: 6)
-    assert_equal 'unreachable', events.last['reason']
-    assert_nil @objectives.note_no_path(frame: 7)
-    assert_equal 1, events.count { |e| e['status'] == 'abandoned' }
-  end
-
-  def test_no_path_counter_resets_with_a_new_objective
-    start({ kind: 'reach_place', place: [7, 8] })
-    2.times { @objectives.note_no_path(frame: 1) }
-    @objectives.abandon(frame: 2, reason: 'x')
-    start({ kind: 'reach_place', place: [7, 8] })
-    2.times { assert_nil @objectives.note_no_path(frame: 3) }
   end
 
   def test_repeated_talking_loops_despite_the_dialogue_opening_and_closing

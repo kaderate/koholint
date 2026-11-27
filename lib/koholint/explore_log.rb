@@ -347,6 +347,8 @@ module Koholint
 
     def walked(place) = @walked.fetch(place, []).dup
 
+    def walked_count = @walked.sum { |_, cells| cells.size }
+
     def known?(place) = @known.include?(place)
 
     def surveyed?(place) = @surveys.key?(place) && !@surveys[place][:provisional]

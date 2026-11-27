@@ -246,11 +246,56 @@ class DelegatedPolicyTest < Minitest::Test
     client = ScriptedClient.new(objective: [objective(kind: 'reach_place', place: [1, 2])] * 2, skill: [walk] * 2)
     p = policy(client)
     hemmed(p)
-    @objectives.abandon(frame: 200, reason: 'stall')
+    @objectives.abandon(frame: 200, reason: 'loop')
     _point, result = decide(p)
     assert_equal 'claude', result[:agent]
     assert @objectives.current
     assert_equal 'claude', decide(p).last[:agent]
+  end
+
+  # b32c: a model-set reach_cell that never closed could be written again for a fresh stall window.
+  def test_an_objective_abandoned_for_stall_is_refused_with_its_cause_for_a_stall_window
+    client = ScriptedClient.new(objective: [objective(kind: 'reach_place', place: [1, 2])] * 3)
+    p = policy(client)
+    decide(p)
+    @objectives.abandon(frame: 200, reason: 'stall')
+    refused = decide(p, state(frame: 300)).last
+    assert refused[:refused], refused.inspect
+    assert_equal 'obj-1 had this predicate and was abandoned at frame 200: no new place, no new text, no shorter route and no new cell in 3600 frames; choose a different objective', refused[:justification]
+    assert_includes client.calls.last[:prompt], 'obj-1 abandoned (stall: no new place, no new text, no shorter route and no new cell in 3600 frames): go'
+    assert_nil @objectives.current
+    refute decide(p, state(frame: 3800)).last[:fallback]
+    assert_equal 'obj-2', @objectives.current[:id]
+    explore = { 'kind' => 'new_place' }
+    p = policy(ScriptedClient.new(objective: ok('title' => 'go', 'predicate' => explore)))
+    @objectives.start(frame: 100, title: 'go', predicate: explore)
+    @objectives.abandon(frame: 200, reason: 'stall')
+    refute decide(p, state(frame: 300)).last[:fallback], 'a predicate naming no place is not the same objective elsewhere'
+  end
+
+  # no-sword-225 (flow-115 4e39): the harness's explore objective names no place and expired at 42114 while explore walked 48 new cells of
+  # A16, A15 and A14 (240/0, 224/0, 208/0) on its way to 194/0, reached at 42701.
+  def test_an_objective_lives_on_a_shorter_route_to_its_place_or_when_it_names_none_on_cells_never_walked
+    log = Koholint::ExploreLog.new
+    log.absorb({ from: { room: 1, map: 0 }, survey: { sides: { right: [{ row: 4, col: 9 }] }, doors: [] }, exits: [{ row: 4, col: 9, direction: :right, outcome: :left, to: [2, 0] }] })
+    log.absorb({ from: { room: 2, map: 0 }, survey: { sides: { left: [{ row: 4, col: 0 }], right: [{ row: 4, col: 9 }] }, doors: [] },
+                 exits: [{ row: 4, col: 0, direction: :left, outcome: :left, to: [1, 0] }, { row: 4, col: 9, direction: :right, outcome: :left, to: [3, 0] }] })
+    live = lambda do |predicate, explore_log, rooms, &walk|
+      @objectives = Koholint::Objectives.new(trace:, visited: [[1, 0], [2, 0], [3, 0]])
+      p = Koholint::Policies::Delegated.new(client: ScriptedClient.new, registry: Koholint::Skills::Registry.default, objectives: @objectives, manual: '',
+                                            memory: Koholint::Policies::Memory.new(explore_log:))
+      @objectives.start(frame: 100, title: 'go', predicate:)
+      [100, 3000, 3700].zip(rooms).each do |frame, room|
+        walk&.call(explore_log, frame)
+        p.observe(state(frame:, room_id: room, map_id: 0), frame:)
+      end
+      @objectives.current ? :kept : @objectives.history.last[:reason]
+    end
+    reach = { 'kind' => 'reach_place', 'place' => [3, 0] }
+    assert_equal [:kept, 'stall'], [log, Koholint::ExploreLog.new].map { |explore_log| live.(reach, explore_log, [1, 2, 2]) }
+    new_place = { 'kind' => 'new_place' }
+    walked = live.(new_place, Koholint::ExploreLog.new, [2, 2, 2]) { |explore_log, frame| explore_log.walk([2, 0], [3, frame / 1000]) }
+    assert_equal [:kept, 'stall'], [walked, live.(new_place, log, [2, 2, 2])]
   end
 
   def test_dialogue_closed_is_rejected_while_no_dialogue_is_open
@@ -599,26 +644,6 @@ class DelegatedPolicyTest < Minitest::Test
     assert_equal 'automatic dialogue advance', again[:justification]
   end
 
-  def test_a_dialogue_does_not_stall_the_objective_and_a_stuck_one_is_still_bounded
-    p = policy(ScriptedClient.new(objective: objective, skill: ok('skill' => 'wait', 'params' => { 'frames' => 3 })), stall_frames: 1800)
-    decide_with_shot(p, state(frame: 100))
-    @objectives.update(state(frame: 100), frame: 100)
-    at = state(frame: 1899, **OPEN)
-    @objectives.update(at, frame: 1899)
-    result = decide_with_shot(p, at)
-    advance(p, result, at, 1929)
-    assert @objectives.current
-    pages(p, 39, from: 1929)
-    capped = state(frame: 3100, **OPEN)
-    decide_with_shot(p, capped)
-    @objectives.update(capped, frame: 3100)
-    assert @objectives.current
-    @objectives.update(capped, frame: 3100 + 1799)
-    assert @objectives.current
-    @objectives.update(capped, frame: 3100 + 1800)
-    assert_nil @objectives.current
-  end
-
   def test_pages_pending_at_an_objective_tour_are_kept_for_the_next_skill_tour
     client = ScriptedClient.new(objective: [objective, objective], skill: ok('skill' => 'wait', 'params' => { 'frames' => 3 }, 'transcription' => "One\n\nTwo\n\nFresh"))
     p = policy(client)
@@ -961,14 +986,13 @@ class DelegatedPolicyTest < Minitest::Test
     assert_includes client.calls.last[:prompt], "Link has been locked for #{frame - 100} frames (cause unknown)"
   end
 
-  def test_leaving_the_locked_phase_resets_the_cap_and_touches_the_objective
+  def test_leaving_the_locked_phase_resets_the_cap
     client = ScriptedClient.new(objective: objective, skill: walk)
     p = policy(client)
     decide(p)
     p.observe(state(frame: 100, **LOCKED), frame: 100)
     p.observe(state(frame: 1000, **LOCKED), frame: 1000)
     p.observe(state(frame: 1010), frame: 1010)
-    assert_equal 1010, @objectives.last_change_frame
     p.observe(state(frame: 1100, **LOCKED), frame: 1100)
     calls = client.calls.size
     assert_equal 'locked: waiting for Link to be free', locked_step(p, 1100)[:justification]

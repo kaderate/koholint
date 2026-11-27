@@ -71,13 +71,11 @@ module Koholint
             unless @locked_since
               @locked_since = state.frame
               @scene_since = state.frame unless @released_at && state.frame - @released_at < SETTLE_FRAMES
-              @objectives.touch(frame: state.frame)
             end
           elsif @locked_since && !state.loading?
             @settle_until = state.frame + [state.frame - @scene_since, SETTLE_FRAMES].min if state.phase == :playing && locked_frames(state).positive?
             @released_at = state.frame
             @locked_since = nil
-            @objectives.touch(frame: state.frame)
           end
         end
 

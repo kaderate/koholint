@@ -25,7 +25,6 @@ module Koholint
 
           @sequence[:waited] = true
           @waiting = true
-          @objectives.touch(frame: state.frame)
           DecisionPoint.harness_choice(REOPEN_WAIT, 'automatic dialogue advance: waiting for the dialogue to reopen')
         end
 
@@ -36,14 +35,12 @@ module Koholint
             @flushes = @flushes.to_i + 1
             @flushing = @flushes == 1
             @agent_driven = true unless @flushing
-            @objectives.touch(frame: state.frame)
             return
           end
           rgb = context[:dialogue_rgb]&.call or return
           unless @sequence
             @sequence = { pages: [], rows: [], start: state.frame, place: state.place, source: @talk_source, contact: @contact }
             @contact = nil
-            @objectives.touch(frame: state.frame)
           end
           @sequence[:last] = state.frame
           @sequence[:waited] = false
@@ -134,7 +131,6 @@ module Koholint
           speaker = @talk_log.speaker_for(conversation)
           @page = @sequence[:pages].size
           @sequence = nil
-          @objectives.touch(frame: state.frame)
           entries = pages.each_with_index.map { |text, i| page_entry(text, i + 1, speaker:, cached: true) }
           @reading = { transcription: entries }
           remember_text(entries, state)

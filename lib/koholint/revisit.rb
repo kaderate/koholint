@@ -161,7 +161,8 @@ module Koholint
     def pending?(place, entity, stamp, world, people, visit)
       entry = @npcs[[place, entity[:type], stamp]]
       return false if entry[:rounds] >= ROUND_CAP || @failures[[visit[:id], entity[:type]]] >= FAILURE_CAP
-      return true unless @talk_log.status(place:, entity: entity[:type], stamp: world) == :exhausted
+      # Once a person's texts ran out, only a milestone or an item reopens them, not a lead.
+      return true unless @talk_log.status(place:, entity: entity[:type], stamp: world) == :exhausted || (@talk_log.last_status(place:, entity: entity[:type]) == :exhausted && !@talk_log.stale?(place:, entity: entity[:type], stamp: world))
 
       people.count { |other| other[:type] == entity[:type] } > 1 && !entry[:slots].include?(entity[:slot])
     end
