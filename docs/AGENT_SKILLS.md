@@ -145,7 +145,7 @@ The skills, protocols and harness behaviours the agent works with. Versioned wit
   it is still a frontier, taken when nothing else here is reachable, before a route to another place. An explore that stops `no_frontier`
   in at most one frame is answered by the harness at the next decision, not after three, since from the same cell it would find none again.
 - flow-111: damage teaches hostility, as typed data. A `hurts` fact on a data/entities.json entry (value = hit, `confidence`,
-  `verified_count`, `source`; written offline from the entity census, never by a run) and the run's own evidence,
+  `verified_count`, `source`; nothing in `lib/` writes it) and the run's own evidence,
   a `notable` of kind `hurt` when an action ends with an hp drop (the drop is its hit; rebuilt from the lineage trace on a resume or a
   fork): of everything within the census window (8 px across, 16 px down or up), the nearest takes it if its type already hurt, and
   otherwise only if Link is not within a cell of the reach of an enemy (catalogued, or a type that already hurt) and it is of kind
