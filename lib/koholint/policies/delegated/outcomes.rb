@@ -63,25 +63,15 @@ module Koholint
           @loop_watch.notes.clear
         end
 
-        def note_no_path(choice, outcome, frame)
-          return unless PATH_SKILLS.include?(choice[:skill]) && outcome[:stopped_by].to_s == 'no_path' && @objectives.current
-
-          track { @objectives.note_no_path(frame:) }
-        end
-
         def note_refusal(error, choice)
           choice = {} unless choice.is_a?(Hash)
           @refusals << { reason: error.message, title: choice[:title], predicate: choice[:predicate] }
           @refusals.shift while @refusals.size > REFUSAL_LIMIT
         end
 
-        def feed_ledger(choice, outcome, state, frame, objective: true)
+        def feed_ledger(choice, outcome, state)
           place = place_of(outcome, :from, state)
           Ledger.edges_of(outcome).each { |edge| @ledger.record(place:, blocked_at: edge) }
-          blocked_at = outcome[:blocked_at]
-          if blocked_at && objective
-            track { @objectives.note_blocked(blocked_at:, target: @objectives.current&.dig(:predicate), frame:) } if @objectives.current
-          end
           note_entered(choice, outcome, place)
           @ledger.reset_unless(state.place) unless state.loading?
         end

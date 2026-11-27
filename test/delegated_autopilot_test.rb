@@ -1328,7 +1328,7 @@ class DelegatedAutopilotTest < Minitest::Test
     @objectives.start(frame: 100, title: 'Go talk', predicate: { kind: 'reach_place', place: [9, 0] }, candidate: 'person-9-0-t70',
                       target: { kind: 'person', place: [9, 0], type: 70, cell: [1, 1] })
     @objectives.update(holding, frame: 101)
-    assert_equal :abandoned, @objectives.update(holding, frame: 2000)
+    assert_equal :abandoned, @objectives.update(holding, frame: 3700)
     refute_includes offered.(), 'person-9-0-t70'
     p.instance_variable_get(:@explore_log).absorb({ from: { room: 163, map: 16 }, exits: [{ row: 0, col: 5, direction: :up, outcome: :left, to: [9, 0] }] })
     assert_includes offered.(), 'person-9-0-t70', 'a route to it reopens it'

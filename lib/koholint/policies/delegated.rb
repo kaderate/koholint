@@ -174,7 +174,7 @@ module Koholint
         note_loop(state, frame)
         @revisit.observe(state)
         note_open_chest(state)
-        track { @objectives.update(state, frame:) }
+        update_objective(state, frame)
         note_puzzle_entry(state)
       end
 
@@ -319,7 +319,7 @@ module Koholint
         @flushes = 0 if state.phase == :playing
         if @auto || @locked_wait
           @auto = @locked_wait = false
-          return track { @objectives.update(state, frame:) }
+          return update_objective(state, frame)
         end
         revisiting = @revisit_acting && choice[:skill] == 'talk_to'
         @revisit.talked(outcome) if revisiting
@@ -332,22 +332,28 @@ module Koholint
         note_talk_source(choice, outcome)
         note_chest_attempt(choice, outcome, state)
         note_try(choice, outcome, state)
-        feed_ledger(choice, outcome, state, frame, objective: !revisiting)
+        feed_ledger(choice, outcome, state)
         opened = feed_triggers(choice, outcome, state)
         feed_talk_log(choice, outcome, state)
         @explore_log.note(outcome, frame:)
         @explore_log.absorb(outcome, frame:) if choice[:skill] == 'explore'
         @skipped = { place: Ledger.place_of(outcome[:from]), vias: Array(outcome[:unreachable]) } if choice[:skill] == 'explore'
-        note_no_path(choice, outcome, frame) unless revisiting
         note_stuck(outcome, state)
         unless @waiting || revisiting
           @objectives.record_attempt(skill: choice[:skill], params: choice[:params], result_summary: "#{'(autopilot) ' if autopiloted}#{summary(outcome, opened)}")
         end
         @waiting = false
-        track { @objectives.update(state, frame:) }
+        update_objective(state, frame)
       end
 
       def offered_candidates = Candidates.offered(@candidates, @candidate)
+
+      def update_objective(state, frame)
+        current = @objectives.current
+        goal = current&.dig(:target, :place) || (current&.dig(:predicate, :place) if %w[reach_place reach_cell].include?(current&.dig(:predicate, :kind).to_s))
+        @distance = [state.place, goal, goal && @explore_log.path(state.place, goal:, ban: false)&.size] unless @distance&.first(2) == [state.place, goal]
+        track { @objectives.update(state, frame:, distance: @distance.last) }
+      end
 
       # A learned capability is offered only while its item is held and its object is on screen; attack only while the sword is on A or B.
       def offer_learned(room_objects, held, armed: false)
@@ -489,7 +495,6 @@ module Koholint
           @read_at = @sequence.slice(:start, :place, :source, :contact).merge(conversation: (Vision::DialogueShot.signature(@sequence[:rows]) unless state.dialog_open?))
           @sequence = nil
           @page = @pages_read
-          @objectives.touch(frame: state.frame)
           @prompt += "\nDialogue pages attached: #{@pages_read} pages. Transcribe them in transcription, one paragraph per page separated by a blank line."
           @prompt += "\nThe harness is talking to the people here again until they repeat themselves: your skill choice is replaced by the next talk." if revisit_candidate(state)
         elsif state.phase == :dialogue && decision_point.name == :choose_skill

@@ -599,26 +599,6 @@ class DelegatedPolicyTest < Minitest::Test
     assert_equal 'automatic dialogue advance', again[:justification]
   end
 
-  def test_a_dialogue_does_not_stall_the_objective_and_a_stuck_one_is_still_bounded
-    p = policy(ScriptedClient.new(objective: objective, skill: ok('skill' => 'wait', 'params' => { 'frames' => 3 })), stall_frames: 1800)
-    decide_with_shot(p, state(frame: 100))
-    @objectives.update(state(frame: 100), frame: 100)
-    at = state(frame: 1899, **OPEN)
-    @objectives.update(at, frame: 1899)
-    result = decide_with_shot(p, at)
-    advance(p, result, at, 1929)
-    assert @objectives.current
-    pages(p, 39, from: 1929)
-    capped = state(frame: 3100, **OPEN)
-    decide_with_shot(p, capped)
-    @objectives.update(capped, frame: 3100)
-    assert @objectives.current
-    @objectives.update(capped, frame: 3100 + 1799)
-    assert @objectives.current
-    @objectives.update(capped, frame: 3100 + 1800)
-    assert_nil @objectives.current
-  end
-
   def test_pages_pending_at_an_objective_tour_are_kept_for_the_next_skill_tour
     client = ScriptedClient.new(objective: [objective, objective], skill: ok('skill' => 'wait', 'params' => { 'frames' => 3 }, 'transcription' => "One\n\nTwo\n\nFresh"))
     p = policy(client)
@@ -961,14 +941,13 @@ class DelegatedPolicyTest < Minitest::Test
     assert_includes client.calls.last[:prompt], "Link has been locked for #{frame - 100} frames (cause unknown)"
   end
 
-  def test_leaving_the_locked_phase_resets_the_cap_and_touches_the_objective
+  def test_leaving_the_locked_phase_resets_the_cap
     client = ScriptedClient.new(objective: objective, skill: walk)
     p = policy(client)
     decide(p)
     p.observe(state(frame: 100, **LOCKED), frame: 100)
     p.observe(state(frame: 1000, **LOCKED), frame: 1000)
     p.observe(state(frame: 1010), frame: 1010)
-    assert_equal 1010, @objectives.last_change_frame
     p.observe(state(frame: 1100, **LOCKED), frame: 1100)
     calls = client.calls.size
     assert_equal 'locked: waiting for Link to be free', locked_step(p, 1100)[:justification]

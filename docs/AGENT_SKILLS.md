@@ -1,6 +1,6 @@
 # Agent skills
 
-The skills, protocols and harness behaviours the agent works with. Versioned with the play flow (currently `flow-114`): update this page, not the README, when a flow changes. Layers and data flow are in [ARCHITECTURE.md](../ARCHITECTURE.md).
+The skills, protocols and harness behaviours the agent works with. Versioned with the play flow (currently `flow-115`): update this page, not the README, when a flow changes. Layers and data flow are in [ARCHITECTURE.md](../ARCHITECTURE.md).
 
 
 - Learned capabilities (`data/capabilities.json`, `bin/koholint capability list`): an `operational` entry is a composite of the skills below, offered in the skill schema and listed under "Learned skills" only while its trigger item is held (flow-49) and its object is on screen (today `sword_on_object_92 row col direction`: stand next to object 92, face it, use the sword, step into its cell). `explore` and `goto` also run it themselves when blocked facing such a cell, and the planner routes through those cells as a last resort. `learn` and `capability publish|retire` are offline commands.
@@ -61,8 +61,9 @@ The skills, protocols and harness behaviours the agent works with. Versioned wit
   no target is left, health is below 2 hearts or a heart below its level at the last call, an attack stops any other
   way (a room change is one: `room_change` ends the chain), or after 8 attacks or 900 frames since that call (checked
   before each attack, so the last one may run past it). The viewer counts no autopilot decision as an objective attempt.
-- A ledger counts blocked edges per place; an edge blocked twice is marked doubtful in the context, and an objective
-  that keeps failing is abandoned as `unreachable`.
+- A ledger counts blocked edges per place; an edge blocked twice is marked doubtful in the context. An objective lives while it
+  makes measured progress (flow-115): a place never visited, a text never read, or a new shortest known route to its place; after
+  3600 frames without any it is abandoned (`stall`) and the model chooses again with the facts.
 - Dialogue pages are advanced automatically (one `decision` with agent `delegated` and cost 0 per page) and read once
   from page sheets.
 - The agent writes a one-line `plan` that the next call sees; the live view shows its reasoning and plan under each
@@ -154,6 +155,12 @@ The skills, protocols and harness behaviours the agent works with. Versioned wit
   context lists it as "hurt Link for N", and a model attack on it is refused at or below its hit. It replaces two rules: the
   session-only one-strike probe of flow-110 (`note_contact`, `probe_choice`, the attack's strike cap from the context) and the
   "no tries in a place that has hurt Link" of flow-107; a type that never hurt Link is tried there again.
+- flow-115: an objective expires on no measured progress, and leads no longer reopen people. Progress is a place never visited, a
+  text never read, or a new shortest known route (hops over the explore log) to the objective's place; after 3600 frames without any
+  the objective is abandoned `stall`. It replaces the stall on an unchanged position (1800 frames), the keep-alive of dialogues and
+  locked phases, and the `unreachable` counts of blocked results and `no_path` stops. A person whose last talk left their texts
+  exhausted is not talked to again by the harness until a milestone or an item changes. b32c (flow-112): obj-7 "reach D12 column 9"
+  lived 6364 frames over C11, C12, D11 and D12, and new leads reopened Marine and Tarkin four times (2093 frames, texts already read).
 - flow-114: `explore(direction)` is truthful. It takes only untried exits and frontiers on that side of the place, else a route over
   the known graph to the nearest place with work whose screen lies that way on the map grid (detours allowed; an interior lies where
   the screen it opens from lies; no pocket or retreat fallback). Work here keeps every kind explore knows (clearable objects, stone
@@ -337,7 +344,8 @@ The skills, protocols and harness behaviours the agent works with. Versioned wit
   keeps their memory.
 - On arrival in a place, before the model is called, people and signs are engaged deterministically (`revisit.rb`, no
   model call to decide it): when a verified `npc` of the current place is not exhausted for the current world stamp
-  (milestone, items held, number of high and normal leads; a place visited does not count) or a verified sign was never read, the policy issues `talk_to` itself (agent `delegated`,
+  (milestone, items held, number of high and normal leads; a place visited does not count; once a person's texts ran out, only a
+  milestone or an item reopens them, flow-115) or a verified sign was never read, the policy issues `talk_to` itself (agent `delegated`,
   cost 0), lets the pages advance, and repeats until two conversations in a row are identical or give nothing new (a sign is read once), at
   most 6 rounds per person, 2 per sign, 1800 frames of free play per stamp and 2700 per visit (frames spent in
   dialogue pages or locked are not counted, so long dialogues never cut it short), 3 stamps per visit (counted by milestone and items, not leads), or 2 failed

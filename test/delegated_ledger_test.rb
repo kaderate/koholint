@@ -87,19 +87,6 @@ class DelegatedLedgerTest < Minitest::Test
     refute_equal [:right], run.next_input(state)
   end
 
-  def test_unreachable_abandons_the_objective_and_the_next_tour_asks_for_an_objective
-    cell = reach_cell(1, 4)
-    p = policy(ScriptedClient.new(objective: cell, skill: walk, default: walk))
-    context = { grid: free_grid(cells: Array.new(8) { Array.new(10) { 'mystery' } }) }
-    p.decide(p.decision_point_for(state), state, context)
-    assert @objectives.current
-    Koholint::Objectives::UNREACHABLE_PAIRS.times { |i| block(p, frame: 101 + i) }
-    assert_nil @objectives.current
-    assert_equal 1, @objectives.history.count { |h| h[:outcome] == :abandoned }
-    assert_equal 'unreachable', @objectives.history.last[:reason]
-    assert_equal :choose_objective, p.decision_point_for(state).name
-  end
-
   def test_a_place_change_clears_the_ledger
     p = policy(ScriptedClient.new(objective: objective(kind: 'reach_place', place: [1, 2]), skill: walk, default: walk))
     ledger = p.instance_variable_get(:@ledger)
@@ -149,23 +136,6 @@ class DelegatedLedgerTest < Minitest::Test
     refute ledger.doubtful?(PLACE, [3, 4], :right)
     assert ledger.doubtful?(PLACE, [2, 6], :down)
     assert_equal 0, ledger.count(PLACE, [3, 5], :right)
-  end
-
-  def test_talk_to_no_path_counts_but_no_response_does_not_and_the_summary_shows_the_talk
-    @objectives = NoPathObjectives.new(trace:)
-    p = Koholint::Policies::Delegated.new(client: ScriptedClient.new(objective: reach_cell(1, 9), skill: walk), registry: Koholint::Skills::Registry.default,
-                                          objectives: @objectives)
-    p.decide(p.decision_point_for(state), state, { grid: unknown_grid })
-    params = { row: 2, col: 5 }
-    sealed = { skill: 'talk_to', params:, stopped_by: 'no_path', cause: 'no reachable cell next to the target', moved_cells: 0, talked: false }
-    p.after_action(choice: { skill: 'talk_to', params: }, outcome: sealed, state:, frame: 140)
-    assert_equal [140], @objectives.no_paths
-    quiet = { skill: 'talk_to', params:, stopped_by: 'no_response', moved_cells: 1, talked: false, standing_cell: { row: 1, col: 5 } }
-    p.after_action(choice: { skill: 'talk_to', params: }, outcome: quiet, state:, frame: 150)
-    assert_equal [140], @objectives.no_paths
-    attempt = @objectives.attempts_for_prompt.last
-    assert_includes attempt, 'talked false'
-    assert_includes attempt, 'standing_cell (1,5)'
   end
 
   def test_talk_to_blocked_or_target_free_is_not_a_talk_attempt
@@ -233,31 +203,21 @@ class DelegatedLedgerTest < Minitest::Test
     assert_nil context[:grid]
   end
 
-  class NoPathObjectives < Koholint::Objectives
-    attr_reader :no_paths
-
-    def note_no_path(frame:) = (@no_paths = [*@no_paths, frame]).then { nil }
-  end
-
-  def test_no_path_results_are_reported_to_the_objectives_and_summarised_with_their_cause
-    @objectives = NoPathObjectives.new(trace:)
+  def test_no_path_results_are_summarised_with_their_cause
+    @objectives = Koholint::Objectives.new(trace:)
     p = Koholint::Policies::Delegated.new(client: ScriptedClient.new(objective: reach_cell(1, 9), skill: walk), registry: Koholint::Skills::Registry.default,
                                           objectives: @objectives)
     p.decide(p.decision_point_for(state), state, { grid: unknown_grid })
     outcome = { skill: 'goto', params: { row: 1, col: 9 }, stopped_by: 'no_path', cause: 'target is sealed', moved_cells: 0,
                 blocked_at: { row: 3, col: 5, direction: :right } }
     p.after_action(choice: { skill: 'goto', params: outcome[:params] }, outcome:, state:, frame: 140)
-    assert_equal [140], @objectives.no_paths
     attempt = @objectives.attempts_for_prompt.last
     assert_includes attempt, 'blocked_at (3,5) right'
     assert_includes attempt, 'cause target is sealed'
-    walked = { skill: 'walk', params: { direction: 'up', cells: 1 }, stopped_by: 'done', moved_cells: 1 }
-    p.after_action(choice: { skill: 'walk', params: walked[:params] }, outcome: walked, state:, frame: 150)
-    assert_equal [140], @objectives.no_paths
   end
 
-  def test_explore_results_feed_the_explore_log_the_ledger_and_the_no_path_count
-    @objectives = NoPathObjectives.new(trace:)
+  def test_explore_results_feed_the_explore_log_and_the_ledger
+    @objectives = Koholint::Objectives.new(trace:)
     log = Koholint::ExploreLog.new
     p = Koholint::Policies::Delegated.new(client: ScriptedClient.new(objective: reach_cell(1, 9), skill: walk), registry: Koholint::Skills::Registry.default,
                                           objectives: @objectives, memory: Koholint::Policies::Memory.new(explore_log: log))
@@ -269,7 +229,6 @@ class DelegatedLedgerTest < Minitest::Test
     outcome = { skill: 'explore', params: {}, stopped_by: :no_frontier, moved_cells: 0, from:, to: from, blocked_at: nil, cells_walked: 2,
                 place_changed: false, blocked_edges: [edge, edge], exits: [{ row: 7, col: 5, direction: :down, outcome: :left }], offered: [], tried_exits: [] }
     p.after_action(choice: { skill: 'explore', params: {} }, outcome:, state:, frame: 140)
-    assert_nil @objectives.no_paths
     assert log.tried?(PLACE, [7, 5], :down)
     assert p.instance_variable_get(:@ledger).doubtful?(PLACE, [3, 5], :right)
     assert_includes @objectives.attempts_for_prompt.last, 'cells walked 2, place_changed false, exits already tried none'

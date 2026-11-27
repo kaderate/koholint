@@ -14,10 +14,7 @@ module Koholint
     TARGET_KINDS = %w[exit door person sign chest examine place lead].freeze
 
     ATTEMPT_LIMIT = 10
-    UNREACHABLE_PAIRS = 6
-    UNREACHABLE_TOTAL = 8
-    UNREACHABLE_NO_PATH = 3
-    UNREACHABLE_NO_PATH_SEARCH = 6
+    STALL_FRAMES = 3600
 
     def self.normalize(predicate)
       predicate.to_h.transform_keys(&:to_sym)
@@ -56,7 +53,7 @@ module Koholint
       objectives
     end
 
-    def initialize(trace:, stall_frames: 1800, loop_window: 12, counter: 0, visited: [], texts: [])
+    def initialize(trace:, stall_frames: STALL_FRAMES, loop_window: 12, counter: 0, visited: [], texts: [])
       @texts = texts.map { |text| Dialogues.key(text) }
       @trace = trace
       @stall_frames = stall_frames
@@ -75,7 +72,7 @@ module Koholint
       id = "obj-#{@counter}"
       extra = { because:, candidate:, target:, autopilot: (true if autopilot) }.compact
       @current = { id:, title:, predicate: self.class.normalize(predicate), started_frame: frame, attempts: [], **extra }
-      @signature = nil
+      @closest = nil
       @last_change_frame = frame
       @seen_alive = false
       @dialogue_seen = false
@@ -86,9 +83,6 @@ module Koholint
       @last_key = nil
       @last_state_part = nil
       @last_frame = frame
-      @blocked_total = 0
-      @no_path = 0
-      @blocked_pairs = Hash.new(0)
       @trace.emit(:objective, frame:, id:, status: 'started', title:, predicate: @current[:predicate], **extra)
       id
     end
@@ -99,6 +93,7 @@ module Koholint
 
       @texts << key
       @new_text = true if @current
+      @last_change_frame = @last_frame if @current
       true
     end
 
@@ -141,11 +136,8 @@ module Koholint
       @last_key = key
     end
 
-    def touch(frame:)
-      @last_change_frame = frame if @current
-    end
-
-    def update(state, frame:)
+    # An objective lives while it makes measured progress: a place never visited, a text never read, or a new shortest route to its place.
+    def update(state, frame:, distance: nil)
       return nil if state.loading?
 
       playing = %i[playing locked dialogue].include?(state.phase)
@@ -158,40 +150,15 @@ module Koholint
       cell = state.cell
       position = cell || [:px, state.x, state.y]
       @last_state_part = [place, position]
-      signature = [place, position, state.dialog_open?, state.hp]
-      if signature != @signature
-        @signature = signature
-        @last_change_frame = frame
-      end
+      closer = playing && distance && (@closest.nil? || distance < @closest)
+      @closest = distance if closer
+      @last_change_frame = frame if first_visit || closer
       @dialogue_seen ||= state.dialog_open?
 
       return finish(:failed, frame:) if died?(state)
       return finish(:achieved, frame:) if achieved?(state, place, cell, first_visit)
       return finish(:abandoned, frame:, reason: 'loop') if @repeat >= @loop_window
       return finish(:abandoned, frame:, reason: 'stall') if frame - @last_change_frame >= @stall_frames
-
-      nil
-    end
-
-    def note_blocked(blocked_at:, target:, frame: @last_frame)
-      return nil unless @current
-
-      cell = self.class.normalize(blocked_at)
-      pair = [cell[:row], cell[:col], cell[:direction].to_s]
-      @blocked_total += 1
-      @blocked_pairs[pair] += 1
-      return nil unless self.class.normalize(target)[:kind].to_s == 'reach_cell'
-      return finish(:abandoned, frame:, reason: 'unreachable') if @blocked_pairs[pair] >= UNREACHABLE_PAIRS || @blocked_total >= UNREACHABLE_TOTAL
-
-      nil
-    end
-
-    def note_no_path(frame: @last_frame)
-      return nil unless @current
-
-      @no_path += 1
-      limit = @current[:predicate][:kind].to_s == 'reach_cell' ? UNREACHABLE_NO_PATH : UNREACHABLE_NO_PATH_SEARCH
-      return finish(:abandoned, frame:, reason: 'unreachable') if @no_path >= limit
 
       nil
     end
