@@ -44,12 +44,6 @@ module Scoreboard
       [state['room_id'], state['map_id']] if event['type'] == 'perception' && state.is_a?(Hash) && state['game_mode'] == PLAY_MODE
     end
 
-    def read_json(path)
-      JSON.parse(File.read(path))
-    rescue SystemCallError, JSON::ParserError
-      {}
-    end
-
     def fork_frame(manifest) = manifest['parent'].is_a?(Hash) ? manifest['parent']['frame'].to_i : 0
 
     def death?(event) = event['type'] == 'notable' && event['kind'] == 'death'
@@ -57,7 +51,7 @@ module Scoreboard
     # The progress vector counts the whole run, inherited prefix included; cost, deaths, stalls and rules count the run's own segment.
     # A run measured from `start` (its fork frame unless given): places seen before it are not new, and stalls count from it.
     def segment(dir, start: nil)
-      manifest = read_json(File.join(dir, 'manifest.json'))
+      manifest = Koholint::Summary.read_json(File.join(dir, 'manifest.json'))
       start ||= fork_frame(manifest)
       events = Koholint::Trace.read(File.join(dir, 'trace.jsonl'))
       before = events.filter_map { |event| place_of(event) if event['frame'].to_i < start }.to_set
@@ -74,7 +68,7 @@ module Scoreboard
       usd = decisions.sum { |event| event['cost_usd'].to_f }
       deaths = own.count { |event| death?(event) }
       per = ->(count) { frames.positive? ? (1000.0 * count / frames).round(3) : nil }
-      progress = progress(events, read_json(File.join(dir, 'summary.json')))
+      progress = progress(events, Koholint::Summary.read_json(File.join(dir, 'summary.json')))
       {
         run: File.basename(dir), tag: manifest['tag'], flow: manifest['flow_version'], harness_sha: manifest['harness_sha'].to_s[0, 8],
         harness_dirty: manifest['harness_dirty'] || false, parent: parent.slice('id', 'frame'), frames:, progress:,

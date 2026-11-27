@@ -140,7 +140,7 @@ module Scoreboard
       pid = spawn_run(command(koholint, 'run', *shared), started)
       dir = nil
       (appear / 0.1).ceil.times do
-        dir = (Dir.glob(File.join(root, '*')) - before).find { |path| Runs.read_json(File.join(path, 'manifest.json'))['tag'] == tag }
+        dir = (Dir.glob(File.join(root, '*')) - before).find { |path| Koholint::Summary.read_json(File.join(path, 'manifest.json'))['tag'] == tag }
         break if dir || !alive?(pid)
 
         sleep 0.1
@@ -176,7 +176,7 @@ module Scoreboard
     end
 
     def watcher(dir, settings, now: clock)
-      start = Measure.fork_frame(Runs.read_json(File.join(dir, 'manifest.json')))
+      start = Measure.fork_frame(Koholint::Summary.read_json(File.join(dir, 'manifest.json')))
       Supervisor.new(trace: File.join(dir, 'trace.jsonl'), **settings.slice(:max_seconds, :max_deaths, :stall), start:, now:)
     end
 
