@@ -121,7 +121,7 @@ text in another branch names an item Link holds, in place of that person's own c
 
 **Objectives and leads** — `objectives.rb`: a short goal with a predicate the harness checks from memory (`leave_place`,
 `reach_place`, `reach_cell`, `dialogue_closed`, `new_place`, `new_text`, …); the engine traces started, achieved, abandoned and
-failed. The agent's long-term `goal` is its own text. `leads.rb` holds claims the agent quotes from texts it read, with a status
+failed. An objective with no measured progress (a place, a text or a shorter known route to its place, else a cell never walked) for 3600 frames is abandoned `stall`. The agent's long-term `goal` is its own text. `leads.rb` holds claims the agent quotes from texts it read, with a status
 derived from the objectives that followed them, and the place names; `lead_check.rb` drops a lead that names an item the text
 does not (the walkthrough rule), withholds the claim of one naming a person, role or thing of `data/vocabulary.json` that no
 text read names, and `koholint check-leads` audits traces for it.
@@ -131,7 +131,7 @@ results, plan), `prompts.rb` holds the system prompts, `claude_cli.rb` calls `cl
 and latency.
 
 **Run storage** — `run.rb`: `runs/<id>/` holds `manifest.json` (flow version, ROM hash, harness sha and dirty flag, model,
-autopilot, capabilities and exits digests, souvenirs cutoff and digest), `inputs.log`, `trace.jsonl` (events validated by `trace.rb`), `keyframes/`,
+autopilot, capabilities and exits digests, souvenirs cutoff and digest), `inputs.log`, `trace.jsonl` (events validated by `trace.rb`; a model `decision` under the autopilot carries `autopilot_hold`), `keyframes/`,
 `save/`, `screens/` (one capture per place, observability only), `world.json` (`goal`, `leads`, `places`, `pickups`), `summary.json`
 (written by `summary.rb` from the trace at every stop), `activity.json`, `suggestions.md`, `star.json` and `notes.md`; `prompts/` (what the agent saw at each decision, local only) and `run.lock` are not part of the run's content.
 `budget.rb` enforces frames, minutes, dollars and steps. `archive.rb` keeps a light bundle per run in git. A run resumes only
@@ -157,7 +157,7 @@ writes game state; it writes only `star.json`, `summary.json`'s `starred`, `note
 `prune-heavy`, `atlas`, `souvenirs`, `census`, `ab-plan` and `ab-report` (`ab.rb`), `check-leads`, `check-pickups`, `learn`, `capability` and
 `bench exits`. `docs/OPERATING.md` documents each.
 
-**Measurement tools** (`tools/`, offline, outside `lib/`) — `tools/gates/` forks three checkpoint runs, plays each for 12000 frames with a stub in place of the model and compares five numbers (calls, calls at 8 hp or less, hp lost, deaths, first delivery) with `tools/gates/expected.json` for the current `FLOW_VERSION`; `test/gates_test.rb` fails while a flow has no numbers. `tools/scoreboard/` measures how far a run got and what it cost (progress vector, rates, harness rules fired), plays the standard run within a daily dollar cap, computes the pit index and alerts on the guardrails. Their commands and fields are in their READMEs.
+**Measurement tools** (`tools/`, offline, outside `lib/`) — `tools/gates/` forks each checkpoint run of `gates.json`, plays it for 12000 frames with a stub in place of the model and compares five numbers (calls, calls at 8 hp or less, hp lost, deaths, first delivery) with `tools/gates/expected.json` for the current `FLOW_VERSION`; `test/gates_test.rb` fails while a flow has no numbers. `tools/scoreboard/` measures how far a run got and what it cost (progress vector, rates, harness rules fired), plays the standard run within a daily dollar cap, computes the pit index and alerts on the guardrails. Their commands and fields are in their READMEs.
 
 ## Data flow of one decision
 
