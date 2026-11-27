@@ -1,6 +1,6 @@
 # Agent skills
 
-The skills, protocols and harness behaviours the agent works with. Versioned with the play flow (currently `flow-116`): update this page, not the README, when a flow changes. Layers and data flow are in [ARCHITECTURE.md](../ARCHITECTURE.md).
+The skills, protocols and harness behaviours the agent works with. Versioned with the play flow (currently `flow-117`): update this page, not the README, when a flow changes. Layers and data flow are in [ARCHITECTURE.md](../ARCHITECTURE.md).
 
 
 - Learned capabilities (`data/capabilities.json`, `bin/koholint capability list`): an `operational` entry is a composite of the skills below, offered in the skill schema and listed under "Learned skills" only while its trigger item is held (flow-49) and its object is on screen (today `sword_on_object_92 row col direction`: stand next to object 92, face it, use the sword, step into its cell). `explore` and `goto` also run it themselves when blocked facing such a cell, and the planner routes through those cells as a last resort. `learn` and `capability publish|retire` are offline commands.
@@ -155,6 +155,9 @@ The skills, protocols and harness behaviours the agent works with. Versioned wit
   context lists it as "hurt Link for N", and a model attack on it is refused at or below its hit. It replaces two rules: the
   session-only one-strike probe of flow-110 (`note_contact`, `probe_choice`, the attack's strike cap from the context) and the
   "no tries in a place that has hurt Link" of flow-107; a type that never hurt Link is tried there again.
+- flow-117: the harness no longer makes an objective of a person whose recorded text names an item Link holds (flow-97: talk to them
+  holding it, then `use_item`); no run, fork or gate ever fired it. Such a person stays a `person-` or `need-` candidate the model may pick,
+  and a souvenir naming a held item is still taken up by the harness (flow-102).
 - flow-116: a model's own objective no longer switches off the harness's exit taking. An objective naming a place (`reach_place`,
   `reach_cell`, `leave_place`) that the model wrote itself, with no candidate, lives only on a place never visited: 1800 frames
   without one (from its start or its last new place) and it is abandoned `stall` ("no new place in 1800 frames"); a shorter route, a
@@ -235,7 +238,7 @@ The skills, protocols and harness behaviours the agent works with. Versioned wit
   name of an item Link holds, by flow-97's rule or a name of `data/items.json` that the item's observed pickup text quotes, read by
   someone who did not hold it, from a person this lineage never heard say it nor talked to holding the item, at a place this lineage's
   own routes reach, becomes candidate `souvenir-<place>-t<type>`: its label quotes the text as a souvenir of another playthrough, never
-  heard in this one, and its target is flow-97's delivery (talk holding the item, then use it). It takes the slot of the candidate for
+  heard in this one, and its target is a delivery: talk holding the item, then use it; only that item used after the talk ends the objective. It takes the slot of the candidate for
   the same place and person or thing; with none it joins the people here or ends the list. Souvenirs appear nowhere else in the context
   and never count as texts read for leads. A picked candidate whose target is still to try is not refused for its place being reached.
   A pickup name is the capitalised words right after an article in the first sentence; one letter is no name, and a text opened more
@@ -252,10 +255,7 @@ The skills, protocols and harness behaviours the agent works with. Versioned wit
   the same rule rebuilds it from the trace on resume). After a gain, the people and unidentified things of other places this lineage
   never read are all candidates past the cap of four, nearest first, then those of places no known route reaches yet, nearest on the
   map; without a gain the cap holds. A candidate no known route reaches whose objective stalled is not offered again until a route to
-  it appears. At an objective choice, a person whose recorded text holds that name as whole words in a row, and
-  who never talked with Link holding the item, becomes the objective (picked by the harness): Link talks to them holding it, then the
-  harness uses it facing them; only that item used after the talk ends the objective. It is picked again for that person only once
-  Link read a new text from them or a route to them appeared. A step of explore a hostile knocked Link back from just before it failed
+  it appears. A step of explore a hostile knocked Link back from just before it failed
   (`knocked_edges` in the result) is barred for that call only: it is no wall, no blocked edge and no tried exit, and the place's work
   stays pending; from the third knock on that step in one visit it is learned like any failed step.
 - flow-96: an examine- objective is achieved only once the thing at its place is tried: talk_to first, then touch when the talk drew

@@ -100,7 +100,6 @@ module Koholint
         @talk_log = memory.talk_log
         @item_names = memory.item_names.dup
         @pending_gains = []
-        @item_tries = memory.item_tries.dup
         @stalled = memory.stalled.dup
         @revisit = revisit || Revisit.new(talk_log: @talk_log)
         @entities = []
@@ -262,9 +261,6 @@ module Koholint
 
           remembered = souvenir_objective(decision_point, state, context)
           return remembered if remembered
-
-          wanted = item_objective(decision_point, state)
-          return wanted if wanted
 
           auto = auto_objective(decision_point, state)
           return auto if auto

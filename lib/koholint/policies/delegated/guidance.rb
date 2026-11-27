@@ -389,33 +389,6 @@ module Koholint
           DecisionPoint.harness_choice(EXPLORE, "#{place.join('-')} is guarded (#{RETREAT_CAP} retreats in #{RETREAT_WINDOW} frames): explore #{route ? "toward #{route[:goal].join('-')}" : 'elsewhere'}", autopilot: true)
         end
 
-        # A person whose recorded text names an item Link holds, by the words of its pickup text, is tried with it: talk while holding it,
-        # then use it; tried again only once Link read a new text from them or a route to them appeared.
-        def item_objective(decision_point, state)
-          return unless decision_point.name == :choose_objective && !@puzzle_ask
-
-          hops = @explore_log.hops(state.place)
-          held = Items.held_ids(state)
-          @item_names.each do |item, words|
-            next unless held.include?(item)
-
-            seen = ->(where, who) { [@talk_log.talks_with(where, who).size, where == state.place || hops.key?(where)] }
-            place, type, cell = @talk_log.mentioning(words).find do |where, who, _|
-              seen.(where, who)[1] && !@talk_log.talked_holding?(where, who, item) && @item_tries[[item, where, who]] != seen.(where, who)
-            end
-            next unless place
-
-            @item_tries[[item, place, type]] = seen.(place, type)
-            who = @talk_log.name_of(place, type) || "person (type #{type})"
-            objective = { title: "Bring the #{words.join(' ')} to #{who}"[0, 80], predicate: { kind: 'reach_place', place: },
-                          target: { kind: 'person', place:, type:, cell:, try: true, item:, name: words.join(' '), seen: seen.(place, type) } }
-            @objectives.start(frame: state.frame, **objective, autopilot: true)
-            @autopilot&.adopt(@objectives.current)
-            return DecisionPoint.harness_choice(objective.slice(:title, :predicate), "autopilot: #{who} in #{place.join('-')} named the #{words.join(' ')} Link holds; talk with it held, then use it", autopilot: true)
-          end
-          nil
-        end
-
         # A reachable souvenir naming a held item by its pickup text is taken up like a lineage text, once; a drop is re-offered by the rules above.
         def souvenir_objective(decision_point, state, context)
           return unless decision_point.name == :choose_objective && !@puzzle_ask && @souvenirs.any?

@@ -124,7 +124,7 @@ module Koholint
       key = Dialogues.key(text)
       return if key.empty? || !cell.all?(Integer)
 
-      @texts << { place:, cell:, key:, words: Dialogues.words(text), stamp:, entity:, conversation:, speaker: }.compact
+      @texts << { place:, cell:, key:, stamp:, entity:, conversation:, speaker: }.compact
     end
 
     def store_pages(conversation, pages)
@@ -185,12 +185,6 @@ module Koholint
     end
 
     def talks_with(place, type) = @texts.select { |talk| talk[:place] == place && talk[:entity] == type }
-
-    # The people whose recorded texts hold these words in a row, as whole words: [place, type, cell], once each.
-    def mentioning(words)
-      @texts.select { |talk| talk[:entity] && TalkLog.names?(talk[:words], words) }
-            .map { |talk| [talk[:place], talk[:entity], talk[:cell]] }.uniq { |place, type, _| [place, type] }
-    end
 
     # Whether a text's words hold the name words in a row, as whole words.
     def self.names?(text_words, words)
