@@ -151,5 +151,51 @@
     "trials": [],
     "verdict": "Failed as a way out of the stall, because the creature is not what closes it. Type 197 (the urchin of B15 and C15) is pushable by one method: hold the shield (B) and walk straight into it. It then moves at about 1 px per 6 frames (1 px in 5 frames, 3 in 20, 9-10 in 60, 15-29 in 180 until something stops it) with no hp lost. With no shield, B alone, idle or a diagonal it moves 0-6 px, and Link loses 4 hp from the third frame. This holds on 2 root lineages, each with a no-shield control, so it is verified. Type 205 is not an urchin: it is the palm-top sprite at the four corners of D15, it hurts nobody, and its cells are solid with or without the slot. The left pocket of D15 is closed by the room objects 92 (0x5C) at (3,2) and (4,2). No push, with or without the shield, moved them or changed room_objects in 192 trials, and Link stops at x 28 on both lineages. So no push reaches the door, and a push fact cannot shrink this stall.",
     "evidence": "Census on throwaway copies of keyframes (RAM write to place Link, the entity census rule; not a capability trial). The probe is handoffs/KOHO-184/push_probe.rb in the Captain drive. Lineage roots from Bench.lineage_root: 20261127-224058-4fc2 and 20261127-134720-27ab, both from boot, so 2 lineages. States: 4fc2 at 48600 (B15, type 197 at (2,3)), 45000 (C15, 197 at (5,2)) and 46800 (D15, 205 at (1,0) and (5,0), objects at (3,2) and (4,2)); 27ab at 36000 (B15, 197 at (2,3)), 34200 (C15, 197 at (5,2)) and 39600 (D15, the same targets). Every target got 48 trials: each side x shield raised or lowered x held for 5, 20, 60 and 180 frames then 30 released, plus B alone and idle (60 frames) per side, and 4 diagonals x shield (60 frames). Each entity trial was repeated on a control copy with the slot cleared (the same cell with no creature). Type 197, shield and straight, on all 4 targets: 0-1 / 3 / 9-10 / 15-29 px at 5 / 20 / 60 / 180 frames, hp 0 on B15 (the C15 hits come from the second urchin at (6,2), present in the control too). With no shield: 0 px every time, hp -4 at frame 3, then -8 by 180 frames. B alone and idle: 0 px. Diagonal: at most 6 px, -4 hp in 7 of 8. In the control, Link walks 5 / 20 / 32-61 px in the same holds, so the push slows him to about a sixth of his walking speed, and the 0-4 px pushes seen in KOHO-150/167 are holds of 20 frames or less. Type 205 and objects 92: 0 px and 0 hp in every valid trial. Trials that put Link outside the room are dropped (12-14 per palm). Played position with no RAM write (4fc2 at 46800, Link at (24,80); 27ab at 39600, Link at (11,70)), each of 8 directions x B for 90 frames, with and without the four 205 slots: identical motion in 31 of 32 rows (the other is a 3 px difference during the scroll into C15). Moving right stops at x 28, against the objects. Cost: 0 USD, no model call, about 105,000 emulated frames, about 10 min of wall time on 2 processes."
+  },
+  {
+    "id": "4fc2-palm-tops-never-move",
+    "kind": "skill",
+    "stall": {
+      "run": "20261127-224058-4fc2",
+      "from": 43344,
+      "to": 49367,
+      "class": "direction"
+    },
+    "status": "testing",
+    "change": "The context lists a creature that data/entities.json catalogues as verified and never moving (type 205, the palm tops of D15's left pocket) as \"gives no dialogue, not an enemy, never moves\" instead of only \"gives no dialogue\" (flow-118, #139).",
+    "trials": [
+      {
+        "run": "20261127-224058-4fc2",
+        "arm": "baseline",
+        "from": 43344,
+        "frames": 2034,
+        "usd": 0.9733,
+        "calls": 28,
+        "new_places": 1,
+        "longest_stall": 2034
+      },
+      {
+        "run": "20261128-001351-f9c4",
+        "arm": "baseline",
+        "from": 43344,
+        "frames": 6048,
+        "usd": 0.2155,
+        "calls": 9,
+        "new_places": 1,
+        "longest_stall": 6048
+      },
+      {
+        "run": "20261128-001351-eb06",
+        "arm": "candidate",
+        "from": 43344,
+        "frames": 11993,
+        "usd": 0.9588,
+        "calls": 31,
+        "new_places": 3,
+        "longest_stall": 4480
+      }
+    ],
+    "verdict": null,
+    "evidence": "Target: in 4fc2 (KOHO-183), 24 of the 28 model calls in D15 (227/0) were walk and step pushes into the type-205 palm tops at (5,0), (5,1) and (1,0), which the model took for the urchins of the shield tip; 27ab and its KOHO-182 fork did the same. Pair (KOHO-185, 4fc2 at 43344, 1 fork per arm, 0.95 USD each, main 4e8b1e60 against d5c503ce): the resume drops the open harness objective, so both forks ask the model at 43344 and leave the recorded path at once. The main fork went from B14 (209/0) to A14 (208/0) without being hit, wandered column A at 8 hp for only 14 frames and was stopped by the stall guard at 6048 frames (0.22 USD, 0 places beyond B13). The flow-118 fork stayed in B14 until 46939, then went B15, A15, A16 and reached B16 (241/0) and C16 (242/0), with one death and 9 calls at 8 hp over 2386 frames (3.8 per 1000) against 16.5 for the recorded segment. The pre-registered criterion is met by the numbers, but the change never acted: neither fork entered D15 and none of the candidate's 31 prompts carries the new text, so the gain is fork variance, not this change. It stays testing until a fork that reaches D15's left pocket compares the two arms."
   }
 ]

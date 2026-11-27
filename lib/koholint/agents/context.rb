@@ -158,7 +158,7 @@ module Koholint
 
         listed = shown.map do |entity|
           what = if entity[:hurt] then "hurt Link for #{entity[:hurt]}"
-                 elsif entity[:kind].to_s == 'creature' then 'gives no dialogue'
+                 elsif entity[:kind].to_s == 'creature' then entity[:verified] && entity[:moves] == false ? 'gives no dialogue, not an enemy, never moves' : 'gives no dialogue'
                  else 'not identified'
                  end
           "type #{entity[:type]} at (#{entity[:cell][0]},#{entity[:cell][1]}) (#{what})"
